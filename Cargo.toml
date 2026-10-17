@@ -1,3 +1,19 @@
 [workspace]
 resolver = "3"
 members = ["packages/emulator"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+authors = [
+  "Kevin Schärer <dev@mineiwik.dev>",
+  "Simon Berger <simon@siku2.io>",
+]
+license = "MIT"
+repository = "https://github.com/dsg-jam/ld60-game"
+readme = "README.md"
+publish = false
+
+[workspace.dependencies]
+emulator = { path = "packages/emulator" }
