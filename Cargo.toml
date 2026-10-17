@@ -17,3 +17,10 @@ publish = false
 
 [workspace.dependencies]
 emulator = { path = "packages/emulator" }
+
+[workspace.lints.rust]
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+arbitrary_source_item_ordering = "warn"
+mod_module_files = "warn"
