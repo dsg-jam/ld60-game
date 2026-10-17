@@ -18,7 +18,7 @@ calco = { path = "packages/calco" }
 machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.229", default-features = false }
 
 [workspace.lints.rust]
 unreachable_pub = "warn"

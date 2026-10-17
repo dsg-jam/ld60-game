@@ -1,3 +1,10 @@
+//! Building blocks shared by the emulated chips: CPU and bus traits, RAM,
+//! program images and assembly listings.
+//!
+//! # Features
+//!
+//! - `serde`: implements `Serialize` and `Deserialize` for [`StuckBit`].
+
 mod assembly;
 mod bus;
 mod cpu;

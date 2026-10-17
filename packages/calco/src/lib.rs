@@ -1,4 +1,9 @@
 //! CalCo calculator coprocessor. See `docs/isa/calco.md`.
+//!
+//! # Features
+//!
+//! - `serde`: implements `Serialize` and `Deserialize` for the chip
+//!   description types.
 
 mod chip;
 mod cpu;

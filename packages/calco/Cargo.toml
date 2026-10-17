@@ -15,7 +15,7 @@ serde = ["dep:serde", "machine/serde"]
 [dependencies]
 asm = { workspace = true }
 machine = { workspace = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
 
 [lints]
 workspace = true
