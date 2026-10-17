@@ -1,0 +1,16 @@
+[package]
+name = "game"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+readme = { workspace = true }
+publish = { workspace = true }
+
+[dependencies]
+bevy = { workspace = true, features = ["3d", "audio", "ui"] }
+
+[lints]
+workspace = true

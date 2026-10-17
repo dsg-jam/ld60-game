@@ -19,6 +19,8 @@ publish = false
 asm = { path = "packages/asm" }
 calco = { path = "packages/calco" }
 machine = { path = "packages/machine" }
+
+bevy = { version = "0.20.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 
 [workspace.lints.rust]
