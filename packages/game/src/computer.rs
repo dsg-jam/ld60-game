@@ -79,7 +79,11 @@ impl Computer {
             bulge: monitor::GLASS_BULGE,
         };
         commands
-            .spawn((Transform::default(), Visibility::default()))
+            .spawn((
+                Name::new("computer"),
+                Transform::default(),
+                Visibility::default(),
+            ))
             .with_children(|parent| {
                 layout.monitor.spawn(
                     parent,

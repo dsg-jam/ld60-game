@@ -82,6 +82,7 @@ impl Editor {
                 ),
                 (
                     Editor,
+                    Name::new("editor"),
                     Node {
                         flex_grow: 1.0,
                         ..default()

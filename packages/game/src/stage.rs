@@ -14,7 +14,11 @@ impl Plugin for StagePlugin {
 }
 
 fn spawn_stage(mut commands: Commands) {
-    commands.spawn((Camera3d::default(), Computer::new().overview()));
+    commands.spawn((
+        Name::new("camera"),
+        Camera3d::default(),
+        Computer::new().overview(),
+    ));
     commands.spawn((
         DirectionalLight {
             illuminance: 4_000.0,

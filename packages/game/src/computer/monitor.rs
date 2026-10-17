@@ -68,7 +68,7 @@ impl Monitor {
         glass: impl Bundle,
     ) {
         parent
-            .spawn((transform, Visibility::default()))
+            .spawn((Name::new("monitor"), transform, Visibility::default()))
             .with_children(|monitor| {
                 monitor.spawn(Shape::cylinder(&self.stand, CASE_DARK));
                 monitor.spawn(Shape::cuboid(&self.body, CASE));

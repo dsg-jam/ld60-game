@@ -204,7 +204,7 @@ impl Keyboard {
         labels: Handle<Image>,
     ) {
         parent
-            .spawn((transform, Visibility::default()))
+            .spawn((Name::new("keyboard"), transform, Visibility::default()))
             .with_children(|keyboard| {
                 keyboard.spawn(Shape::cuboid(&self.base, CASE_DARK));
                 for key in &self.keys {
