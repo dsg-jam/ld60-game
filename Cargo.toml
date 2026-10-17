@@ -15,6 +15,7 @@ publish = false
 [workspace.dependencies]
 asm = { path = "packages/asm" }
 calco = { path = "packages/calco" }
+devices = { path = "packages/devices" }
 machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
