@@ -32,11 +32,17 @@ struct TopTexture {
 #[derive(Clone, Copy, Debug)]
 enum Kind {
     Cuboid,
+    /// Upright cylinder that fills the width and height of its block.
+    Cylinder,
 }
 
 impl Shape {
     pub(crate) fn cuboid(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Cuboid, block, color)
+    }
+
+    pub(crate) fn cylinder(block: &Block, color: Color) -> impl Bundle {
+        Self::bundle(Kind::Cylinder, block, color)
     }
 
     /// A cuboid with `region` of `image` on its top face.
@@ -71,6 +77,7 @@ impl Shape {
     fn mesh(&self) -> Mesh {
         let mut mesh: Mesh = match self.kind {
             Kind::Cuboid => Cuboid::from_size(self.size).into(),
+            Kind::Cylinder => Cylinder::new(self.size.x / 2.0, self.size.y).into(),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);

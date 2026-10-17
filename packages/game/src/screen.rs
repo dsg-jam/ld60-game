@@ -1,12 +1,43 @@
+mod crt;
+
 use bevy::{
-    camera::RenderTarget, image::ImageSampler, prelude::*, render::render_resource::TextureFormat,
+    asset::uuid::Uuid,
+    camera::{NormalizedRenderTarget, RenderTarget},
+    image::ImageSampler,
+    input::ButtonState,
+    input_focus::AcquireFocus,
+    picking::{
+        PickingSystems,
+        pointer::{Location, PointerAction, PointerButton, PointerId, PointerInput},
+    },
+    prelude::*,
+    render::render_resource::TextureFormat,
+    window::{PrimaryWindow, WindowEvent},
 };
+
+pub(crate) use self::crt::{CrtGlass, CrtMaterial};
+
+pub(crate) struct ScreenPlugin;
+
+impl Plugin for ScreenPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(crt::CrtPlugin)
+            .add_systems(
+                First,
+                ScreenSurface::drive_pointers.in_set(PickingSystems::Input),
+            )
+            .add_observer(ScreenSurface::add_pointer)
+            .add_observer(ScreenSurface::keep_ui_focus);
+    }
+}
 
 /// An offscreen UI that renders into an image.
 pub(crate) struct UiCanvas {
     pub(crate) image: Handle<Image>,
     pub(crate) camera: Entity,
+    pub(crate) size: UVec2,
 }
+
 impl UiCanvas {
     pub(crate) fn spawn(commands: &mut Commands, images: &mut Assets<Image>, size: UVec2) -> Self {
         let mut image =
@@ -24,6 +55,135 @@ impl UiCanvas {
                 RenderTarget::Image(image.clone().into()),
             ))
             .id();
-        Self { image, camera }
+        Self {
+            image,
+            camera,
+            size,
+        }
+    }
+}
+
+/// A mesh showing a [`UiCanvas`] that forwards the mouse into that UI.
+///
+/// The mesh UVs must span the whole canvas, like [`CrtGlass`] does. The
+/// surface entity is also the virtual pointer that drives the canvas UI.
+#[derive(Component, Debug)]
+#[require(Transform)]
+pub(crate) struct ScreenSurface {
+    target: NormalizedRenderTarget,
+    size: Vec2,
+    cursor: Option<Vec2>,
+}
+
+impl ScreenSurface {
+    pub(crate) fn new(canvas: &UiCanvas) -> Self {
+        Self {
+            target: NormalizedRenderTarget::Image(canvas.image.clone().into()),
+            size: canvas.size.as_vec2(),
+            cursor: None,
+        }
+    }
+
+    fn add_pointer(add: On<Add<ScreenSurface>>, mut commands: Commands) {
+        let id = PointerId::Custom(Uuid::from_u64_pair(0x5C12_EE17, add.entity.to_bits()));
+        commands.entity(add.entity).insert(id);
+    }
+
+    /// Stops clicks on the surface mesh from taking focus away from its UI.
+    ///
+    /// The real mouse clicks the mesh whenever the virtual pointer clicks
+    /// the UI. Without this the click would bubble to the window, which
+    /// clears focus.
+    fn keep_ui_focus(mut acquire: On<AcquireFocus>, surfaces: Query<(), With<ScreenSurface>>) {
+        if surfaces.contains(acquire.focused_entity) {
+            acquire.propagate(false);
+        }
+    }
+
+    fn drive_pointers(
+        mut raycast: MeshRayCast,
+        window: Single<&Window, With<PrimaryWindow>>,
+        cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+        mut surfaces: Query<(Entity, &mut ScreenSurface, &PointerId)>,
+        mut window_events: MessageReader<WindowEvent>,
+        mut inputs: MessageWriter<PointerInput>,
+    ) {
+        // The nearest surface under the real mouse, if any. Bevy's `RayMap`
+        // is only rebuilt after pointer inputs are processed, so it would be
+        // a frame late here. We cast from the current cursor instead.
+        let settings = MeshRayCastSettings {
+            visibility: RayCastVisibility::VisibleInView,
+            filter: &|entity| surfaces.contains(entity),
+            early_exit_test: &|_| true,
+        };
+        let hit = window.cursor_position().and_then(|cursor| {
+            cameras.iter().find_map(|(camera, transform)| {
+                let ray = camera.viewport_to_world(transform, cursor).ok()?;
+                let (entity, hit) = raycast.cast_ray(ray, &settings).first()?;
+                Some((*entity, hit.uv?))
+            })
+        });
+
+        // Read once, because every surface needs to see the releases.
+        let actions: Vec<PointerAction> = window_events
+            .read()
+            .filter_map(Self::pointer_action)
+            .collect();
+
+        for (entity, mut surface, &id) in &mut surfaces {
+            let hit = hit
+                .filter(|(e, _)| *e == entity)
+                .map(|(_, uv)| uv * surface.size);
+            let last = surface.cursor;
+            let Some(position) = hit.or(last) else {
+                continue;
+            };
+            let location = Location {
+                target: surface.target.clone(),
+                position,
+            };
+
+            if hit.is_some() && last != hit {
+                inputs.write(PointerInput::new(
+                    id,
+                    location.clone(),
+                    PointerAction::Move {
+                        delta: position - last.unwrap_or(position),
+                    },
+                ));
+            }
+            for action in &actions {
+                // Everything needs the cursor on the screen except releases,
+                // so a drag that leaves the screen still ends.
+                if hit.is_some() || matches!(action, PointerAction::Release(_)) {
+                    inputs.write(PointerInput::new(id, location.clone(), *action));
+                }
+            }
+            surface.cursor = hit;
+        }
+    }
+
+    /// Mouse buttons and the wheel, as pointer actions for the canvas.
+    fn pointer_action(event: &WindowEvent) -> Option<PointerAction> {
+        match event {
+            WindowEvent::MouseButtonInput(input) => {
+                let button = match input.button {
+                    MouseButton::Left => PointerButton::Primary,
+                    MouseButton::Middle => PointerButton::Middle,
+                    _ => return None,
+                };
+                Some(match input.state {
+                    ButtonState::Pressed => PointerAction::Press(button),
+                    ButtonState::Released => PointerAction::Release(button),
+                })
+            }
+            WindowEvent::MouseWheel(wheel) => Some(PointerAction::Scroll {
+                unit: wheel.unit,
+                x: wheel.x,
+                y: wheel.y,
+                phase: wheel.phase,
+            }),
+            _ => None,
+        }
     }
 }

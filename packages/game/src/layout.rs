@@ -42,8 +42,38 @@ impl Block {
         Transform::from_translation(self.center)
     }
 
+    /// Moves the center onto the center of `other`.
+    pub(crate) fn centered_on(self, other: &Block) -> Self {
+        Self {
+            center: other.center,
+            ..self
+        }
+    }
+
     pub(crate) fn on_top_of(self, other: &Block) -> Self {
         self.with_y(other.max().y + self.size.y / 2.0)
+    }
+
+    pub(crate) fn below(self, other: &Block) -> Self {
+        self.with_y(other.min().y - self.size.y / 2.0)
+    }
+
+    pub(crate) fn left_of(self, other: &Block) -> Self {
+        self.with_x(other.min().x - self.size.x / 2.0)
+    }
+
+    pub(crate) fn right_of(self, other: &Block) -> Self {
+        self.with_x(other.max().x + self.size.x / 2.0)
+    }
+
+    /// Places the block against the front face of `other`.
+    pub(crate) fn in_front_of(self, other: &Block) -> Self {
+        self.with_z(other.max().z + self.size.z / 2.0)
+    }
+
+    /// Places the block against the back face of `other`.
+    pub(crate) fn behind(self, other: &Block) -> Self {
+        self.with_z(other.min().z - self.size.z / 2.0)
     }
 
     pub(crate) fn translated(self, offset: Vec3) -> Self {
@@ -53,9 +83,23 @@ impl Block {
         }
     }
 
+    fn with_x(self, x: f32) -> Self {
+        Self {
+            center: self.center.with_x(x),
+            ..self
+        }
+    }
+
     fn with_y(self, y: f32) -> Self {
         Self {
             center: self.center.with_y(y),
+            ..self
+        }
+    }
+
+    fn with_z(self, z: f32) -> Self {
+        Self {
+            center: self.center.with_z(z),
             ..self
         }
     }
@@ -71,9 +115,27 @@ mod tests {
 
     #[test]
     fn stacking_touches_faces() {
-        let base = Block::new(Vec3::new(0.3, 0.02, 0.1));
-        let key = Block::new(Vec3::splat(0.01)).on_top_of(&base);
-        assert_close(key.min().y, base.max().y);
-        assert_close(key.bottom().y, base.max().y);
+        let stand = Block::new(Vec3::new(0.2, 0.03, 0.2));
+        let body = Block::new(Vec3::new(0.38, 0.32, 0.36)).on_top_of(&stand);
+        assert_close(body.min().y, stand.max().y);
+
+        let neck = Block::new(Vec3::new(0.28, 0.24, 0.12))
+            .centered_on(&body)
+            .behind(&body);
+        assert_close(neck.max().z, body.min().z);
+        assert_close(neck.center.y, body.center.y);
+    }
+
+    #[test]
+    fn frame_surrounds_opening() {
+        let opening = Block::new(Vec3::new(0.3, 0.2, 0.0));
+        let top = Block::new(Vec3::new(0.3, 0.02, 0.01))
+            .centered_on(&opening)
+            .on_top_of(&opening);
+        let left = Block::new(Vec3::new(0.02, 0.2, 0.01))
+            .centered_on(&opening)
+            .left_of(&opening);
+        assert_close(top.min().y, opening.max().y);
+        assert_close(left.max().x, opening.min().x);
     }
 }

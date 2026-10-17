@@ -5,6 +5,7 @@ mod shape;
 mod stage;
 
 use bevy::asset::AssetMetaCheck;
+use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 
 const TITLE: &str = "LD60";
@@ -27,7 +28,9 @@ fn main() -> AppExit {
                 }),
         )
         .add_plugins((
+            MeshPickingPlugin,
             shape::ShapePlugin,
+            screen::ScreenPlugin,
             computer::ComputerPlugin,
             stage::StagePlugin,
         ))

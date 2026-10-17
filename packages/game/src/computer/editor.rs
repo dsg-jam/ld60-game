@@ -1,0 +1,143 @@
+mod clicks;
+
+use bevy::{
+    input::keyboard::{Key, KeyboardInput},
+    input::mouse::MouseScrollUnit,
+    input_focus::{AutoFocus, FocusedInput, tab_navigation::TabIndex},
+    picking::events::PointerScroll,
+    prelude::*,
+    text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
+    ui_widgets::TextInput,
+};
+
+use self::clicks::Clicks;
+
+pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
+
+const PHOSPHOR: Color = Color::srgb(0.45, 1.0, 0.55);
+const PHOSPHOR_DIM: Color = Color::srgb(0.2, 0.55, 0.26);
+const FONT_SIZE: f32 = 13.0;
+/// Keeps text clear of the bezel, which covers the edges of the glass.
+const PADDING: f32 = 32.0;
+const ROW_GAP: f32 = 6.0;
+const INDENT: &str = "    ";
+/// Lines scrolled per mouse wheel notch.
+const SCROLL_LINES: f32 = 3.0;
+/// Matches the default line height of 1.2 times the font size.
+const LINE_HEIGHT: f32 = FONT_SIZE * 1.2;
+
+/// Draft firmware until jobs provide the real source.
+const PLACEHOLDER_SOURCE: &str = include_str!("placeholder.asm");
+
+pub(super) struct EditorPlugin;
+
+impl Plugin for EditorPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            PostUpdate,
+            Clicks::correct_edits.before(EditableTextSystems),
+        )
+        .add_observer(Editor::indent_on_tab)
+        .add_observer(Editor::scroll_on_wheel);
+    }
+}
+
+/// The firmware source editor on the computer screen.
+#[derive(Component)]
+pub(super) struct Editor;
+
+impl Editor {
+    /// Spawns the editor UI into the canvas rendered by `camera`.
+    pub(super) fn spawn(commands: &mut Commands, camera: Entity) {
+        let font = TextFont {
+            font_size: FontSize::Px(FONT_SIZE),
+            ..default()
+        };
+        let title = |text| (Text::new(text), font.clone(), TextColor(Color::BLACK));
+        let mut source = EditableText {
+            visible_lines: None,
+            allow_newlines: true,
+            ..EditableText::new(PLACEHOLDER_SOURCE)
+        };
+        source.queue_edit(TextEdit::TextStart(false));
+        commands.spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                flex_direction: FlexDirection::Column,
+                padding: px(PADDING).all(),
+                row_gap: px(ROW_GAP),
+                ..default()
+            },
+            UiTargetCamera(camera),
+            children![
+                (
+                    Node {
+                        justify_content: JustifyContent::SpaceBetween,
+                        padding: px(2).horizontal(),
+                        ..default()
+                    },
+                    BackgroundColor(PHOSPHOR),
+                    children![title("FIRMWARE EDITOR"), title("CALCO REV A"),],
+                ),
+                (
+                    Editor,
+                    Node {
+                        flex_grow: 1.0,
+                        ..default()
+                    },
+                    TextInput,
+                    source,
+                    TextLayout::no_wrap(),
+                    font.clone(),
+                    TextColor(PHOSPHOR),
+                    TextCursorStyle {
+                        color: PHOSPHOR,
+                        selection_color: PHOSPHOR_DIM,
+                        ..default()
+                    },
+                    TabIndex(0),
+                    AutoFocus,
+                ),
+                (
+                    Text::new("F5 ASSEMBLE   F6 FLASH"),
+                    font,
+                    TextColor(PHOSPHOR_DIM),
+                ),
+            ],
+        ));
+    }
+
+    /// Inserts spaces instead of moving focus.
+    fn indent_on_tab(
+        mut input: On<FocusedInput<KeyboardInput>>,
+        mut editors: Query<&mut EditableText, With<Editor>>,
+    ) {
+        let Ok(mut text) = editors.get_mut(input.focused_entity) else {
+            return;
+        };
+        if input.input.logical_key == Key::Tab {
+            input.propagate(false);
+            if input.input.state.is_pressed() {
+                text.queue_edit(TextEdit::Insert(INDENT.into()));
+            }
+        }
+    }
+
+    /// `TextInput` only scrolls to follow the caret, so the wheel is ours.
+    /// Layout clamps the offset to the text.
+    fn scroll_on_wheel(
+        mut scroll: On<PointerScroll>,
+        mut editors: Query<&mut EditableText, With<Editor>>,
+    ) {
+        let Ok(mut text) = editors.get_mut(scroll.entity) else {
+            return;
+        };
+        scroll.propagate(false);
+        let pixels = match scroll.unit {
+            MouseScrollUnit::Line => scroll.y * SCROLL_LINES * LINE_HEIGHT,
+            MouseScrollUnit::Pixel => scroll.y,
+        };
+        text.viewport.offset.y = (text.viewport.offset.y - pixels).max(0.0);
+    }
+}

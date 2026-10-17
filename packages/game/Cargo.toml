@@ -9,8 +9,9 @@ repository = { workspace = true }
 readme = { workspace = true }
 publish = { workspace = true }
 
-[dependencies]
-bevy = { workspace = true, features = ["3d", "audio", "ui"] }
+[dependencies.bevy]
+workspace = true
+features = ["3d", "audio", "system_clipboard", "ui"]
 
 [lints]
 workspace = true
