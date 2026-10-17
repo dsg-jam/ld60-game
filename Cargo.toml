@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["packages/emulator"]
+members = ["packages/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,7 +16,10 @@ readme = "README.md"
 publish = false
 
 [workspace.dependencies]
-emulator = { path = "packages/emulator" }
+asm = { path = "packages/asm" }
+calco = { path = "packages/calco" }
+machine = { path = "packages/machine" }
+serde = { version = "1", features = ["derive"] }
 
 [workspace.lints.rust]
 unreachable_pub = "warn"
