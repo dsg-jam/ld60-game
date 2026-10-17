@@ -1,11 +1,12 @@
 # CalCo ISA, Revision A
 
-CalCo is an 8-bit calculator coprocessor. Revision A drives a 6-digit adding machine. It works with decimal digits, one digit per byte.
+CalCo is an 8-bit calculator coprocessor. Revision A drives a 6-digit adding
+machine. It works with decimal digits, one digit per byte.
 
 ## Programmer model
 
 | Item  | Size      | Notes                                       |
-|-------|-----------|---------------------------------------------|
+| ----- | --------- | ------------------------------------------- |
 | A     | 8 bit     | Accumulator. All ALU results go here.       |
 | B     | 8 bit     | Pointer for `[B+n]` and counter for `DJNZ`. |
 | PC    | 8 bit     | Wraps from 0xFF to 0x00.                    |
@@ -18,9 +19,11 @@ Memory:
 - ROM: 256 bytes of program, 0x00 to 0xFF. Code cannot read ROM as data.
 - RAM: 16 bytes, named `M0` to `MF`. `M1` to `M6` are the display.
 
-The stack is a ring of two entries. A third `CALL` overwrites the oldest return address.
+The stack is a ring of two entries. A third `CALL` overwrites the oldest return
+address.
 
-Reset state: PC = 0x00, A = 0, B = 0, Z = C = 0. RAM and stack contents are undefined.
+Reset state: PC = 0x00, A = 0, B = 0, Z = C = 0. RAM and stack contents are
+undefined.
 
 Every instruction takes one cycle per byte.
 
@@ -35,10 +38,10 @@ oooo nnnn aaaaaaaa    two bytes, second byte is an address or immediate
 
 For memory instructions, bit 7 selects the addressing mode:
 
-| Bit 7 | Mode     | Address              | Example          |
-|-------|----------|----------------------|------------------|
-| 0     | Direct   | n                    | `14` = `LD M4`   |
-| 1     | Indexed  | (B + n) and 0x0F     | `94` = `LD [B+4]`|
+| Bit 7 | Mode    | Address          | Example           |
+| ----- | ------- | ---------------- | ----------------- |
+| 0     | Direct  | n                | `14` = `LD M4`    |
+| 1     | Indexed | (B + n) and 0x0F | `94` = `LD [B+4]` |
 
 Indexed addresses wrap inside RAM. `[B+3]` with B = 0x0E reads `M1`.
 
@@ -46,36 +49,36 @@ Indexed addresses wrap inside RAM. `[B+3]` with B = 0x0E reads `M1`.
 
 `*` means the flag is set from the result. `-` means unchanged.
 
-| Hex   | Mnemonic    | Operation                            | Z | C |
-|-------|-------------|--------------------------------------|---|---|
-| 00    | `NOP`       | Nothing                              | - | - |
-| 01    | `HLT`       | Wait for a key press, then continue  | - | - |
-| 02    | `RET`       | PC <- pop                            | - | - |
-| 03    | `SWP`       | Swap A and B                         | - | - |
-| 04    | `CLC`       | C <- 0                               | - | 0 |
-| 05    | `SEC`       | C <- 1                               | - | 1 |
-| 06    | `INC`       | A <- A + 1                           | * | - |
-| 07    | `DEC`       | A <- A - 1                           | * | - |
-| 08    | `DA`        | Decimal adjust after `ADC`           | * | * |
-| 09    | `DS`        | Decimal adjust after `SBC`           | * | - |
-| 1n    | `LD Mn`     | A <- Mn                              | - | - |
-| 2n    | `ST Mn`     | Mn <- A                              | - | - |
-| 30 ii | `LDI A, ii` | A <- ii                              | - | - |
-| 31 ii | `LDI B, ii` | B <- ii                              | - | - |
-| 32 ii | `CPI ii`    | Compute A - ii, discard result       | * | * |
-| 4n    | `ADC Mn`    | A <- A + Mn + C                      | * | * |
-| 5n    | `SBC Mn`    | A <- A - Mn - C                      | * | * |
-| 6n    | `CMP Mn`    | Compute A - Mn, discard result       | * | * |
-| 7p    | `IN p`      | A <- port p                          | - | - |
-| 8p    | `OUT p`     | port p <- A                          | - | - |
-| 9n    | `LD [B+n]`  | A <- M(B+n)                          | - | - |
-| An    | `ST [B+n]`  | M(B+n) <- A                          | - | - |
-| Bc aa | `Jcc aa`    | If condition c holds, PC <- aa       | - | - |
-| Cn    | `ADC [B+n]` | A <- A + M(B+n) + C                  | * | * |
-| Dn    | `SBC [B+n]` | A <- A - M(B+n) - C                  | * | * |
-| En    | `CMP [B+n]` | Compute A - M(B+n), discard result   | * | * |
-| F0 aa | `CALL aa`   | push PC + 2, PC <- aa                | - | - |
-| F1 aa | `DJNZ aa`   | B <- B - 1, if B != 0 then PC <- aa  | - | - |
+| Hex   | Mnemonic    | Operation                           | Z | C |
+| ----- | ----------- | ----------------------------------- | - | - |
+| 00    | `NOP`       | Nothing                             | - | - |
+| 01    | `HLT`       | Wait for a key press, then continue | - | - |
+| 02    | `RET`       | PC <- pop                           | - | - |
+| 03    | `SWP`       | Swap A and B                        | - | - |
+| 04    | `CLC`       | C <- 0                              | - | 0 |
+| 05    | `SEC`       | C <- 1                              | - | 1 |
+| 06    | `INC`       | A <- A + 1                          | * | - |
+| 07    | `DEC`       | A <- A - 1                          | * | - |
+| 08    | `DA`        | Decimal adjust after `ADC`          | * | * |
+| 09    | `DS`        | Decimal adjust after `SBC`          | * | - |
+| 1n    | `LD Mn`     | A <- Mn                             | - | - |
+| 2n    | `ST Mn`     | Mn <- A                             | - | - |
+| 30 ii | `LDI A, ii` | A <- ii                             | - | - |
+| 31 ii | `LDI B, ii` | B <- ii                             | - | - |
+| 32 ii | `CPI ii`    | Compute A - ii, discard result      | * | * |
+| 4n    | `ADC Mn`    | A <- A + Mn + C                     | * | * |
+| 5n    | `SBC Mn`    | A <- A - Mn - C                     | * | * |
+| 6n    | `CMP Mn`    | Compute A - Mn, discard result      | * | * |
+| 7p    | `IN p`      | A <- port p                         | - | - |
+| 8p    | `OUT p`     | port p <- A                         | - | - |
+| 9n    | `LD [B+n]`  | A <- M(B+n)                         | - | - |
+| An    | `ST [B+n]`  | M(B+n) <- A                         | - | - |
+| Bc aa | `Jcc aa`    | If condition c holds, PC <- aa      | - | - |
+| Cn    | `ADC [B+n]` | A <- A + M(B+n) + C                 | * | * |
+| Dn    | `SBC [B+n]` | A <- A - M(B+n) - C                 | * | * |
+| En    | `CMP [B+n]` | Compute A - M(B+n), discard result  | * | * |
+| F0 aa | `CALL aa`   | push PC + 2, PC <- aa               | - | - |
+| F1 aa | `DJNZ aa`   | B <- B - 1, if B != 0 then PC <- aa | - | - |
 
 All encodings not listed are reserved. Their behavior is undefined.
 
@@ -89,7 +92,7 @@ Notes:
 ### Conditions
 
 | c | Mnemonic | Jumps if |
-|---|----------|----------|
+| - | -------- | -------- |
 | 0 | `JMP`    | always   |
 | 1 | `JZ`     | Z = 1    |
 | 2 | `JNZ`    | Z = 0    |
@@ -100,7 +103,8 @@ After `CMP` or `CPI`, `JC` jumps if A is lower and `JZ` jumps if A is equal.
 
 ### Decimal adjust
 
-Digits are stored as plain values 0 to 9. `DA` and `DS` keep them in that range and carry to the next digit.
+Digits are stored as plain values 0 to 9. `DA` and `DS` keep them in that range
+and carry to the next digit.
 
 ```
 DA:  if A >= 10:  A <- A - 10, C <- 1
@@ -109,16 +113,18 @@ DA:  if A >= 10:  A <- A - 10, C <- 1
 DS:  if C = 1:    A <- A + 10
 ```
 
-`DA` expects A in the range 0 to 19. `DS` keeps C set so the borrow moves to the next digit.
+`DA` expects A in the range 0 to 19. `DS` keeps C set so the borrow moves to the
+next digit.
 
 ## Display
 
-`M1` to `M6` are shown on the display, left to right. `M6` is the rightmost digit. Values above 9 are invalid segment patterns.
+`M1` to `M6` are shown on the display, left to right. `M6` is the rightmost
+digit. Values above 9 are invalid segment patterns.
 
 ## Ports
 
 | Port | Name  | Dir | Function                                           |
-|------|-------|-----|----------------------------------------------------|
+| ---- | ----- | --- | -------------------------------------------------- |
 | 0    | `KEY` | in  | Last key code, or 0xFF if none. Reading clears it. |
 | F    | `REV` | in  | Chip revision. Rev A returns 0x10.                 |
 | 0    | `ANN` | out | Bit 0 minus sign, bit 1 error.                     |
@@ -126,7 +132,7 @@ DS:  if C = 1:    A <- A + 10
 Key codes:
 
 | Code  | Key    |
-|-------|--------|
+| ----- | ------ |
 | 00-09 | 0 to 9 |
 | 0A    | +      |
 | 0B    | -      |
@@ -145,7 +151,8 @@ label:  MNEMONIC operand   ; comment
 
 ## Example
 
-Add the display to a total stored in `M9` to `ME`. Both numbers have the most significant digit first, so the loop runs from the rightmost digit to the left.
+Add the display to a total stored in `M9` to `ME`. Both numbers have the most
+significant digit first, so the loop runs from the rightmost digit to the left.
 
 ```
 ADDR  BYTES   SOURCE
