@@ -1,8 +1,15 @@
 use bevy::prelude::*;
 
 use crate::computer::Computer;
+use crate::desk::{Desk, DeskLayout};
+use crate::lamp::Lamp;
 
 const BACKGROUND: Color = Color::srgb_u8(0x2a, 0x26, 0x24);
+
+const COMPUTER_SPOT: Vec2 = Vec2::new(0.55, -0.3);
+const COMPUTER_YAW: f32 = -0.5;
+const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
+const LAMP_YAW: f32 = -0.7;
 
 pub(crate) struct StagePlugin;
 
@@ -14,11 +21,15 @@ impl Plugin for StagePlugin {
 }
 
 fn spawn_stage(mut commands: Commands) {
+    let desk = DeskLayout::new();
+    commands.spawn((Name::new("desk"), Desk));
     commands.spawn((
-        Name::new("camera"),
-        Camera3d::default(),
-        Computer::new().overview(),
+        Name::new("computer"),
+        Computer,
+        desk.place(COMPUTER_SPOT, COMPUTER_YAW),
     ));
+    commands.spawn((Name::new("lamp"), Lamp, desk.place(LAMP_SPOT, LAMP_YAW)));
+    commands.spawn((Name::new("camera"), Camera3d::default(), desk.seated_view()));
     commands.spawn((
         DirectionalLight {
             illuminance: 4_000.0,

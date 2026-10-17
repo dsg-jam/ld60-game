@@ -9,6 +9,8 @@
 mod computer;
 #[cfg(feature = "debug_port")]
 mod debug_port;
+mod desk;
+mod lamp;
 mod layout;
 mod screen;
 mod shape;
@@ -43,6 +45,8 @@ fn main() -> AppExit {
         MeshPickingPlugin,
         shape::ShapePlugin,
         screen::ScreenPlugin,
+        desk::DeskPlugin,
+        lamp::LampPlugin,
         computer::ComputerPlugin,
         stage::StagePlugin,
     ));

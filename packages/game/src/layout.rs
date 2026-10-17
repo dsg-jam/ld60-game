@@ -38,6 +38,18 @@ impl Block {
         self.center.with_y(self.min().y)
     }
 
+    /// A point on the top face.
+    ///
+    /// `spot` goes from -1 to 1 along x and along z (back to front).
+    pub(crate) fn top_spot(&self, spot: Vec2) -> Vec3 {
+        let offset = spot * self.size.xz() / 2.0;
+        Vec3::new(
+            self.center.x + offset.x,
+            self.max().y,
+            self.center.z + offset.y,
+        )
+    }
+
     pub(crate) fn transform(&self) -> Transform {
         Transform::from_translation(self.center)
     }
@@ -52,6 +64,15 @@ impl Block {
 
     pub(crate) fn on_top_of(self, other: &Block) -> Self {
         self.with_y(other.max().y + self.size.y / 2.0)
+    }
+
+    /// Rests the block on the top face of `other` at `spot`, see
+    /// [`Block::top_spot`].
+    pub(crate) fn resting_on(self, other: &Block, spot: Vec2) -> Self {
+        Self {
+            center: other.top_spot(spot) + Vec3::Y * self.size.y / 2.0,
+            ..self
+        }
     }
 
     pub(crate) fn below(self, other: &Block) -> Self {
@@ -124,6 +145,15 @@ mod tests {
             .behind(&body);
         assert_close(neck.max().z, body.min().z);
         assert_close(neck.center.y, body.center.y);
+    }
+
+    #[test]
+    fn resting_on_a_spot() {
+        let top = Block::new(Vec3::new(2.0, 0.1, 1.0));
+        let item = Block::new(Vec3::splat(0.2)).resting_on(&top, Vec2::new(1.0, -1.0));
+        assert_close(item.min().y, top.max().y);
+        assert_close(item.center.x, 1.0);
+        assert_close(item.center.z, -0.5);
     }
 
     #[test]
