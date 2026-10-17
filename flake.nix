@@ -25,7 +25,7 @@
             overlays = [ rust-overlay.overlays.default ];
           };
           toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-          runtimeLibs = pkgs.lib.optionals pkgs.stdenv.isLinux (
+          runtimeLibs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux (
             with pkgs;
             # See: <https://github.com/bevyengine/bevy/blob/latest/docs/linux_dependencies.md#nix>
             [
