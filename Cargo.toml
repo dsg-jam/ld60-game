@@ -19,6 +19,7 @@ machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
 serde = { version = "1.0.229", default-features = false }
+serde_json = { version = "1.0.154", default-features = false }
 
 [workspace.lints.rust]
 unreachable_pub = "warn"

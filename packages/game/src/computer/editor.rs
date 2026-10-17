@@ -11,6 +11,8 @@ use bevy::{
 };
 
 use self::clicks::Clicks;
+#[cfg(feature = "debug_port")]
+use crate::debug_port::DebugMethods;
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 
@@ -39,6 +41,8 @@ impl Plugin for EditorPlugin {
         )
         .add_observer(Editor::indent_on_tab)
         .add_observer(Editor::scroll_on_wheel);
+        #[cfg(feature = "debug_port")]
+        app.add_debug_method("ld60.editor", Editor::debug_state);
     }
 }
 
@@ -140,5 +144,20 @@ impl Editor {
             MouseScrollUnit::Pixel => scroll.y,
         };
         text.viewport.offset.y = (text.viewport.offset.y - pixels).max(0.0);
+    }
+
+    /// `ld60.editor` returns the text, the caret and the selected byte range.
+    #[cfg(feature = "debug_port")]
+    fn debug_state(
+        In(_): In<Option<serde_json::Value>>,
+        editor: Single<&EditableText, With<Editor>>,
+    ) -> bevy::remote::BrpResult {
+        let selection = editor.editor().raw_selection();
+        let range = selection.text_range();
+        Ok(serde_json::json!({
+            "text": editor.value().to_string(),
+            "caret": selection.focus().index(),
+            "selection": [range.start, range.end],
+        }))
     }
 }
