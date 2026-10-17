@@ -1,0 +1,19 @@
+[package]
+name = "levels"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+readme = { workspace = true }
+publish = { workspace = true }
+
+[dependencies]
+devices = { workspace = true, features = ["serde"] }
+machine = { workspace = true }
+ron = { workspace = true }
+serde = { workspace = true }
+
+[lints]
+workspace = true

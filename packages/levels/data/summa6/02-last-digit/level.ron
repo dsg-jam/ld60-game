@@ -1,0 +1,16 @@
+(
+    id: "summa6-02",
+    title: "Last digit is always 0",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Market stall owner",
+        complaint: "My totals always end in 0. The customers are happy, I am not.",
+    ),
+    tests: [
+        (keys: "12+34=", display: "000046"),
+        (keys: "5+5=", display: "000010"),
+    ],
+    reward: 15,
+)

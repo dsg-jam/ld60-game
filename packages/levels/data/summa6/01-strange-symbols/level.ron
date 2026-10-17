@@ -1,0 +1,16 @@
+(
+    id: "summa6-01",
+    title: "Strange symbols",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Bookkeeper",
+        complaint: "It shows strange symbols when I switch it on. They go away when I press C.",
+    ),
+    tests: [
+        (keys: "", display: "000000"),
+        (keys: "5", display: "000005"),
+    ],
+    reward: 10,
+)

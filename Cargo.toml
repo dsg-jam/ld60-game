@@ -16,9 +16,11 @@ publish = false
 asm = { path = "packages/asm" }
 calco = { path = "packages/calco" }
 devices = { path = "packages/devices" }
+levels = { path = "packages/levels" }
 machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
+ron = "0.12"
 serde = { version = "1.0.229", default-features = false }
 serde_json = { version = "1.0.154", default-features = false }
 
