@@ -12,8 +12,8 @@ publish = { workspace = true }
 [dependencies]
 devices = { workspace = true, features = ["serde"] }
 machine = { workspace = true }
-ron = { workspace = true }
-serde = { workspace = true }
+ron = { workspace = true, features = ["std"] }
+serde = { workspace = true, features = ["derive", "std"] }
 
 [lints]
 workspace = true

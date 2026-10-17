@@ -1,3 +1,11 @@
+//! Devices that run firmware on an emulated chip, like the Summa6 adding
+//! machine.
+//!
+//! # Features
+//!
+//! - `serde`: implements `Serialize` and `Deserialize` for the device and
+//!   fault description types.
+
 mod any_device;
 mod chip_spec;
 mod device;

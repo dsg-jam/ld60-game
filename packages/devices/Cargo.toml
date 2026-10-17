@@ -15,7 +15,7 @@ serde = ["dep:serde", "calco/serde", "machine/serde"]
 [dependencies]
 calco = { workspace = true }
 machine = { workspace = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
 
 [lints]
 workspace = true
