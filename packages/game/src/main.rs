@@ -6,12 +6,14 @@
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
+mod camera;
 mod computer;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod desk;
 mod lamp;
 mod layout;
+mod look;
 mod screen;
 mod shape;
 mod stage;
@@ -45,6 +47,8 @@ fn main() -> AppExit {
         MeshPickingPlugin,
         shape::ShapePlugin,
         screen::ScreenPlugin,
+        camera::CameraPlugin,
+        look::LookPlugin,
         desk::DeskPlugin,
         lamp::LampPlugin,
         computer::ComputerPlugin,

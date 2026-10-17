@@ -73,6 +73,8 @@ pub(crate) struct ScreenSurface {
     target: NormalizedRenderTarget,
     size: Vec2,
     cursor: Option<Vec2>,
+    /// Only active surfaces receive the mouse.
+    pub(crate) active: bool,
 }
 
 impl ScreenSurface {
@@ -81,6 +83,7 @@ impl ScreenSurface {
             target: NormalizedRenderTarget::Image(canvas.image.clone().into()),
             size: canvas.size.as_vec2(),
             cursor: None,
+            active: false,
         }
     }
 
@@ -113,7 +116,11 @@ impl ScreenSurface {
         // a frame late here. We cast from the current cursor instead.
         let settings = MeshRayCastSettings {
             visibility: RayCastVisibility::VisibleInView,
-            filter: &|entity| surfaces.contains(entity),
+            filter: &|entity| {
+                surfaces
+                    .get(entity)
+                    .is_ok_and(|(_, surface, _)| surface.active)
+            },
             early_exit_test: &|_| true,
         };
         let hit = window.cursor_position().and_then(|cursor| {

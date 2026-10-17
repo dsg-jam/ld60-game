@@ -7,6 +7,7 @@ use bevy::{mesh::MeshBuilder, prelude::*};
 use self::editor::Editor;
 use self::keyboard::{KeyCap, Keyboard};
 use self::monitor::Monitor;
+use crate::camera::{Focus, FocusTarget};
 use crate::layout::Block;
 use crate::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
 
@@ -15,6 +16,8 @@ const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);
 
 /// Space between the front of the monitor and the back of the keyboard.
 const KEYBOARD_GAP: f32 = 0.06;
+/// Distance of the camera from the glass while focused on the computer.
+const SCREEN_VIEW_DISTANCE: f32 = 0.32;
 
 pub(crate) struct ComputerPlugin;
 
@@ -22,6 +25,14 @@ impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(editor::EditorPlugin)
             .add_systems(Update, KeyCap::follow_input)
+            .add_systems(
+                OnEnter(Focus::Computer),
+                (Computer::activate_screen::<true>, Editor::take_focus),
+            )
+            .add_systems(
+                OnExit(Focus::Computer),
+                (Computer::activate_screen::<false>, Editor::release_focus),
+            )
             .add_observer(Computer::on_add);
     }
 }
@@ -32,6 +43,14 @@ impl Plugin for ComputerPlugin {
 pub(crate) struct Computer;
 
 impl Computer {
+    fn activate_screen<const ACTIVE: bool>(
+        mut screens: Query<&mut ScreenSurface, With<ComputerScreen>>,
+    ) {
+        for mut screen in &mut screens {
+            screen.active = ACTIVE;
+        }
+    }
+
     fn on_add(
         add: On<Add<Computer>>,
         mut commands: Commands,
@@ -49,24 +68,35 @@ impl Computer {
             size: monitor::GLASS_SIZE,
             bulge: monitor::GLASS_BULGE,
         };
-        commands.entity(add.entity).with_children(|parent| {
-            layout.monitor.spawn(
-                parent,
-                Transform::default(),
-                (
-                    ScreenSurface::new(&canvas),
-                    Mesh3d(meshes.add(glass.build())),
-                    MeshMaterial3d(crt_materials.add(CrtMaterial::new(&canvas))),
-                ),
-            );
-            layout.keyboard.spawn(
-                parent,
-                Transform::from_translation(layout.keyboard_placement.bottom()),
-                labels.image,
-            );
-        });
+        commands
+            .entity(add.entity)
+            .insert(FocusTarget {
+                focus: Focus::Computer,
+                view: layout.screen_view(),
+            })
+            .with_children(|parent| {
+                layout.monitor.spawn(
+                    parent,
+                    Transform::default(),
+                    (
+                        ComputerScreen,
+                        ScreenSurface::new(&canvas),
+                        Mesh3d(meshes.add(glass.build())),
+                        MeshMaterial3d(crt_materials.add(CrtMaterial::new(&canvas))),
+                    ),
+                );
+                layout.keyboard.spawn(
+                    parent,
+                    Transform::from_translation(layout.keyboard_placement.bottom()),
+                    labels.image,
+                );
+            });
     }
 }
+
+/// The glass of the computer's monitor.
+#[derive(Component)]
+struct ComputerScreen;
 
 /// Geometry of a [`Computer`] in its own space.
 struct ComputerLayout {
@@ -87,5 +117,12 @@ impl ComputerLayout {
             keyboard: Keyboard::new(),
             keyboard_placement,
         }
+    }
+
+    /// Camera pose straight in front of the glass.
+    fn screen_view(&self) -> Transform {
+        let glass = self.monitor.glass.center;
+        Transform::from_translation(glass + Vec3::Z * SCREEN_VIEW_DISTANCE)
+            .looking_at(glass, Vec3::Y)
     }
 }

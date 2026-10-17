@@ -3,7 +3,7 @@ mod clicks;
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
     input::mouse::MouseScrollUnit,
-    input_focus::{AutoFocus, FocusedInput, tab_navigation::TabIndex},
+    input_focus::{FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
     picking::events::PointerScroll,
     prelude::*,
     text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
@@ -102,7 +102,6 @@ impl Editor {
                         ..default()
                     },
                     TabIndex(0),
-                    AutoFocus,
                 ),
                 (
                     Text::new("F5 ASSEMBLE   F6 FLASH"),
@@ -111,6 +110,14 @@ impl Editor {
                 ),
             ],
         ));
+    }
+
+    pub(super) fn take_focus(editor: Single<Entity, With<Editor>>, mut focus: ResMut<InputFocus>) {
+        focus.set(*editor, FocusCause::Navigated);
+    }
+
+    pub(super) fn release_focus(mut focus: ResMut<InputFocus>) {
+        focus.clear();
     }
 
     /// Inserts spaces instead of moving focus.

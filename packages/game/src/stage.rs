@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::camera::PlayerCamera;
 use crate::computer::Computer;
 use crate::desk::{Desk, DeskLayout};
 use crate::lamp::Lamp;
@@ -29,7 +30,10 @@ fn spawn_stage(mut commands: Commands) {
         desk.place(COMPUTER_SPOT, COMPUTER_YAW),
     ));
     commands.spawn((Name::new("lamp"), Lamp, desk.place(LAMP_SPOT, LAMP_YAW)));
-    commands.spawn((Name::new("camera"), Camera3d::default(), desk.seated_view()));
+    commands.spawn((
+        Name::new("camera"),
+        PlayerCamera::seated_at(desk.seated_view()),
+    ));
     commands.spawn((
         DirectionalLight {
             illuminance: 4_000.0,
