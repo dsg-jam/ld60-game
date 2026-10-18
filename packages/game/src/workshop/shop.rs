@@ -29,7 +29,7 @@ const CABINET: Vec3 = Vec3::new(0.45, 1.3, 0.7);
 
 /// Dusty air, which the lamp's light shows up in.
 const HAZE: Color = Color::srgb_u8(0xd8, 0xcc, 0xb8);
-const HAZE_DENSITY: f32 = 0.012;
+const HAZE_DENSITY: f32 = 0.04;
 const HAZE_GLOW: f32 = 1.0;
 
 const PLASTER: Color = Color::srgb_u8(0x5e, 0x55, 0x4c);

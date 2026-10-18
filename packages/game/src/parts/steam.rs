@@ -27,7 +27,7 @@ const SWAY: f32 = 0.12;
 const WISP: f32 = 0.025;
 /// How much the wisps twist and curl, in meters.
 const CURL: f32 = 0.015;
-const DENSITY: f32 = 150.0;
+const DENSITY: f32 = 0.04;
 /// Water droplets barely absorb light and scatter most of it forward.
 const ABSORPTION: f32 = 0.05;
 const SCATTERING: f32 = 0.9;
