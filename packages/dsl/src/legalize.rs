@@ -102,169 +102,6 @@ impl Inliner<'_> {
     }
 }
 
-/// Makes the program fit the backend: inlines calls and unrolls loops it lacks.
-pub(crate) fn legalize(
-    mut program: Program,
-    backend: &dyn Backend,
-) -> std::result::Result<Program, Vec<Diagnostic>> {
-    let features = backend.features().clone();
-    if !features.calls {
-        let mut sites = BTreeMap::new();
-        for block in &program.blocks {
-            Node::visit(&block.body, &mut |node| {
-                if let Stmt::Prim(Prim::Call(target)) = node.stmt {
-                    *sites.entry(target).or_insert(0) += 1;
-                }
-            });
-        }
-        let (routines, blocks): (Vec<_>, Vec<_>) = program
-            .blocks
-            .into_iter()
-            .partition(|b| b.kind == BlockKind::Routine);
-        let mut inliner = Inliner {
-            routines: routines.into_iter().map(|r| (r.label, r)).collect(),
-            sites,
-            labels: &mut program.labels,
-        };
-        let mut errors = Vec::new();
-        let mut inlined = Vec::new();
-        for mut block in blocks {
-            match inliner.nodes(std::mem::take(&mut block.body), &mut Vec::new()) {
-                Ok(body) => block.body = body,
-                Err(error) => errors.push(error),
-            }
-            inlined.push(block);
-        }
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-        program.blocks = inlined;
-    }
-    let mut refs = BTreeMap::new();
-    for block in &program.blocks {
-        for (id, count) in references(&block.body) {
-            *refs.entry(id).or_insert(0) += count;
-        }
-    }
-    let mut unroller = Unroller {
-        features: &features,
-        name: backend.name(),
-        refs,
-        labels: &mut program.labels,
-    };
-    let mut errors = Vec::new();
-    for block in &mut program.blocks {
-        let body = std::mem::take(&mut block.body);
-        match unroller.nodes(body) {
-            Ok(body) => block.body = body,
-            Err(error) => errors.push(error),
-        }
-    }
-    if errors.is_empty() {
-        Ok(program)
-    } else {
-        Err(errors)
-    }
-}
-
-fn map_labels(nodes: &mut [Node], f: &impl Fn(LabelId) -> LabelId) {
-    for node in nodes {
-        match &mut node.stmt {
-            Stmt::Label(id) => *id = f(*id),
-            Stmt::Prim(Prim::Jump(id) | Prim::Branch(_, id) | Prim::LoopBack(id)) => {
-                *id = f(*id);
-            }
-            Stmt::If { then, els, .. } => {
-                map_labels(then, f);
-                map_labels(els, f);
-            }
-            Stmt::Inlined { body, .. } => map_labels(body, f),
-            Stmt::Repeat { label, body } => {
-                if let Some(id) = label {
-                    *id = f(*id);
-                }
-                map_labels(body, f);
-            }
-            _ => {}
-        }
-    }
-}
-
-fn map_places(nodes: &mut [Node], f: &impl Fn(Place) -> Place) {
-    let value = |v: &mut Value| {
-        if let Value::Place(place) = v {
-            *place = f(*place);
-        }
-    };
-    let cond = |c: &mut Cond| {
-        if let Cond::Compare(_, v) = c {
-            value(v);
-        }
-    };
-    for node in nodes {
-        match &mut node.stmt {
-            Stmt::Prim(prim) => match prim {
-                Prim::AddCarry(v) | Prim::Load(v) | Prim::SubCarry(v) => value(v),
-                Prim::Branch(c, _) => cond(c),
-                Prim::Move { dst, src } => {
-                    *dst = f(*dst);
-                    value(src);
-                }
-                Prim::Store(place) => *place = f(*place),
-                _ => {}
-            },
-            Stmt::If { cond: c, then, els } => {
-                cond(c);
-                map_places(then, f);
-                map_places(els, f);
-            }
-            Stmt::Inlined { body, .. } | Stmt::Repeat { body, .. } => map_places(body, f),
-            Stmt::Asm(_) | Stmt::Comment(_) | Stmt::Label(_) => {}
-        }
-    }
-}
-
-fn prefix(name: &str) -> String {
-    name.chars().take(1).collect()
-}
-
-/// Turns every `return` into a jump to `end`. Returns whether there was one.
-fn replace_returns(nodes: &mut [Node], end: LabelId) -> bool {
-    let mut found = false;
-    for node in nodes {
-        match &mut node.stmt {
-            Stmt::Prim(prim @ Prim::Return) => {
-                *prim = Prim::Jump(end);
-                found = true;
-            }
-            Stmt::If { then, els, .. } => {
-                found |= replace_returns(then, end);
-                found |= replace_returns(els, end);
-            }
-            Stmt::Repeat { body, .. } => found |= replace_returns(body, end),
-            _ => {}
-        }
-    }
-    found
-}
-
-/// Whether `nodes` may read i.
-fn reads_index(nodes: &[Node]) -> bool {
-    let mut found = uses_indexed(nodes);
-    Node::visit(nodes, &mut |node| {
-        found |= matches!(node.stmt, Stmt::Prim(Prim::Call(_)) | Stmt::Asm(_));
-    });
-    found
-}
-
-fn uses_indexed(nodes: &[Node]) -> bool {
-    let mut found = false;
-    Node::places(nodes, &mut |place| {
-        found |= matches!(place, Place::Indexed(_))
-    });
-    found
-}
-
 struct Unroller<'a> {
     features: &'a Features,
     name: &'a str,
@@ -432,6 +269,169 @@ impl Unroller<'_> {
     fn needs_unroll(&self, body: &[Node]) -> bool {
         !self.features.loops || (!self.features.indexed && uses_indexed(body))
     }
+}
+
+/// Makes the program fit the backend: inlines calls and unrolls loops it lacks.
+pub(crate) fn legalize(
+    mut program: Program,
+    backend: &dyn Backend,
+) -> std::result::Result<Program, Vec<Diagnostic>> {
+    let features = backend.features().clone();
+    if !features.calls {
+        let mut sites = BTreeMap::new();
+        for block in &program.blocks {
+            Node::visit(&block.body, &mut |node| {
+                if let Stmt::Prim(Prim::Call(target)) = node.stmt {
+                    *sites.entry(target).or_insert(0) += 1;
+                }
+            });
+        }
+        let (routines, blocks): (Vec<_>, Vec<_>) = program
+            .blocks
+            .into_iter()
+            .partition(|b| b.kind == BlockKind::Routine);
+        let mut inliner = Inliner {
+            routines: routines.into_iter().map(|r| (r.label, r)).collect(),
+            sites,
+            labels: &mut program.labels,
+        };
+        let mut errors = Vec::new();
+        let mut inlined = Vec::new();
+        for mut block in blocks {
+            match inliner.nodes(std::mem::take(&mut block.body), &mut Vec::new()) {
+                Ok(body) => block.body = body,
+                Err(error) => errors.push(error),
+            }
+            inlined.push(block);
+        }
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+        program.blocks = inlined;
+    }
+    let mut refs = BTreeMap::new();
+    for block in &program.blocks {
+        for (id, count) in references(&block.body) {
+            *refs.entry(id).or_insert(0) += count;
+        }
+    }
+    let mut unroller = Unroller {
+        features: &features,
+        name: backend.name(),
+        refs,
+        labels: &mut program.labels,
+    };
+    let mut errors = Vec::new();
+    for block in &mut program.blocks {
+        let body = std::mem::take(&mut block.body);
+        match unroller.nodes(body) {
+            Ok(body) => block.body = body,
+            Err(error) => errors.push(error),
+        }
+    }
+    if errors.is_empty() {
+        Ok(program)
+    } else {
+        Err(errors)
+    }
+}
+
+fn map_labels(nodes: &mut [Node], f: &impl Fn(LabelId) -> LabelId) {
+    for node in nodes {
+        match &mut node.stmt {
+            Stmt::Label(id) => *id = f(*id),
+            Stmt::Prim(Prim::Jump(id) | Prim::Branch(_, id) | Prim::LoopBack(id)) => {
+                *id = f(*id);
+            }
+            Stmt::If { then, els, .. } => {
+                map_labels(then, f);
+                map_labels(els, f);
+            }
+            Stmt::Inlined { body, .. } => map_labels(body, f),
+            Stmt::Repeat { label, body } => {
+                if let Some(id) = label {
+                    *id = f(*id);
+                }
+                map_labels(body, f);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn map_places(nodes: &mut [Node], f: &impl Fn(Place) -> Place) {
+    let value = |v: &mut Value| {
+        if let Value::Place(place) = v {
+            *place = f(*place);
+        }
+    };
+    let cond = |c: &mut Cond| {
+        if let Cond::Compare(_, v) = c {
+            value(v);
+        }
+    };
+    for node in nodes {
+        match &mut node.stmt {
+            Stmt::Prim(prim) => match prim {
+                Prim::AddCarry(v) | Prim::Load(v) | Prim::SubCarry(v) => value(v),
+                Prim::Branch(c, _) => cond(c),
+                Prim::Move { dst, src } => {
+                    *dst = f(*dst);
+                    value(src);
+                }
+                Prim::Store(place) => *place = f(*place),
+                _ => {}
+            },
+            Stmt::If { cond: c, then, els } => {
+                cond(c);
+                map_places(then, f);
+                map_places(els, f);
+            }
+            Stmt::Inlined { body, .. } | Stmt::Repeat { body, .. } => map_places(body, f),
+            Stmt::Asm(_) | Stmt::Comment(_) | Stmt::Label(_) => {}
+        }
+    }
+}
+
+fn prefix(name: &str) -> String {
+    name.chars().take(1).collect()
+}
+
+/// Turns every `return` into a jump to `end`. Returns whether there was one.
+fn replace_returns(nodes: &mut [Node], end: LabelId) -> bool {
+    let mut found = false;
+    for node in nodes {
+        match &mut node.stmt {
+            Stmt::Prim(prim @ Prim::Return) => {
+                *prim = Prim::Jump(end);
+                found = true;
+            }
+            Stmt::If { then, els, .. } => {
+                found |= replace_returns(then, end);
+                found |= replace_returns(els, end);
+            }
+            Stmt::Repeat { body, .. } => found |= replace_returns(body, end),
+            _ => {}
+        }
+    }
+    found
+}
+
+/// Whether `nodes` may read i.
+fn reads_index(nodes: &[Node]) -> bool {
+    let mut found = uses_indexed(nodes);
+    Node::visit(nodes, &mut |node| {
+        found |= matches!(node.stmt, Stmt::Prim(Prim::Call(_)) | Stmt::Asm(_));
+    });
+    found
+}
+
+fn uses_indexed(nodes: &[Node]) -> bool {
+    let mut found = false;
+    Node::places(nodes, &mut |place| {
+        found |= matches!(place, Place::Indexed(_))
+    });
+    found
 }
 
 /// Puts `notes` on the first instruction of `nodes`, or in comment lines before it.
