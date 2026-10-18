@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use crate::emit::{Instr, Line, Operand};
 use crate::hir::Program;
-use crate::labels::Names;
+use crate::labels::{Names, asm_label};
 
 const CODE_COLUMN: usize = 8;
 const COMMENT_COLUMN: usize = 28;
@@ -111,24 +111,20 @@ fn instruction(instr: &Instr, names: &Names) -> String {
 
 /// An `asm { }` line. A leading `label:` goes in the label column.
 fn raw_line(label: Option<String>, raw: &str) -> String {
-    let code_part = raw.split(';').next().unwrap_or_default();
-    if let Some((name, _)) = code_part.split_once(':') {
-        let name = name.trim();
-        if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            let rest = raw[name.len() + 1..].trim();
-            let mut text = String::new();
-            if let Some(label) = label {
-                text.push_str(&label);
-                text.push('\n');
-            }
-            text.push_str(&format!("{name}:"));
-            if !rest.is_empty() {
-                let pad = CODE_COLUMN.saturating_sub(name.len() + 1).max(1);
-                text.push_str(&" ".repeat(pad));
-                text.push_str(rest);
-            }
-            return text;
-        }
+    let Some((name, rest)) = asm_label(raw) else {
+        return code(label, raw, None);
+    };
+    let mut text = String::new();
+    if let Some(label) = label {
+        text.push_str(&label);
+        text.push('\n');
     }
-    code(label, raw, None)
+    text.push_str(name);
+    text.push(':');
+    if !rest.is_empty() {
+        let pad = CODE_COLUMN.saturating_sub(name.len() + 1).max(1);
+        text.push_str(&" ".repeat(pad));
+        text.push_str(rest);
+    }
+    text
 }
