@@ -197,6 +197,41 @@ entry main {
 }
 
 #[test]
+fn gotos_cannot_enter_routines() {
+    for (body, line, message) in [
+        (
+            "entry main {\n    s()\n    s()\n    goto s\n}\nroutine s {\n    a += 1\n}\n",
+            6,
+            "s is a routine. Call it with s()",
+        ),
+        (
+            "entry main {\n    s()\n    goto inner\n}\nroutine s {\n    a += 1\ninner:\n    a += 1\n}\n",
+            5,
+            "'inner' is inside routine s. Only s can jump to it",
+        ),
+        (
+            "entry main {\n    s()\n    s()\n    goto inner\n}\nroutine s {\n    a += 1\ninner:\n    a += 1\n}\n",
+            6,
+            "'inner' is inside routine s. Only s can jump to it",
+        ),
+        (
+            "entry main {\n    p()\n    n = a\n    wait\n}\nroutine p {\n    q()\n}\nroutine q {\n    goto x\n}\nroutine x {\n    y()\n}\nroutine y {\n    a += 1\n}\n",
+            12,
+            "x is a routine. Call it with x()",
+        ),
+    ] {
+        for revision in [Revision::A, Revision::B] {
+            let diagnostic = error(tally(revision, body));
+            assert_eq!(
+                (diagnostic.line, diagnostic.message.as_str()),
+                (line, message),
+                "{body}"
+            );
+        }
+    }
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {

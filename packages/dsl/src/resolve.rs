@@ -28,6 +28,10 @@ struct Resolver<'a> {
     consts: BTreeMap<String, Literal>,
     labels: BTreeMap<String, LabelId>,
     routines: BTreeMap<String, Routine>,
+    /// The block each label is defined in.
+    owners: BTreeMap<String, String>,
+    /// The block being resolved.
+    current: String,
     table: Labels,
     errors: Vec<Diagnostic>,
 }
@@ -147,6 +151,7 @@ impl Resolver<'_> {
     }
 
     fn block(&mut self, block: &ast::Block) -> Block {
+        self.current.clone_from(&block.name);
         let body = self.stmts(&block.body, block.kind);
         Block {
             kind: block.kind,
@@ -196,6 +201,7 @@ impl Resolver<'_> {
         }
         let id = self.table.add(LabelName::Fixed(name.into()));
         self.labels.insert(name.into(), id);
+        self.owners.insert(name.into(), self.current.clone());
     }
 
     fn declare_labels(&mut self, stmts: &[ast::Stmt]) {
@@ -237,6 +243,22 @@ impl Resolver<'_> {
             .iter()
             .find(|&&i| i == name)
             .copied()
+    }
+
+    /// A label that the current block may jump to. Routines are only entered by a call.
+    fn jump_target(&self, name: &str, pos: Pos) -> Result<LabelId> {
+        let id = self.label(name, pos)?;
+        match self.owners.get(name) {
+            Some(owner) if *owner != self.current && self.routines.contains_key(owner) => {
+                let message = if owner == name {
+                    format!("{name} is a routine. Call it with {name}()")
+                } else {
+                    format!("'{name}' is inside routine {owner}. Only {owner} can jump to it")
+                };
+                Err(Diagnostic::error(pos, message))
+            }
+            _ => Ok(id),
+        }
     }
 
     fn label(&self, name: &str, pos: Pos) -> Result<LabelId> {
@@ -344,7 +366,7 @@ impl Resolver<'_> {
                     },
                 ]
             }
-            StmtKind::Goto(name) => vec![Stmt::Prim(Prim::Jump(self.label(name, pos)?))],
+            StmtKind::Goto(name) => vec![Stmt::Prim(Prim::Jump(self.jump_target(name, pos)?))],
             StmtKind::If { cond, then, els } => vec![Stmt::If {
                 cond: self.cond(cond)?,
                 then: self.stmts(then, kind),
@@ -352,7 +374,7 @@ impl Resolver<'_> {
             }],
             StmtKind::IfGoto { cond, target } => vec![Stmt::Prim(Prim::Branch(
                 self.cond(cond)?,
-                self.label(target, pos)?,
+                self.jump_target(target, pos)?,
             ))],
             StmtKind::Label(name) => vec![Stmt::Label(self.label(name, pos)?)],
             StmtKind::Match { scrutinee, arms } => {
@@ -362,7 +384,7 @@ impl Resolver<'_> {
                 let mut nodes = Vec::new();
                 for arm in arms {
                     let cond = self.pattern(&arm.pattern)?;
-                    let target = self.label(&arm.target, arm.pos)?;
+                    let target = self.jump_target(&arm.target, arm.pos)?;
                     nodes.push(Node {
                         stmt: Stmt::Prim(Prim::Branch(cond, target)),
                         comment: arm.comment.clone(),
@@ -509,6 +531,8 @@ pub(crate) fn resolve(
         consts: BTreeMap::new(),
         labels: BTreeMap::new(),
         routines: BTreeMap::new(),
+        owners: BTreeMap::new(),
+        current: String::new(),
         table: Labels::default(),
         errors: Vec::new(),
     };
@@ -590,6 +614,7 @@ pub(crate) fn resolve(
         }
     }
     for block in &blocks {
+        resolver.current.clone_from(&block.name);
         resolver.declare_label(&block.name, block.pos);
         resolver.declare_labels(&block.body);
         if block.kind == BlockKind::Routine {
