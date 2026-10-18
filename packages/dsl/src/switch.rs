@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use crate::ast::{Arm, Cond, Expr, ExprKind, File, Item, Stmt, StmtKind, Switch, SwitchKind};
 use crate::diagnostic::Pos;
@@ -157,9 +157,26 @@ impl Selector<'_> {
 
 /// Every switch name in the file, on both sides of every switch.
 #[derive(Default)]
-struct Names(BTreeSet<String>);
+struct Names {
+    kinds: BTreeMap<String, SwitchKind>,
+    conflicts: Vec<Diagnostic>,
+}
 
 impl Names {
+    fn add<T>(&mut self, switch: &Switch<T>) {
+        let kind = *self.kinds.entry(switch.name.clone()).or_insert(switch.kind);
+        if kind != switch.kind {
+            self.conflicts.push(Diagnostic::error(
+                switch.pos,
+                format!(
+                    "switch '{}' is a {} switch elsewhere",
+                    switch.name,
+                    kind.keyword()
+                ),
+            ));
+        }
+    }
+
     fn expr(&mut self, expr: &Expr) {
         match &expr.kind {
             ExprKind::Binary(_, lhs, rhs) | ExprKind::Range(lhs, rhs) => {
@@ -169,7 +186,7 @@ impl Names {
             ExprKind::Call(_, args) => args.iter().for_each(|a| self.expr(a)),
             ExprKind::Index(_, index) => self.expr(index),
             ExprKind::Switch(switch) => {
-                self.0.insert(switch.name.clone());
+                self.add(switch);
                 switch
                     .default
                     .iter()
@@ -183,7 +200,7 @@ impl Names {
     fn item(&mut self, item: &Item) {
         match item {
             Item::Switch(switch) => {
-                self.0.insert(switch.name.clone());
+                self.add(switch);
                 switch
                     .default
                     .iter()
@@ -205,7 +222,7 @@ impl Names {
     fn stmt(&mut self, stmt: &Stmt) {
         match &stmt.kind {
             StmtKind::Switch(switch) => {
-                self.0.insert(switch.name.clone());
+                self.add(switch);
                 switch
                     .default
                     .iter()
@@ -244,17 +261,20 @@ impl Names {
     }
 }
 
-/// Every switch name in the file.
-pub(crate) fn names(file: &File) -> BTreeSet<String> {
+/// Picks one side of every switch.
+///
+/// Fails on unknown switch names and on a name used with two kinds.
+pub(crate) fn select(file: File, selection: &Selection<'_>) -> Result<File> {
     let mut names = Names::default();
     file.items.iter().for_each(|i| names.item(i));
-    names.0
-}
-
-/// Picks one side of every switch. Fails on unknown switch names.
-pub(crate) fn select(file: File, selection: &Selection<'_>) -> Result<File> {
-    let known = names(&file);
-    if let Some(name) = selection.switches.iter().find(|n| !known.contains(*n)) {
+    if let Some(conflict) = names.conflicts.into_iter().next() {
+        return Err(conflict);
+    }
+    if let Some(name) = selection
+        .switches
+        .iter()
+        .find(|n| !names.kinds.contains_key(*n))
+    {
         return Err(Diagnostic::error(
             Pos::default(),
             format!("unknown switch '{name}'"),
