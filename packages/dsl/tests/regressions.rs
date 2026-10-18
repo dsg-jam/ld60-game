@@ -363,6 +363,40 @@ entry main {
 }
 
 #[test]
+fn recursion_fails_on_every_revision() {
+    let uncalled = "entry main {\n    wait\n    goto main\n}\nroutine z {\n    z()\n}\n";
+    let cycle = "\
+entry main {
+    p()
+    goto main
+}
+routine p {
+    q()
+}
+routine q {
+    p()
+}
+routine z {
+    z()
+}
+";
+    for revision in [Revision::A, Revision::B] {
+        let errors = tally(revision, uncalled).unwrap_err();
+        let found: Vec<_> = errors
+            .iter()
+            .map(|d| (d.line, d.message.as_str()))
+            .collect();
+        assert_eq!(found, [(8, "z calls itself")]);
+        let errors = tally(revision, cycle).unwrap_err();
+        let found: Vec<_> = errors
+            .iter()
+            .map(|d| (d.line, d.message.as_str()))
+            .collect();
+        assert_eq!(found, [(11, "p calls itself"), (14, "z calls itself")]);
+    }
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {

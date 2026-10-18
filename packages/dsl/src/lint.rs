@@ -175,6 +175,60 @@ pub(crate) fn lint(
     }
 }
 
+/// Finds routines that call themselves, called or not. Runs before
+/// legalization, so every revision reports the same errors.
+pub(crate) fn recursion(program: &Program) -> Result<(), Vec<Diagnostic>> {
+    fn visit(
+        program: &Program,
+        routine: LabelId,
+        stack: &mut Vec<LabelId>,
+        done: &mut Vec<LabelId>,
+        errors: &mut Vec<Diagnostic>,
+    ) {
+        let Some(block) = program.routine(routine) else {
+            return;
+        };
+        if done.contains(&routine) {
+            return;
+        }
+        stack.push(routine);
+        let mut calls = Vec::new();
+        Node::visit(&block.body, &mut |node| {
+            if let Stmt::Prim(Prim::Call(target)) = node.stmt {
+                calls.push((target, node.pos));
+            }
+        });
+        for (target, pos) in calls {
+            if stack.contains(&target) {
+                let name = program.routine(target).map_or("?", |r| r.name.as_str());
+                errors.push(Diagnostic::error(pos, format!("{name} calls itself")));
+            } else {
+                visit(program, target, stack, done, errors);
+            }
+        }
+        stack.pop();
+        done.push(routine);
+    }
+    let mut errors = Vec::new();
+    let mut done = Vec::new();
+    for block in &program.blocks {
+        if block.kind == BlockKind::Routine {
+            visit(
+                program,
+                block.label,
+                &mut Vec::new(),
+                &mut done,
+                &mut errors,
+            );
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
 fn reads_a(node: &Node) -> bool {
     match &node.stmt {
         Stmt::Prim(prim) => matches!(
