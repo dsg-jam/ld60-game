@@ -4,6 +4,7 @@ pub(crate) mod keypad;
 pub(crate) mod knob;
 pub(crate) mod latch_button;
 pub(crate) mod lcd;
+pub(crate) mod liquid;
 pub(crate) mod paper;
 pub(crate) mod screen;
 pub(crate) mod script;
@@ -23,6 +24,7 @@ impl Plugin for PartsPlugin {
             knob::KnobPlugin,
             latch_button::LatchButtonPlugin,
             lcd::LcdPlugin,
+            liquid::LiquidPlugin,
             paper::PaperPlugin,
             screen::ScreenPlugin,
             sticker::StickerPlugin,

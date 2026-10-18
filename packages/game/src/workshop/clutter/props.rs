@@ -3,6 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
+use crate::parts::liquid::Liquid;
 
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;
@@ -36,7 +37,7 @@ const SCREW_SHANK_LENGTH: f32 = 0.012;
 
 const CERAMIC: Color = Color::srgb_u8(0xe8, 0xe0, 0xd0);
 const STRIPE: Color = Color::srgb_u8(0x3a, 0x55, 0x7a);
-const COFFEE: Color = Color::srgb_u8(0x2a, 0x18, 0x10);
+const COFFEE: Color = Color::srgb_u8(0x12, 0x09, 0x05);
 const GRIP: Color = Color::srgb_u8(0xb0, 0x2e, 0x24);
 const STEEL: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
 
@@ -44,29 +45,18 @@ const STEEL: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
 pub(super) struct Finishes {
     ceramic: Handle<SurfaceMaterial>,
     stripe: Handle<SurfaceMaterial>,
-    coffee: Handle<StandardMaterial>,
     grip: Handle<SurfaceMaterial>,
     steel: Handle<SurfaceMaterial>,
 }
 
 impl Finishes {
-    pub(super) fn new(
-        materials: &mut Assets<StandardMaterial>,
-        surfaces: &mut Assets<SurfaceMaterial>,
-    ) -> Self {
-        let coffee = materials.add(StandardMaterial {
-            base_color: COFFEE,
-            perceptual_roughness: 0.6,
-            reflectance: 0.2,
-            ..default()
-        });
+    pub(super) fn new(surfaces: &mut Assets<SurfaceMaterial>) -> Self {
         let mut finish = |finish: Finish, color: Color| {
             surfaces.add(finish.material(color, Form::Freeform, 0.0))
         };
         Self {
             ceramic: finish(Finish::Ceramic, CERAMIC),
             stripe: finish(Finish::Ceramic, STRIPE),
-            coffee,
             grip: finish(Finish::Grip, GRIP),
             steel: finish(Finish::Metal, STEEL),
         }
@@ -117,7 +107,7 @@ impl Props<'_> {
         // clean line. It also keeps light from shining through the mug.
         parent.spawn((
             Mesh3d(self.meshes.add(Circle::new(MUG_RADIUS - MUG_WALL / 2.0))),
-            MeshMaterial3d(self.finishes.coffee.clone()),
+            Liquid::new(MUG_RADIUS - MUG_WALL, coffee_level, COFFEE),
             Transform::from_xyz(0.0, coffee_level, 0.0)
                 .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         ));
