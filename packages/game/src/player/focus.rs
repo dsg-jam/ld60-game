@@ -1,5 +1,11 @@
+use std::iter;
+
 use bevy::{
-    picking::{events::PointerPress, pointer::PointerButton},
+    picking::{
+        events::PointerPress,
+        hover::HoverMap,
+        pointer::{PointerButton, PointerId},
+    },
     prelude::*,
 };
 
@@ -146,4 +152,16 @@ impl Focused {
         commands.trigger(FocusOn { entity });
         Ok(serde_json::Value::Null)
     }
+}
+
+/// Entities under the mouse, each followed by its ancestors.
+pub(crate) fn under_mouse<'a>(
+    hovers: &'a HoverMap,
+    parents: &'a Query<&ChildOf>,
+) -> impl Iterator<Item = Entity> + 'a {
+    hovers
+        .get(&PointerId::Mouse)
+        .into_iter()
+        .flat_map(|hits| hits.keys())
+        .flat_map(|&hit| iter::once(hit).chain(parents.iter_ancestors(hit)))
 }

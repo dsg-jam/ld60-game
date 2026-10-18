@@ -5,7 +5,7 @@ use bevy::{
     camera::primitives::Aabb,
     light::NotShadowCaster,
     math::Affine3A,
-    picking::{hover::HoverMap, pointer::PointerId},
+    picking::hover::HoverMap,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -13,7 +13,7 @@ use bevy::{
 
 use super::{
     camera::PlayerCamera,
-    focus::{Focus, FocusTarget},
+    focus::{self, Focus, FocusTarget},
 };
 
 const COLOR: LinearRgba = LinearRgba::new(1.0, 0.98, 0.9, 1.0);
@@ -105,16 +105,10 @@ impl Shimmer {
         targets: &Query<(), With<FocusTarget>>,
         parents: &Query<&ChildOf>,
     ) -> Option<Entity> {
-        hovers
-            .get(&PointerId::Mouse)
-            .filter(|_| *state.get() == Focus::Desk)
-            .and_then(|hits| {
-                hits.keys().find_map(|&hit| {
-                    iter::once(hit)
-                        .chain(parents.iter_ancestors(hit))
-                        .find(|&entity| targets.contains(entity))
-                })
-            })
+        if *state.get() != Focus::Desk {
+            return None;
+        }
+        focus::under_mouse(hovers, parents).find(|&entity| targets.contains(entity))
     }
 
     /// Adds overlays to a newly hovered target.
