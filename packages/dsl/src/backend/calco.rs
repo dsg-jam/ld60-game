@@ -1,5 +1,5 @@
 use ld60_calco::datasheet::{INSTRUCTIONS, PORTS};
-use ld60_calco::{Addr, Cond as Jcc, Op, RAM_LEN, Revision};
+use ld60_calco::{Addr, Cond as Jcc, Op, RAM_LEN, ROM_LEN, Revision};
 use ld60_machine::Isa;
 
 use crate::backend::{Backend, Features, Port};
@@ -24,6 +24,7 @@ impl CalcoBackend {
             loops: has(Op::Djnz(0)) && has(Op::LdiB(0)),
             indexed: has(Op::Ld(Addr::Indexed(0))) && has(Op::St(Addr::Indexed(0))),
             ram_cells: RAM_LEN as u8,
+            rom_len: ROM_LEN,
             stack_depth: Some(STACK_DEPTH),
         };
         let ports = PORTS
@@ -92,7 +93,7 @@ impl CalcoBackend {
                 self.name()
             ));
         }
-        out.op(mnemonic(op), operands);
+        out.op(mnemonic(op), operands, usize::from(op.size()));
         Ok(())
     }
 
