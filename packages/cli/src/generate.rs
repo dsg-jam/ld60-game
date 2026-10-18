@@ -20,7 +20,7 @@ pub fn run(out: &mut impl Write, data_dir: &Path, check: bool) -> crate::Result<
             continue;
         };
         let text = std::fs::read_to_string(data_dir.join(&firmware.source))?;
-        let target = Target::new(level.chip, level.device);
+        let target = Target::new(level.chip, level.board());
         let pair = match compile_pair(&text, &target, &firmware.switches) {
             Ok(pair) => pair,
             Err(failures) => {

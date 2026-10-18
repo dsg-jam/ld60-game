@@ -6,14 +6,14 @@
 //!
 //! ```
 //! use ld60_calco::{ChipInfo, DateCode, Revision};
-//! use ld60_devices::{ChipSpec, DeviceKind};
+//! use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 //! use ld60_dsl::{Flavor, Selection, Target, compile};
 //!
 //! let chip = ChipSpec::Calco(ChipInfo {
 //!     revision: Revision::B,
 //!     date_code: DateCode::new(76, 30),
 //! });
-//! let target = Target::new(chip, DeviceKind::Tally2);
+//! let target = Target::new(chip, DeviceKind::Tally2.board(BoardRev::A));
 //! let source = "firmware \"Demo\" for tally2\nentry main {\n    wait\n    goto main\n}\n";
 //! let selection = Selection {
 //!     flavor: Flavor::Fixed,
