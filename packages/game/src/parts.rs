@@ -8,6 +8,7 @@ pub(crate) mod liquid;
 pub(crate) mod paper;
 pub(crate) mod screen;
 pub(crate) mod script;
+pub(crate) mod steam;
 pub(crate) mod sticker;
 
 use bevy::prelude::*;
@@ -27,6 +28,7 @@ impl Plugin for PartsPlugin {
             liquid::LiquidPlugin,
             paper::PaperPlugin,
             screen::ScreenPlugin,
+            steam::SteamPlugin,
             sticker::StickerPlugin,
         ));
     }

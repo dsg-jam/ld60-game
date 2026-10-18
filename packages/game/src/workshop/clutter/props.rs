@@ -4,12 +4,15 @@ use bevy::prelude::*;
 
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::parts::liquid::Liquid;
+use crate::parts::steam::Steam;
 
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;
 const MUG_WALL: f32 = 0.004;
 /// How far the coffee sits below the rim.
 const COFFEE_DROP: f32 = 0.014;
+/// How high the steam over the coffee reaches.
+const STEAM_HEIGHT: f32 = 0.35;
 const STRIPE_HEIGHT: f32 = 0.008;
 /// From the rim to the top of the stripe.
 const STRIPE_DROP: f32 = 0.012;
@@ -110,6 +113,13 @@ impl Props<'_> {
             Liquid::new(MUG_RADIUS - MUG_WALL, coffee_level, COFFEE),
             Transform::from_xyz(0.0, coffee_level, 0.0)
                 .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+        ));
+        parent.spawn((
+            Steam {
+                radius: MUG_RADIUS - MUG_WALL,
+                height: STEAM_HEIGHT,
+            },
+            Transform::from_xyz(0.0, coffee_level, 0.0),
         ));
     }
 
