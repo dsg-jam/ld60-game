@@ -1,6 +1,9 @@
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
-use ld60_levels::{CATALOG, TEST_SEEDS, Variant, initial_rom, run_line_tests};
+use ld60_levels::{Catalog, TEST_SEEDS, Variant, initial_rom, run_line_tests};
+
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
 
 /// Levels whose bug only the customer's tests find.
 const MISSED_BY_LINE_TESTS: &[&str] = &["summa6-05", "summa6-06"];
@@ -8,7 +11,7 @@ const MISSED_BY_LINE_TESTS: &[&str] = &["summa6-05", "summa6-06"];
 #[test]
 fn line_tests_catch_the_bug_unless_listed() {
     let mut failures = Vec::new();
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let original = Variant::original(source).unwrap();
         let level = &original.level;
         let rom = initial_rom(level, &original.buggy).unwrap();
@@ -25,7 +28,7 @@ fn line_tests_catch_the_bug_unless_listed() {
 fn every_level_is_solvable_and_starts_broken() {
     let mut failures = Vec::new();
     let mut ids = HashSet::new();
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         match Variant::original(source) {
             Ok(original) => match original.verify() {
                 Ok(()) if !ids.insert(original.level.id.clone()) => {
@@ -45,7 +48,7 @@ fn every_level_is_solvable_and_starts_broken() {
 
 #[test]
 fn tutorial_starts_on_the_smallest_chip() {
-    let chips: Vec<&str> = CATALOG[..2]
+    let chips: Vec<&str> = CATALOG.levels()[..2]
         .iter()
         .map(|source| source.load().unwrap().chip.isa().name())
         .collect();
@@ -57,7 +60,7 @@ fn tutorial_starts_on_the_smallest_chip() {
 #[test]
 fn most_seeds_give_a_rewrite() {
     const SEEDS: u64 = 64;
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let original = Variant::original(source).unwrap();
         if original.level.keeps_layout() {
             continue;
@@ -75,7 +78,7 @@ fn most_seeds_give_a_rewrite() {
 
 #[test]
 fn every_level_has_working_variants() {
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let original = Variant::original(source).unwrap();
         if original.level.keeps_layout() && original.level.allowed_boards().len() == 1 {
             continue;

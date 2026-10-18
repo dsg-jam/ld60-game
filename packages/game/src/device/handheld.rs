@@ -177,7 +177,7 @@ impl Handheld {
         let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
         let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
         let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, level);
-        let sticker_seed = Sticker::seed(&level.serial);
+        let sticker_seed = Sticker::seed(&level.serial());
         let sticker_spot = body
             .top_spot(model.sticker_spot)
             .with_y(body.min().y - STICKER_GAP);
@@ -237,7 +237,7 @@ impl Handheld {
         };
         Message::new("device-sticker")
             .with("name", Message::new(model.name))
-            .with("serial", level.serial.as_str())
+            .with("serial", level.serial())
             .with("board", level.board().name())
             .with("chip", chip)
     }

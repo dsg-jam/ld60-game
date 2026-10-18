@@ -1,5 +1,9 @@
+use std::sync::LazyLock;
+
 use ld60_dsl::{Flavor, Selection, Target, compile, compile_pair};
-use ld60_levels::{CATALOG, DATA_DIR, Variant};
+use ld60_levels::{Catalog, DATA_DIR, Variant};
+
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
 
 fn read(path: &str) -> String {
     std::fs::read_to_string(format!("{DATA_DIR}/{path}")).unwrap()
@@ -8,7 +12,7 @@ fn read(path: &str) -> String {
 #[test]
 fn generated_firmware_is_current() {
     let mut stale = Vec::new();
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let level = source.load().unwrap();
         let Some(firmware) = &level.firmware else {
             continue;
@@ -31,8 +35,8 @@ fn generated_firmware_is_current() {
             panic!("{}: {error}", source.path);
         }
         for (name, generated, committed) in [
-            ("buggy.asm", &pair.buggy.asm, source.buggy),
-            ("fixed.asm", &pair.fixed.asm, source.fixed),
+            ("buggy.asm", &pair.buggy.asm, &source.buggy),
+            ("fixed.asm", &pair.fixed.asm, &source.fixed),
         ] {
             if generated != committed {
                 stale.push(format!("{}/{name}\n{generated}", source.path));
@@ -49,18 +53,16 @@ fn generated_firmware_is_current() {
 #[test]
 fn every_level_is_generated() {
     let generated = CATALOG
+        .levels()
         .iter()
         .filter(|s| s.load().unwrap().firmware.is_some())
         .count();
-    assert_eq!(generated, CATALOG.len());
+    assert_eq!(generated, CATALOG.levels().len());
 }
 
 #[test]
 fn firmware_1_0_built_for_rev_a_fixes_the_clear_key_level() {
-    let source = CATALOG
-        .iter()
-        .find(|s| s.path == "tally2/01-clear-key")
-        .unwrap();
+    let source = CATALOG.find("tally2/01-clear-key").unwrap();
     let level = source.load().unwrap();
     let selection = Selection {
         flavor: Flavor::Fixed,
@@ -70,7 +72,7 @@ fn firmware_1_0_built_for_rev_a_fixes_the_clear_key_level() {
     let fixed = compile(&read("tally2/firmware-1.0.fw"), &target, &selection).unwrap();
     let variant = Variant {
         level,
-        buggy: source.buggy.into(),
+        buggy: source.buggy.clone(),
         fixed: fixed.asm,
     };
     variant.verify().unwrap();

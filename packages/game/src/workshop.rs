@@ -6,6 +6,7 @@ mod dust;
 mod front;
 pub(crate) mod job;
 mod lamp;
+pub(crate) mod levels;
 mod pickup;
 mod radio;
 mod receipt;
@@ -57,6 +58,7 @@ impl Plugin for WorkshopPlugin {
             datasheet::DatasheetPlugin,
             ticket::TicketPlugin,
             job::JobPlugin,
+            levels::LevelsPlugin,
             receipt::ReceiptPlugin,
             tools::ToolsPlugin,
             computer::ComputerPlugin,

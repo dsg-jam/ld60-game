@@ -3625,11 +3625,13 @@ dependencies = [
 name = "ld60-cli"
 version = "0.1.0"
 dependencies = [
+ "fluent-bundle",
  "ld60-calco",
  "ld60-devices",
  "ld60-dsl",
  "ld60-levels",
  "ld60-machine",
+ "unic-langid",
 ]
 
 [[package]]

@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::LevelError;
 
+/// A repair job.
+///
+/// Its text is in a Fluent message named after [`Level::id`]. The attributes
+/// of that message are [`Level::CUSTOMER`], [`Level::COMPLAINT`] and one
+/// [`Level::remark`] per remark. They get the arguments of
+/// [`Level::text_args`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Level {
     pub id: String,
@@ -19,15 +25,15 @@ pub struct Level {
     #[serde(default)]
     pub keep_layout: bool,
     pub chip: ChipSpec,
-    /// Printed on the sticker under the device and on the job ticket.
-    pub serial: String,
-    /// Notes from the intake bench, shown on the job ticket.
+    /// The unit number. [`Level::serial`] puts the board in front of it.
+    pub unit: String,
+    /// Notes from the intake bench, shown on the job ticket. Each is the
+    /// key of an attribute of the level's message, see [`Level::remark`].
     #[serde(default)]
     pub remarks: Vec<String>,
     pub rom: RomSpec,
     #[serde(default)]
     pub faults: Vec<Fault>,
-    pub customer: Customer,
     pub tests: Vec<TestCase>,
     pub reward: u32,
     /// Where `buggy.asm` and `fixed.asm` are generated from, if they are.
@@ -52,12 +58,6 @@ pub struct RomSpec {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Customer {
-    pub name: String,
-    pub complaint: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TestCase {
     /// Keys pressed after power on. Whitespace is ignored.
     pub keys: String,
@@ -65,6 +65,27 @@ pub struct TestCase {
 }
 
 impl Level {
+    /// The attribute that names the customer.
+    pub const CUSTOMER: &str = "customer";
+    /// The attribute with what the customer says is wrong.
+    pub const COMPLAINT: &str = "complaint";
+
+    /// The attribute for the remark `key`.
+    pub fn remark(key: &str) -> String {
+        format!("remark-{key}")
+    }
+
+    /// The arguments of the level's attributes: the board, like `6A`, as
+    /// `$board`.
+    pub fn text_args(&self) -> [(&'static str, String); 1] {
+        [("board", self.board().name())]
+    }
+
+    /// Printed on the sticker under the device and on the job ticket.
+    pub fn serial(&self) -> String {
+        format!("{}-{}", self.board().name(), self.unit)
+    }
+
     pub fn from_ron(source: &str) -> Result<Self, LevelError> {
         ron::from_str(source).map_err(|e| LevelError::Parse(e.to_string()))
     }

@@ -61,6 +61,7 @@ mod tests {
     use crate::locale::Localized;
     use crate::workshop::computer::editor::{Editor, footer::Status, undo::Undo};
     use crate::workshop::job::Job;
+    use crate::workshop::levels::Levels;
 
     #[test]
     fn notes_survive_a_new_job() {
@@ -71,7 +72,7 @@ mod tests {
             .spawn((Notes, EditableText::new("ADD IS 3 BYTES")))
             .id();
         for index in [0, 1] {
-            world.insert_resource(Job::load(index).unwrap().unwrap());
+            world.insert_resource(Job::load(&Levels::on_disk(), index).unwrap().unwrap());
             world.run_system_once(Editor::load_job).unwrap();
         }
         let text = world.get::<EditableText>(notes).unwrap();

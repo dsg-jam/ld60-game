@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use ld60_dsl::{Target, compile_pair};
-use ld60_levels::{CATALOG, Level};
+use ld60_levels::{Catalog, Level, LevelSource};
 
 /// Regenerates `buggy.asm` and `fixed.asm` of every level with a firmware
 /// source in `data_dir`.
@@ -13,9 +13,10 @@ use ld60_levels::{CATALOG, Level};
 pub fn run(out: &mut impl Write, data_dir: &Path, check: bool) -> crate::Result<bool> {
     let mut files: Vec<(String, PathBuf, String)> = Vec::new();
     let mut errors = Vec::new();
-    for source in CATALOG {
-        let dir = data_dir.join(source.path);
-        let level = Level::from_ron(&std::fs::read_to_string(dir.join("level.ron"))?)?;
+    let order = Catalog::order(&std::fs::read_to_string(data_dir.join(Catalog::FILE))?)?;
+    for path in order {
+        let file = |name| data_dir.join(LevelSource::file(&path, name));
+        let level = Level::from_ron(&std::fs::read_to_string(file(LevelSource::LEVEL_FILE))?)?;
         let Some(firmware) = &level.firmware else {
             continue;
         };
@@ -27,17 +28,20 @@ pub fn run(out: &mut impl Write, data_dir: &Path, check: bool) -> crate::Result<
                 errors.extend(
                     failures
                         .iter()
-                        .map(|e| format!("{}: {}:{e}", source.path, firmware.source)),
+                        .map(|e| format!("{path}: {}:{e}", firmware.source)),
                 );
                 continue;
             }
         };
-        for (name, output) in [("buggy.asm", pair.buggy), ("fixed.asm", pair.fixed)] {
-            let shown = format!("{}/{name}", source.path);
+        for (name, output) in [
+            (LevelSource::BUGGY_FILE, pair.buggy),
+            (LevelSource::FIXED_FILE, pair.fixed),
+        ] {
+            let shown = LevelSource::file(&path, name);
             for warning in &output.warnings {
                 writeln!(out, "{shown}: {}:{warning}", firmware.source)?;
             }
-            files.push((shown, dir.join(name), output.asm));
+            files.push((shown, file(name), output.asm));
         }
     }
     if !errors.is_empty() {

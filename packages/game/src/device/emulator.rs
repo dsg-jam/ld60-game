@@ -114,14 +114,15 @@ impl Emulator {
 
 #[cfg(test)]
 mod tests {
-    use ld60_levels::{CATALOG, device, initial_rom};
+    use ld60_levels::{Catalog, device, initial_rom};
 
     use super::*;
 
     fn tally() -> AnyDevice {
-        let source = &CATALOG[0];
+        let catalog = Catalog::on_disk().unwrap();
+        let source = &catalog.levels()[0];
         let level = source.load().unwrap();
-        let rom = initial_rom(&level, source.buggy).unwrap();
+        let rom = initial_rom(&level, &source.buggy).unwrap();
         device(&level, rom).unwrap()
     }
 

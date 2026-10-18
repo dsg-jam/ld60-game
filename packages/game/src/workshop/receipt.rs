@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use ld60_levels::Level;
 
 use super::counter::CounterLayout;
+use super::levels::Levels;
 use super::pickup::{Earnings, Pickup};
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
@@ -32,7 +33,7 @@ impl Plugin for ReceiptPlugin {
 #[require(Transform, Visibility)]
 pub(crate) struct Receipt {
     job: String,
-    customer: String,
+    customer: Message,
     pickup: Pickup,
     earnings: Earnings,
 }
@@ -41,7 +42,7 @@ impl Receipt {
     pub(crate) fn new(level: &Level, pickup: Pickup, earnings: Earnings) -> Self {
         Self {
             job: level.id.to_uppercase(),
-            customer: level.customer.name.clone(),
+            customer: Levels::text(level, Level::CUSTOMER),
             pickup,
             earnings,
         }
@@ -123,7 +124,7 @@ impl Receipt {
         page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
             ("ticket-job", Localized::verbatim(&self.job)),
-            ("ticket-customer", Localized::verbatim(&self.customer)),
+            ("ticket-customer", self.customer.clone().into()),
             (
                 "receipt-paid",
                 Message::new("receipt-amount").with("amount", paid).into(),

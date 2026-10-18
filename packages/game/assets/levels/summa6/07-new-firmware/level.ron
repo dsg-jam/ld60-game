@@ -3,16 +3,9 @@
     title: "The update",
     device: Summa6,
     chip: Calco((revision: B, date_code: 7630)),
-    serial: "6A-05102",
-    remarks: [
-        "Thinking 1.1, put in by the trader's office.",
-        "Gets stuck after +, - or =. Only putting it to sleep and waking it up again helps.",
-    ],
+    unit: "05102",
+    remarks: ["trader", "stuck"],
     rom: (kind: Eprom, blank_available: true),
-    customer: (
-        name: "Brakka, shop keeper",
-        complaint: "A trader gave it new thinking, version 1.1. It is shorter, he said. Now it freezes when I press +, - or =.",
-    ),
     tests: [
         (keys: "12+34=", display: "000046"),
         (keys: "99+1=", display: "000100"),

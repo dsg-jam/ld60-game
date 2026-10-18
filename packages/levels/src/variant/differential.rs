@@ -72,11 +72,13 @@ mod tests {
     use ld60_devices::{BoardRev, DeviceKind};
 
     use super::*;
-    use crate::CATALOG;
+    use crate::Catalog;
     use crate::variant::firmware::Firmware;
 
     fn moved_to_b(firmware: &str) -> (Variant, Variant) {
-        let source = CATALOG
+        let catalog = Catalog::on_disk().unwrap();
+        let source = catalog
+            .levels()
             .iter()
             .find(|s| s.path.starts_with("tally2"))
             .unwrap();
