@@ -73,6 +73,7 @@ impl Page {
         mut pages: Query<(Entity, &Page, &mut Node)>,
         mut title: Single<&mut Text, With<PageTitle>>,
         mut labels: Query<(&Command, &mut TextColor)>,
+        state: Res<State<Focus>>,
         mut focus: ResMut<InputFocus>,
     ) {
         title.0 = active.0.title().into();
@@ -83,7 +84,7 @@ impl Page {
                 PHOSPHOR_DIM
             };
         }
-        let at_computer = focus.get().is_some_and(|entity| pages.contains(entity));
+        let at_computer = *state.get() == Focus::Computer;
         for (entity, &page, mut node) in &mut pages {
             if page == active.0 {
                 node.display = Display::Flex;
