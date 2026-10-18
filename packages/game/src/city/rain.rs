@@ -1,8 +1,7 @@
 use bevy::{
-    asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
+    asset::{AssetPath, embedded_asset, embedded_path},
     camera::visibility::NoFrustumCulling,
     light::NotShadowCaster,
-    mesh::{Indices, PrimitiveTopology},
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -11,6 +10,7 @@ use rand::RngExt;
 
 use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
+use crate::geometry::quads::Quads;
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
 
@@ -104,27 +104,11 @@ impl RainMaterial {
     /// shader turns it into the falling streak.
     fn streaks() -> Mesh {
         let mut rng = rng(SEED);
-        let mut seeds = Vec::with_capacity(STREAKS * 4);
-        let mut uvs = Vec::with_capacity(STREAKS * 4);
-        let mut indices = Vec::with_capacity(STREAKS * 6);
-        for streak in 0..STREAKS as u32 {
-            let seed = [
-                rng.random::<f32>(),
-                rng.random::<f32>(),
-                rng.random::<f32>(),
-            ];
-            seeds.extend([seed; 4]);
-            uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
-            let base = streak * 4;
-            indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+        let mut quads = Quads::default();
+        for _ in 0..STREAKS {
+            quads.push(Vec3::new(rng.random(), rng.random(), rng.random()));
         }
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, seeds)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-        .with_inserted_indices(Indices::U32(indices))
+        quads.into_mesh()
     }
 
     /// Picks the lights that matter most near the player.

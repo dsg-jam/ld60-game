@@ -1,8 +1,7 @@
 use bevy::{
-    asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
+    asset::{AssetPath, embedded_asset, embedded_path},
     camera::visibility::NoFrustumCulling,
     light::NotShadowCaster,
-    mesh::{Indices, PrimitiveTopology},
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -12,6 +11,7 @@ use rand::RngExt;
 use super::buildings::Skyline;
 use super::rng;
 use super::weather::Weather;
+use crate::geometry::quads::Quads;
 
 const SEED: u64 = 7;
 const DROPS_PER_METER: f32 = 4.0;
@@ -92,16 +92,11 @@ impl DripMaterial {
     /// One quad per drop along each edge. The vertex shader lets them fall.
     fn drops(edges: &[DripEdge]) -> Mesh {
         let mut rng = rng(SEED);
-        let mut anchors = Vec::new();
-        let mut timings = Vec::new();
-        let mut lights = Vec::new();
-        let mut uvs = Vec::new();
-        let mut indices = Vec::new();
+        let mut quads = Quads::default();
         for edge in edges {
             let count = (edge.from.distance(edge.to) * DROPS_PER_METER).ceil() as usize;
             let light = edge.light.to_linear();
             for _ in 0..count {
-                let base = anchors.len() as u32;
                 let anchor = edge.from.lerp(edge.to, rng.random::<f32>());
                 let timing = [
                     rng.random_range(PERIOD.0..PERIOD.1),
@@ -109,22 +104,10 @@ impl DripMaterial {
                     0.0,
                 ];
                 let light = [light.red, light.green, light.blue, rng.random::<f32>()];
-                anchors.extend([anchor.to_array(); 4]);
-                timings.extend([timing; 4]);
-                lights.extend([light; 4]);
-                uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
-                indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+                quads.push_with(anchor, timing, light);
             }
         }
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, anchors)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, timings)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, lights)
-        .with_inserted_indices(Indices::U32(indices))
+        quads.into_mesh()
     }
 
     fn follow_weather(

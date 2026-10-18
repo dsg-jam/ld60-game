@@ -2,6 +2,7 @@ import bevy_pbr::render::{
     mesh_view_bindings::{globals, view},
     view_transformations::position_world_to_clip,
 };
+import package::geometry::streak::{across, streak};
 
 struct Rain {
     /// Corner of the box the rain falls in.
@@ -37,31 +38,25 @@ struct Streak {
     @location(2) thinning: f32,
 }
 
-/// Roughly the angle a pixel covers, in radians.
-const PIXEL_ANGLE: f32 = 0.0012;
-
 @vertex
 fn vertex(vertex: Vertex) -> Streak {
     let drop = rain.origin + fract(vertex.seed + rain.fall * globals.time / rain.size) * rain.size;
-    let along = normalize(rain.fall);
-    let side = normalize(cross(along, view.world_position - drop));
-    let width = max(rain.width, distance(drop, view.world_position) * PIXEL_ANGLE);
-    let world = drop + side * (vertex.uv.x - 0.5) * width + along * (vertex.uv.y - 0.5) * rain.length;
+    let along = normalize(rain.fall) * rain.length;
+    let shape = streak(drop - along * 0.5, along, rain.width, vertex.uv, view.world_position);
     var out: Streak;
-    out.clip = position_world_to_clip(world);
+    out.clip = position_world_to_clip(shape.world);
     // Light rain drops some of the streaks.
     if fract(vertex.seed.x * 13.7 + vertex.seed.z * 7.1) >= rain.amount {
         out.clip = vec4<f32>(0.0);
     }
     out.uv = vertex.uv;
-    out.world = world;
-    out.thinning = rain.width / width;
+    out.world = shape.world;
+    out.thinning = shape.thinning;
     return out;
 }
 
 @fragment
 fn fragment(in: Streak) -> @location(0) vec4<f32> {
-    let across = 1.0 - abs(in.uv.x * 2.0 - 1.0);
     let along = smoothstep(0.0, 0.3, in.uv.y) * (1.0 - in.uv.y * 0.6);
     // Rain only shows where light falls on it.
     var light = vec3<f32>(0.6, 0.7, 1.0) * rain.ambient;
@@ -71,5 +66,5 @@ fn fragment(in: Streak) -> @location(0) vec4<f32> {
         light += rain.colors[i].rgb * lamp.w / (1.0 + dot(d, d) * 0.25);
     }
     let fade = 1.0 - smoothstep(12.0, 25.0, distance(in.world, view.world_position));
-    return vec4<f32>(light * across * along * fade * in.thinning, 0.0);
+    return vec4<f32>(light * across(in.uv) * along * fade * in.thinning, 0.0);
 }
