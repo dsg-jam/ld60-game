@@ -4,6 +4,9 @@ The Tally 2 is a 2-digit tally counter by DSG Electronics. It runs a
 [CalCo](../isa/calco.md) chip with the firmware in a 256 byte EPROM socket.
 It is the first job on the bench.
 
+Early units have a CalCo Rev A, which only supports a few instructions. Later
+units have a Rev B. Check the chip sticker before you change the firmware.
+
 ## Display
 
 `M1` and `M2` are shown on the display, left to right. `M2` is the rightmost
