@@ -106,7 +106,12 @@ impl Command {
 #[derive(Event, Debug)]
 pub(super) struct Run(pub(super) Command);
 
+/// The device runs new firmware built from this source.
+#[derive(Event, Debug)]
+pub(super) struct Flashed(pub(super) String);
+
 impl Run {
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
@@ -115,6 +120,7 @@ impl Run {
         mut emulators: Query<&mut Emulator>,
         mut status: Single<&mut Text, (With<Status>, Without<Command>)>,
         mut labels: Query<(&Command, &mut Text), Without<Status>>,
+        mut commands: Commands,
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
@@ -135,7 +141,7 @@ impl Run {
                 Err(err) => Self::describe(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
-                Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source),
+                Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source, &mut commands),
                 Err(_) => "NO DEVICE CONNECTED".into(),
             },
         };
@@ -144,7 +150,12 @@ impl Run {
 
     /// Burns `source` into the device and powers it on. Testing it is up to
     /// the player.
-    fn flash(job: &mut Job, emulator: &mut Emulator, source: &str) -> String {
+    fn flash(
+        job: &mut Job,
+        emulator: &mut Emulator,
+        source: &str,
+        commands: &mut Commands,
+    ) -> String {
         let assembly = match ld60_levels::assemble(&job.level, source) {
             Ok(assembly) => assembly,
             Err(err) => return Self::describe(&err),
@@ -158,6 +169,7 @@ impl Run {
             Err(err) => return Self::describe(&err),
         };
         emulator.restart(device);
+        commands.trigger(Flashed(source.into()));
         job.flashed = true;
         "FLASHED. DEVICE RESTARTED.".into()
     }
