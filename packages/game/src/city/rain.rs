@@ -131,8 +131,8 @@ impl RainMaterial {
     /// Picks the lights that matter most near the player.
     fn light_up(
         camera: Single<&GlobalTransform, With<PlayerCamera>>,
-        spots: Query<(&SpotLight, &GlobalTransform)>,
-        points: Query<(&PointLight, &GlobalTransform)>,
+        spots: Query<(&SpotLight, &GlobalTransform, &InheritedVisibility)>,
+        points: Query<(&PointLight, &GlobalTransform, &InheritedVisibility)>,
         weather: Res<Weather>,
         rains: Query<&MeshMaterial3d<RainMaterial>>,
         mut materials: ResMut<Assets<RainMaterial>>,
@@ -141,10 +141,11 @@ impl RainMaterial {
         let mut lights: Vec<(Vec3, f32, Color)> =
             spots
                 .iter()
-                .map(|(light, at)| (at.translation(), light.intensity * SPOT_SCALE, light.color))
-                .chain(points.iter().map(|(light, at)| {
-                    (at.translation(), light.intensity * POINT_SCALE, light.color)
-                }))
+                .filter(|(_, _, visible)| visible.get())
+                .map(|(light, at, _)| (at.translation(), light.intensity * SPOT_SCALE, light.color))
+                .chain(points.iter().filter(|(_, _, visible)| visible.get()).map(
+                    |(light, at, _)| (at.translation(), light.intensity * POINT_SCALE, light.color),
+                ))
                 .filter(|(at, _, _)| at.z < shop::FRONT)
                 .collect();
         let weight =
