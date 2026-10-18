@@ -1,10 +1,15 @@
+#[cfg(test)]
+mod check;
 mod localized;
 mod messages;
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
-use bevy::prelude::*;
-use fluent_bundle::{FluentArgs, FluentResource, FluentValue, concurrent::FluentBundle};
+use bevy::{prelude::*, text::detect_text_needs_rerender, ui::UiSystems};
+use fluent_bundle::{
+    FluentArgs, FluentError, FluentResource, FluentValue, concurrent::FluentBundle,
+};
 use unic_langid::{LanguageIdentifier, langid};
 
 pub(crate) use self::localized::{Arg, Localized, Message};
@@ -31,7 +36,13 @@ impl Plugin for LocalePlugin {
         app.init_asset::<Messages>()
             .init_asset_loader::<MessagesLoader>()
             .init_resource::<Locale>()
-            .add_systems(Update, (Locale::assemble, Localized::show).chain());
+            .add_systems(Update, Locale::assemble)
+            .add_systems(
+                PostUpdate,
+                Localized::show
+                    .before(UiSystems::Content)
+                    .before(detect_text_needs_rerender),
+            );
     }
 }
 
@@ -42,35 +53,6 @@ pub(crate) struct Locale {
     files: Vec<Handle<Messages>>,
     /// Empty until all files are loaded.
     bundle: Option<FluentBundle<Arc<FluentResource>>>,
-}
-
-#[cfg(test)]
-impl Locale {
-    /// The messages of the default language, read straight from the files.
-    pub(crate) fn on_disk() -> Self {
-        let dir = format!("{}/assets/locales/{LANGUAGE}", env!("CARGO_MANIFEST_DIR"));
-        let files = FILES.iter().map(|file| {
-            let source = std::fs::read_to_string(format!("{dir}/{file}")).unwrap();
-            Arc::new(FluentResource::try_new(source).unwrap())
-        });
-        Self {
-            language: LANGUAGE,
-            files: Vec::new(),
-            bundle: Some(Self::bundle(&LANGUAGE, files)),
-        }
-    }
-
-    /// Whether the message or its attribute exists.
-    pub(crate) fn has(&self, message: &Message) -> bool {
-        let found = self
-            .bundle
-            .as_ref()
-            .and_then(|bundle| bundle.get_message(&message.id));
-        match &message.attribute {
-            Some(attribute) => found.is_some_and(|found| found.get_attribute(attribute).is_some()),
-            None => found.is_some_and(|found| found.value().is_some()),
-        }
-    }
 }
 
 impl FromWorld for Locale {
@@ -99,39 +81,53 @@ impl Locale {
     }
 
     fn message(&self, message: &Message) -> String {
+        let mut problems = Vec::new();
+        let text = self.format(message, &mut problems);
+        for problem in problems {
+            warn!("{}: {problem}", self.language);
+        }
+        text
+    }
+
+    /// Formats `message` and adds what went wrong to `problems`.
+    fn format(&self, message: &Message, problems: &mut Vec<String>) -> String {
         let Some(bundle) = &self.bundle else {
             return String::new();
-        };
-        let id = match &message.attribute {
-            Some(attribute) => format!("{}.{attribute}", message.id),
-            None => message.id.to_string(),
-        };
-        let found = bundle.get_message(&message.id);
-        let pattern = match &message.attribute {
-            Some(attribute) => found
-                .and_then(|found| found.get_attribute(attribute))
-                .map(|attribute| attribute.value()),
-            None => found.and_then(|found| found.value()),
-        };
-        let Some(pattern) = pattern else {
-            warn!("no message `{id}` in {}", self.language);
-            return id;
         };
         let mut args = FluentArgs::new();
         for (name, arg) in &message.args {
             let value = match arg {
                 Arg::Number(number) => FluentValue::from(*number),
                 Arg::Text(text) => FluentValue::from(text.as_str()),
-                Arg::Message(message) => FluentValue::from(self.message(message)),
+                Arg::Message(message) => FluentValue::from(self.format(message, problems)),
             };
             args.set(*name, value);
         }
         let mut errors = Vec::new();
-        let text = bundle.format_pattern(pattern, Some(&args), &mut errors);
+        let Some(text) = Self::format_pattern(bundle, message, &args, &mut errors) else {
+            problems.push(format!("no message `{}`", message.key()));
+            return message.key();
+        };
         for error in errors {
-            warn!("message `{id}`: {error}");
+            problems.push(format!("message `{}`: {error}", message.key()));
         }
         text.into_owned()
+    }
+
+    /// Formats the message or attribute that `message` names, if there is
+    /// one.
+    fn format_pattern<'bundle>(
+        bundle: &'bundle FluentBundle<Arc<FluentResource>>,
+        message: &Message,
+        args: &FluentArgs,
+        errors: &mut Vec<FluentError>,
+    ) -> Option<Cow<'bundle, str>> {
+        let found = bundle.get_message(&message.id)?;
+        let pattern = match &message.attribute {
+            Some(attribute) => found.get_attribute(attribute)?.value(),
+            None => found.value()?,
+        };
+        Some(bundle.format_pattern(pattern, Some(args), errors))
     }
 
     /// Puts the files together once they are all loaded, and again when one

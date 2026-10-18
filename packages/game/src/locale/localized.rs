@@ -47,10 +47,22 @@ impl Localized {
         Self::Verbatim(text.into())
     }
 
-    pub(super) fn show(locale: Res<Locale>, mut texts: Query<(Ref<Localized>, &mut Text)>) {
-        for (localized, mut text) in &mut texts {
-            if locale.is_changed() || localized.is_changed() {
-                text.0 = locale.text(&localized);
+    /// Formats every text when the messages change, otherwise only the
+    /// changed ones.
+    pub(super) fn show(
+        locale: Res<Locale>,
+        mut texts: Query<(&Localized, &mut Text)>,
+        changed: Query<Entity, Changed<Localized>>,
+    ) {
+        if locale.is_changed() {
+            for (localized, mut text) in &mut texts {
+                text.0 = locale.text(localized);
+            }
+        } else {
+            for entity in &changed {
+                if let Ok((localized, mut text)) = texts.get_mut(entity) {
+                    text.0 = locale.text(localized);
+                }
             }
         }
     }
@@ -79,6 +91,14 @@ impl Message {
     pub(crate) fn with(mut self, name: &'static str, arg: impl Into<Arg>) -> Self {
         self.args.push((name, arg.into()));
         self
+    }
+
+    /// The ID, with the attribute after a dot.
+    pub(super) fn key(&self) -> String {
+        match &self.attribute {
+            Some(attribute) => format!("{}.{attribute}", self.id),
+            None => self.id.to_string(),
+        }
     }
 }
 

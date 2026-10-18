@@ -124,22 +124,28 @@ impl Datasheet {
         }
     }
 
+    /// The contents of each page.
+    const PAGES: [fn(&mut ChildSpawnerCommands, Revision); 4] = [
+        Self::overview,
+        Self::instructions,
+        Self::conditions,
+        Self::errata,
+    ];
+
+    fn footer(revision: Revision) -> Message {
+        Message::new("datasheet-footer").with("revision", revision.to_string())
+    }
+
     fn print(commands: &mut Commands, canvas: &UiCanvas, revision: Revision) -> Vec<Entity> {
-        let footer = Message::new("datasheet-footer").with("revision", revision.to_string());
-        let contents: [fn(&mut ChildSpawnerCommands, Revision); _] = [
-            Self::overview,
-            Self::instructions,
-            Self::conditions,
-            Self::errata,
-        ];
-        contents
+        let footer = Self::footer(revision);
+        Self::PAGES
             .iter()
             .enumerate()
             .map(|(index, content)| {
                 Paper::spawn_page(
                     commands,
                     canvas,
-                    (index + 1, contents.len()),
+                    (index + 1, Self::PAGES.len()),
                     footer.clone(),
                     |page| content(page, revision),
                 )
@@ -245,12 +251,7 @@ impl Datasheet {
             page.spawn(Paper::row([
                 (Localized::verbatim(format!("{:X}", cond.code())), 40.0),
                 (Localized::verbatim(cond.mnemonic()), 80.0),
-                (
-                    Message::new("datasheet-condition")
-                        .with("condition", cond.description())
-                        .into(),
-                    440.0,
-                ),
+                (Self::condition(cond).into(), 440.0),
             ]));
         }
         let compares = if revision.supports(Op::Cmp(Addr::Direct(0))) {
@@ -273,6 +274,17 @@ impl Datasheet {
         }
     }
 
+    /// When the jump of `cond` is taken.
+    fn condition(cond: Cond) -> Message {
+        Message::new(match cond {
+            Cond::Always => "datasheet-condition-always",
+            Cond::Zero => "datasheet-condition-zero",
+            Cond::NotZero => "datasheet-condition-not-zero",
+            Cond::Carry => "datasheet-condition-carry",
+            Cond::NoCarry => "datasheet-condition-no-carry",
+        })
+    }
+
     fn errata(page: &mut ChildSpawnerCommands, revision: Revision) {
         page.spawn(Paper::heading(Message::new("datasheet-errata")));
         let errata: Vec<_> = Erratum::ALL
@@ -292,6 +304,23 @@ impl Datasheet {
                 Message::new("datasheet-affects").with("chips", erratum.affected_chips()),
             ));
             page.spawn(Paper::text(Localized::verbatim(erratum.description())));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+
+    #[test]
+    fn every_page_formats() {
+        let locale = Locale::on_disk();
+        for revision in Revision::ALL {
+            locale.assert_formats([Datasheet::footer(revision)]);
+            for content in Datasheet::PAGES {
+                locale.assert_formats(Localized::spawned_by(|page| content(page, revision)));
+            }
         }
     }
 }

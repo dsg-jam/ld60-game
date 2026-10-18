@@ -119,3 +119,15 @@ impl ActivePage {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+
+    #[test]
+    fn every_title_formats() {
+        let titles = [Page::Source, Page::Notes, Page::Versions].map(Page::title);
+        Locale::on_disk().assert_formats(titles);
+    }
+}

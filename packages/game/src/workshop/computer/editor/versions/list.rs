@@ -1,4 +1,10 @@
+use std::time::Duration;
+
+use ld60_levels::LevelError;
+
+use super::changes::LineChanges;
 use crate::locale::Message;
+use crate::workshop::job::Job;
 
 /// Most versions a job keeps, including the factory firmware. The player
 /// can save one less, so a restore always has room to keep the changes.
@@ -46,6 +52,26 @@ pub(super) enum SaveError {
     Full,
     /// The same source is already saved under this number.
     Duplicate(u32),
+}
+
+impl Version {
+    /// The time on the job, the lines changed from the factory firmware and
+    /// how the source assembles.
+    pub(super) fn label(job: &Job, factory: &str, source: &str, on_job: Duration) -> Message {
+        let seconds = on_job.as_secs();
+        let changes = LineChanges::between(factory, source);
+        let assembled = match ld60_levels::assemble(&job.level, source) {
+            Ok(assembly) => Message::new("editor-version-bytes").with("bytes", assembly.byte_len()),
+            Err(LevelError::Assemble(errors)) => {
+                Message::new("editor-version-errors").with("errors", errors.len())
+            }
+            Err(_) => Message::new("editor-version-error"),
+        };
+        Message::new("editor-version-label")
+            .with("time", format!("{:02}:{:02}", seconds / 60, seconds % 60))
+            .with("changes", changes.to_string())
+            .with("result", assembled)
+    }
 }
 
 impl VersionList {

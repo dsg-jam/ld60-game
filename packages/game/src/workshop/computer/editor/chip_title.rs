@@ -20,7 +20,7 @@ impl ChipTitle {
             |job| job.level.chip.isa().name().to_uppercase(),
         );
         for mut title in &mut titles {
-            *title = Localized::verbatim(name.clone());
+            title.set_if_neq(Localized::verbatim(name.clone()));
         }
     }
 }

@@ -41,6 +41,8 @@ pub(crate) enum Complaint {
         keys: String,
         expected: String,
         shown: String,
+        /// Some digits showed broken segments.
+        broken: bool,
     },
     /// The device stopped responding during `keys`.
     Froze { keys: String },
@@ -69,12 +71,15 @@ impl Pickup {
                 tries_left,
             } => (
                 complaint,
-                Message::new("note-tries-left").with("tries", *tries_left),
+                Message::new("receipt-note-tries-left").with("tries", *tries_left),
             ),
-            Self::Left(complaint) => (complaint, Message::new("note-gave-up").with("tries", TRIES)),
+            Self::Left(complaint) => (
+                complaint,
+                Message::new("receipt-note-gave-up").with("tries", TRIES),
+            ),
         };
         Some(
-            Message::new("note")
+            Message::new("receipt-note")
                 .with("complaint", complaint.note())
                 .with("reaction", reaction),
         )
@@ -102,27 +107,52 @@ impl Complaint {
     /// What the customer says they did and saw.
     fn note(&self) -> Message {
         match self {
-            Self::Dead => Message::new("note-dead"),
+            Self::Dead => Message::new("receipt-note-dead"),
             Self::Wrong {
                 keys,
                 expected,
                 shown,
+                broken,
             } => {
-                // The readout prints broken segments as `?`.
-                let id = match (keys.is_empty(), shown.contains('?')) {
-                    (true, false) => "note-woke-said",
-                    (true, true) => "note-woke-squiggles",
-                    (false, false) => "note-pressed-said",
-                    (false, true) => "note-pressed-squiggles",
+                let id = match (keys.is_empty(), *broken) {
+                    (true, false) => "receipt-note-woke-said",
+                    (true, true) => "receipt-note-woke-squiggles",
+                    (false, false) => "receipt-note-pressed-said",
+                    (false, true) => "receipt-note-pressed-squiggles",
                 };
                 Message::new(id)
                     .with("keys", keys.as_str())
                     .with("shown", shown.as_str())
                     .with("expected", expected.as_str())
             }
-            Self::Froze { keys } if keys.is_empty() => Message::new("note-woke-froze"),
-            Self::Froze { keys } => Message::new("note-pressed-froze").with("keys", keys.as_str()),
+            Self::Froze { keys } if keys.is_empty() => Message::new("receipt-note-woke-froze"),
+            Self::Froze { keys } => {
+                Message::new("receipt-note-pressed-froze").with("keys", keys.as_str())
+            }
         }
+    }
+}
+
+#[cfg(test)]
+impl Complaint {
+    /// One complaint for each sentence of the note.
+    pub(crate) fn examples() -> Vec<Self> {
+        let wrong = |keys: &str, broken| Self::Wrong {
+            keys: keys.into(),
+            expected: "000046".into(),
+            shown: if broken { "0?0040" } else { "000040" }.into(),
+            broken,
+        };
+        let froze = |keys: &str| Self::Froze { keys: keys.into() };
+        vec![
+            Self::Dead,
+            wrong("", false),
+            wrong("", true),
+            wrong("12+34=", false),
+            wrong("12+34=", true),
+            froze(""),
+            froze("12+"),
+        ]
     }
 }
 
@@ -139,6 +169,8 @@ impl From<&Outcome> for Complaint {
                 keys,
                 expected: outcome.case.display.clone(),
                 shown: shown.clone(),
+                // The readout prints broken segments as `?`.
+                broken: shown.contains('?'),
             },
             Err(_) => Self::Froze { keys },
         }
@@ -206,10 +238,11 @@ mod tests {
             keys: "12+34=".into(),
             expected: "000046".into(),
             shown: "000040".into(),
+            broken: false,
         };
         assert_eq!(
             wrong.note(),
-            Message::new("note-pressed-said")
+            Message::new("receipt-note-pressed-said")
                 .with("keys", "12+34=")
                 .with("shown", "000040")
                 .with("expected", "000046")
@@ -218,10 +251,11 @@ mod tests {
             keys: String::new(),
             expected: "000000".into(),
             shown: "0?00?0".into(),
+            broken: true,
         };
         assert_eq!(
             garbage.note(),
-            Message::new("note-woke-squiggles")
+            Message::new("receipt-note-woke-squiggles")
                 .with("keys", "")
                 .with("shown", "0?00?0")
                 .with("expected", "000000")
@@ -229,7 +263,7 @@ mod tests {
         let froze = Complaint::Froze {
             keys: String::new(),
         };
-        assert_eq!(froze.note(), Message::new("note-woke-froze"));
+        assert_eq!(froze.note(), Message::new("receipt-note-woke-froze"));
     }
 
     #[test]
@@ -242,11 +276,11 @@ mod tests {
         assert_eq!(
             note,
             Some(
-                Message::new("note")
-                    .with("complaint", Message::new("note-dead"))
+                Message::new("receipt-note")
+                    .with("complaint", Message::new("receipt-note-dead"))
                     .with(
                         "reaction",
-                        Message::new("note-tries-left").with("tries", 2_u32)
+                        Message::new("receipt-note-tries-left").with("tries", 2_u32)
                     )
             )
         );

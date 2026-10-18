@@ -1,5 +1,6 @@
 mod emulator;
 mod handheld;
+mod name;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -10,6 +11,7 @@ use bevy::{
 
 pub(crate) use self::emulator::Emulator;
 pub(crate) use self::handheld::Handheld;
+pub(crate) use self::name::{BoardLetter, DeviceName};
 use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};

@@ -11,7 +11,7 @@ use ld60_machine::AsmError;
 
 use super::Editor;
 use super::lexer::{Kind, Lexicon};
-use crate::workshop::job::Job;
+use crate::workshop::job::{Job, JobId};
 
 const MNEMONIC: Color = Color::srgb(0.82, 1.0, 0.84);
 const DIRECTIVE: Color = Color::srgb(0.95, 1.0, 0.6);
@@ -38,7 +38,7 @@ const MARGIN_LINES: usize = 16;
 #[require(Text, TextLayout = TextLayout::no_wrap(), Pickable = Pickable::IGNORE)]
 pub(super) struct Highlight {
     source: String,
-    job: Option<usize>,
+    job: Option<JobId>,
     lexicon: Lexicon,
     marks: Marks,
     /// The source lines the spans show.
@@ -92,11 +92,11 @@ impl Highlight {
     ) {
         let (root, mut highlight, mut padding, font, children) = overlay.into_inner();
         let highlight = &mut *highlight;
-        let job_index = job.as_ref().map(|job| job.index);
+        let job_id = job.as_ref().map(|job| job.id);
         // Includes text the IME is still composing.
         let source = editor.editor().raw_text();
         let changed =
-            job_index != highlight.job || (editor.is_changed() && source != highlight.source);
+            job_id != highlight.job || (editor.is_changed() && source != highlight.source);
         if changed {
             let isa = job.as_ref().map(|job| job.isa());
             highlight.lexicon = isa.map(|isa| Lexicon::new(isa, source)).unwrap_or_default();
@@ -105,7 +105,7 @@ impl Highlight {
                 .unwrap_or_default();
             highlight.marks = Marks::new(&errors);
             highlight.source = source.to_owned();
-            highlight.job = job_index;
+            highlight.job = job_id;
         }
         let lines = highlight.visible(&editor.viewport);
         if !changed && lines == highlight.lines {

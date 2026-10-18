@@ -1,11 +1,12 @@
 use bevy::prelude::*;
-use ld60_devices::{ChipSpec, DeviceKind, RomKind};
+use ld60_devices::{ChipSpec, RomKind};
 use ld60_levels::Level;
 
 use super::job::Job;
 use super::levels::Levels;
-use super::service;
+use super::service::ServiceSheet;
 use crate::audio::{Play, Sound};
+use crate::device::DeviceName;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
@@ -35,6 +36,9 @@ const STAMP_START_SCALE: f32 = 1.7;
 const STAMP_INK: Color = Color::srgba(0.72, 0.12, 0.1, 0.8);
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 440.0;
+
+/// Writes the contents of a page about the job.
+type PageContent = fn(&mut ChildSpawnerCommands, &Level);
 
 pub(crate) struct TicketPlugin;
 
@@ -79,31 +83,17 @@ impl JobTicket {
         };
         let level = &ticket.level;
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
-        let pages = vec![
-            Paper::spawn_page(
-                &mut commands,
-                &canvas,
-                (1, 3),
-                Message::new("ticket-footer"),
-                |page| {
-                    Self::write(page, level);
-                },
-            ),
-            Paper::spawn_page(
-                &mut commands,
-                &canvas,
-                (2, 3),
-                service::footer(level.device),
-                |page| service::write(page, level.board()),
-            ),
-            Paper::spawn_page(
-                &mut commands,
-                &canvas,
-                (3, 3),
-                service::footer(level.device),
-                |page| service::write_line_tests(page, level.device),
-            ),
-        ];
+        let pages = Self::pages(level);
+        let count = pages.len();
+        let pages = pages
+            .into_iter()
+            .enumerate()
+            .map(|(index, (footer, content))| {
+                Paper::spawn_page(&mut commands, &canvas, (index + 1, count), footer, |page| {
+                    content(page, level);
+                })
+            })
+            .collect();
         let board = Block::new(BOARD_SIZE);
         let clip = Block::new(CLIP_SIZE)
             .on_top_of(&board)
@@ -134,14 +124,29 @@ impl JobTicket {
         ));
     }
 
+    /// The footer and contents of each page on the clipboard.
+    fn pages(level: &Level) -> [(Message, PageContent); 3] {
+        let sheet = ServiceSheet::new(level.board());
+        [
+            (Message::new("ticket-footer"), Self::write),
+            (sheet.footer(), |page, level| {
+                ServiceSheet::new(level.board()).write(page);
+            }),
+            (sheet.footer(), |page, level| {
+                ServiceSheet::new(level.board()).write_line_tests(page);
+            }),
+        ]
+    }
+
+    /// The job number, as the ticket and the receipt print it.
+    pub(super) fn job(level: &Level) -> Localized {
+        Localized::verbatim(level.id.to_uppercase())
+    }
+
     fn write(page: &mut ChildSpawnerCommands, level: &Level) {
-        let device = match level.device {
-            DeviceKind::Tally2 => "ticket-device-tally2",
-            DeviceKind::Summa6 => "ticket-device-summa6",
-        };
         let chip = match level.chip {
             ChipSpec::Calco(info) => Message::new("ticket-chip-calco")
-                .with("revision", format!("{:?}", info.revision))
+                .with("revision", info.revision.to_string())
                 .with("date-code", info.date_code.to_string()),
         };
         let rom = match (level.rom.kind, level.rom.blank_available) {
@@ -153,12 +158,12 @@ impl JobTicket {
         page.spawn(Paper::title(Message::new("ticket-title")));
         page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
-            ("ticket-job", Localized::verbatim(level.id.to_uppercase())),
+            ("ticket-job", Self::job(level)),
             (
                 "ticket-customer",
                 Levels::text(level, Level::CUSTOMER).into(),
             ),
-            ("ticket-device", Message::new(device).into()),
+            ("ticket-device", level.device.name().into()),
             ("ticket-serial", Localized::verbatim(level.serial())),
             ("ticket-board", Localized::verbatim(level.board().name())),
             ("ticket-chip", chip.into()),
@@ -209,7 +214,7 @@ impl TicketStatus {
         mut commands: Commands,
     ) {
         for mut text in &mut texts {
-            *text = Self::text(Some(&job)).into();
+            text.set_if_neq(Self::text(Some(&job)).into());
         }
         for (stamp, mut visibility, landing) in &mut stamps {
             if !job.stamped {
@@ -297,9 +302,9 @@ impl ShopStamp {
                 },
                 BorderColor::all(STAMP_INK),
                 children![
-                    ink(20.0, Message::new("stamp-authorized").into()),
+                    ink(20.0, Message::new("ticket-stamp-authorized").into()),
                     ink(64.0, Localized::verbatim("DSG")),
-                    ink(22.0, Message::new("stamp-shop").into()),
+                    ink(22.0, Message::new("ticket-stamp-shop").into()),
                     (
                         Node {
                             width: percent(100),
@@ -308,9 +313,41 @@ impl ShopStamp {
                         },
                         BackgroundColor(STAMP_INK),
                     ),
-                    ink(16.0, Message::new("stamp-care").into()),
+                    ink(16.0, Message::new("ticket-stamp-care").into()),
                 ],
             )],
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+    use crate::workshop::levels::Levels;
+
+    #[test]
+    fn every_page_formats() {
+        let locale = Locale::on_disk();
+        for source in Levels::on_disk().levels() {
+            let level = source.load().unwrap();
+            for (footer, content) in JobTicket::pages(&level) {
+                locale.assert_formats([footer]);
+                locale.assert_formats(Localized::spawned_by(|page| content(page, &level)));
+            }
+        }
+    }
+
+    #[test]
+    fn every_status_formats() {
+        let mut job = Job::load(&Levels::on_disk(), 0).unwrap().unwrap();
+        let mut statuses = vec![TicketStatus::text(None), TicketStatus::text(Some(&job))];
+        job.returns = 1;
+        statuses.push(TicketStatus::text(Some(&job)));
+        job.flashed = true;
+        statuses.push(TicketStatus::text(Some(&job)));
+        job.stamped = true;
+        statuses.push(TicketStatus::text(Some(&job)));
+        Locale::on_disk().assert_formats(statuses);
     }
 }

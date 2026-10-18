@@ -6,7 +6,7 @@ use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
 use ld60_levels::{Level, LevelError};
 
 use super::emulator::Emulator;
-use super::{DeviceButton, Holdable};
+use super::{DeviceButton, DeviceName, Holdable};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
@@ -73,7 +73,6 @@ const TALLY2_ROWS: &[&[KeyDef<char>]] = &[&[
 ]];
 
 const SUMMA6: Model = Model {
-    name: "device-name-summa6",
     body_size: Vec3::new(0.09, 0.014, 0.15),
     body: Color::srgb_u8(0x3d, 0x44, 0x50),
     lcd_width: 0.07,
@@ -85,7 +84,6 @@ const SUMMA6: Model = Model {
 };
 
 const TALLY2: Model = Model {
-    name: "device-name-tally2",
     body_size: Vec3::new(0.065, 0.02, 0.085),
     body: Color::srgb_u8(0x8a, 0x3b, 0x2e),
     lcd_width: 0.03,
@@ -98,8 +96,6 @@ const TALLY2: Model = Model {
 
 /// Shape and keys of one device kind.
 struct Model {
-    /// The message printed on the sticker.
-    name: &'static str,
     body_size: Vec3,
     body: Color,
     /// Width of the LCD. Its height follows the canvas.
@@ -176,7 +172,7 @@ impl Handheld {
         let keypad = Keypad::new(model.rows, &STYLE, &body, model.keypad_spot);
         let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
         let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
-        let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, level);
+        let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, level);
         let sticker_seed = Sticker::seed(&level.serial());
         let sticker_spot = body
             .top_spot(model.sticker_spot)
@@ -229,14 +225,14 @@ impl Handheld {
         ld60_levels::device(&self.level, rom)
     }
 
-    fn sticker_text(model: &Model, level: &Level) -> Message {
+    fn sticker_text(level: &Level) -> Message {
         let chip = match level.chip {
             ChipSpec::Calco(info) => Message::new("device-chip-calco")
-                .with("revision", format!("{:?}", info.revision))
+                .with("revision", info.revision.to_string())
                 .with("date-code", info.date_code.to_string()),
         };
         Message::new("device-sticker")
-            .with("name", Message::new(model.name))
+            .with("name", level.device.plate())
             .with("serial", level.serial())
             .with("board", level.board().name())
             .with("chip", chip)
@@ -246,7 +242,6 @@ impl Handheld {
         commands: &mut Commands,
         images: &mut Assets<Image>,
         owner: Entity,
-        model: &Model,
         level: &Level,
     ) -> Handle<Image> {
         let canvas = UiCanvas::spawn(commands, images, STICKER_CANVAS, owner);
@@ -262,7 +257,7 @@ impl Handheld {
             BackgroundColor(STICKER_PAPER),
             canvas.target(),
             children![(
-                Localized::from(Self::sticker_text(model, level)),
+                Localized::from(Self::sticker_text(level)),
                 TextFont {
                     font_size: FontSize::Px(STICKER_FONT_SIZE),
                     ..default()
@@ -271,5 +266,21 @@ impl Handheld {
             )],
         ));
         canvas.image
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+    use crate::workshop::levels::Levels;
+
+    #[test]
+    fn stickers_format() {
+        let locale = Locale::on_disk();
+        for source in Levels::on_disk().levels() {
+            let level = source.load().unwrap();
+            locale.assert_formats([Handheld::sticker_text(&level)]);
+        }
     }
 }

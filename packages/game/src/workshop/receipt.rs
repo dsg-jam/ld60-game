@@ -4,6 +4,7 @@ use ld60_levels::Level;
 use super::counter::CounterLayout;
 use super::levels::Levels;
 use super::pickup::{Earnings, Pickup};
+use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
@@ -32,7 +33,7 @@ impl Plugin for ReceiptPlugin {
 #[derive(Component, Clone, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Receipt {
-    job: String,
+    job: Localized,
     customer: Message,
     pickup: Pickup,
     earnings: Earnings,
@@ -41,7 +42,7 @@ pub(crate) struct Receipt {
 impl Receipt {
     pub(crate) fn new(level: &Level, pickup: Pickup, earnings: Earnings) -> Self {
         Self {
-            job: level.id.to_uppercase(),
+            job: JobTicket::job(level),
             customer: Levels::text(level, Level::CUSTOMER),
             pickup,
             earnings,
@@ -123,7 +124,7 @@ impl Receipt {
         page.spawn(Paper::title(Message::new(title)));
         page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
-            ("ticket-job", Localized::verbatim(&self.job)),
+            ("ticket-job", self.job.clone()),
             ("ticket-customer", self.customer.clone().into()),
             (
                 "receipt-paid",
@@ -136,12 +137,38 @@ impl Receipt {
             ]));
         }
         if let Some(note) = self.pickup.note() {
-            page.spawn(Paper::heading(Message::new("receipt-note")));
+            page.spawn(Paper::heading(Message::new("receipt-note-heading")));
             page.spawn(Paper::text(Message::new("paper-quote").with("text", note)));
         }
         page.spawn(Paper::heading(Message::new("receipt-till")));
         page.spawn(Paper::text(
             Message::new("receipt-till-total").with("amount", self.earnings.0),
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+    use crate::workshop::levels::Levels;
+    use crate::workshop::pickup::Complaint;
+
+    #[test]
+    fn every_receipt_formats() {
+        let locale = Locale::on_disk();
+        let level = Levels::on_disk().levels()[0].load().unwrap();
+        let mut pickups = vec![Pickup::Paid(10)];
+        for complaint in Complaint::examples() {
+            pickups.push(Pickup::HandedBack {
+                complaint: complaint.clone(),
+                tries_left: 2,
+            });
+            pickups.push(Pickup::Left(complaint));
+        }
+        for pickup in pickups {
+            let receipt = Receipt::new(&level, pickup, Earnings(10));
+            locale.assert_formats(Localized::spawned_by(|page| receipt.write(page)));
+        }
     }
 }
