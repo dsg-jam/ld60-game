@@ -20,6 +20,7 @@ use crate::workshop::job::Job;
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Command {
     Notes,
+    Versions,
     Assemble,
     Flash,
     Clicks,
@@ -30,11 +31,18 @@ pub(super) enum Command {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 4] = [Self::Notes, Self::Assemble, Self::Flash, Self::Clicks];
+    pub(super) const ALL: [Self; 5] = [
+        Self::Notes,
+        Self::Versions,
+        Self::Assemble,
+        Self::Flash,
+        Self::Clicks,
+    ];
 
     fn key(self) -> KeyCode {
         match self {
             Self::Notes => KeyCode::F2,
+            Self::Versions => KeyCode::F3,
             Self::Assemble => KeyCode::F5,
             Self::Flash => KeyCode::F6,
             Self::Clicks => KeyCode::F8,
@@ -44,6 +52,7 @@ impl Command {
     pub(super) fn label(self, clicks: bool) -> String {
         match self {
             Self::Notes => "F2 NOTES".into(),
+            Self::Versions => "F3 VERSIONS".into(),
             Self::Assemble => "F5 ASSEMBLE".into(),
             Self::Flash => "F6 FLASH".into(),
             Self::Clicks => format!("F8 CLICKS {}", if clicks { "ON" } else { "OFF" }),
@@ -109,7 +118,7 @@ impl Run {
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
-            (Command::Notes, _) => return,
+            (Command::Notes | Command::Versions, _) => return,
             (Command::Clicks, _) => {
                 clicks.0 = !clicks.0;
                 for (command, mut text) in &mut labels {
