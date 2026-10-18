@@ -16,6 +16,7 @@ mod locale;
 mod menu;
 mod parts;
 mod player;
+mod typeface;
 mod workshop;
 
 use bevy::asset::AssetMetaCheck;
@@ -54,6 +55,7 @@ fn main() -> AppExit {
         menu::MenuPlugin,
         parts::PartsPlugin,
         player::PlayerPlugin,
+        typeface::TypefacePlugin,
         workshop::WorkshopPlugin,
         device::DevicePlugin,
     ));
