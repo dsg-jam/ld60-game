@@ -25,6 +25,14 @@ impl Block {
         }
     }
 
+    /// The block spanning two opposite corners.
+    pub(crate) fn between(a: Vec3, b: Vec3) -> Self {
+        Self {
+            center: (a + b) / 2.0,
+            size: (b - a).abs(),
+        }
+    }
+
     pub(crate) fn min(&self) -> Vec3 {
         self.center - self.size / 2.0
     }

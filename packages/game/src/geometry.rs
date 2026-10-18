@@ -1,4 +1,5 @@
 pub(crate) mod block;
+pub(crate) mod frame;
 pub(crate) mod shape;
 pub(crate) mod surface;
 

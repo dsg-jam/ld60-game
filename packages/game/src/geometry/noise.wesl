@@ -8,6 +8,7 @@ fn pcg(seed: u32) -> u32 {
     return (word >> 22u) ^ word;
 }
 
+const PI: f32 = 3.1415927;
 const TAU: f32 = 6.2831853;
 const MAX_U32: f32 = 4294967295.0;
 

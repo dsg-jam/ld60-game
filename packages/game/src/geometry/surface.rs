@@ -42,6 +42,8 @@ pub(crate) enum Finish {
     Planks = 8,
     /// Plastic with ribs around its local Y axis, for handles.
     Grip = 9,
+    /// Metal sheet with rows of round holes, like a speaker grille.
+    Perforated = 10,
 }
 
 /// The shape a [`Finish`] covers, which decides where its edges wear.
@@ -117,7 +119,7 @@ impl Finish {
     fn roughness(self) -> f32 {
         match self {
             Self::Ceramic => 0.25,
-            Self::Metal => 0.35,
+            Self::Metal | Self::Perforated => 0.35,
             Self::Plastic => 0.5,
             Self::Paint | Self::Grip => 0.6,
             Self::Wood | Self::Planks => 0.65,
@@ -129,7 +131,7 @@ impl Finish {
 
     fn metallic(self) -> f32 {
         match self {
-            Self::Metal => 1.0,
+            Self::Metal | Self::Perforated => 1.0,
             _ => 0.0,
         }
     }
