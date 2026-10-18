@@ -21,8 +21,9 @@ fn run(data_dir: &Path, check: bool) -> (bool, String) {
     (current, String::from_utf8(out).unwrap())
 }
 
-fn scratch() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ld60-generate-{}", std::process::id()));
+fn scratch(tag: &str) -> PathBuf {
+    let name = format!("ld60-generate-{tag}-{}", std::process::id());
+    let dir = std::env::temp_dir().join(name);
     let _ = std::fs::remove_dir_all(&dir);
     copy_dir(Path::new(DATA_DIR), &dir);
     dir
@@ -36,7 +37,7 @@ fn check_passes_on_the_committed_files() {
 
 #[test]
 fn check_catches_stale_files_and_gen_fixes_them() {
-    let dir = scratch();
+    let dir = scratch("stale");
     let fixed = dir.join("summa6/02-last-digit/fixed.asm");
     let text = std::fs::read_to_string(&fixed).unwrap();
     std::fs::write(&fixed, text.replace("LDI  B, 6", "LDI  B, 7")).unwrap();
@@ -63,5 +64,25 @@ fn check_catches_stale_files_and_gen_fixes_them() {
 
     let (current, _) = run(&dir, true);
     assert!(current);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_failing_level_stops_all_writes() {
+    let dir = scratch("fail");
+    let fixed = dir.join("tally2/02-double-count/fixed.asm");
+    std::fs::write(&fixed, "stale").unwrap();
+    let source = dir.join("summa6/firmware.fw");
+    let text = std::fs::read_to_string(&source).unwrap();
+    let broken = format!("{text}\nblock broken {{\n    goto nowhere\n}}\n");
+    std::fs::write(&source, broken).unwrap();
+
+    let mut out = Vec::new();
+    let error = ld60_cli::generate::run(&mut out, &dir, false).unwrap_err();
+    assert!(
+        error.to_string().contains("unknown label 'nowhere'"),
+        "{error}"
+    );
+    assert_eq!(std::fs::read_to_string(&fixed).unwrap(), "stale");
     let _ = std::fs::remove_dir_all(&dir);
 }
