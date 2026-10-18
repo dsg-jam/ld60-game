@@ -3587,6 +3587,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ld60-dsl"
+version = "0.1.0"
+dependencies = [
+ "ld60-calco",
+ "ld60-devices",
+ "ld60-machine",
+]
+
+[[package]]
 name = "ld60-game"
 version = "0.1.0"
 dependencies = [

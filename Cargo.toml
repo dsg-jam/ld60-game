@@ -16,6 +16,7 @@ publish = false
 ld60-asm = { path = "packages/asm" }
 ld60-calco = { path = "packages/calco" }
 ld60-devices = { path = "packages/devices" }
+ld60-dsl = { path = "packages/dsl" }
 ld60-levels = { path = "packages/levels" }
 ld60-machine = { path = "packages/machine" }
 
