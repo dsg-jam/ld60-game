@@ -12,6 +12,7 @@ publish = { workspace = true }
 [dependencies]
 ld60-calco = { workspace = true }
 ld60-devices = { workspace = true }
+ld60-dsl = { workspace = true }
 ld60-levels = { workspace = true }
 ld60-machine = { workspace = true }
 
