@@ -45,7 +45,7 @@ impl Plugin for EditorPlugin {
         .add_systems(Update, Editor::load_job)
         .add_systems(
             Update,
-            ChipTitle::update.run_if(resource_exists_and_changed::<Job>),
+            ChipTitle::update.run_if(resource_changed_or_removed::<Job>),
         )
         .add_observer(Editor::indent_on_tab)
         .add_observer(Command::run_on_key)
@@ -94,7 +94,10 @@ impl Editor {
                         ..default()
                     },
                     BackgroundColor(PHOSPHOR),
-                    children![title("FIRMWARE EDITOR"), (title(""), ChipTitle)],
+                    children![
+                        title("FIRMWARE EDITOR"),
+                        (title(ChipTitle::NONE), ChipTitle)
+                    ],
                 ),
                 (
                     Editor,
