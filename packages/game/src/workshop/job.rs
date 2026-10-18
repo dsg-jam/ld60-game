@@ -2,6 +2,7 @@ use std::error::Error;
 
 use bevy::prelude::*;
 use ld60_levels::{CATALOG, GAME_SEED, Level, LevelError, Variant};
+use ld60_machine::Isa;
 
 use super::desk::DeskLayout;
 use super::pickup::{Complaint, Earnings, Pickup};
@@ -70,6 +71,11 @@ impl Job {
             flashed: false,
             stamped: false,
         }))
+    }
+
+    /// The instruction set the firmware of this job is written in.
+    pub(crate) fn isa(&self) -> &'static dyn Isa {
+        self.level.chip.isa()
     }
 
     fn spawn_items(job: Option<Res<Job>>, mut commands: Commands) {

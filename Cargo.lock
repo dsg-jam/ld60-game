@@ -3604,6 +3604,7 @@ dependencies = [
  "ld60-calco",
  "ld60-devices",
  "ld60-levels",
+ "ld60-machine",
  "rand",
  "serde_json",
 ]
