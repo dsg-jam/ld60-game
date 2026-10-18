@@ -1,0 +1,115 @@
+//! Compiler for the level firmware language. See `docs/dsl.md`.
+//!
+//! One source file describes a firmware. `bug`, `fix` and `change` switches
+//! pick the buggy and the fixed version from it. The output is assembly that
+//! looks hand written.
+//!
+//! ```
+//! use ld60_calco::{ChipInfo, DateCode, Revision};
+//! use ld60_devices::{ChipSpec, DeviceKind};
+//! use ld60_dsl::{Flavor, Selection, Target, compile};
+//!
+//! let chip = ChipSpec::Calco(ChipInfo {
+//!     revision: Revision::B,
+//!     date_code: DateCode::new(76, 30),
+//! });
+//! let target = Target::new(chip, DeviceKind::Tally2);
+//! let source = "firmware \"Demo\" for tally2\nentry main {\n    wait\n    goto main\n}\n";
+//! let selection = Selection {
+//!     flavor: Flavor::Fixed,
+//!     switches: &[],
+//! };
+//! let output = compile(source, &target, &selection).unwrap();
+//! assert!(output.asm.contains("main:   HLT"));
+//! ```
+
+mod ast;
+mod backend;
+mod diagnostic;
+mod emit;
+mod hir;
+mod labels;
+mod legalize;
+mod lexer;
+mod lint;
+mod literal;
+mod parser;
+mod print;
+mod resolve;
+mod switch;
+mod target;
+
+pub use diagnostic::{Diagnostic, Severity};
+pub use target::Target;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Flavor {
+    Buggy,
+    Fixed,
+}
+
+/// Which firmware to build and which switches the level turns on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Selection<'a> {
+    pub flavor: Flavor,
+    pub switches: &'a [String],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Output {
+    pub asm: String,
+    pub warnings: Vec<Diagnostic>,
+}
+
+/// The buggy and the fixed firmware of one level.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pair {
+    pub buggy: Output,
+    pub fixed: Output,
+}
+
+/// Compiles one firmware. The output always assembles for the target chip.
+pub fn compile(
+    source: &str,
+    target: &Target,
+    selection: &Selection<'_>,
+) -> Result<Output, Vec<Diagnostic>> {
+    let backend = target.backend.as_ref();
+    let file = parser::parse(source).map_err(|e| vec![e])?;
+    let file = switch::select(file, selection).map_err(|e| vec![e])?;
+    let program = resolve::resolve(&file, target)?;
+    let program = legalize::legalize(program, backend)?;
+    let warnings = lint::lint(&program, backend.features(), selection.flavor)?;
+    let emitted = emit::emit(&program, backend).map_err(|e| vec![e])?;
+    let names = emitted
+        .labels
+        .name(&emitted.lines, |instr| backend.label_role(instr));
+    let asm = print::print(&program, &emitted.lines, &names);
+    if let Err(errors) = target.chip.isa().assemble(&asm) {
+        return Err(errors
+            .into_iter()
+            .map(|e| {
+                Diagnostic::error(
+                    diagnostic::Pos::default(),
+                    format!("generated line {}: {}", e.line, e.message),
+                )
+            })
+            .collect());
+    }
+    Ok(Output { asm, warnings })
+}
+
+/// Compiles the buggy and the fixed firmware.
+///
+/// Fails if a switch name does not exist in the source.
+pub fn compile_pair(
+    source: &str,
+    target: &Target,
+    switches: &[String],
+) -> Result<Pair, Vec<Diagnostic>> {
+    let build = |flavor| compile(source, target, &Selection { flavor, switches });
+    Ok(Pair {
+        buggy: build(Flavor::Buggy)?,
+        fixed: build(Flavor::Fixed)?,
+    })
+}
