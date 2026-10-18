@@ -57,7 +57,7 @@ impl PlayerCamera {
             .and_then(|entity| targets.get(entity).ok())
             .map(|(target, global)| match target.view {
                 View::Local(view) => global.mul_transform(view).compute_transform(),
-                View::Seated => camera.seat,
+                View::World(view) => view,
             });
         let (goal, decay_rate) = match focus_view {
             Some(view) => (view, DECAY_RATE),

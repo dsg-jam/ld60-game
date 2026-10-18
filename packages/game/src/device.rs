@@ -14,8 +14,12 @@ use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
 
-/// Distance of a held device from the player's eyes.
-const HOLD_DISTANCE: f32 = 0.24;
+/// How far a held device lifts off the desk.
+const LIFT: f32 = 0.1;
+/// How much a held device faces up rather than towards the player.
+const TILT_UP: f32 = 0.8;
+/// Distance of the player's eyes from a held device.
+const VIEW_DISTANCE: f32 = 0.26;
 /// Radians of rotation per pixel dragged.
 const DRAG_SPEED: f32 = 0.01;
 /// How quickly a device moves between the desk and the hand.
@@ -30,6 +34,7 @@ impl Plugin for DevicePlugin {
             .add_systems(
                 Update,
                 (
+                    Holdable::frame,
                     Holdable::follow,
                     DeviceButton::send_keys.after(PressableKey::update),
                     DeviceKey::log,
@@ -88,15 +93,36 @@ impl Holdable {
         }
         commands.entity(add.entity).insert(FocusTarget {
             focus: Focus::Device,
-            view: View::Seated,
+            view: View::World(Transform::IDENTITY),
         });
     }
 
-    /// Pose in front of the seated player, with the top facing them.
+    /// Pose lifted above its resting place. The top tilts towards the player
+    /// but stays in the light from above.
     fn held_pose(&self, seat: Transform) -> Transform {
-        let face_player = Quat::from_rotation_x(FRAC_PI_2);
-        Transform::from_translation(seat.translation + seat.forward() * HOLD_DISTANCE)
-            .with_rotation(seat.rotation * self.spin * face_player)
+        let center = self.held_center();
+        let towards = (seat.translation - center).normalize() + Vec3::Y * TILT_UP;
+        let facing = Transform::from_translation(center + towards).looking_at(center, Vec3::Y);
+        let face_up = Quat::from_rotation_x(FRAC_PI_2);
+        Transform::from_translation(center).with_rotation(facing.rotation * self.spin * face_up)
+    }
+
+    fn held_center(&self) -> Vec3 {
+        self.rest.translation + Vec3::Y * LIFT
+    }
+
+    /// The player leans in from the seat to look at the held device.
+    fn view(&self, seat: Transform) -> Transform {
+        let center = self.held_center();
+        let towards_seat = (seat.translation - center).normalize();
+        Transform::from_translation(center + towards_seat * VIEW_DISTANCE)
+            .looking_at(center, Vec3::Y)
+    }
+
+    fn frame(camera: Single<&PlayerCamera>, mut targets: Query<(&Holdable, &mut FocusTarget)>) {
+        for (holdable, mut target) in &mut targets {
+            target.view = View::World(holdable.view(camera.seat()));
+        }
     }
 
     fn follow(
