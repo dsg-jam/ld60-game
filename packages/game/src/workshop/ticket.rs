@@ -1,8 +1,6 @@
-use std::error::Error;
-
 use bevy::prelude::*;
 use ld60_devices::{ChipSpec, DeviceKind, RomKind};
-use ld60_levels::{Level, LevelSource};
+use ld60_levels::Level;
 
 use super::job::Job;
 use super::service;
@@ -56,12 +54,14 @@ impl Plugin for TicketPlugin {
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct JobTicket {
-    level: &'static LevelSource,
+    level: Level,
 }
 
 impl JobTicket {
-    pub(crate) fn for_level(level: &'static LevelSource) -> Self {
-        Self { level }
+    pub(crate) fn for_level(level: &Level) -> Self {
+        Self {
+            level: level.clone(),
+        }
     }
 
     fn on_add(
@@ -75,21 +75,11 @@ impl JobTicket {
         let Ok(ticket) = tickets.get(add.entity) else {
             return;
         };
-        let level = match ticket.level.load() {
-            Ok(level) => level,
-            Err(err) => {
-                error!(
-                    error = &err as &dyn Error,
-                    "level {} does not load", ticket.level.path
-                );
-                return;
-            }
-        };
-
+        let level = &ticket.level;
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let pages = vec![
             Paper::spawn_page(&mut commands, &canvas, (1, 2), FOOTER, |page| {
-                Self::write(page, &level);
+                Self::write(page, level);
             }),
             Paper::spawn_page(
                 &mut commands,
