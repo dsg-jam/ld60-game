@@ -20,6 +20,18 @@ pub struct Level {
     pub customer: Customer,
     pub tests: Vec<TestCase>,
     pub reward: u32,
+    /// Where `buggy.asm` and `fixed.asm` are generated from, if they are.
+    #[serde(default)]
+    pub firmware: Option<FirmwareSource>,
+}
+
+/// A firmware source file and the switches a level turns on.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FirmwareSource {
+    /// Path relative to [`DATA_DIR`](crate::DATA_DIR).
+    pub source: String,
+    #[serde(default)]
+    pub switches: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
