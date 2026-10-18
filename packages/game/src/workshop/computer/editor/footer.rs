@@ -143,7 +143,7 @@ impl Run {
             Ok(device) => device,
             Err(err) => return Self::describe(&err),
         };
-        *emulator = Emulator::power_on(device);
+        emulator.restart(device);
         job.flashed = true;
         "FLASHED. DEVICE RESTARTED.".into()
     }
