@@ -1,7 +1,7 @@
-# CalCo ISA, Revision A
+# CalCo ISA
 
-CalCo is an 8-bit calculator coprocessor. Revision A drives a 6-digit adding
-machine. It works with decimal digits, one digit per byte.
+CalCo is an 8-bit calculator coprocessor. It drives adding machines and tally
+counters. It works with decimal digits, one digit per byte.
 
 ## Programmer model
 
@@ -116,12 +116,30 @@ DS:  if C = 1:    A <- A + 10
 `DA` expects A in the range 0 to 19. `DS` keeps C set so the borrow moves to the
 next digit.
 
+## Revisions
+
+All revisions use the same encoding and assembly syntax. They differ in the
+instructions they support.
+
+| Revision | `IN REV` | Supported instructions                                                                  |
+| -------- | -------- | --------------------------------------------------------------------------------------- |
+| A        | 0x10     | `NOP`, `HLT`, `INC`, `LD Mn`, `ST Mn`, `LDI A, ii`, `CPI ii`, `IN p`, `JMP`, `JZ`, `JC` |
+| B        | 0x20     | All                                                                                     |
+| C        | 0x30     | All                                                                                     |
+
+Rev A has just enough to count key presses. It waits for a key, reads it,
+compares it and counts digits with `INC`. It has no B register instructions, no
+stack, no arithmetic and no output port.
+
+The assembler rejects instructions that the revision does not support. The chip
+runs them like reserved encodings.
+
 ## Ports
 
 | Port | Name  | Dir | Function                                            |
 | ---- | ----- | --- | --------------------------------------------------- |
 | 0    | `KEY` | in  | Last key code, or 0xFF if none. Reading clears it.  |
-| F    | `REV` | in  | Chip revision. Rev A returns 0x10.                  |
+| F    | `REV` | in  | Chip revision. See [Revisions](#revisions).         |
 | 0    | `ANN` | out | Annunciators. The board decides what each bit does. |
 
 The board defines the key codes and the annunciators. See the device docs,
@@ -131,7 +149,7 @@ for example [Summa 6](../devices/summa6.md).
 
 | Bug                                | Affects                       |
 | ---------------------------------- | ----------------------------- |
-| `DS` clears C when the result is 0 | Rev A, date codes before 7624 |
+| `DS` clears C when the result is 0 | Rev B, date codes before 7624 |
 
 When `DS` adds 10 and the result is 0, C is cleared instead of kept. The borrow
 to the next digit is lost.
