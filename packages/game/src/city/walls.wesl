@@ -3,7 +3,7 @@
 
 import package::geometry::noise::{hash1, noise};
 
-/// Matches `Cladding` in `buildings.rs`.
+/// Matches `Cladding` in `buildings/cladding.rs`.
 const CONCRETE: u32 = 0u;
 const PANELS: u32 = 1u;
 const TILES: u32 = 2u;
@@ -21,13 +21,15 @@ const SALT: vec3<f32> = vec3<f32>(0.5, 0.5, 0.47);
 const STREAKY: f32 = 0.4;
 
 /// A brick or tile of a regular pattern, and how close to its joint a point
-/// is. `shift` moves every other row along by that share of a unit.
+/// is.
 struct Unit {
     id: vec2<f32>,
     /// Distance to the nearest joint, in meters.
     joint: f32,
 }
 
+/// The unit at `wall`. `shift` moves every other row along by that share of
+/// a unit.
 fn unit(wall: vec2<f32>, size: vec2<f32>, shift: f32) -> Unit {
     let row = floor(wall.y / size.y);
     let x = wall.x / size.x + shift * (row % 2.0);

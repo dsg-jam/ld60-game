@@ -79,6 +79,23 @@ impl Kit {
             block.transform().with_scale(block.size),
         )
     }
+
+    /// A bar from `a` to `b`, `thickness` wide and deep.
+    fn bar<M: Material>(&self, a: Vec3, b: Vec3, thickness: f32, material: Handle<M>) -> Part<M> {
+        let along = b - a;
+        let up = if along.normalize_or_zero().y.abs() > 0.9 {
+            Vec3::X
+        } else {
+            Vec3::Y
+        };
+        (
+            Mesh3d(self.cube.clone()),
+            MeshMaterial3d(material),
+            Transform::from_translation((a + b) / 2.0)
+                .looking_to(along, up)
+                .with_scale(Vec3::new(thickness, thickness, along.length())),
+        )
+    }
 }
 
 /// The street has more lights than Bevy expects by default. Without more room

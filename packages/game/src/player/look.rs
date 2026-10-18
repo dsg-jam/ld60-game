@@ -52,8 +52,8 @@ pub(crate) struct LookAngles {
 }
 
 impl LookAngles {
-    /// Turns the head of `seat`: yaw around the world up axis, pitch around
-    /// the camera's own right axis.
+    /// Turns the head of `seat` by adding the look angles to its own yaw and
+    /// pitch, without roll.
     pub(crate) fn apply(&self, seat: Transform) -> Transform {
         let (yaw, pitch, _) = seat.rotation.to_euler(EulerRot::YXZ);
         seat.with_rotation(Quat::from_euler(

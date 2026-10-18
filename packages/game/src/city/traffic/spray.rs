@@ -11,12 +11,12 @@ use rand::RngExt;
 
 use super::super::rng;
 use super::super::weather::Weather;
+use super::models::WHEELBASE;
 
 const SEED: u64 = 6;
 /// Droplets per rear wheel. The front wheels throw fewer.
 const DROPLETS: usize = 80;
 const FRONT_DROPLETS: usize = 24;
-const WHEELBASE: f32 = 1.45;
 /// Distance of the wheels from the middle of the car.
 const TRACK: f32 = 0.85;
 const LIFETIME: f32 = 0.6;

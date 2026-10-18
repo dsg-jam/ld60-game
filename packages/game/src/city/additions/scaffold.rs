@@ -43,8 +43,11 @@ impl Additions {
         let top = wall.footing + lifts as f32 * LIFT;
         let inner = GAP;
         let outer = GAP + DEPTH;
+        // Poles reach past their ends, so the joints close.
         let bar = |parent: &mut ChildSpawnerCommands, a: Vec3, b: Vec3| {
-            self.spawn_bar(parent, kit, &self.scaffold, wall.at(a), wall.at(b), POLE);
+            let (a, b) = (wall.at(a), wall.at(b));
+            let past = (b - a).normalize_or_zero() * POLE / 2.0;
+            parent.spawn(kit.bar(a - past, b + past, POLE, self.scaffold.clone()));
         };
 
         for bay in 0..=bays {
@@ -100,11 +103,7 @@ impl Additions {
                 wall.at(Vec3::new(left, wall.footing + 0.3, outer + POLE)),
                 wall.at(Vec3::new(left + width, top + GUARD, outer + POLE + 0.01)),
             );
-            parent.spawn((
-                Mesh3d(kit.cube.clone()),
-                MeshMaterial3d(self.netting.clone()),
-                net.transform().with_scale(net.size),
-            ));
+            parent.spawn(kit.cuboid(&net, self.netting.clone()));
         }
     }
 }

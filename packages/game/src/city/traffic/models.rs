@@ -58,7 +58,7 @@ const WHEEL_RADIUS: f32 = 0.33;
 const WHEEL_WIDTH: f32 = 0.26;
 /// How far the wheels stick out of the body.
 const WHEEL_OUT: f32 = 0.04;
-const WHEELBASE: f32 = 1.45;
+pub(super) const WHEELBASE: f32 = 1.45;
 const POD_RADIUS: f32 = 0.22;
 const POD_LENGTH: f32 = 1.6;
 const STRIP: f32 = 0.06;

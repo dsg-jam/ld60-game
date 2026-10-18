@@ -4,7 +4,9 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use rand::{RngExt, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, rngs::SmallRng};
+
+use crate::city::rng;
 
 /// Voxels along each side of the noise, which repeats seamlessly.
 const SIZE: usize = 64;
@@ -95,10 +97,13 @@ impl Lattice {
 /// high, so it bulges in round lumps. Green holds finer cellular noise that
 /// wears away their edges into wisps.
 pub(super) fn noise() -> Image {
-    let mut rng = SmallRng::seed_from_u64(SEED);
-    let points: Vec<Points> = SHAPE_CELLS
+    let mut rng = rng(SEED);
+    let shape_points: Vec<Points> = SHAPE_CELLS
         .iter()
-        .chain(&DETAIL_CELLS)
+        .map(|&cells| Points::new(cells, &mut rng))
+        .collect();
+    let detail_points: Vec<Points> = DETAIL_CELLS
+        .iter()
         .map(|&cells| Points::new(cells, &mut rng))
         .collect();
     let lattices: Vec<Lattice> = SHAPE_CELLS
@@ -114,9 +119,9 @@ pub(super) fn noise() -> Image {
                 let fbm = |values: &mut dyn Iterator<Item = f32>| {
                     values.zip(OCTAVE_WEIGHTS).map(|(v, w)| v * w).sum::<f32>()
                 };
-                let cells = fbm(&mut points[..3].iter().map(|points| points.cellular(p)));
+                let cells = fbm(&mut shape_points.iter().map(|points| points.cellular(p)));
                 let smooth = fbm(&mut lattices.iter().map(|lattice| lattice.smooth(p)));
-                let detail = fbm(&mut points[3..].iter().map(|points| points.cellular(p)));
+                let detail = fbm(&mut detail_points.iter().map(|points| points.cellular(p)));
                 shapes.push(cells + smooth * (1.0 - cells));
                 details.push(detail);
             }

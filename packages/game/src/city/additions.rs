@@ -38,7 +38,7 @@ const TOWEL_WIDTH: Range<f32> = 0.35..0.6;
 const TOWEL_LENGTH: Range<f32> = 0.4..0.9;
 const PIPE: f32 = 0.12;
 
-const BULB_GLOW: f32 = 15.0;
+const LAMP_GLOW: f32 = 15.0;
 
 const RAIL: Color = Color::srgb_u8(0x30, 0x32, 0x36);
 const DRAIN: Color = Color::srgb_u8(0x5a, 0x5c, 0x5e);
@@ -57,11 +57,7 @@ const LED_GREEN: Color = Color::srgb_u8(0x40, 0xff, 0x60);
 const LED_RED: Color = Color::srgb_u8(0xff, 0x30, 0x20);
 const PLANT: Color = Color::srgb_u8(0x3a, 0x5a, 0x34);
 const WIRE: Color = Color::srgb_u8(0x12, 0x12, 0x14);
-const BULBS: [Color; 3] = [
-    Color::srgb_u8(0xff, 0xd0, 0x80),
-    Color::srgb_u8(0xff, 0x70, 0xc0),
-    Color::srgb_u8(0x70, 0xd0, 0xff),
-];
+const LAMP: Color = Color::srgb_u8(0xff, 0xd0, 0x80);
 
 /// The street side of a building that additions go on.
 struct Wall {
@@ -105,7 +101,7 @@ pub(super) struct Additions {
     wire: Handle<SurfaceMaterial>,
     laundry: Vec<Handle<SurfaceMaterial>>,
     leds: [Handle<StandardMaterial>; 2],
-    bulbs: Vec<Handle<StandardMaterial>>,
+    lamp: Handle<StandardMaterial>,
 }
 
 impl Additions {
@@ -138,10 +134,7 @@ impl Additions {
                 materials.add(glow(LED_GREEN, LED_GLOW)),
                 materials.add(glow(LED_RED, LED_GLOW)),
             ],
-            bulbs: BULBS
-                .iter()
-                .map(|&color| materials.add(glow(color, BULB_GLOW)))
-                .collect(),
+            lamp: materials.add(glow(LAMP, LAMP_GLOW)),
         }
     }
 
@@ -170,18 +163,21 @@ impl Additions {
         let cell = grid.cell;
         let columns = (building.size.x / cell.x) as i32;
         let rows = (building.size.y / cell.y) as i32;
-        let first_column = 0;
-        let last_column = columns;
         let first_row = ((LOWEST - building.min().y) / cell.y).ceil().max(0.0) as i32;
         // Leave the top floor and the roof edge free.
         let last_row = rows - 1;
-        if last_column <= first_column || last_row <= first_row {
+        if columns <= 0 || last_row <= first_row {
             return;
         }
-        // Corner of a window cell, and whether it is still free.
-        let corner = |column: i32, row: i32| {
-            Vec2::new(building.min().x, building.min().y)
-                + Vec2::new(column as f32, row as f32) * cell
+        let wall = Wall {
+            building: *building,
+            front,
+            facing,
+            cell,
+            bottom: building.min().y,
+            footing: if building.min().y > 0.0 { LOWEST } else { 0.0 },
+            rows: first_row..last_row,
+            columns: 0..columns,
         };
         let out = |block: Block| block.translated(Vec3::Z * facing * block.size.z / 2.0);
         let mut taken = HashSet::new();
@@ -191,14 +187,13 @@ impl Additions {
         let pier = cell.x * (1.0 - grid.window.x);
 
         for row in first_row..last_row {
-            // Additions get rarer higher up.
-            let above = corner(0, row).y - LOWEST;
+            let above = wall.corner(0, row).y - LOWEST;
             let chance = (-above / FALLOFF).exp();
-            for column in first_column..last_column {
+            for column in 0..columns {
                 if taken.contains(&(column, row)) {
                     continue;
                 }
-                let span = if column + 1 < last_column
+                let span = if column + 1 < columns
                     && !taken.contains(&(column + 1, row))
                     && rng.random_bool(0.4)
                 {
@@ -207,7 +202,7 @@ impl Additions {
                     1
                 };
                 let roll = rng.random::<f64>() / f64::from(chance);
-                let at = corner(column, row);
+                let at = wall.corner(column, row);
                 if roll < POD_CHANCE {
                     for next in column..column + span {
                         taken.insert((next, row));
@@ -218,11 +213,7 @@ impl Additions {
                         size: size.extend(rng.random_range(POD_DEPTH)),
                     });
                     let facade = facades.add(Facade::random(&pod, 0.0, pod.size.y, rng));
-                    parent.spawn((
-                        Mesh3d(kit.cube.clone()),
-                        MeshMaterial3d(facade),
-                        pod.transform().with_scale(pod.size),
-                    ));
+                    parent.spawn(kit.cuboid(&pod, facade));
                     self.spawn_struts(parent, kit, &pod, front, facing);
                 } else if roll < POD_CHANCE + BALCONY_CHANCE {
                     for next in column..column + span {
@@ -234,7 +225,7 @@ impl Additions {
                 } else if roll < POD_CHANCE + BALCONY_CHANCE + AC_CHANCE {
                     let center = if under_sill && sill > AC_SIZE.y + 0.15 {
                         Vec2::new(at.x + cell.x / 2.0, at.y + sill / 2.0)
-                    } else if pier > AC_SIZE.x + 0.1 && column + 1 < last_column {
+                    } else if pier > AC_SIZE.x + 0.1 && column + 1 < columns {
                         Vec2::new(at.x + cell.x, at.y + cell.y / 2.0)
                     } else {
                         continue;
@@ -247,45 +238,10 @@ impl Additions {
             }
         }
 
-        let wall = Wall {
-            building: *building,
-            front,
-            facing,
-            cell,
-            bottom: building.min().y,
-            footing: if building.min().y > 0.0 { LOWEST } else { 0.0 },
-            rows: first_row..last_row,
-            columns: first_column..last_column,
-        };
         self.spawn_services(parent, kit, &wall, rng);
         if rng.random_bool(scaffold::SCAFFOLD_CHANCE) {
             self.spawn_scaffold(parent, kit, &wall, rng);
         }
-    }
-
-    /// A bar of `thickness` from `a` to `b`.
-    fn spawn_bar(
-        &self,
-        parent: &mut ChildSpawnerCommands,
-        kit: &Kit,
-        material: &Handle<SurfaceMaterial>,
-        a: Vec3,
-        b: Vec3,
-        thickness: f32,
-    ) {
-        let along = b - a;
-        let up = if along.normalize_or_zero().y.abs() > 0.9 {
-            Vec3::X
-        } else {
-            Vec3::Y
-        };
-        parent.spawn((
-            Mesh3d(kit.cube.clone()),
-            MeshMaterial3d(material.clone()),
-            Transform::from_translation((a + b) / 2.0)
-                .looking_to(along, up)
-                .with_scale(Vec3::new(thickness, thickness, along.length() + thickness)),
-        ));
     }
 
     /// A towel or a small rug hanging over a window sill.
@@ -323,14 +279,7 @@ impl Additions {
         for x in [pod.min().x + 0.3, pod.max().x - 0.3] {
             let on_pod = Vec3::new(x, pod.min().y, front + facing * reach * 0.9);
             let on_wall = Vec3::new(x, pod.min().y - reach, front);
-            let length = on_pod.distance(on_wall);
-            parent.spawn((
-                Mesh3d(kit.cube.clone()),
-                MeshMaterial3d(self.rail.clone()),
-                Transform::from_translation((on_pod + on_wall) / 2.0)
-                    .looking_to(on_pod - on_wall, Vec3::X)
-                    .with_scale(Vec3::new(STRUT, STRUT, length)),
-            ));
+            parent.spawn(kit.bar(on_wall, on_pod, STRUT, self.rail.clone()));
         }
     }
 
@@ -432,7 +381,7 @@ impl Additions {
                 Vec3::new(corner.x + 0.1, corner.y + 2.0, corner.z),
                 Vec3::new(corner.x + 0.3, corner.y + 2.12, corner.z + facing * 0.1),
             );
-            parent.spawn(kit.cuboid(&lamp, self.bulbs[0].clone()));
+            parent.spawn(kit.cuboid(&lamp, self.lamp.clone()));
         }
     }
 }

@@ -11,7 +11,6 @@ use super::{FAR_CURB, NEAR_CURB};
 
 /// How dark and glossy the ground gets when fully wet.
 const WETNESS: f32 = 0.6;
-const RIPPLES: f32 = 1.0;
 
 pub(super) struct WetPlugin;
 
@@ -65,9 +64,7 @@ impl Wet {
             },
         }
     }
-}
 
-impl Wet {
     fn shader() -> ShaderRef {
         AssetPath::from_path_buf(embedded_path!("wet.wesl"))
             .with_source("embedded")
@@ -79,7 +76,7 @@ impl Wet {
             let wet = &mut material.extension;
             wet.params.wetness = weather.wetness * WETNESS;
             wet.params.puddles = weather.wetness * wet.puddles;
-            wet.params.ripples = weather.rain * RIPPLES;
+            wet.params.ripples = weather.rain;
         }
     }
 }

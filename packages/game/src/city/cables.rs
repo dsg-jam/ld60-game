@@ -16,7 +16,7 @@ use crate::workshop::shop;
 const SEED: u64 = 8;
 const CABLES: usize = 14;
 const SPAN: f32 = 30.0;
-/// Below the lowest flight lane.
+/// Below the lowest flying cars.
 const HEIGHT: Range<f32> = 4.8..7.0;
 const THICKNESS: f32 = 0.025;
 const SAG: Range<f32> = 0.3..1.0;
@@ -88,13 +88,7 @@ impl Cable {
                 for segment in 0..SEGMENTS {
                     let a = cable.point(segment as f32 / SEGMENTS as f32);
                     let b = cable.point((segment + 1) as f32 / SEGMENTS as f32);
-                    parent.spawn((
-                        Mesh3d(kit.cube.clone()),
-                        MeshMaterial3d(wire.clone()),
-                        Transform::from_translation((a + b) / 2.0)
-                            .looking_to(b - a, Vec3::Y)
-                            .with_scale(Vec3::new(THICKNESS, THICKNESS, a.distance(b))),
-                    ));
+                    parent.spawn(kit.bar(a, b, THICKNESS, wire.clone()));
                 }
                 let apart = last_string.is_none_or(|last| index - last >= STRING_SPACING);
                 if apart && rng.random_bool(STRING_LIGHT_CHANCE) {

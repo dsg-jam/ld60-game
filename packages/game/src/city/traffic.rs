@@ -1,5 +1,5 @@
+mod flying;
 mod models;
-mod sky;
 mod spray;
 
 use std::error::Error;
@@ -7,8 +7,8 @@ use std::error::Error;
 use bevy::prelude::*;
 use rand::RngExt;
 
+use self::flying::SkyCar;
 use self::models::Fleet;
-use self::sky::SkyCar;
 use self::spray::Spray;
 use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng};
 use crate::geometry::surface::SurfaceMaterial;
@@ -43,7 +43,7 @@ pub(super) struct TrafficPlugin;
 
 impl Plugin for TrafficPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((spray::SprayPlugin, sky::SkyPlugin))
+        app.add_plugins((spray::SprayPlugin, flying::FlyingPlugin))
             .add_systems(Startup, Vehicle::spawn_all)
             .add_systems(Update, (Vehicle::drive, Vehicle::rumble));
     }

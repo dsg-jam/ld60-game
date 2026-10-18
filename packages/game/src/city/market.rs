@@ -381,13 +381,7 @@ impl Bay {
         for side in [-1.0, 1.0] {
             let on_awning = lip + reach * side * 0.95 - Vec3::Y * 0.03;
             let on_pillar = Vec3::new(side * width / 2.0, MARKET_HEIGHT - STRUT_DROP, 0.0);
-            stall.spawn((
-                Mesh3d(kit.cube.clone()),
-                MeshMaterial3d(stock.metal.clone()),
-                Transform::from_translation((on_awning + on_pillar) / 2.0)
-                    .looking_to(on_awning - on_pillar, Vec3::Y)
-                    .with_scale(Vec3::new(STRUT, STRUT, on_awning.distance(on_pillar))),
-            ));
+            stall.spawn(kit.bar(on_pillar, on_awning, STRUT, stock.metal.clone()));
         }
         Some(DripEdge {
             from: lip - reach,
