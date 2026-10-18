@@ -5,13 +5,13 @@
     chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-04890",
     remarks: [
-        "Minus annunciator lights in the segment test.",
-        "Customer wants negative results shown.",
+        "The minus mark lights up when every stroke is tested.",
+        "Customer wants to see when there is less than nothing.",
     ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
-        name: "Student",
-        complaint: "12 minus 34 is 999978? My bank account says otherwise. Where is the minus sign?",
+        name: "Yimbo, student",
+        complaint: "12 minus 34 is 999978? My money pouch says otherwise. Where is the minus mark?",
     ),
     tests: [
         (keys: "12-34=", display: "-000022"),

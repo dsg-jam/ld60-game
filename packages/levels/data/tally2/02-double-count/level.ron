@@ -5,12 +5,12 @@
     chip: Calco((revision: B, date_code: 7630)),
     serial: "2A-00412",
     remarks: [
-        "Both keys and the display test fine.",
-        "Factory firmware 1.0.",
+        "Both buttons and the little window work fine.",
+        "Still has its first thinking, version 1.0.",
     ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
-        name: "Usher",
+        name: "Ploof, seat finder",
         complaint: "My counter said 40 guests tonight. We have 20 chairs and nobody had to stand.",
     ),
     tests: [

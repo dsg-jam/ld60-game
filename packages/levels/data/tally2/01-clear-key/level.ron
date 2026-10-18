@@ -7,13 +7,13 @@
     chip: Calco((revision: A, date_code: 7541)),
     serial: "2A-00107",
     remarks: [
-        "The C key switch tests fine.",
-        "Early unit. Factory firmware 0.9.",
+        "C button poked with the tingle stick. Tingles fine.",
+        "One of the first ones made. Still has its first thinking, version 0.9.",
     ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
-        name: "Doorman",
-        complaint: "I press C before we open, but it keeps counting from last night.",
+        name: "Drob, door guard",
+        complaint: "I press C before the doors open, but it keeps counting from last night.",
     ),
     tests: [
         (keys: "", display: "00"),

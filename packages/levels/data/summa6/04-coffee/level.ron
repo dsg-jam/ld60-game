@@ -5,14 +5,14 @@
     chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-04417",
     remarks: [
-        "Coffee residue on the board around the RAM. Cleaned.",
-        "Customer will not pay for a new chip.",
+        "Dried bean juice on the board, around the part that remembers numbers. Wiped off.",
+        "Customer will not pay for a new little black brain.",
     ],
     rom: (kind: Eprom, blank_available: true),
     faults: [StuckRamBit((cell: 7, bit: 0, high: true))],
     customer: (
-        name: "Night shift accountant",
-        complaint: "I spilled coffee on it. Now it only subtracts. The new chip costs more than the machine.",
+        name: "Plimm, night counter",
+        complaint: "I spilled hot bean juice on it. Now it only takes away. A new little black brain costs more than the whole box.",
     ),
     tests: [
         (keys: "12+34=", display: "000046"),
