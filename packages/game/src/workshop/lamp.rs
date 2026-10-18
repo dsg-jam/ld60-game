@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::layout::Block;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
 
 const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
 const POLE_SIZE: Vec3 = Vec3::new(0.016, 0.46, 0.016);

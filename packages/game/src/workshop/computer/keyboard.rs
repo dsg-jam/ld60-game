@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 
 use super::{CASE, CASE_DARK};
-use crate::keypad::KeyBinding::Code;
-use crate::keypad::{KeyDef, Keypad, KeypadStyle};
-use crate::layout::Block;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
+use crate::parts::keypad::KeyBinding::Code;
+use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 
 /// Base border around the keys.
 const MARGIN: f32 = 0.012;

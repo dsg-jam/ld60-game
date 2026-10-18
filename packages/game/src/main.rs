@@ -6,19 +6,13 @@
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
-mod camera;
-mod computer;
 #[cfg(feature = "debug_port")]
 mod debug_port;
-mod desk;
 mod device;
-mod keypad;
-mod lamp;
-mod layout;
-mod look;
-mod screen;
-mod shape;
-mod stage;
+mod geometry;
+mod parts;
+mod player;
+mod workshop;
 
 use bevy::asset::AssetMetaCheck;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
@@ -47,16 +41,11 @@ fn main() -> AppExit {
     app.add_plugins(debug_port::DebugPortPlugin);
     app.add_plugins((
         MeshPickingPlugin,
-        shape::ShapePlugin,
-        keypad::KeypadPlugin,
-        screen::ScreenPlugin,
-        camera::CameraPlugin,
-        look::LookPlugin,
-        desk::DeskPlugin,
-        lamp::LampPlugin,
-        computer::ComputerPlugin,
+        geometry::shape::ShapePlugin,
+        parts::PartsPlugin,
+        player::PlayerPlugin,
+        workshop::WorkshopPlugin,
         device::DevicePlugin,
-        stage::StagePlugin,
     ));
     app.run()
 }

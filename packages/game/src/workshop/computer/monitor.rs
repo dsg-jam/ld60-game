@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use super::{CASE, CASE_DARK};
-use crate::layout::Block;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
 
 const STAND_SIZE: Vec3 = Vec3::new(0.2, 0.03, 0.2);
 const BODY_SIZE: Vec3 = Vec3::new(0.38, 0.32, 0.36);

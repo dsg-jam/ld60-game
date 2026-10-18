@@ -8,8 +8,9 @@ use bevy::{
 };
 
 pub(crate) use self::summa6::Summa6;
-use crate::camera::{Focus, FocusTarget, Focused, PlayerCamera, View};
-use crate::keypad::PressableKey;
+use crate::parts::keypad::PressableKey;
+use crate::player::camera::PlayerCamera;
+use crate::player::focus::{Focus, FocusTarget, Focused, View};
 
 /// Distance of a held device from the player's eyes.
 const HOLD_DISTANCE: f32 = 0.24;

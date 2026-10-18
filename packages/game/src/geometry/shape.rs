@@ -1,6 +1,6 @@
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
-use crate::layout::Block;
+use super::block::Block;
 
 pub(crate) struct ShapePlugin;
 

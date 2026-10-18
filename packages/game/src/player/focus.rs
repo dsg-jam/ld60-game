@@ -1,30 +1,18 @@
 use bevy::{
-    core_pipeline::tonemapping::DebandDither,
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
 
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
-use crate::look::LookAngles;
 
-/// How quickly the camera moves to a new view.
-const DECAY_RATE: f32 = 8.0;
-/// Faster rate for mouse look, so it feels direct.
-const LOOK_DECAY_RATE: f32 = 25.0;
-/// Distance from the seat below which the camera counts as seated.
-const SEATED_DISTANCE: f32 = 0.01;
+pub(super) struct FocusPlugin;
 
-pub(crate) struct CameraPlugin;
-
-impl Plugin for CameraPlugin {
+impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<Focus>()
             .init_resource::<Focused>()
-            .add_systems(
-                Update,
-                (Focused::leave_on_right_click, PlayerCamera::follow).chain(),
-            )
+            .add_systems(Update, Focused::leave_on_right_click)
             .add_observer(FocusOn::apply)
             .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
@@ -39,58 +27,6 @@ pub(crate) enum Focus {
     Desk,
     Computer,
     Device,
-}
-
-/// The camera of the seated player.
-#[derive(Component, Debug)]
-#[require(Camera3d, IsDefaultUiCamera, DebandDither::Disabled)]
-pub(crate) struct PlayerCamera {
-    /// Pose while sitting at the desk and looking straight ahead.
-    seat: Transform,
-}
-
-impl PlayerCamera {
-    pub(crate) fn seated_at(seat: Transform) -> impl Bundle {
-        (Self { seat }, seat)
-    }
-
-    pub(crate) fn seat(&self) -> Transform {
-        self.seat
-    }
-
-    fn follow(
-        time: Res<Time>,
-        focused: Res<Focused>,
-        angles: Res<LookAngles>,
-        targets: Query<(&FocusTarget, &GlobalTransform)>,
-        camera: Single<(&PlayerCamera, &mut Transform)>,
-    ) {
-        let (camera, mut transform) = camera.into_inner();
-        let focus_view =
-            focused
-                .0
-                .and_then(|entity| targets.get(entity).ok())
-                .map(|(target, global)| match target.view {
-                    View::Local(view) => global.mul_transform(view).compute_transform(),
-                    View::Seated => camera.seat,
-                });
-        let (goal, decay_rate) = match focus_view {
-            Some(view) => (view, DECAY_RATE),
-            None => {
-                let goal = angles.apply(camera.seat);
-                let seated = transform.translation.distance(goal.translation) < SEATED_DISTANCE;
-                (goal, if seated { LOOK_DECAY_RATE } else { DECAY_RATE })
-            }
-        };
-
-        let dt = time.delta_secs();
-        transform
-            .translation
-            .smooth_nudge(&goal.translation, decay_rate, dt);
-        transform
-            .rotation
-            .smooth_nudge(&goal.rotation, decay_rate, dt);
-    }
 }
 
 /// Makes an entity clickable from the seated view.
@@ -163,7 +99,7 @@ impl Focused {
         next.set(Focus::Desk);
     }
 
-    fn leave_on_right_click(
+    pub(super) fn leave_on_right_click(
         mouse: Res<ButtonInput<MouseButton>>,
         mut focused: ResMut<Focused>,
         mut next: ResMut<NextState<Focus>>,

@@ -4,9 +4,9 @@ use bevy::{
     prelude::*,
 };
 
-use crate::layout::Block;
-use crate::screen::UiCanvas;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
+use crate::parts::screen::UiCanvas;
 
 pub(crate) struct KeypadPlugin;
 

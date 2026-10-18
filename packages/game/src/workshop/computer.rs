@@ -7,10 +7,10 @@ use bevy::{mesh::MeshBuilder, prelude::*};
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
-use crate::camera::{Focus, FocusTarget, View};
-use crate::keypad::PressableKey;
-use crate::layout::Block;
-use crate::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
+use crate::geometry::block::Block;
+use crate::parts::keypad::PressableKey;
+use crate::parts::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
+use crate::player::focus::{Focus, FocusTarget, View};
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);

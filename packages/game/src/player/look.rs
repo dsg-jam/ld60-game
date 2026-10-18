@@ -10,14 +10,14 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use crate::camera::Focus;
+use super::focus::Focus;
 
 const SENSITIVITY: f32 = 0.0025;
 const MAX_YAW: f32 = 1.2;
 const MAX_PITCH: f32 = 0.7;
 const CROSSHAIR_SIZE: f32 = 6.0;
 
-pub(crate) struct LookPlugin;
+pub(super) struct LookPlugin;
 
 impl Plugin for LookPlugin {
     fn build(&self, app: &mut App) {

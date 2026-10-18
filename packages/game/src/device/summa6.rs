@@ -3,11 +3,11 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::{input::keyboard::Key, prelude::*};
 
 use super::{DeviceButton, Holdable};
-use crate::keypad::KeyBinding::{Named, Typed};
-use crate::keypad::{KeyDef, Keypad, KeypadStyle};
-use crate::layout::Block;
-use crate::screen::UiCanvas;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
+use crate::parts::keypad::KeyBinding::{Named, Typed};
+use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
+use crate::parts::screen::UiCanvas;
 
 const BODY_SIZE: Vec3 = Vec3::new(0.09, 0.014, 0.15);
 const WINDOW_SIZE: Vec3 = Vec3::new(0.075, 0.0015, 0.03);

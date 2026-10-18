@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::layout::Block;
-use crate::shape::Shape;
+use crate::geometry::block::Block;
+use crate::geometry::shape::Shape;
 
 /// Height of the top surface above the ground.
 const HEIGHT: f32 = 0.75;

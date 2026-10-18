@@ -1,10 +1,14 @@
+mod computer;
+mod desk;
+mod lamp;
+
 use bevy::prelude::*;
 
-use crate::camera::PlayerCamera;
-use crate::computer::Computer;
-use crate::desk::{Desk, DeskLayout};
+use self::computer::Computer;
+use self::desk::{Desk, DeskLayout};
+use self::lamp::Lamp;
 use crate::device::Summa6;
-use crate::lamp::Lamp;
+use crate::player::camera::PlayerCamera;
 
 const BACKGROUND: Color = Color::srgb_u8(0x2a, 0x26, 0x24);
 
@@ -15,11 +19,12 @@ const LAMP_YAW: f32 = -0.7;
 const SUMMA6_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
 const SUMMA6_YAW: f32 = 0.15;
 
-pub(crate) struct StagePlugin;
+pub(crate) struct WorkshopPlugin;
 
-impl Plugin for StagePlugin {
+impl Plugin for WorkshopPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(BACKGROUND))
+        app.add_plugins((desk::DeskPlugin, lamp::LampPlugin, computer::ComputerPlugin))
+            .insert_resource(ClearColor(BACKGROUND))
             .add_systems(Startup, spawn_stage);
     }
 }
