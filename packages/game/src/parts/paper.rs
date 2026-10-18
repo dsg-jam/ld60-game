@@ -101,17 +101,19 @@ impl Paper {
                             justify_content: JustifyContent::Center,
                             ..default()
                         },
-                        children![Self::faded(
-                            Message::new("paper-footer")
-                                .with("footer", footer)
-                                .with("page", number)
-                                .with("pages", count)
-                        )],
+                        children![Self::faded(Self::footer(footer, (number, count)))],
                     ));
                     bottom.spawn(Self::corner_mark(">", number < count));
                 });
             })
             .id()
+    }
+
+    fn footer(footer: Localized, (number, count): (usize, usize)) -> Message {
+        Message::new("paper-footer")
+            .with("footer", footer)
+            .with("page", number)
+            .with("pages", count)
     }
 
     /// Hidden on the first and last page, but still taking up its space.
@@ -284,5 +286,20 @@ impl Paper {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+
+    #[test]
+    fn footers_format() {
+        let footer = Paper::footer(Localized::verbatim("DSG"), (1, 2));
+        assert_eq!(
+            Locale::on_disk().check(&footer.into()),
+            Ok("DSG   PAGE 1 OF 2".into())
+        );
     }
 }

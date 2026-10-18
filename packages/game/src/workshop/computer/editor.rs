@@ -33,7 +33,7 @@ use self::versions::VersionsPage;
 use crate::debug_port::DebugMethods;
 use crate::locale::{Localized, Message};
 use crate::parts::screen::UiCanvas;
-use crate::workshop::job::Job;
+use crate::workshop::job::{Job, JobId};
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 
@@ -69,7 +69,7 @@ impl Plugin for EditorPlugin {
                 Highlight::place.after(UiSystems::PostLayout),
             ),
         )
-        .add_systems(Update, Editor::load_job)
+        .add_systems(Update, (Editor::load_job, Command::show_labels))
         .add_systems(
             Update,
             ChipTitle::update.run_if(resource_changed_or_removed::<Job>),
@@ -167,10 +167,11 @@ impl Editor {
                         column_gap: px(FONT_SIZE * 2.0),
                         ..default()
                     },
+                    // `Command::show_labels` fills in the labels.
                     Children::spawn(SpawnIter(Command::ALL.into_iter().map(move |command| {
                         (
                             command,
-                            Localized::from(command.label(true)),
+                            Localized::verbatim(""),
                             font.clone(),
                             TextColor(PHOSPHOR_DIM),
                         )
@@ -183,15 +184,15 @@ impl Editor {
     /// Puts the firmware of a new job into the editor.
     fn load_job(
         job: Option<Res<Job>>,
-        mut loaded: Local<Option<usize>>,
+        mut loaded: Local<Option<JobId>>,
         editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
         mut status: Single<&mut Localized, With<Status>>,
     ) {
-        let index = job.as_ref().map(|job| job.index);
-        if index == *loaded {
+        let id = job.as_ref().map(|job| job.id);
+        if id == *loaded {
             return;
         }
-        *loaded = index;
+        *loaded = id;
         let (mut text, mut undo) = editor.into_inner();
         text.clear();
         text.viewport.offset.y = 0.0;

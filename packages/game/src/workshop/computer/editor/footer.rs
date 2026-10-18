@@ -5,13 +5,13 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
-use ld60_devices::{DeviceError, ProgramError};
+use ld60_devices::{DeviceError, IsaKind, ProgramError};
 use ld60_levels::LevelError;
 
 use super::Editor;
 use super::page::Page;
 use crate::audio::KeyClicks;
-use crate::device::Emulator;
+use crate::device::{BoardLetter, DeviceName, Emulator};
 use crate::locale::{Localized, Message};
 use crate::workshop::job::Job;
 
@@ -60,6 +60,18 @@ impl Command {
             Self::Clicks if clicks => "editor-command-clicks-on",
             Self::Clicks => "editor-command-clicks-off",
         })
+    }
+
+    /// Labels new commands and follows the key clicks setting.
+    pub(super) fn show_labels(
+        clicks: Res<KeyClicks>,
+        mut labels: Query<(Ref<Command>, &mut Localized)>,
+    ) {
+        for (command, mut label) in &mut labels {
+            if clicks.is_changed() || command.is_added() {
+                label.set_if_neq(command.label(clicks.0).into());
+            }
+        }
     }
 
     pub(super) fn run_on_key(
@@ -114,15 +126,13 @@ pub(super) struct Run(pub(super) Command);
 pub(super) struct Flashed(pub(super) String);
 
 impl Run {
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
         job: Option<ResMut<Job>>,
         mut clicks: ResMut<KeyClicks>,
         mut emulators: Query<&mut Emulator>,
-        mut status: Single<&mut Localized, (With<Status>, Without<Command>)>,
-        mut labels: Query<(&Command, &mut Localized), Without<Status>>,
+        mut status: Single<&mut Localized, With<Status>>,
         mut commands: Commands,
     ) {
         let source = editor.value().to_string();
@@ -130,15 +140,12 @@ impl Run {
             (Command::Notes | Command::Versions, _) => return,
             (Command::Clicks, _) => {
                 clicks.0 = !clicks.0;
-                for (command, mut text) in &mut labels {
-                    *text = command.label(clicks.0).into();
-                }
                 return;
             }
             (_, None) => Message::new("editor-no-job"),
             (Command::Assemble, Some(job)) => match ld60_levels::assemble(&job.level, &source) {
                 Ok(assembly) => Message::new("editor-assembled").with("bytes", assembly.byte_len()),
-                Err(err) => Self::describe(&err),
+                Err(err) => Message::from(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
                 Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source, &mut commands),
@@ -158,15 +165,15 @@ impl Run {
     ) -> Message {
         let assembly = match ld60_levels::assemble(&job.level, source) {
             Ok(assembly) => assembly,
-            Err(err) => return Self::describe(&err),
+            Err(err) => return Message::from(&err),
         };
         let rom = match ld60_levels::burn(&job.level, emulator.rom(), assembly.image) {
             Ok(rom) => rom,
-            Err(err) => return Self::burn_failed(err),
+            Err(err) => return err.into(),
         };
         let device = match ld60_levels::device(&job.level, rom.clone()) {
             Ok(device) => device,
-            Err(err) => return Self::describe(&err),
+            Err(err) => return Message::from(&err),
         };
         emulator.restart(device);
         commands.trigger(Flashed(source.into()));
@@ -175,49 +182,158 @@ impl Run {
         }
         Message::new("editor-flashed")
     }
+}
 
+impl From<&LevelError> for Message {
     /// The first assembler error with its line, or the error itself.
-    fn describe(err: &LevelError) -> Message {
+    fn from(err: &LevelError) -> Self {
         match err {
             LevelError::Assemble(errors) => match errors.as_slice() {
-                [] => Message::new("editor-assembly-failed"),
-                [only] => Message::new("editor-asm-error")
+                [] => Self::new("editor-assembly-failed"),
+                [only] => Self::new("editor-asm-error")
                     .with("line", only.line)
                     .with("message", only.message.as_str()),
-                [first, rest @ ..] => Message::new("editor-asm-error-more")
+                [first, rest @ ..] => Self::new("editor-asm-error-more")
                     .with("line", first.line)
                     .with("message", first.message.as_str())
                     .with("more", rest.len()),
             },
             LevelError::Parse(message) => {
-                Message::new("editor-error-parse").with("message", message.as_str())
+                Self::new("editor-error-parse").with("message", message.as_str())
             }
-            LevelError::BoardNotAllowed(rev) => {
-                Message::new("editor-error-board-not-allowed").with("board", format!("{rev:?}"))
-            }
+            LevelError::BoardNotAllowed(rev) => Self::new("editor-error-board-not-allowed")
+                .with("board", BoardLetter(*rev).to_string()),
             LevelError::NoRewrite(rev) => {
-                Message::new("editor-error-no-rewrite").with("board", format!("{rev:?}"))
+                Self::new("editor-error-no-rewrite").with("board", BoardLetter(*rev).to_string())
             }
             LevelError::Device(DeviceError::ChipMismatch { device, chip }) => {
-                Message::new("editor-error-chip-mismatch")
-                    .with("device", format!("{device:?}"))
-                    .with("chip", format!("{chip:?}"))
+                let chip = match chip {
+                    IsaKind::Calco => "CalCo",
+                };
+                Self::new("editor-error-chip-mismatch")
+                    .with("device", device.name())
+                    .with("chip", chip)
             }
             LevelError::Device(DeviceError::RomSize { expected, actual }) => {
-                Message::new("editor-error-rom-size")
+                Self::new("editor-error-rom-size")
                     .with("expected", *expected)
                     .with("actual", *actual)
             }
         }
     }
+}
 
-    fn burn_failed(err: ProgramError) -> Message {
+impl From<ProgramError> for Message {
+    fn from(err: ProgramError) -> Self {
         match err {
-            ProgramError::MaskRom => Message::new("editor-burn-mask-rom"),
-            ProgramError::SizeMismatch => Message::new("editor-burn-size-mismatch"),
+            ProgramError::MaskRom => Self::new("editor-burn-mask-rom"),
+            ProgramError::SizeMismatch => Self::new("editor-burn-size-mismatch"),
             ProgramError::BitConflict { addr } => {
-                Message::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
+                Self::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ld60_devices::{BoardRev, DeviceKind};
+    use ld60_levels::{GAME_SEED, Variant};
+    use ld60_machine::AsmError;
+
+    use super::*;
+    use crate::locale::Locale;
+    use crate::workshop::computer::editor::undo::Undo;
+    use crate::workshop::levels::Levels;
+
+    /// What the status line says after `command` runs on `source`, with or
+    /// without the first job and its device.
+    fn status(job: bool, powered: bool, source: &str, command: Command) -> Localized {
+        let mut world = World::new();
+        world.init_resource::<KeyClicks>();
+        if job {
+            let job = Job::load(&Levels::on_disk(), 0).unwrap().unwrap();
+            if powered {
+                let rom = ld60_levels::initial_rom(&job.level, &job.buggy).unwrap();
+                let device = ld60_levels::device(&job.level, rom).unwrap();
+                world.spawn(Emulator::power_on(device));
+            }
+            world.insert_resource(job);
+        }
+        world.spawn((Editor, EditableText::new(source), Undo::default()));
+        let status = world.spawn((Status, Localized::verbatim(""))).id();
+        world.add_observer(Run::apply);
+        world.trigger(Run(command));
+        world.flush();
+        world.get::<Localized>(status).unwrap().clone()
+    }
+
+    #[test]
+    fn every_status_formats() {
+        let job = Variant::new(&Levels::on_disk().levels()[0], GAME_SEED).unwrap();
+        let mut statuses = vec![
+            status(false, false, "", Command::Assemble),
+            status(true, false, &job.buggy, Command::Assemble),
+            status(true, false, "NOPE\nNOPE", Command::Assemble),
+            status(true, false, &job.fixed, Command::Flash),
+            status(true, true, &job.fixed, Command::Flash),
+            status(true, true, "NOPE", Command::Flash),
+        ];
+
+        let mut world = World::new();
+        world.spawn((Editor, EditableText::default(), Undo::default()));
+        let line = world.spawn((Status, Localized::verbatim(""))).id();
+        let load_job = world.register_system(Editor::load_job);
+        world.insert_resource(Job::load(&Levels::on_disk(), 0).unwrap().unwrap());
+        world.run_system(load_job).unwrap();
+        world.remove_resource::<Job>();
+        world.run_system(load_job).unwrap();
+        statuses.push(world.get::<Localized>(line).unwrap().clone());
+
+        for status in &statuses {
+            assert!(matches!(status, Localized::Message(_)), "{status:?}");
+        }
+        Locale::on_disk().assert_formats(statuses);
+    }
+
+    #[test]
+    fn every_error_formats() {
+        let asm = |line| AsmError {
+            line,
+            span: 0..1,
+            message: "unknown mnemonic".into(),
+        };
+        let errors = [
+            LevelError::Assemble(Vec::new()),
+            LevelError::Assemble(vec![asm(1)]),
+            LevelError::Assemble(vec![asm(1), asm(2)]),
+            LevelError::Parse("bad".into()),
+            LevelError::BoardNotAllowed(BoardRev::B),
+            LevelError::NoRewrite(BoardRev::C),
+            LevelError::Device(DeviceError::ChipMismatch {
+                device: DeviceKind::Summa6,
+                chip: IsaKind::Calco,
+            }),
+            LevelError::Device(DeviceError::RomSize {
+                expected: 256,
+                actual: 1,
+            }),
+        ];
+        let burns = [
+            ProgramError::MaskRom,
+            ProgramError::SizeMismatch,
+            ProgramError::BitConflict { addr: 0x1F },
+        ];
+        let locale = Locale::on_disk();
+        locale.assert_formats(errors.iter().map(Message::from));
+        locale.assert_formats(burns.map(Message::from));
+    }
+
+    #[test]
+    fn every_label_formats() {
+        let labels = Command::ALL
+            .into_iter()
+            .flat_map(|command| [command.label(true), command.label(false)]);
+        Locale::on_disk().assert_formats(labels);
     }
 }

@@ -10,8 +10,6 @@ ticket-board = BOARD
 ticket-chip = CHIP
 ticket-rom = ROM
 
-ticket-device-tally2 = Tally 2 counter
-ticket-device-summa6 = Summa 6 adding machine
 ticket-chip-calco = CalCo rev { $revision }, date code { $date-code }
 ticket-rom-blank = EPROM, blank in stock
 ticket-rom-no-blank = EPROM, no blank. Burn over it.
@@ -25,6 +23,6 @@ ticket-status-flashed = Flashed. Stamp the ticket when it works.
 ticket-status-done = Done. Ring the bell for pickup.
 ticket-status-returned = Came back. Tries left: { $tries }.
 
-stamp-authorized = AUTHORIZED
-stamp-shop = REPAIR SHOP
-stamp-care = FIXED WITH CARE
+ticket-stamp-authorized = AUTHORIZED
+ticket-stamp-shop = REPAIR SHOP
+ticket-stamp-care = FIXED WITH CARE

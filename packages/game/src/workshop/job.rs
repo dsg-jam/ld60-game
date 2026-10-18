@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use bevy::prelude::*;
 use ld60_levels::{Catalog, GAME_SEED, Level, LevelError, LevelSource, Variant};
@@ -36,6 +37,7 @@ impl Plugin for JobPlugin {
 /// it fails, they hand it back and the steps start over.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {
+    pub(crate) id: JobId,
     /// Position in the [`Catalog`].
     pub(crate) index: usize,
     /// The files the job is built from.
@@ -51,6 +53,11 @@ pub(crate) struct Job {
     pub(crate) returns: u32,
 }
 
+/// Tells one job on the bench from the next, even when both are built from
+/// the same level.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct JobId(u32);
+
 /// The device and ticket of the current [`Job`]. They leave the desk when
 /// the customer takes the device home.
 #[derive(Component, Debug, Default)]
@@ -61,12 +68,20 @@ pub(crate) struct JobItem;
 #[derive(Event, Debug)]
 pub(crate) struct HandIn;
 
+impl JobId {
+    pub(crate) fn next() -> Self {
+        static NEXT: AtomicU32 = AtomicU32::new(0);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
 impl Job {
     /// The job at `index` in `catalog`, or `None` after the last one.
     pub(crate) fn load(catalog: &Catalog, index: usize) -> Option<Result<Self, LevelError>> {
         let source = catalog.levels().get(index)?;
         let variant = Variant::new(source, GAME_SEED);
         Some(variant.map(|Variant { level, buggy, .. }| Self {
+            id: JobId::next(),
             index,
             source: source.clone(),
             level,

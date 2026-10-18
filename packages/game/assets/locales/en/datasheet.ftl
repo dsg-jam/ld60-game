@@ -26,7 +26,11 @@ datasheet-flag-legend = * from result   - unchanged   0 cleared   1 set
 datasheet-operand-legend = n: cell or offset   ii: byte   aa: address   p: port
 
 datasheet-conditions = CONDITIONS
-datasheet-condition = jumps if { $condition }
+datasheet-condition-always = always jumps
+datasheet-condition-zero = jumps if Z = 1
+datasheet-condition-not-zero = jumps if Z = 0
+datasheet-condition-carry = jumps if C = 1
+datasheet-condition-no-carry = jumps if C = 0
 datasheet-compare-cmp = After CMP or CPI, JC jumps if A is lower and JZ if A is equal.
 datasheet-compare-cpi = After CPI, JC jumps if A is lower and JZ if A is equal.
 datasheet-notes = NOTES
