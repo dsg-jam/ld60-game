@@ -62,6 +62,7 @@ impl Receipt {
                 self,
                 CounterLayout::new().place(SPOT, YAW),
                 FocusTarget {
+                    prompt: "click-receipt",
                     focus: Focus::Paper,
                     view: View::Local(Paper::reading_view(Self::sheet_center())),
                 },

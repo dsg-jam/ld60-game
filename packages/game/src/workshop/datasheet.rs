@@ -97,6 +97,7 @@ impl Datasheet {
                 revision: None,
             },
             FocusTarget {
+                prompt: "click-datasheet",
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(Vec3::ZERO)),
             },

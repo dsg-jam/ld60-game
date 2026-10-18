@@ -15,6 +15,8 @@ use bevy::{
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
+use crate::menu::AppState;
+
 pub(crate) use self::crt::{CrtGlass, CrtLight, CrtMaterial};
 
 pub(crate) struct ScreenPlugin;
@@ -134,6 +136,7 @@ impl ScreenSurface {
     }
 
     fn drive_pointers(
+        app_state: Res<State<AppState>>,
         mut raycast: MeshRayCast,
         window: Single<&Window, With<PrimaryWindow>>,
         cameras: Query<(&Camera, &GlobalTransform, &RenderTarget), With<Camera3d>>,
@@ -141,6 +144,12 @@ impl ScreenSurface {
         mut window_events: MessageReader<WindowEvent>,
         mut inputs: MessageWriter<PointerInput>,
     ) {
+        // Still paused on the frame that resumes, so the click that resumes
+        // is dropped as well.
+        if *app_state.get() != AppState::Playing {
+            window_events.clear();
+            return;
+        }
         // The nearest surface under the real mouse, if any. Bevy's `RayMap`
         // is only rebuilt after pointer inputs are processed, so it would be
         // a frame late here. We cast from the current cursor instead.

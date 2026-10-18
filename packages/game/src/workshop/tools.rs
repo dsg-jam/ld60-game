@@ -58,6 +58,13 @@ pub(crate) enum Tool {
 }
 
 impl Tool {
+    const fn prompt(self) -> &'static str {
+        match self {
+            Self::Stamp => "click-stamp",
+            Self::Bell => "click-bell",
+        }
+    }
+
     fn usable(self, job: Option<&Job>) -> bool {
         match (self, job) {
             (Self::Stamp, Some(job)) => job.flashed && !job.stamped,
@@ -74,7 +81,9 @@ impl Tool {
         for (entity, tool, clickable) in &tools {
             let usable = tool.usable(job.as_deref());
             if usable && !clickable {
-                commands.entity(entity).insert(Clickable);
+                commands.entity(entity).insert(Clickable {
+                    prompt: tool.prompt(),
+                });
             } else if !usable && clickable {
                 commands.entity(entity).remove::<Clickable>();
             }

@@ -1,12 +1,16 @@
 use bevy::{
-    input::{InputSystems, keyboard::Key},
+    input::{
+        InputSystems,
+        keyboard::{Key, KeyboardInput},
+        mouse::MouseWheel,
+    },
     input_focus::InputFocusSystems,
     prelude::*,
     window::{PrimaryWindow, WindowFocused},
 };
 
 use super::AppState;
-use crate::player::focus::Focus;
+use crate::player::{focus::Focus, look::CursorLock};
 
 const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.6);
 
@@ -22,20 +26,15 @@ impl Plugin for PausePlugin {
             PreUpdate,
             hold_input
                 .after(InputSystems)
-                .before(InputFocusSystems::Dispatch)
                 .run_if(in_state(AppState::Paused)),
         )
         .add_systems(
             Update,
-            (pause_on_escape, pause_on_blur).run_if(in_state(AppState::Playing)),
+            (pause_on_escape, pause_on_blur, pause_on_lost_lock)
+                .run_if(in_state(AppState::Playing)),
         )
         .add_systems(OnEnter(AppState::Paused), (spawn_shade, stop_time))
         .add_systems(OnExit(AppState::Paused), start_time);
-        #[cfg(target_arch = "wasm32")]
-        app.add_systems(
-            Update,
-            pause_on_lost_lock.run_if(in_state(AppState::Playing)),
-        );
     }
 }
 
@@ -65,32 +64,37 @@ fn pause_on_blur(
 
 /// Browsers take Escape to release the cursor lock and don't pass the key
 /// on, so losing the lock pauses instead.
-#[cfg(target_arch = "wasm32")]
-fn pause_on_lost_lock(mut had_lock: Local<bool>, mut next: ResMut<NextState<AppState>>) {
-    let locked = web_sys::window()
-        .and_then(|window| window.document())
-        .and_then(|document| document.pointer_lock_element())
-        .is_some();
-    if *had_lock && !locked {
+fn pause_on_lost_lock(lock: Res<CursorLock>, mut next: ResMut<NextState<AppState>>) {
+    if lock.lost() {
         next.set(AppState::Paused);
     }
-    *had_lock = locked;
 }
 
-/// Keeps the game from seeing input while paused. A click or Escape goes
-/// back to the game.
+/// Keeps the game from seeing input while paused, up to and including the
+/// frame that resumes. A click or Escape goes back to the game.
+///
+/// Browsers only lock the cursor after a click, so there only a click
+/// resumes.
 fn hold_input(
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut logical: ResMut<ButtonInput<Key>>,
     mut mouse: ResMut<ButtonInput<MouseButton>>,
+    mut keyboard: ResMut<Messages<KeyboardInput>>,
+    mut wheel: ResMut<Messages<MouseWheel>>,
     mut next: ResMut<NextState<AppState>>,
 ) {
-    if mouse.just_pressed(MouseButton::Left) || keys.just_pressed(KeyCode::Escape) {
+    let escape = cfg!(not(target_arch = "wasm32")) && keys.just_pressed(KeyCode::Escape);
+    if mouse.just_pressed(MouseButton::Left) || escape {
         next.set(AppState::Playing);
     }
-    keys.reset_all();
-    logical.reset_all();
-    mouse.reset_all();
+    // Held buttons stay held, so key repeats don't count as new presses.
+    keys.clear();
+    logical.clear();
+    mouse.clear();
+    // Focused input is dispatched from these. Its reader falls behind while
+    // paused and would see them after resuming.
+    keyboard.clear();
+    wheel.clear();
 }
 
 /// Darkens the view. It also catches the pointer, so nothing behind it

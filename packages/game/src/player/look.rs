@@ -1,9 +1,9 @@
 use bevy::{
     camera::RenderTarget,
+    ecs::system::SystemParam,
     input::mouse::AccumulatedMouseMotion,
     picking::{
         PickingSystems,
-        hover::HoverMap,
         input::mouse_pick_events,
         pointer::{Location, PointerAction, PointerId, PointerInput},
     },
@@ -11,11 +11,7 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use super::{
-    camera::PlayerCamera,
-    cursor,
-    focus::{self, Clickable, Focus},
-};
+use super::{camera::PlayerCamera, focus::Focus};
 use crate::menu::AppState;
 
 const SENSITIVITY: f32 = 0.0025;
@@ -27,20 +23,16 @@ pub(super) struct LookPlugin;
 impl Plugin for LookPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LookAngles>()
-            .add_systems(Startup, Crosshair::spawn)
-            .add_systems(
-                Update,
-                (
-                    update_cursor,
-                    LookAngles::update.run_if(in_state(Focus::Desk)),
-                    Crosshair::update,
-                ),
-            )
+            .init_resource::<CursorLock>()
+            .add_systems(Update, (LookAngles::update, update_cursor).chain())
             .add_systems(
                 First,
-                center_pointer
-                    .in_set(PickingSystems::Input)
-                    .after(mouse_pick_events),
+                (
+                    CursorLock::update.before(PickingSystems::Input),
+                    center_pointer
+                        .in_set(PickingSystems::Input)
+                        .after(mouse_pick_events),
+                ),
             );
     }
 }
@@ -67,12 +59,12 @@ impl LookAngles {
 
     /// Turns freely, but never past looking straight up or down.
     fn update(
+        gaze: Gaze,
         motion: Res<AccumulatedMouseMotion>,
-        cursor: Single<&CursorOptions, With<PrimaryWindow>>,
         camera: Single<&PlayerCamera>,
         mut angles: ResMut<LookAngles>,
     ) {
-        if cursor.grab_mode != CursorGrabMode::Locked {
+        if !gaze.looking_around() {
             return;
         }
         let delta = motion.delta * SENSITIVITY;
@@ -83,80 +75,82 @@ impl LookAngles {
     }
 }
 
-/// Dot in the middle of the view that marks what a click hits.
+/// Whether the cursor is locked.
 ///
-/// It grows while it rests on a [`Clickable`].
-#[derive(Component)]
-struct Crosshair;
+/// Browsers drop the lock on their own, for example on Escape, so on the web
+/// this follows the browser and not only [`CursorOptions::grab_mode`].
+#[derive(Resource, Default, Debug)]
+pub(crate) struct CursorLock {
+    locked: bool,
+    lost: bool,
+}
 
-impl Crosshair {
-    fn spawn(mut commands: Commands) {
-        commands.spawn((
-            Node {
-                width: percent(100),
-                height: percent(100),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            Pickable::IGNORE,
-            children![(
-                Crosshair,
-                Node {
-                    width: px(cursor::DOT_SIZE),
-                    height: px(cursor::DOT_SIZE),
-                    border: UiRect::all(px(cursor::DOT_OUTLINE)),
-                    border_radius: BorderRadius::MAX,
-                    ..default()
-                },
-                BackgroundColor(cursor::DOT_FILL),
-                BorderColor::all(cursor::DOT_INK),
-                Pickable::IGNORE,
-                Visibility::Hidden,
-            )],
-        ));
+impl CursorLock {
+    /// Whether the lock went away this frame while the game still wants it.
+    pub(crate) fn lost(&self) -> bool {
+        self.lost
     }
 
-    fn update(
-        state: Res<State<Focus>>,
-        cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-        hovers: Res<HoverMap>,
-        targets: Query<(), With<Clickable>>,
-        parents: Query<&ChildOf>,
-        crosshair: Single<(&mut Visibility, &mut Node), With<Crosshair>>,
-    ) {
-        let (mut visibility, mut node) = crosshair.into_inner();
-        let locked = cursor.grab_mode == CursorGrabMode::Locked;
-        *visibility = if locked && *state.get() == Focus::Desk {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
-        let on_target =
-            focus::under_mouse(&hovers, &parents).any(|entity| targets.contains(entity));
-        let size = px(if on_target {
-            cursor::DOT_HOVER_SIZE
-        } else {
-            cursor::DOT_SIZE
-        });
-        node.width = size;
-        node.height = size;
+    fn update(cursor: Single<&CursorOptions, With<PrimaryWindow>>, mut lock: ResMut<CursorLock>) {
+        let wanted = cursor.grab_mode == CursorGrabMode::Locked;
+        let locked = wanted && Self::held_by_browser();
+        lock.lost = wanted && lock.locked && !locked;
+        lock.locked = locked;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    const fn held_by_browser() -> bool {
+        true
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn held_by_browser() -> bool {
+        web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.pointer_lock_element())
+            .is_some()
+    }
+}
+
+/// What the player looks at, by game state, focus and cursor lock.
+#[derive(SystemParam)]
+pub(super) struct Gaze<'w> {
+    app_state: Res<'w, State<AppState>>,
+    focus: Res<'w, State<Focus>>,
+    lock: Res<'w, CursorLock>,
+}
+
+impl Gaze<'_> {
+    /// Turning the head with the mouse, in the desk view.
+    pub(super) fn looking_around(&self) -> bool {
+        self.playing() && *self.focus.get() == Focus::Desk && self.lock.locked
+    }
+
+    /// Focused on something, with the cursor free.
+    pub(super) fn focused(&self) -> bool {
+        self.playing() && *self.focus.get() != Focus::Desk
+    }
+
+    fn playing(&self) -> bool {
+        *self.app_state.get() == AppState::Playing
     }
 }
 
 /// Locks the cursor while looking around and frees it otherwise.
 ///
 /// Browsers only allow the lock after a click, so a click in the desk view
-/// locks it again.
+/// locks it again. Until a browser grants the lock, the pointer stays
+/// visible to click with.
 fn update_cursor(
-    app: Res<State<AppState>>,
-    state: Res<State<Focus>>,
+    app_state: Res<State<AppState>>,
+    focus: Res<State<Focus>>,
     mouse: Res<ButtonInput<MouseButton>>,
+    held: Res<CursorLock>,
     mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    let playing = *app.get() == AppState::Playing;
-    let desk = playing && *state.get() == Focus::Desk;
-    let changed = app.is_changed() || state.is_changed();
+    let playing = *app_state.get() == AppState::Playing;
+    let desk = playing && *focus.get() == Focus::Desk;
+    let changed = app_state.is_changed() || focus.is_changed();
     let free = !desk && changed;
     let lock = desk && (changed || mouse.just_pressed(MouseButton::Left));
     if free {
@@ -165,18 +159,20 @@ fn update_cursor(
     } else if lock {
         cursor.grab_mode = CursorGrabMode::Locked;
         cursor.visible = false;
+    } else if cursor.grab_mode == CursorGrabMode::Locked && cursor.visible == held.locked {
+        cursor.visible = !held.locked;
     }
 }
 
 /// Keeps the mouse pointer in the middle of the window while the cursor is
 /// locked, so picking hits what the crosshair shows.
 fn center_pointer(
-    state: Res<State<Focus>>,
-    window: Single<(Entity, &Window, &CursorOptions), With<PrimaryWindow>>,
+    gaze: Gaze,
+    window: Single<(Entity, &Window), With<PrimaryWindow>>,
     mut inputs: MessageWriter<PointerInput>,
 ) {
-    let (entity, window, cursor) = *window;
-    if *state.get() != Focus::Desk || cursor.grab_mode != CursorGrabMode::Locked {
+    let (entity, window) = *window;
+    if !gaze.looking_around() {
         return;
     }
     let Some(target) = RenderTarget::Window(WindowRef::Entity(entity)).normalize(Some(entity))
