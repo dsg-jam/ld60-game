@@ -27,8 +27,8 @@ const SWAY: f32 = 0.12;
 const WISP: f32 = 0.025;
 /// How much the wisps twist and curl, in meters.
 const CURL: f32 = 0.015;
-/// Water droplets barely absorb light and scatter most of it forward.
 const DENSITY: f32 = 150.0;
+/// Water droplets barely absorb light and scatter most of it forward.
 const ABSORPTION: f32 = 0.05;
 const SCATTERING: f32 = 0.9;
 const FORWARD: f32 = 0.6;
@@ -87,12 +87,11 @@ impl Wisps {
             let (x, y, z) = (wrap(cell.x, dx), wrap(cell.y, dy), wrap(cell.z, dz));
             self.0[x + NOISE * (y + NOISE * z)]
         };
-        let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
-        let x00 = lerp(corner(0, 0, 0), corner(1, 0, 0), f.x);
-        let x10 = lerp(corner(0, 1, 0), corner(1, 1, 0), f.x);
-        let x01 = lerp(corner(0, 0, 1), corner(1, 0, 1), f.x);
-        let x11 = lerp(corner(0, 1, 1), corner(1, 1, 1), f.x);
-        lerp(lerp(x00, x10, f.y), lerp(x01, x11, f.y), f.z)
+        let x00 = corner(0, 0, 0).lerp(corner(1, 0, 0), f.x);
+        let x10 = corner(0, 1, 0).lerp(corner(1, 1, 0), f.x);
+        let x01 = corner(0, 0, 1).lerp(corner(1, 0, 1), f.x);
+        let x11 = corner(0, 1, 1).lerp(corner(1, 1, 1), f.x);
+        x00.lerp(x10, f.y).lerp(x01.lerp(x11, f.y), f.z)
     }
 }
 

@@ -17,7 +17,7 @@ use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
 
 /// Air lit by the city, which everything fades into far away.
-const HAZE: Color = Color::srgb_u8(0x42, 0x36, 0x3e);
+const FOG: Color = Color::srgb_u8(0x42, 0x36, 0x3e);
 /// The clear night sky above the haze.
 pub(super) const SKY: Color = Color::srgb_u8(0x14, 0x18, 0x30);
 /// How much a meter of air hides at street level.
@@ -26,6 +26,7 @@ const FOG_DENSITY: f32 = 0.016;
 const RAIN_FOG_DENSITY: f32 = 0.008;
 /// The haze thins out to a third every this many meters up.
 const FOG_HEIGHT: f32 = 12.0;
+/// Faint light from the city that reaches everywhere.
 const AMBIENT: Color = Color::srgb_u8(0x6a, 0x60, 0xa0);
 const AMBIENT_BRIGHTNESS: f32 = 20.0;
 /// Light reflected by the planet in the sky.
@@ -42,7 +43,9 @@ const RAIN_HAZE_DENSITY: f32 = 0.03;
 const HAZE_HALF_LENGTH: f32 = 25.0;
 /// Makes up for the thin haze.
 const HAZE_GLOW: f32 = 8.0;
+/// Samples along each view ray through the haze.
 const HAZE_STEPS: u32 = 64;
+/// The street haze reaches this high, in meters.
 const HAZE_HEIGHT: f32 = 12.0;
 
 pub(super) struct AtmospherePlugin;
@@ -134,7 +137,7 @@ fn dress_camera(add: On<Add<PlayerCamera>>, mut commands: Commands) {
         },
         Exposure::INDOOR,
         HeightFog {
-            color: HAZE.to_linear().to_vec4(),
+            color: FOG.to_linear().to_vec4(),
             density: FOG_DENSITY,
             falloff: 1.0 / FOG_HEIGHT,
             ground: 0.0,

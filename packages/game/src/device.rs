@@ -14,7 +14,7 @@ use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
 
-/// How far a held device lifts off the desk.
+/// How far a held device lifts off the counter.
 const LIFT: f32 = 0.1;
 /// How much a held device faces up rather than towards the player.
 const TILT_UP: f32 = 0.8;
@@ -22,7 +22,7 @@ const TILT_UP: f32 = 0.8;
 const VIEW_DISTANCE: f32 = 0.26;
 /// Radians of rotation per pixel dragged.
 const DRAG_SPEED: f32 = 0.01;
-/// How quickly a device moves between the desk and the hand.
+/// How quickly a device moves between the counter and the hand.
 const DECAY_RATE: f32 = 10.0;
 
 pub(crate) struct DevicePlugin;
@@ -73,7 +73,7 @@ impl DeviceKey {
 
 /// A device the player can pick up, rotate and put back.
 ///
-/// It rests where it was spawned and can be focused from the desk.
+/// It rests where it was spawned and can be focused from the seat.
 #[derive(Component, Debug, Default)]
 #[require(Transform, Visibility)]
 pub(crate) struct Holdable {

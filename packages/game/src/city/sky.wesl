@@ -14,7 +14,7 @@ struct Sky {
     planet_size: f32,
     axis: vec3<f32>,
     planet_light: f32,
-    /// Towards the sun, which is below the horizon.
+    /// Towards the sun, which lights the planet from the side.
     sun: vec3<f32>,
     rain: f32,
     /// How far the wind has blown the clouds, in meters.

@@ -68,13 +68,7 @@ fn spawn_street(
     let concrete = wet.add(Wet::material(matte(CONCRETE, 0.92), WALK_PUDDLES, 2.0));
     let curb = wet.add(Wet::material(matte(CURB, 0.8), 0.0, 3.0));
     let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, 1.0));
-    let slab = |block: &Block, material: &Handle<WetMaterial>| {
-        (
-            Mesh3d(kit.cube.clone()),
-            MeshMaterial3d(material.clone()),
-            block.transform().with_scale(block.size),
-        )
-    };
+    let slab = |block: &Block, material: &Handle<WetMaterial>| kit.cuboid(block, material.clone());
 
     let ground = |top: f32, near: f32, far: f32| {
         Block::between(
@@ -190,17 +184,7 @@ fn spawn_lamps(
                     parts.spawn(kit.cuboid(&plinth, post.clone()));
                     parts.spawn(kit.cuboid(&pole, post.clone()));
                     parts.spawn(kit.cuboid(&arm, post.clone()));
-                    parts.spawn((
-                        Mesh3d(kit.cube.clone()),
-                        MeshMaterial3d(post.clone()),
-                        Transform::from_translation((strut_low + strut_high) / 2.0)
-                            .looking_to(strut_high - strut_low, Vec3::X)
-                            .with_scale(Vec3::new(
-                                LAMP_STRUT,
-                                LAMP_STRUT,
-                                strut_low.distance(strut_high),
-                            )),
-                    ));
+                    parts.spawn(kit.bar(strut_low, strut_high, LAMP_STRUT, post.clone()));
                     parts
                         .spawn((
                             Transform::from_translation(head).with_rotation(tilt),

@@ -33,9 +33,9 @@ const STREET_MARGIN: f32 = 12.0;
 /// Time before a car sets off on its next route.
 const PAUSE: Range<f32> = 0.0..25.0;
 
-pub(super) struct SkyPlugin;
+pub(super) struct FlyingPlugin;
 
-impl Plugin for SkyPlugin {
+impl Plugin for FlyingPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SkyRng(rng(SEED)))
             .add_systems(Update, SkyCar::fly);

@@ -22,11 +22,11 @@ impl Plugin for DustPlugin {
 /// Specks of dust floating in the air around an entity. They only show
 /// where a light shines on them.
 #[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct Dust {
+pub(super) struct Dust {
     /// Where the specks float, in the entity's own space.
-    pub(crate) cloud: Block,
-    pub(crate) motes: usize,
-    pub(crate) seed: u64,
+    pub(super) cloud: Block,
+    pub(super) motes: usize,
+    pub(super) seed: u64,
 }
 
 /// A speck of [`Dust`].

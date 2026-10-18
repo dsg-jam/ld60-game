@@ -284,7 +284,7 @@ pub(super) struct Facade {
 
 /// Matches `Facade` in `facade.wesl`.
 #[derive(ShaderType, Reflect, Debug, Clone)]
-pub(super) struct FacadeParams {
+struct FacadeParams {
     /// Corner of the building with the smallest coordinates.
     origin: Vec3,
     seed: f32,
@@ -381,11 +381,7 @@ impl Skyline {
                     } else {
                         let facade =
                             facades.add(Facade::random(&block, row.facing, floor, &mut rng));
-                        parent.spawn((
-                            Mesh3d(kit.cube.clone()),
-                            MeshMaterial3d(facade.clone()),
-                            block.transform().with_scale(block.size),
-                        ));
+                        parent.spawn(kit.cuboid(&block, facade.clone()));
                         facade
                     };
                     parent.spawn(kit.cuboid(&Self::roof_edge(&block), ledge.clone()));
@@ -422,11 +418,7 @@ impl Skyline {
                             Vec3::Z * row.facing * -rng.random_range(0.0..roof.size.z * 0.1),
                         );
                         let facade = Facade::random(&tier, 0.0, floor, &mut rng);
-                        parent.spawn((
-                            Mesh3d(kit.cube.clone()),
-                            MeshMaterial3d(facades.add(facade)),
-                            tier.transform().with_scale(tier.size),
-                        ));
+                        parent.spawn(kit.cuboid(&tier, facades.add(facade)));
                         parent.spawn(kit.cuboid(&Self::roof_edge(&tier), ledge.clone()));
                         skyline.volumes.push(tier);
                         roof = tier;
@@ -436,7 +428,7 @@ impl Skyline {
                         let crown = &crowns[rng.random_range(0..crowns.len())];
                         Self::spawn_crown(parent, &kit, &roof, crown);
                     }
-                    spawn_roof_gear(parent, &kit, &roof, &gear, &beacon, &mut rng);
+                    Self::spawn_roof_gear(parent, &kit, &roof, &gear, &beacon, &mut rng);
                     if row.market && row.facing > 0.0 {
                         skyline.front.push(Frontage { block, facade });
                     } else if row.facing > 0.0 && !low && block.size.y > BACKDROP_HEIGHT {
@@ -466,17 +458,16 @@ impl Skyline {
         for part in parts {
             commands.spawn((
                 Name::new("shop building"),
-                Mesh3d(kit.cube.clone()),
-                MeshMaterial3d(facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, &mut rng))),
-                part.transform().with_scale(part.size),
+                kit.cuboid(
+                    &part,
+                    facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, &mut rng)),
+                ),
             ));
         }
         commands.insert_resource(skyline);
         commands.insert_resource(DripEdges(drips));
     }
-}
 
-impl Skyline {
     /// A building with a market in its ground floor and windows above.
     /// Returns the facade of the upper floors.
     #[expect(
@@ -509,11 +500,7 @@ impl Skyline {
             )
         };
         let facade = facades.add(Facade::random(&upper, facing, floor, rng));
-        parent.spawn((
-            Mesh3d(kit.cube.clone()),
-            MeshMaterial3d(facade.clone()),
-            upper.transform().with_scale(upper.size),
-        ));
+        parent.spawn(kit.cuboid(&upper, facade.clone()));
         parent.spawn(kit.cuboid(&base, market.wall()));
         market.spawn_market(parent, kit, block, facing, drips, rng);
         if let Some(grid) = facades
@@ -524,9 +511,7 @@ impl Skyline {
         }
         facade
     }
-}
 
-impl Skyline {
     /// Whether `block` is within `width` times the view of the sky from the
     /// shop.
     fn near_view(block: &Block, width: f32) -> bool {
@@ -575,6 +560,35 @@ impl Skyline {
             block.min().with_y(block.max().y - LEDGE_HEIGHT) - Vec3::new(LEDGE_OUT, 0.0, LEDGE_OUT),
             block.max() + Vec3::new(LEDGE_OUT, 0.05, LEDGE_OUT),
         )
+    }
+
+    /// Air conditioners and antennas on a roof.
+    fn spawn_roof_gear(
+        parent: &mut ChildSpawnerCommands,
+        kit: &Kit,
+        roof: &Block,
+        gear: &Handle<SurfaceMaterial>,
+        beacon: &Handle<StandardMaterial>,
+        rng: &mut impl Rng,
+    ) {
+        for _ in 0..rng.random_range(ROOF_BOXES) {
+            let size = Vec3::new(
+                rng.random_range(1.0..3.0),
+                rng.random_range(0.8..2.0),
+                rng.random_range(1.0..3.0),
+            );
+            let spot = Vec2::new(rng.random_range(-0.8..0.8), rng.random_range(-0.8..0.8));
+            let unit = Block::new(size).resting_on(roof, spot);
+            parent.spawn(kit.cuboid(&unit, gear.clone()));
+        }
+        if rng.random_bool(ANTENNA_CHANCE) {
+            let spot = Vec2::new(rng.random_range(-0.7..0.7), rng.random_range(-0.7..0.7));
+            let mast = Block::new(Vec3::new(0.12, rng.random_range(ANTENNA_HEIGHT), 0.12))
+                .resting_on(roof, spot);
+            let light = Block::new(Vec3::splat(BEACON_SIZE)).on_top_of(&mast);
+            parent.spawn(kit.cuboid(&mast, gear.clone()));
+            parent.spawn(kit.cuboid(&light, beacon.clone()));
+        }
     }
 }
 
@@ -747,34 +761,5 @@ impl Beacon {
         let on = (time.elapsed_secs() / BEACON_PERIOD).fract() < 0.15;
         let strength = if on { 40.0 } else { 0.5 };
         material.emissive = BEACON.to_linear() * strength;
-    }
-}
-
-/// Air conditioners and antennas on a roof.
-fn spawn_roof_gear(
-    parent: &mut ChildSpawnerCommands,
-    kit: &Kit,
-    roof: &Block,
-    gear: &Handle<SurfaceMaterial>,
-    beacon: &Handle<StandardMaterial>,
-    rng: &mut impl Rng,
-) {
-    for _ in 0..rng.random_range(ROOF_BOXES) {
-        let size = Vec3::new(
-            rng.random_range(1.0..3.0),
-            rng.random_range(0.8..2.0),
-            rng.random_range(1.0..3.0),
-        );
-        let spot = Vec2::new(rng.random_range(-0.8..0.8), rng.random_range(-0.8..0.8));
-        let unit = Block::new(size).resting_on(roof, spot);
-        parent.spawn(kit.cuboid(&unit, gear.clone()));
-    }
-    if rng.random_bool(ANTENNA_CHANCE) {
-        let spot = Vec2::new(rng.random_range(-0.7..0.7), rng.random_range(-0.7..0.7));
-        let mast = Block::new(Vec3::new(0.12, rng.random_range(ANTENNA_HEIGHT), 0.12))
-            .resting_on(roof, spot);
-        let light = Block::new(Vec3::splat(BEACON_SIZE)).on_top_of(&mast);
-        parent.spawn(kit.cuboid(&mast, gear.clone()));
-        parent.spawn(kit.cuboid(&light, beacon.clone()));
     }
 }

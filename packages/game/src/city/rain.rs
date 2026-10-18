@@ -1,6 +1,5 @@
 use bevy::{
-    asset::RenderAssetUsages,
-    asset::{AssetPath, embedded_asset, embedded_path},
+    asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
     camera::visibility::NoFrustumCulling,
     light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},

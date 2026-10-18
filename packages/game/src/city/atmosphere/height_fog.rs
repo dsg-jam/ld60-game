@@ -59,15 +59,15 @@ impl Plugin for HeightFogPlugin {
 /// included, so far away buildings and the sky behind them fade alike.
 #[derive(Component, ExtractComponent, ShaderType, Clone, Copy, Debug)]
 #[extract_app(RenderApp)]
-pub(crate) struct HeightFog {
+pub(super) struct HeightFog {
     /// Linear color the haze glows in.
-    pub(crate) color: Vec4,
+    pub(super) color: Vec4,
     /// How much a meter of air at the ground hides.
-    pub(crate) density: f32,
+    pub(super) density: f32,
     /// How quickly the haze thins out, per meter of height.
-    pub(crate) falloff: f32,
+    pub(super) falloff: f32,
     /// Height of the ground the density is measured at.
-    pub(crate) ground: f32,
+    pub(super) ground: f32,
 }
 
 /// The render pipeline for [`HeightFog`].

@@ -37,7 +37,7 @@ struct Liquid {
     turn: f32,
     /// Per mode: the heights of its two waves, its Bessel root and its
     /// number of waves around.
-    waves: array<vec4<f32>, 10>,
+    waves: array<vec4<f32>, WAVES>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> liquid: Liquid;

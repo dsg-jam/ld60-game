@@ -57,7 +57,7 @@ impl Plugin for CameraPlugin {
     ScreenSpaceAmbientOcclusion,
 )]
 pub(crate) struct PlayerCamera {
-    /// Pose while sitting at the desk and looking straight ahead.
+    /// Pose while sitting at the counter, before looking around.
     seat: Transform,
 }
 
