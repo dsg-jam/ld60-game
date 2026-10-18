@@ -1,3 +1,4 @@
+mod chip_title;
 mod clicks;
 mod footer;
 
@@ -11,6 +12,7 @@ use bevy::{
     ui_widgets::TextInput,
 };
 
+use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::footer::{Command, Run, Status};
 #[cfg(feature = "debug_port")]
@@ -41,6 +43,10 @@ impl Plugin for EditorPlugin {
             Clicks::correct_edits.before(EditableTextSystems),
         )
         .add_systems(Update, Editor::load_job)
+        .add_systems(
+            Update,
+            ChipTitle::update.run_if(resource_exists_and_changed::<Job>),
+        )
         .add_observer(Editor::indent_on_tab)
         .add_observer(Command::run_on_key)
         .add_observer(Command::run_on_click)
@@ -88,7 +94,7 @@ impl Editor {
                         ..default()
                     },
                     BackgroundColor(PHOSPHOR),
-                    children![title("FIRMWARE EDITOR"), title("CALCO REV A"),],
+                    children![title("FIRMWARE EDITOR"), (title(""), ChipTitle)],
                 ),
                 (
                     Editor,
