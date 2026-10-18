@@ -142,8 +142,8 @@ runs them like reserved encodings.
 | F    | `REV` | in  | Chip revision. See [Revisions](#revisions).         |
 | 0    | `ANN` | out | Annunciators. The board decides what each bit does. |
 
-The board defines the key codes and the annunciators. See the device docs,
-for example [Summa 6](../devices/summa6.md).
+The board defines the key codes and the annunciators. See the device docs, for
+example [Summa 6](../devices/summa6.md).
 
 ## Errata
 
