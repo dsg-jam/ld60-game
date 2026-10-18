@@ -1,7 +1,9 @@
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, TAU};
 
 use bevy::{
+    asset::RenderAssetUsages,
     input::mouse::MouseScrollUnit,
+    mesh::{Indices, PrimitiveTopology},
     picking::{
         events::{PointerDrag, PointerPress, PointerScroll},
         pointer::PointerButton,
@@ -12,7 +14,7 @@ use bevy::{
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
+use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::player::focus::Focused;
 
 const RADIUS: f32 = 0.016;
@@ -21,6 +23,11 @@ const DEPTH: f32 = 0.018;
 /// almost to the edge.
 const MARK: Vec3 = Vec3::new(0.002, 0.001, RADIUS * 0.8);
 const MARK_START: f32 = RADIUS * 0.1;
+/// Grooves around the side of the cap, for grip.
+const GROOVES: u32 = 30;
+const GROOVE_DEPTH: f32 = 0.0007;
+/// Points along the side per groove.
+const GROOVE_STEPS: u32 = 6;
 const CAP: Color = Color::srgb_u8(0x22, 0x1e, 0x1a);
 const MARK_COLOR: Color = Color::srgb_u8(0xd9, 0xcf, 0xb4);
 /// How far a smooth knob turns from one end to the other, in radians.
@@ -38,7 +45,8 @@ pub(crate) struct KnobPlugin;
 
 impl Plugin for KnobPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, Knob::show)
+        app.init_resource::<KnobCap>()
+            .add_systems(Update, Knob::show)
             .add_observer(Knob::on_add)
             .add_observer(Knob::press)
             .add_observer(Knob::drag)
@@ -57,6 +65,73 @@ pub(crate) enum Knob {
     /// Snaps to one of `count` positions. A click moves on to the next one,
     /// round to the first after the last.
     Stepped { position: usize, count: usize },
+}
+
+/// The cap mesh and material all knobs share.
+#[derive(Resource, Debug)]
+struct KnobCap {
+    mesh: Handle<Mesh>,
+    material: Handle<SurfaceMaterial>,
+}
+
+impl FromWorld for KnobCap {
+    fn from_world(world: &mut World) -> Self {
+        let mesh = world.resource_mut::<Assets<Mesh>>().add(Self::mesh());
+        let material = world
+            .resource_mut::<Assets<SurfaceMaterial>>()
+            .add(Finish::Plastic.material(CAP, Form::Freeform, 0.0));
+        Self { mesh, material }
+    }
+}
+
+impl KnobCap {
+    /// A cap standing on the origin along +Y, with grooves around its side.
+    fn mesh() -> Mesh {
+        let steps = GROOVES * GROOVE_STEPS;
+        let radius = |angle: f32| {
+            let groove = (0.5 + 0.5 * (angle * GROOVES as f32).cos()).powi(3);
+            RADIUS - GROOVE_DEPTH * groove
+        };
+        let mut positions = Vec::new();
+        let mut normals = Vec::new();
+        let mut indices = Vec::new();
+        for step in 0..=steps {
+            let angle = step as f32 / steps as f32 * TAU;
+            let (sin, cos) = angle.sin_cos();
+            let r = radius(angle);
+            // Turns the slope of the radius into a tilt of the normal.
+            let slope = (radius(angle + 1e-3) - radius(angle - 1e-3)) / 2e-3;
+            let along = Vec3::new(slope * cos - r * sin, 0.0, slope * sin + r * cos);
+            let normal = Vec3::Y.cross(along).normalize();
+            for y in [0.0, DEPTH] {
+                positions.push([r * cos, y, r * sin]);
+                normals.push(normal.to_array());
+            }
+            if step < steps {
+                let a = 2 * step;
+                indices.extend([a, a + 1, a + 3, a, a + 3, a + 2]);
+            }
+        }
+        let center = positions.len() as u32;
+        positions.push([0.0, DEPTH, 0.0]);
+        normals.push([0.0, 1.0, 0.0]);
+        for step in 0..=steps {
+            let rim = positions[2 * step as usize + 1];
+            positions.push(rim);
+            normals.push([0.0, 1.0, 0.0]);
+            if step < steps {
+                let a = center + 1 + step;
+                indices.extend([center, a + 1, a]);
+            }
+        }
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_indices(Indices::U32(indices))
+    }
 }
 
 impl Knob {
@@ -91,16 +166,19 @@ impl Knob {
         true
     }
 
-    fn on_add(add: On<Add<Knob>>, mut commands: Commands) {
+    fn on_add(add: On<Add<Knob>>, cap: Res<KnobCap>, mut commands: Commands) {
         let mark = Block::new(MARK).translated(Vec3::new(0.0, DEPTH, -MARK.z / 2.0 - MARK_START));
-        let cap = Block::new(Vec3::new(2.0 * RADIUS, DEPTH, 2.0 * RADIUS));
+        let cap = (
+            Mesh3d(cap.mesh.clone()),
+            MeshMaterial3d(cap.material.clone()),
+        );
         commands.entity(add.entity).with_children(|knob| {
             knob.spawn((
                 Transform::from_rotation(Quat::from_rotation_x(FRAC_PI_2)),
                 Visibility::default(),
             ))
             .with_children(|turned| {
-                turned.spawn((Shape::cylinder(&cap, CAP), Finish::Plastic));
+                turned.spawn(cap);
                 turned.spawn(Shape::cuboid(&mark, MARK_COLOR));
             });
         });
