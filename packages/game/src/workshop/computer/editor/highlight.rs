@@ -13,7 +13,8 @@ const LABEL: Color = Color::srgb(0.6, 1.0, 0.3);
 const REGISTER: Color = Color::srgb(0.45, 1.0, 0.55);
 const PORT: Color = Color::srgb(0.35, 0.95, 0.85);
 const NUMBER: Color = Color::srgb(0.55, 0.85, 0.7);
-const COMMENT: Color = Color::srgb(0.24, 0.6, 0.31);
+/// At least 3:1 against the selection color of the editor.
+const COMMENT: Color = Color::srgb(0.28, 0.68, 0.36);
 const PLAIN: Color = Color::srgb(0.35, 0.78, 0.43);
 /// Underlines source the assembler rejects.
 const ERROR: Color = Color::srgb(1.0, 0.8, 0.35);
