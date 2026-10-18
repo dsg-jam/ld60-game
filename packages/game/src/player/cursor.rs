@@ -16,7 +16,8 @@ pub(crate) const DOT_SIZE: f32 = 10.0;
 /// Diameter of the dot cursor over a [`Clickable`] in the desk view.
 pub(crate) const DOT_HOVER_SIZE: f32 = 16.0;
 pub(crate) const DOT_OUTLINE: f32 = 1.5;
-pub(crate) const DOT_FILL: Color = Color::srgba(1.0, 0.98, 0.9, 0.9);
+/// Opaque, since Firefox miscolors translucent cursor pixels.
+pub(crate) const DOT_FILL: Color = Color::srgb(1.0, 0.98, 0.9);
 pub(crate) const DOT_INK: Color = Color::srgb_u8(0x4a, 0x44, 0x3a);
 
 /// `#` is the outline, `.` the fill and a space is transparent.
