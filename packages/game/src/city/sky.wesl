@@ -180,8 +180,7 @@ fn clouds(origin: vec3<f32>, d: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
     // bands.
     let jitter = interleaved_gradient_noise(pixel);
     // Light scattered forward towards the planet glows a little brighter.
-    let towards_planet = dot(d, sky.planet);
-    let phase = 0.6 + 0.4 * towards_planet * towards_planet;
+    let phase = 0.6 + 0.4 * pow(max(dot(d, sky.planet), 0.0), 2.0);
     let fade = 1.0 - smoothstep(CLOUD_REACH * 0.4, CLOUD_REACH, start);
     var light = vec3<f32>(0.0);
     var through = 1.0;
