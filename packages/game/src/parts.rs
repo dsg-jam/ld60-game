@@ -1,3 +1,4 @@
+pub(crate) mod bulb;
 pub(crate) mod dot_matrix;
 pub(crate) mod gauge;
 pub(crate) mod keypad;
@@ -19,6 +20,7 @@ pub(crate) struct PartsPlugin;
 impl Plugin for PartsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
+            bulb::BulbPlugin,
             dot_matrix::DotMatrixPlugin,
             gauge::GaugePlugin,
             keypad::KeypadPlugin,

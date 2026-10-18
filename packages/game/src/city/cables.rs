@@ -7,8 +7,10 @@ use bevy::{
 use rand::{Rng, RngExt};
 
 use super::signs::{Sign, SignBounds};
-use super::{FACADES, Kit, glow, rng};
+use super::{FACADES, Kit, rng};
+use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
+use crate::parts::bulb::Bulb;
 use crate::workshop::shop;
 
 const SEED: u64 = 8;
@@ -26,10 +28,14 @@ const STRING_LIGHT_CHANCE: f64 = 0.5;
 /// Bulb strings are at least this many cables apart.
 const STRING_SPACING: usize = 3;
 const BULB_SPACING: f32 = 0.9;
-const BULB: f32 = 0.07;
-const BULB_GLOW: f32 = 15.0;
+const BULB_RADIUS: f32 = 0.035;
+/// Bright enough to light up the rain from across the street.
+const BULB_GLOW: f32 = 60.0;
+/// The socket each bulb hangs from, under the cable.
+const SOCKET: Vec3 = Vec3::new(0.02, 0.03, 0.02);
 
 const WIRE: Color = Color::srgb_u8(0x12, 0x12, 0x14);
+const SOCKET_COLOR: Color = Color::srgb_u8(0x1a, 0x1a, 0x1c);
 const BULBS: [Color; 3] = [
     Color::srgb_u8(0xff, 0xd0, 0x80),
     Color::srgb_u8(0xff, 0x70, 0xc0),
@@ -59,15 +65,11 @@ impl Cable {
         mut commands: Commands,
         kit: Res<Kit>,
         signs: Res<SignBounds>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
         let mut rng = rng(SEED);
         let wire = surfaces.add(Finish::Plastic.scaled(WIRE));
-        let bulbs: Vec<_> = BULBS
-            .iter()
-            .map(|&color| materials.add(glow(color, BULB_GLOW)))
-            .collect();
+        let socket = surfaces.add(Finish::Plastic.scaled(SOCKET_COLOR));
         let slot = 2.0 * SPAN / CABLES as f32;
         let mut last_string = None;
         let mut root = commands.spawn((
@@ -97,14 +99,22 @@ impl Cable {
                 let apart = last_string.is_none_or(|last| index - last >= STRING_SPACING);
                 if apart && rng.random_bool(STRING_LIGHT_CHANCE) {
                     last_string = Some(index);
-                    let bulb = bulbs[rng.random_range(0..bulbs.len())].clone();
+                    let color = BULBS[rng.random_range(0..BULBS.len())];
                     let count = (cable.near.distance(cable.far) / BULB_SPACING) as usize;
                     for index in 1..count {
-                        let at = cable.point(index as f32 / count as f32) - Vec3::Y * BULB;
+                        let at = cable.point(index as f32 / count as f32);
+                        let holder = Block::new(SOCKET).standing_at(at - Vec3::Y * SOCKET.y);
+                        parent.spawn(kit.cuboid(&holder, socket.clone()));
                         parent.spawn((
-                            Mesh3d(kit.cube.clone()),
-                            MeshMaterial3d(bulb.clone()),
-                            Transform::from_translation(at).with_scale(Vec3::splat(BULB)),
+                            Bulb {
+                                radius: BULB_RADIUS,
+                                color,
+                                glow: BULB_GLOW,
+                                on: true,
+                            },
+                            Transform::from_translation(
+                                holder.bottom() - Vec3::Y * BULB_RADIUS * 0.9,
+                            ),
                         ));
                     }
                 }
