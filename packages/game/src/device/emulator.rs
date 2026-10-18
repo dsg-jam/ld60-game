@@ -2,14 +2,12 @@ use std::error::Error;
 
 use bevy::prelude::*;
 use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, Rom};
+use ld60_levels::TEST_SEEDS;
 
 use super::{DeviceButton, DeviceKey};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::parts::lcd::LcdDisplay;
-
-/// Decides the random RAM contents at power on.
-const POWER_ON_SEED: u64 = 1;
 
 pub(super) struct EmulatorPlugin;
 
@@ -34,15 +32,36 @@ impl Plugin for EmulatorPlugin {
 pub(crate) struct Emulator {
     device: AnyDevice,
     readout: Readout,
+    /// Index into [`TEST_SEEDS`] of the seed for the RAM garbage at the
+    /// last power on. Each power on takes the next one, like the customer's
+    /// tests do.
+    power_ons: usize,
 }
 
 impl Emulator {
     /// Powers the device on and runs it until it waits for a key.
-    pub(crate) fn power_on(mut device: AnyDevice) -> Self {
-        device.power_on(POWER_ON_SEED);
+    pub(crate) fn power_on(device: AnyDevice) -> Self {
+        Self::power_on_with(device, 0)
+    }
+
+    fn power_on_with(mut device: AnyDevice, power_ons: usize) -> Self {
+        device.power_on(Self::seed(power_ons));
         Self::run(&mut device);
         let readout = device.readout();
-        Self { device, readout }
+        Self {
+            device,
+            readout,
+            power_ons,
+        }
+    }
+
+    /// Replaces the device and powers it on with fresh RAM garbage.
+    pub(crate) fn restart(&mut self, device: AnyDevice) {
+        *self = Self::power_on_with(device, self.power_ons + 1);
+    }
+
+    fn seed(power_ons: usize) -> u64 {
+        TEST_SEEDS[power_ons % TEST_SEEDS.len()]
     }
 
     pub(crate) fn rom(&self) -> &Rom {
@@ -90,5 +109,32 @@ impl Emulator {
             .map(|(name, emulator)| (name.to_string(), emulator.readout.to_string().into()))
             .collect();
         Ok(readouts.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ld60_levels::{CATALOG, device, initial_rom};
+
+    use super::*;
+
+    fn tally() -> AnyDevice {
+        let source = &CATALOG[0];
+        let level = source.load().unwrap();
+        let rom = initial_rom(&level, source.buggy).unwrap();
+        device(&level, rom).unwrap()
+    }
+
+    #[test]
+    fn each_restart_takes_the_next_test_seed() {
+        let mut emulator = Emulator::power_on(tally());
+        let mut seeds = vec![Emulator::seed(emulator.power_ons)];
+        for _ in 1..=TEST_SEEDS.len() {
+            emulator.restart(tally());
+            seeds.push(Emulator::seed(emulator.power_ons));
+        }
+        let mut expected = TEST_SEEDS.to_vec();
+        expected.push(TEST_SEEDS[0]);
+        assert_eq!(seeds, expected);
     }
 }
