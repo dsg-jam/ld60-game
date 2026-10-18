@@ -1,6 +1,8 @@
 mod chip_title;
 mod clicks;
 mod footer;
+mod highlight;
+mod lexer;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
@@ -9,12 +11,14 @@ use bevy::{
     picking::events::PointerScroll,
     prelude::*,
     text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
+    ui::UiSystems,
     ui_widgets::TextInput,
 };
 
 use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::footer::{Command, Run, Status};
+use self::highlight::Highlight;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::parts::screen::UiCanvas;
@@ -24,6 +28,8 @@ pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 
 const PHOSPHOR: Color = Color::srgb(0.45, 1.0, 0.55);
 const PHOSPHOR_DIM: Color = Color::srgb(0.2, 0.55, 0.26);
+/// Dark enough for the dimmest highlight color to stay readable on it.
+const SELECTION: Color = Color::srgb(0.13, 0.38, 0.18);
 const FONT_SIZE: f32 = 13.0;
 /// Keeps text clear of the bezel, which covers the edges of the glass.
 const PADDING: f32 = 32.0;
@@ -40,9 +46,15 @@ impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            Clicks::correct_edits.before(EditableTextSystems),
+            (
+                Clicks::correct_edits.before(EditableTextSystems),
+                Highlight::follow_scroll.before(UiSystems::Layout),
+            ),
         )
-        .add_systems(Update, Editor::load_job)
+        .add_systems(
+            Update,
+            (Editor::load_job, Highlight::refresh.after(Editor::load_job)),
+        )
         .add_systems(
             Update,
             ChipTitle::update.run_if(resource_changed_or_removed::<Job>),
@@ -104,19 +116,22 @@ impl Editor {
                     Name::new("editor"),
                     Node {
                         flex_grow: 1.0,
+                        overflow: Overflow::clip(),
                         ..default()
                     },
                     TextInput,
                     source,
                     TextLayout::no_wrap(),
                     font.clone(),
-                    TextColor(PHOSPHOR),
+                    // `Highlight` draws the text.
+                    TextColor(Color::NONE),
                     TextCursorStyle {
                         color: PHOSPHOR,
-                        selection_color: PHOSPHOR_DIM,
+                        selection_color: SELECTION,
                         ..default()
                     },
                     TabIndex(0),
+                    children![Highlight::bundle(font.clone())],
                 ),
                 (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
                 (
@@ -203,18 +218,34 @@ impl Editor {
         text.viewport.offset.y = (text.viewport.offset.y - pixels).max(0.0);
     }
 
-    /// `ld60.editor` returns the text, the caret and the selected byte range.
+    /// `ld60.editor` returns the text, the caret, the selected byte range and
+    /// the assembler errors.
     #[cfg(feature = "debug_port")]
     fn debug_state(
         In(_): In<Option<serde_json::Value>>,
-        editor: Single<&EditableText, With<Editor>>,
+        text: Single<&EditableText, With<Editor>>,
+        job: Option<Res<Job>>,
     ) -> bevy::remote::BrpResult {
-        let selection = editor.editor().raw_selection();
+        use serde_json::json;
+
+        let source = text.value().to_string();
+        let errors = job
+            .and_then(|job| job.isa().assemble(&source).err())
+            .unwrap_or_default();
+        let selection = text.editor().raw_selection();
         let range = selection.text_range();
-        Ok(serde_json::json!({
-            "text": editor.value().to_string(),
+        Ok(json!({
             "caret": selection.focus().index(),
             "selection": [range.start, range.end],
+            "errors": errors
+                .iter()
+                .map(|error| json!({
+                    "line": error.line,
+                    "span": error.span.as_ref().map(|span| [span.start, span.end]),
+                    "message": error.message,
+                }))
+                .collect::<Vec<_>>(),
+            "text": source,
         }))
     }
 }
