@@ -203,15 +203,6 @@ impl Editor {
         focus.clear();
     }
 
-    /// Replaces all of the source, such as when the player restores a
-    /// saved version.
-    fn replace_text(text: &mut EditableText, source: &str) {
-        text.clear();
-        text.viewport.offset.y = 0.0;
-        text.queue_edit(TextEdit::Insert(source.into()));
-        text.queue_edit(TextEdit::TextStart(false));
-    }
-
     /// Inserts spaces instead of moving focus.
     fn indent_on_tab(
         mut input: On<FocusedInput<KeyboardInput>>,
