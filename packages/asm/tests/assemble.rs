@@ -59,20 +59,10 @@ fn reports_all_errors_with_line_numbers() {
 
 #[test]
 fn reports_the_span_of_each_error() {
-    let errors = assemble(
-        "  FOO
-JMP nowhere
-x: NOP
-x: NOP
-.db 1, 300",
-        &Toy,
-    )
-    .unwrap_err();
+    let source = "  FOO\nJMP nowhere\nx: NOP\nx: NOP\n.db 1, 300";
+    let errors = assemble(source, &Toy).unwrap_err();
     let spans: Vec<_> = errors.iter().map(|e| e.span.clone()).collect();
-    assert_eq!(
-        spans,
-        vec![Some(2..5), Some(4..11), Some(0..1), Some(4..10)]
-    );
+    assert_eq!(spans, vec![2..5, 4..11, 0..1, 4..10]);
 }
 
 #[test]
