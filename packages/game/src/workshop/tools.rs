@@ -8,7 +8,7 @@ use bevy::{
 };
 
 use super::job::{HandIn, Job};
-use super::ticket::JobTicket;
+use super::ticket::{JobTicket, Landing};
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -84,33 +84,31 @@ impl Tool {
     fn use_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        tools: Query<&Tool, With<Clickable>>,
+        tools: Query<(&Tool, &Transform), With<Clickable>>,
+        landings: Query<(), With<Landing>>,
         job: Option<ResMut<Job>>,
         mut tickets: Query<(Entity, &mut Paper), With<JobTicket>>,
-        transforms: Query<&Transform>,
         mut commands: Commands,
     ) {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let (Ok(&tool), Some(mut job)) = (tools.get(press.entity), job) else {
+        let (Ok((&tool, &rest)), Some(mut job)) = (tools.get(press.entity), job) else {
             return;
         };
         press.propagate(false);
         match tool {
             Self::Stamp => {
                 job.stamped = true;
-                if let Ok(transform) = transforms.get(press.entity) {
-                    commands.entity(press.entity).insert(Press {
-                        elapsed: 0.0,
-                        rest: *transform,
-                    });
-                }
+                commands
+                    .entity(press.entity)
+                    .insert(Press { elapsed: 0.0, rest });
                 if let Ok((ticket, mut paper)) = tickets.single_mut() {
                     paper.open_first_page();
                     commands.trigger(FocusOn { entity: ticket });
                 }
             }
+            Self::Bell if !landings.is_empty() => {}
             Self::Bell => {
                 commands.trigger(Play(Sound::Ding));
                 commands.trigger(HandIn);

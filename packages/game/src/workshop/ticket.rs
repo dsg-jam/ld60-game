@@ -44,7 +44,8 @@ impl Plugin for TicketPlugin {
             (
                 TicketStatus::update.run_if(resource_exists_and_changed::<Job>),
                 Landing::animate,
-            ),
+            )
+                .chain(),
         );
     }
 }
@@ -177,11 +178,14 @@ impl JobTicket {
 struct TicketStatus;
 
 impl TicketStatus {
-    fn text(job: Option<&Job>) -> &'static str {
+    fn text(job: Option<&Job>) -> String {
         match job {
-            Some(job) if job.stamped => "Done. Ring the bell for pickup.",
-            Some(job) if job.flashed => "Flashed. Stamp the ticket when it works.",
-            _ => "Open",
+            Some(job) if job.stamped => "Done. Ring the bell for pickup.".into(),
+            Some(job) if job.flashed => "Flashed. Stamp the ticket when it works.".into(),
+            Some(job) if job.returns > 0 => {
+                format!("Came back. Tries left: {}.", job.tries_left())
+            }
+            _ => "Open".into(),
         }
     }
 
@@ -192,11 +196,12 @@ impl TicketStatus {
         mut commands: Commands,
     ) {
         for mut text in &mut texts {
-            text.0 = Self::text(Some(&job)).into();
+            text.0 = Self::text(Some(&job));
         }
         for (stamp, mut visibility, landing) in &mut stamps {
             if !job.stamped {
                 *visibility = Visibility::Hidden;
+                commands.entity(stamp).remove::<Landing>();
             } else if *visibility == Visibility::Hidden && !landing {
                 commands.entity(stamp).insert(Landing::default());
             }
@@ -209,7 +214,7 @@ impl TicketStatus {
 /// It waits for the camera to reach the ticket, then drops from above and
 /// thunks when it hits the paper.
 #[derive(Component, Debug, Default)]
-struct Landing {
+pub(super) struct Landing {
     elapsed: f32,
 }
 
