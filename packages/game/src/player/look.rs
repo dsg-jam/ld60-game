@@ -11,13 +11,14 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use super::focus::{Focus, FocusTarget};
+use super::{
+    cursor,
+    focus::{self, Focus, FocusTarget},
+};
 
 const SENSITIVITY: f32 = 0.0025;
 const MAX_YAW: f32 = 1.2;
 const MAX_PITCH: f32 = 0.7;
-const CROSSHAIR_SIZE: f32 = 6.0;
-const CROSSHAIR_HOVER_SIZE: f32 = 12.0;
 
 pub(super) struct LookPlugin;
 
@@ -92,12 +93,14 @@ impl Crosshair {
             children![(
                 Crosshair,
                 Node {
-                    width: px(CROSSHAIR_SIZE),
-                    height: px(CROSSHAIR_SIZE),
+                    width: px(cursor::DOT_SIZE),
+                    height: px(cursor::DOT_SIZE),
+                    border: UiRect::all(px(cursor::DOT_OUTLINE)),
                     border_radius: BorderRadius::MAX,
                     ..default()
                 },
-                BackgroundColor(Color::srgba(1.0, 0.98, 0.9, 0.8)),
+                BackgroundColor(cursor::DOT_FILL),
+                BorderColor::all(cursor::DOT_INK),
                 Pickable::IGNORE,
                 Visibility::Hidden,
             )],
@@ -119,17 +122,12 @@ impl Crosshair {
         } else {
             Visibility::Hidden
         };
-        let on_target = hovers.get(&PointerId::Mouse).is_some_and(|hits| {
-            hits.keys().any(|&hit| {
-                std::iter::once(hit)
-                    .chain(parents.iter_ancestors(hit))
-                    .any(|entity| targets.contains(entity))
-            })
-        });
+        let on_target =
+            focus::under_mouse(&hovers, &parents).any(|entity| targets.contains(entity));
         let size = px(if on_target {
-            CROSSHAIR_HOVER_SIZE
+            cursor::DOT_HOVER_SIZE
         } else {
-            CROSSHAIR_SIZE
+            cursor::DOT_SIZE
         });
         node.width = size;
         node.height = size;

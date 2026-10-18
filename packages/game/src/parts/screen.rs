@@ -87,6 +87,11 @@ impl ScreenSurface {
         }
     }
 
+    /// Whether the mouse is over this surface.
+    pub(crate) fn hovered(&self) -> bool {
+        self.cursor.is_some()
+    }
+
     fn add_pointer(add: On<Add<ScreenSurface>>, mut commands: Commands) {
         let id = PointerId::Custom(Uuid::from_u64_pair(0x5C12_EE17, add.entity.to_bits()));
         commands.entity(add.entity).insert(id);
