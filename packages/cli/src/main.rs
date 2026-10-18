@@ -5,12 +5,15 @@ use ld60_calco::Revision;
 
 const USAGE: &str = "\
 Usage:
-  cli list                               List all levels
-  cli check <level> [file.asm]           Run level tests on the buggy ROM or a file
-  cli play <level> [--fixed] [--seed N] [--variant N]
+  cli list                               List all levels and their boards
+  cli check <level> [file.asm] [--variant N] [--board R]
+                                         Run level tests on the buggy ROM or a file
+  cli play <level> [--fixed] [--seed N] [--variant N] [--board R]
                                          Open a level on the bench
   cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)
-  cli gen [--check]                      Regenerate level firmware from its source";
+  cli gen [--check]                      Regenerate level firmware from its source
+
+--board R moves the level to board revision R (A, B or C).";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -18,8 +21,7 @@ fn main() -> ExitCode {
     let mut out = io::stdout().lock();
     let result = match args.as_slice() {
         ["list"] => ld60_cli::list::run(&mut out).map(|()| true),
-        ["check", level] => ld60_cli::check::run(&mut out, level, None),
-        ["check", level, file] => ld60_cli::check::run(&mut out, level, Some(file)),
+        ["check", level, options @ ..] => check(&mut out, level, options),
         ["play", level, options @ ..] => play(&mut out, level, options).map(|()| true),
         ["asm", file] => listing(&mut out, file, "C").map(|()| true),
         ["asm", file, "--rev", revision] | ["asm", "--rev", revision, file] => {
@@ -50,6 +52,23 @@ fn is_broken_pipe(error: &(dyn std::error::Error + 'static)) -> bool {
         .is_some_and(|e| e.kind() == io::ErrorKind::BrokenPipe)
 }
 
+fn check(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result<bool> {
+    let mut file = None;
+    let mut variant = None;
+    let mut board = None;
+    let mut rest = options.iter();
+    while let Some(&option) = rest.next() {
+        match option {
+            "--variant" => variant = Some(value(&mut rest, option)?.parse()?),
+            "--board" => board = Some(value(&mut rest, option)?.parse()?),
+            path if file.is_none() && !path.starts_with("--") => file = Some(path),
+            other => return Err(format!("unknown option '{other}'").into()),
+        }
+    }
+    let variant = ld60_cli::find_variant(level, variant, board)?;
+    ld60_cli::check::run(out, &variant, file)
+}
+
 fn generate(out: &mut impl Write, check: bool) -> ld60_cli::Result<bool> {
     let data_dir = std::path::Path::new(ld60_levels::DATA_DIR);
     ld60_cli::generate::run(out, data_dir, check)
@@ -67,26 +86,24 @@ fn play(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result
     let mut fixed = false;
     let mut seed = ld60_cli::seed::random();
     let mut variant = None;
+    let mut board = None;
     let mut rest = options.iter();
     while let Some(&option) = rest.next() {
         match option {
             "--fixed" => fixed = true,
-            "--seed" => {
-                let value = rest.next().ok_or("--seed needs a number")?;
-                seed = value.parse()?;
-            }
-            "--variant" => {
-                let value = rest.next().ok_or("--variant needs a number")?;
-                variant = Some(value.parse()?);
-            }
+            "--seed" => seed = value(&mut rest, option)?.parse()?,
+            "--variant" => variant = Some(value(&mut rest, option)?.parse()?),
+            "--board" => board = Some(value(&mut rest, option)?.parse()?),
             other => return Err(format!("unknown option '{other}'").into()),
         }
     }
-    let source = ld60_cli::find_level(level)?;
-    let variant = match variant {
-        Some(n) => ld60_levels::Variant::new(source, n)?,
-        None => ld60_levels::Variant::original(source)?,
-    };
+    let variant = ld60_cli::find_variant(level, variant, board)?;
     let mut session = ld60_cli::Session::new(variant, fixed, seed)?;
     ld60_cli::play::run(&mut session, io::stdin().lock(), out)
+}
+
+fn value<'a>(rest: &mut std::slice::Iter<'_, &'a str>, option: &str) -> ld60_cli::Result<&'a str> {
+    rest.next()
+        .copied()
+        .ok_or_else(|| format!("{option} needs a value").into())
 }

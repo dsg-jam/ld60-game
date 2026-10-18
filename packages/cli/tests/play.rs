@@ -1,4 +1,5 @@
-use ld60_cli::{Session, find_level};
+use ld60_cli::{Session, find_level, find_variant};
+use ld60_devices::BoardRev;
 use ld60_levels::Variant;
 
 fn play(level: &str, fixed: bool, input: &str) -> String {
@@ -40,6 +41,15 @@ fn breakpoints_stop_on_labels() {
 fn stepping_reports_the_halt() {
     let out = play("summa6/01-strange-symbols", true, "s 3\n");
     assert!(out.contains("Waiting for a key."), "{out}");
+}
+
+#[test]
+fn boards_show_their_io_and_keep_the_fix() {
+    let variant = find_variant("summa6/06-below-zero", None, Some(BoardRev::C)).unwrap();
+    let out = play_variant(variant, true, "k 12-34=\nq\n");
+    assert!(out.contains("Board 6C: display M8 to MD"), "{out}");
+    assert!(out.contains("ANN bit 2 Minus"), "{out}");
+    assert!(out.contains("[ -000022 ]"), "{out}");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use ld60_devices::Device;
+use ld60_devices::{Board, Device};
 use ld60_machine::DisasmLine;
 
 use crate::{Session, Stop};
@@ -9,6 +9,33 @@ pub(crate) fn hex_words(words: &[u16], word_bits: u8) -> String {
     let width = usize::from(word_bits).div_ceil(4);
     let parts: Vec<String> = words.iter().map(|w| format!("{w:0width$X}")).collect();
     parts.join(" ")
+}
+
+/// The I/O of the board, as the service sheet lists it.
+pub(crate) fn board(out: &mut impl Write, board: &Board) -> io::Result<()> {
+    let cells = board.display_cells();
+    writeln!(
+        out,
+        "Board {}: display M{:X} to M{:X}, left to right",
+        board.name(),
+        cells.start(),
+        cells.end()
+    )?;
+    let keys: Vec<String> = board
+        .keys
+        .iter()
+        .map(|(key, code)| format!("{key} {code:02X}"))
+        .collect();
+    writeln!(out, "  Keys {}", keys.join(", "))?;
+    if !board.annunciators.is_empty() {
+        let bits: Vec<String> = board
+            .annunciators
+            .iter()
+            .map(|(annunciator, bit)| format!("bit {bit} {annunciator:?}"))
+            .collect();
+        writeln!(out, "  ANN {}", bits.join(", "))?;
+    }
+    Ok(())
 }
 
 pub(crate) fn stop(out: &mut impl Write, stop: Stop) -> io::Result<()> {
