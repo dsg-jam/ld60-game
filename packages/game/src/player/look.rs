@@ -3,6 +3,7 @@ use bevy::{
     input::mouse::AccumulatedMouseMotion,
     picking::{
         PickingSystems,
+        hover::HoverMap,
         input::mouse_pick_events,
         pointer::{Location, PointerAction, PointerId, PointerInput},
     },
@@ -10,12 +11,13 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use super::focus::Focus;
+use super::focus::{Focus, FocusTarget};
 
 const SENSITIVITY: f32 = 0.0025;
 const MAX_YAW: f32 = 1.2;
 const MAX_PITCH: f32 = 0.7;
 const CROSSHAIR_SIZE: f32 = 6.0;
+const CROSSHAIR_HOVER_SIZE: f32 = 12.0;
 
 pub(super) struct LookPlugin;
 
@@ -71,6 +73,8 @@ impl LookAngles {
 }
 
 /// Dot in the middle of the view that marks what a click hits.
+///
+/// It grows while it rests on a [`FocusTarget`].
 #[derive(Component)]
 struct Crosshair;
 
@@ -103,14 +107,32 @@ impl Crosshair {
     fn update(
         state: Res<State<Focus>>,
         cursor: Single<&CursorOptions, With<PrimaryWindow>>,
-        mut crosshair: Single<&mut Visibility, With<Crosshair>>,
+        hovers: Res<HoverMap>,
+        targets: Query<(), With<FocusTarget>>,
+        parents: Query<&ChildOf>,
+        crosshair: Single<(&mut Visibility, &mut Node), With<Crosshair>>,
     ) {
+        let (mut visibility, mut node) = crosshair.into_inner();
         let locked = cursor.grab_mode == CursorGrabMode::Locked;
-        **crosshair = if locked && *state.get() == Focus::Desk {
+        *visibility = if locked && *state.get() == Focus::Desk {
             Visibility::Inherited
         } else {
             Visibility::Hidden
         };
+        let on_target = hovers.get(&PointerId::Mouse).is_some_and(|hits| {
+            hits.keys().any(|&hit| {
+                std::iter::once(hit)
+                    .chain(parents.iter_ancestors(hit))
+                    .any(|entity| targets.contains(entity))
+            })
+        });
+        let size = px(if on_target {
+            CROSSHAIR_HOVER_SIZE
+        } else {
+            CROSSHAIR_SIZE
+        });
+        node.width = size;
+        node.height = size;
     }
 }
 
