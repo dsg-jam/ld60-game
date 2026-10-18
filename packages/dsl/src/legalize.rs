@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use crate::Diagnostic;
 use crate::ast::BlockKind;
 use crate::backend::{Backend, Features};
+use crate::diagnostic::Pos;
 use crate::hir::{Block, Cond, Node, Place, Prim, Program, Stmt, Value};
-use crate::labels::{LabelId, LabelName, Labels};
+use crate::labels::{LabelId, LabelName, Labels, asm_label};
 
 const MAX_UNROLL: u8 = 16;
 
@@ -35,7 +36,18 @@ impl Inliner<'_> {
                     stack.pop();
                     let once = self.sites.get(&target) == Some(&1);
                     if !once {
-                        self.relabel(&mut body);
+                        if has_asm_label(&body) {
+                            return Err(Diagnostic::error(
+                                pos,
+                                format!(
+                                    "{} has asm labels and more than one call, so it cannot be \
+                                     copied",
+                                    routine.name
+                                ),
+                            ));
+                        }
+                        let defined = defined_labels(&body);
+                        relabel(self.labels, &mut body, &defined);
                     }
                     let end = self.labels.add(LabelName::Join(prefix(&routine.name)));
                     if matches!(
@@ -88,29 +100,6 @@ impl Inliner<'_> {
         }
         Ok(out)
     }
-
-    /// Gives the labels defined in `body` fresh ids, so a second copy does not clash.
-    fn relabel(&mut self, body: &mut [Node]) {
-        let mut defined = Vec::new();
-        Node::visit(body, &mut |node| match &node.stmt {
-            Stmt::Label(id)
-            | Stmt::Repeat {
-                label: Some(id), ..
-            } => defined.push(*id),
-            _ => {}
-        });
-        let fresh: BTreeMap<LabelId, LabelId> = defined
-            .into_iter()
-            .map(|id| {
-                let name = match self.labels.get(id) {
-                    LabelName::Fixed(name) | LabelName::Hint(name) => LabelName::Hint(name.clone()),
-                    join @ LabelName::Join(_) => join.clone(),
-                };
-                (id, self.labels.add(name))
-            })
-            .collect();
-        map_labels(body, &|id| fresh.get(&id).copied().unwrap_or(id));
-    }
 }
 
 /// Makes the program fit the backend: inlines calls and unrolls loops it lacks.
@@ -151,10 +140,22 @@ pub(crate) fn legalize(
         }
         program.blocks = inlined;
     }
+    let mut refs = BTreeMap::new();
+    for block in &program.blocks {
+        for (id, count) in references(&block.body) {
+            *refs.entry(id).or_insert(0) += count;
+        }
+    }
+    let mut unroller = Unroller {
+        features: &features,
+        name: backend.name(),
+        refs,
+        labels: &mut program.labels,
+    };
     let mut errors = Vec::new();
     for block in &mut program.blocks {
         let body = std::mem::take(&mut block.body);
-        match unroll(body, &features, backend.name()) {
+        match unroller.nodes(body) {
             Ok(body) => block.body = body,
             Err(error) => errors.push(error),
         }
@@ -264,129 +265,255 @@ fn uses_indexed(nodes: &[Node]) -> bool {
     found
 }
 
-fn unroll(nodes: Vec<Node>, features: &Features, name: &str) -> Result<Vec<Node>> {
-    let mut out: Vec<Node> = Vec::new();
-    let mut index: Option<(u8, usize)> = None;
-    for node in nodes {
-        let Node { stmt, comment, pos } = node;
-        match stmt {
-            Stmt::Prim(Prim::SetIndex(literal)) => {
-                index = Some((literal.value, out.len()));
-                out.push(Node {
-                    stmt: Stmt::Prim(Prim::SetIndex(literal)),
-                    comment,
-                    pos,
-                });
-            }
-            Stmt::Repeat { label, body }
-                if !features.loops || (!features.indexed && uses_indexed(&body)) =>
-            {
-                let Some((count, at)) = index.take() else {
-                    return Err(Diagnostic::error(
+struct Unroller<'a> {
+    features: &'a Features,
+    name: &'a str,
+    /// How often each label is a jump or call target in the whole program.
+    refs: BTreeMap<LabelId, usize>,
+    labels: &'a mut Labels,
+}
+
+impl Unroller<'_> {
+    /// Checks that `body` can be copied and returns the labels it defines.
+    fn check(&self, body: &[Node], label: Option<LabelId>, pos: Pos) -> Result<Vec<LabelId>> {
+        let mut blocked = false;
+        Node::visit(body, &mut |n| {
+            blocked |= matches!(n.stmt, Stmt::Repeat { .. } | Stmt::Prim(Prim::Call(_)));
+        });
+        if blocked {
+            return Err(Diagnostic::error(
+                pos,
+                "loops with loops or calls inside cannot be unrolled",
+            ));
+        }
+        if has_asm_label(body) {
+            return Err(Diagnostic::error(
+                pos,
+                "loops with asm labels inside cannot be unrolled",
+            ));
+        }
+        let inner = references(body);
+        if let Some(label) = label
+            && inner.contains_key(&label)
+        {
+            return Err(Diagnostic::error(
+                pos,
+                "a loop that jumps to its own label cannot be unrolled",
+            ));
+        }
+        let defined = defined_labels(body);
+        let escapes = defined.iter().any(|id| self.refs.get(id) > inner.get(id));
+        if escapes {
+            return Err(Diagnostic::error(
+                pos,
+                "a loop with a label used outside it cannot be unrolled",
+            ));
+        }
+        Ok(defined)
+    }
+
+    fn nodes(&mut self, nodes: Vec<Node>) -> Result<Vec<Node>> {
+        let mut out: Vec<Node> = Vec::new();
+        let mut index: Option<(u8, usize)> = None;
+        for node in nodes {
+            let Node { stmt, comment, pos } = node;
+            match stmt {
+                Stmt::Prim(Prim::SetIndex(literal)) => {
+                    index = Some((literal.value, out.len()));
+                    out.push(Node {
+                        stmt: Stmt::Prim(Prim::SetIndex(literal)),
+                        comment,
                         pos,
-                        format!(
-                            "{name} cannot run this loop. Set i to a number right before it so \
-                             it can be unrolled"
-                        ),
-                    ));
-                };
-                if count == 0 || count > MAX_UNROLL {
-                    return Err(Diagnostic::error(
-                        pos,
-                        format!(
-                            "{name} cannot run this loop. Only 1 to {MAX_UNROLL} passes unroll"
-                        ),
-                    ));
-                }
-                let mut nested = false;
-                Node::visit(&body, &mut |n| {
-                    nested |= matches!(
-                        n.stmt,
-                        Stmt::Label(_) | Stmt::Repeat { .. } | Stmt::Prim(Prim::Call(_))
-                    );
-                });
-                if nested {
-                    return Err(Diagnostic::error(
-                        pos,
-                        "loops with labels, loops or calls inside cannot be unrolled",
-                    ));
-                }
-                let set = out.remove(at);
-                if reads_index(&out[at..]) {
-                    out.insert(at, set);
-                }
-                let cells = features.ram_cells;
-                for k in (1..=count).rev() {
-                    let mut copy = body.clone();
-                    map_places(&mut copy, &|place| match place {
-                        Place::Indexed(offset) => {
-                            let cell = (u16::from(offset) + u16::from(k)) % u16::from(cells);
-                            Place::Cell(cell as u8)
-                        }
-                        place => place,
                     });
-                    if k == count {
-                        if let Some(label) = label {
-                            out.push(Node {
-                                stmt: Stmt::Label(label),
-                                comment: None,
-                                pos,
-                            });
-                        }
-                        if let (Some(first), Some(text)) = (copy.first_mut(), &comment) {
-                            first.comment.get_or_insert_with(|| text.clone());
-                        }
+                }
+                Stmt::Repeat { label, body } if self.needs_unroll(&body) => {
+                    let name = self.name;
+                    let Some((count, at)) = index.take() else {
+                        return Err(Diagnostic::error(
+                            pos,
+                            format!(
+                                "{name} cannot run this loop. Set i to a number right before \
+                                 it so it can be unrolled"
+                            ),
+                        ));
+                    };
+                    if count == 0 || count > MAX_UNROLL {
+                        return Err(Diagnostic::error(
+                            pos,
+                            format!(
+                                "{name} cannot run this loop. Only 1 to {MAX_UNROLL} passes \
+                                 unroll"
+                            ),
+                        ));
                     }
-                    out.extend(copy);
+                    let defined = self.check(&body, label, pos)?;
+                    let set = out.remove(at);
+                    let mut notes = Vec::new();
+                    if reads_index(&out[at..]) {
+                        out.insert(at, set);
+                    } else {
+                        notes.extend(set.comment);
+                    }
+                    notes.extend(comment);
+                    if let Some(label) = label {
+                        out.push(Node {
+                            stmt: Stmt::Label(label),
+                            comment: None,
+                            pos,
+                        });
+                    }
+                    for k in (1..=count).rev() {
+                        let mut copy = body.clone();
+                        let cells = self.features.ram_cells;
+                        map_places(&mut copy, &|place| match place {
+                            Place::Indexed(offset) => {
+                                let cell = (u16::from(offset) + u16::from(k)) % u16::from(cells);
+                                Place::Cell(cell as u8)
+                            }
+                            place => place,
+                        });
+                        if k == count {
+                            attach(&mut copy, std::mem::take(&mut notes), pos);
+                        } else {
+                            drop_labels(&mut copy, &|id| self.refs.contains_key(&id));
+                            relabel(self.labels, &mut copy, &defined);
+                        }
+                        out.extend(copy);
+                    }
                 }
-            }
-            Stmt::Repeat { label, body } => {
-                index = None;
-                out.push(Node {
-                    stmt: Stmt::Repeat {
-                        label,
-                        body: unroll(body, features, name)?,
-                    },
-                    comment,
-                    pos,
-                });
-            }
-            Stmt::If { cond, then, els } => {
-                index = None;
-                out.push(Node {
-                    stmt: Stmt::If {
-                        cond,
-                        then: unroll(then, features, name)?,
-                        els: unroll(els, features, name)?,
-                    },
-                    comment,
-                    pos,
-                });
-            }
-            Stmt::Inlined {
-                name: routine,
-                body,
-            } => {
-                index = None;
-                out.push(Node {
-                    stmt: Stmt::Inlined {
-                        name: routine,
-                        body: unroll(body, features, name)?,
-                    },
-                    comment,
-                    pos,
-                });
-            }
-            stmt => {
-                if matches!(
-                    stmt,
-                    Stmt::Asm(_) | Stmt::Label(_) | Stmt::Prim(Prim::Call(_))
-                ) {
+                Stmt::Repeat { label, body } => {
                     index = None;
+                    out.push(Node {
+                        stmt: Stmt::Repeat {
+                            label,
+                            body: self.nodes(body)?,
+                        },
+                        comment,
+                        pos,
+                    });
                 }
-                out.push(Node { stmt, comment, pos });
+                Stmt::If { cond, then, els } => {
+                    index = None;
+                    out.push(Node {
+                        stmt: Stmt::If {
+                            cond,
+                            then: self.nodes(then)?,
+                            els: self.nodes(els)?,
+                        },
+                        comment,
+                        pos,
+                    });
+                }
+                Stmt::Inlined { name, body } => {
+                    index = None;
+                    out.push(Node {
+                        stmt: Stmt::Inlined {
+                            name,
+                            body: self.nodes(body)?,
+                        },
+                        comment,
+                        pos,
+                    });
+                }
+                stmt => {
+                    if matches!(
+                        stmt,
+                        Stmt::Asm(_) | Stmt::Label(_) | Stmt::Prim(Prim::Call(_))
+                    ) {
+                        index = None;
+                    }
+                    out.push(Node { stmt, comment, pos });
+                }
             }
         }
+        Ok(out)
     }
-    Ok(out)
+
+    fn needs_unroll(&self, body: &[Node]) -> bool {
+        !self.features.loops || (!self.features.indexed && uses_indexed(body))
+    }
+}
+
+/// Puts `notes` on the first instruction of `nodes`, or in comment lines before it.
+fn attach(nodes: &mut Vec<Node>, notes: Vec<String>, pos: Pos) {
+    let mut lines = Vec::new();
+    for note in notes {
+        match nodes.first_mut() {
+            Some(first) if first.comment.is_none() && matches!(first.stmt, Stmt::Prim(_)) => {
+                first.comment = Some(note);
+            }
+            _ => lines.push(Node {
+                stmt: Stmt::Comment(note),
+                comment: None,
+                pos,
+            }),
+        }
+    }
+    nodes.splice(0..0, lines);
+}
+
+fn defined_labels(nodes: &[Node]) -> Vec<LabelId> {
+    let mut defined = Vec::new();
+    Node::visit(nodes, &mut |node| match &node.stmt {
+        Stmt::Label(id)
+        | Stmt::Repeat {
+            label: Some(id), ..
+        } => defined.push(*id),
+        _ => {}
+    });
+    defined
+}
+
+/// Removes the labels in `nodes` that `keep` rejects.
+fn drop_labels(nodes: &mut Vec<Node>, keep: &impl Fn(LabelId) -> bool) {
+    nodes.retain(|node| !matches!(node.stmt, Stmt::Label(id) if !keep(id)));
+    for node in nodes {
+        match &mut node.stmt {
+            Stmt::If { then, els, .. } => {
+                drop_labels(then, keep);
+                drop_labels(els, keep);
+            }
+            Stmt::Inlined { body, .. } | Stmt::Repeat { body, .. } => drop_labels(body, keep),
+            _ => {}
+        }
+    }
+}
+
+fn has_asm_label(nodes: &[Node]) -> bool {
+    let mut found = false;
+    Node::visit(nodes, &mut |node| {
+        if let Stmt::Asm(lines) = &node.stmt {
+            found |= lines.iter().any(|line| asm_label(line).is_some());
+        }
+    });
+    found
+}
+
+/// How often each label is a jump, branch, loop or call target.
+fn references(nodes: &[Node]) -> BTreeMap<LabelId, usize> {
+    let mut refs = BTreeMap::new();
+    Node::visit(nodes, &mut |node| {
+        if let Stmt::Prim(
+            Prim::Jump(id) | Prim::Branch(_, id) | Prim::LoopBack(id) | Prim::Call(id),
+        ) = &node.stmt
+        {
+            *refs.entry(*id).or_insert(0) += 1;
+        }
+    });
+    refs
+}
+
+/// Gives the `defined` labels of `body` fresh ids, so a copy does not clash.
+fn relabel(labels: &mut Labels, body: &mut [Node], defined: &[LabelId]) {
+    let fresh: BTreeMap<LabelId, LabelId> = defined
+        .iter()
+        .map(|&id| {
+            let name = match labels.get(id) {
+                LabelName::Fixed(name) | LabelName::Hint(name) => LabelName::Hint(name.clone()),
+                join @ LabelName::Join(_) => join.clone(),
+            };
+            (id, labels.add(name))
+        })
+        .collect();
+    map_labels(body, &|id| fresh.get(&id).copied().unwrap_or(id));
 }
