@@ -16,6 +16,7 @@ const FILES: &[&str] = &[
     "datasheet.ftl",
     "device.ftl",
     "editor.ftl",
+    "levels.ftl",
     "paper.ftl",
     "receipt.ftl",
     "service.ftl",
@@ -41,6 +42,35 @@ pub(crate) struct Locale {
     files: Vec<Handle<Messages>>,
     /// Empty until all files are loaded.
     bundle: Option<FluentBundle<Arc<FluentResource>>>,
+}
+
+#[cfg(test)]
+impl Locale {
+    /// The messages of the default language, read straight from the files.
+    pub(crate) fn on_disk() -> Self {
+        let dir = format!("{}/assets/locales/{LANGUAGE}", env!("CARGO_MANIFEST_DIR"));
+        let files = FILES.iter().map(|file| {
+            let source = std::fs::read_to_string(format!("{dir}/{file}")).unwrap();
+            Arc::new(FluentResource::try_new(source).unwrap())
+        });
+        Self {
+            language: LANGUAGE,
+            files: Vec::new(),
+            bundle: Some(Self::bundle(&LANGUAGE, files)),
+        }
+    }
+
+    /// Whether the message or its attribute exists.
+    pub(crate) fn has(&self, message: &Message) -> bool {
+        let found = self
+            .bundle
+            .as_ref()
+            .and_then(|bundle| bundle.get_message(&message.id));
+        match &message.attribute {
+            Some(attribute) => found.is_some_and(|found| found.get_attribute(attribute).is_some()),
+            None => found.is_some_and(|found| found.value().is_some()),
+        }
+    }
 }
 
 impl FromWorld for Locale {
@@ -72,10 +102,20 @@ impl Locale {
         let Some(bundle) = &self.bundle else {
             return String::new();
         };
-        let id = message.id;
-        let Some(pattern) = bundle.get_message(id).and_then(|found| found.value()) else {
+        let id = match &message.attribute {
+            Some(attribute) => format!("{}.{attribute}", message.id),
+            None => message.id.to_string(),
+        };
+        let found = bundle.get_message(&message.id);
+        let pattern = match &message.attribute {
+            Some(attribute) => found
+                .and_then(|found| found.get_attribute(attribute))
+                .map(|attribute| attribute.value()),
+            None => found.and_then(|found| found.value()),
+        };
+        let Some(pattern) = pattern else {
             warn!("no message `{id}` in {}", self.language);
-            return id.to_owned();
+            return id;
         };
         let mut args = FluentArgs::new();
         for (name, arg) in &message.args {
@@ -118,17 +158,25 @@ impl Locale {
         else {
             return;
         };
-        let mut bundle = FluentBundle::new_concurrent(vec![locale.language.clone()]);
+        let bundle = Self::bundle(&locale.language, loaded.iter().map(|file| file.0.clone()));
+        locale.bundle = Some(bundle);
+    }
+
+    fn bundle(
+        language: &LanguageIdentifier,
+        files: impl IntoIterator<Item = Arc<FluentResource>>,
+    ) -> FluentBundle<Arc<FluentResource>> {
+        let mut bundle = FluentBundle::new_concurrent(vec![language.clone()]);
         // The fonts have no glyphs for the marks that keep right-to-left
         // text apart.
         bundle.set_use_isolating(false);
-        for file in loaded {
-            if let Err(errors) = bundle.add_resource(file.0.clone()) {
+        for file in files {
+            if let Err(errors) = bundle.add_resource(file) {
                 for error in errors {
-                    warn!("{}: {error}", locale.language);
+                    warn!("{language}: {error}");
                 }
             }
         }
-        locale.bundle = Some(bundle);
+        bundle
     }
 }

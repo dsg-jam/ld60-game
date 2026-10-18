@@ -3,6 +3,7 @@ use ld60_devices::{ChipSpec, DeviceKind, RomKind};
 use ld60_levels::Level;
 
 use super::job::Job;
+use super::levels::Levels;
 use super::service;
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
@@ -153,9 +154,12 @@ impl JobTicket {
         page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
             ("ticket-job", Localized::verbatim(level.id.to_uppercase())),
-            ("ticket-customer", Localized::verbatim(&level.customer.name)),
+            (
+                "ticket-customer",
+                Levels::text(level, Level::CUSTOMER).into(),
+            ),
             ("ticket-device", Message::new(device).into()),
-            ("ticket-serial", Localized::verbatim(&level.serial)),
+            ("ticket-serial", Localized::verbatim(level.serial())),
             ("ticket-board", Localized::verbatim(level.board().name())),
             ("ticket-chip", chip.into()),
             ("ticket-rom", Message::new(rom).into()),
@@ -167,12 +171,13 @@ impl JobTicket {
         }
         page.spawn(Paper::heading(Message::new("ticket-complaint")));
         page.spawn(Paper::text(
-            Message::new("paper-quote").with("text", level.customer.complaint.as_str()),
+            Message::new("paper-quote").with("text", Levels::text(level, Level::COMPLAINT)),
         ));
         page.spawn(Paper::heading(Message::new("ticket-remarks")));
         for remark in &level.remarks {
             page.spawn(Paper::text(
-                Message::new("paper-bullet").with("text", remark.as_str()),
+                Message::new("paper-bullet")
+                    .with("text", Levels::text(level, Level::remark(remark))),
             ));
         }
         page.spawn(Paper::heading(Message::new("ticket-status")));

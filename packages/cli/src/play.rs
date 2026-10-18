@@ -1,9 +1,11 @@
 use std::io::{BufRead, Write};
 
 use ld60_devices::Device;
+use ld60_levels::Level;
 use ld60_machine::Step;
 
 use crate::render;
+use crate::text::LevelText;
 use crate::{Session, Stop};
 
 const HELP: &str = "\
@@ -28,10 +30,12 @@ pub fn run(session: &mut Session, input: impl BufRead, out: &mut impl Write) -> 
         level.title,
         level.chip.isa().name()
     )?;
+    let text = LevelText::read()?;
     writeln!(
         out,
         "{}: \"{}\"",
-        level.customer.name, level.customer.complaint
+        text.get(level, Level::CUSTOMER)?,
+        text.get(level, Level::COMPLAINT)?
     )?;
     render::board(out, session.device.board())?;
     writeln!(out, "Type h for help.")?;

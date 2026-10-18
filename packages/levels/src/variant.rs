@@ -5,7 +5,7 @@ mod line;
 mod ram_map;
 mod rng;
 
-use ld60_devices::{Board, BoardRev, Fault};
+use ld60_devices::{BoardRev, Fault};
 
 use self::firmware::Firmware;
 use self::ram_map::RamMap;
@@ -59,8 +59,8 @@ impl Variant {
     pub fn original(source: &LevelSource) -> Result<Self, LevelError> {
         Ok(Self {
             level: source.load()?,
-            buggy: source.buggy.into(),
-            fixed: source.fixed.into(),
+            buggy: source.buggy.clone(),
+            fixed: source.fixed.clone(),
         })
     }
 
@@ -102,11 +102,6 @@ impl Variant {
         };
         let mut level = self.level.clone();
         level.board = board;
-        level.serial = rename_units(&level.serial, from, to);
-        for remark in &mut level.remarks {
-            *remark = rename_units(remark, from, to);
-        }
-        level.customer.complaint = rename_units(&level.customer.complaint, from, to);
         for fault in &mut level.faults {
             if let Fault::StuckRamBit(bit) = fault {
                 bit.cell = map.get(rotation.get(bit.cell));
@@ -142,9 +137,4 @@ impl Variant {
         }
         Ok(())
     }
-}
-
-/// Moves serial numbers like `6A-05530` in `text` to the `to` board.
-fn rename_units(text: &str, from: &Board, to: &Board) -> String {
-    text.replace(&format!("{}-", from.name()), &format!("{}-", to.name()))
 }

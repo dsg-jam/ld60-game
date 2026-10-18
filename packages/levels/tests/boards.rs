@@ -1,14 +1,17 @@
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 use ld60_devices::{BoardRev, Fault};
-use ld60_levels::{CATALOG, GAME_SEED, LevelError, LevelSource, Variant};
+use ld60_levels::{Catalog, GAME_SEED, LevelError, LevelSource, Variant};
+
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
 
 const SEEDS: std::ops::Range<u64> = 0..256;
 /// Levels whose buggy firmware checks a wrong key code.
 const WRONG_KEY_CODE: &[&str] = &["tally2/01-clear-key"];
 
 fn find(path: &str) -> &'static LevelSource {
-    CATALOG.iter().find(|s| s.path == path).unwrap()
+    CATALOG.find(path).unwrap()
 }
 
 /// The cell named at the start of the header comment that contains `text`.
@@ -37,7 +40,7 @@ fn compares(firmware: &str) -> HashSet<u8> {
 #[test]
 fn every_level_verifies_on_every_allowed_board() {
     let mut failures = Vec::new();
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let level = source.load().unwrap();
         for board in level.allowed_boards() {
             for seed in SEEDS.chain([GAME_SEED]) {
@@ -62,7 +65,7 @@ fn every_level_verifies_on_every_allowed_board() {
 
 #[test]
 fn board_choice_is_deterministic_and_uses_every_board() {
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         let mut seen = HashSet::new();
         for seed in 0..32 {
             let variant = Variant::new(source, seed).unwrap();
@@ -81,12 +84,12 @@ fn board_choice_is_deterministic_and_uses_every_board() {
 
 #[test]
 fn key_checks_use_the_board_codes() {
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         for board in source.load().unwrap().allowed_boards() {
             let variant = Variant::with_board(source, 3, board).unwrap();
             let board = variant.level.board();
             let mut firmwares = vec![&variant.fixed];
-            if !WRONG_KEY_CODE.contains(&source.path) {
+            if !WRONG_KEY_CODE.contains(&source.path.as_str()) {
                 firmwares.push(&variant.buggy);
             }
             for firmware in firmwares {
@@ -102,7 +105,7 @@ fn key_checks_use_the_board_codes() {
 
 #[test]
 fn display_comment_names_the_board_cells() {
-    for source in CATALOG {
+    for source in CATALOG.levels() {
         for board in source.load().unwrap().allowed_boards() {
             let variant = Variant::with_board(source, 5, board).unwrap();
             let first = *variant.level.board().display_cells().start();
@@ -141,18 +144,7 @@ fn stuck_bit_follows_the_cell() {
 fn serial_shows_the_board() {
     let source = find("summa6/02-last-digit");
     let variant = Variant::with_board(source, 1, BoardRev::C).unwrap();
-    assert_eq!(variant.level.serial, "6C-03702");
-}
-
-#[test]
-fn remarks_name_units_on_the_new_board() {
-    let source = find("summa6/05-errata");
-    let variant = Variant::with_board(source, 1, BoardRev::B).unwrap();
-    assert!(
-        variant.level.remarks.iter().any(|r| r.contains("6B-05530")),
-        "{:?}",
-        variant.level.remarks
-    );
+    assert_eq!(variant.level.serial(), "6C-03702");
 }
 
 #[test]
@@ -174,8 +166,8 @@ fn levels_can_restrict_boards() {
         .level
         .replace("device: Summa6,", "device: Summa6,\n    boards: [A],");
     let source = LevelSource {
-        level: Box::leak(level.into_boxed_str()),
-        ..*source
+        level,
+        ..source.clone()
     };
     assert_eq!(
         Variant::with_board(&source, 0, BoardRev::B),

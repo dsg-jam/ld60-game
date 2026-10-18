@@ -10,11 +10,13 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
+fluent-bundle = { workspace = true }
 ld60-calco = { workspace = true }
 ld60-devices = { workspace = true }
 ld60-dsl = { workspace = true }
 ld60-levels = { workspace = true }
 ld60-machine = { workspace = true }
+unic-langid = { workspace = true, features = ["macros"] }
 
 [lints]
 workspace = true

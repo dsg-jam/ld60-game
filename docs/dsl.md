@@ -4,8 +4,8 @@ Level firmware is written in a small language and compiled to assembly. Each
 statement becomes a short, fixed instruction pattern, so the output looks hand
 written. Players only see the generated `.asm` files.
 
-Sources live in `packages/levels/data` with the extension `.fw`. A level points
-to its source in `level.ron`:
+Sources live in `packages/game/assets/levels` with the extension `.fw`. A level
+points to its source in `level.ron`:
 
 ```ron
 firmware: Some((source: "summa6/firmware.fw", switches: ["no-clear"])),

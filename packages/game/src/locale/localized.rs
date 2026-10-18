@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bevy::prelude::*;
 
 use super::Locale;
@@ -21,10 +23,12 @@ pub(crate) enum Localized {
     Verbatim(String),
 }
 
-/// A Fluent message and the values to fill into it.
+/// A Fluent message, or one of its attributes, and the values to fill into
+/// it.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Message {
-    pub(super) id: &'static str,
+    pub(super) id: Cow<'static, str>,
+    pub(super) attribute: Option<Cow<'static, str>>,
     pub(super) args: Vec<(&'static str, Arg)>,
 }
 
@@ -59,11 +63,17 @@ impl From<Message> for Localized {
 }
 
 impl Message {
-    pub(crate) const fn new(id: &'static str) -> Self {
+    pub(crate) fn new(id: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            id,
+            id: id.into(),
+            attribute: None,
             args: Vec::new(),
         }
+    }
+
+    pub(crate) fn attribute(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.attribute = Some(name.into());
+        self
     }
 
     pub(crate) fn with(mut self, name: &'static str, arg: impl Into<Arg>) -> Self {

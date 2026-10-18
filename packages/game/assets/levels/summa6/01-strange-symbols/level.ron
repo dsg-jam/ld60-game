@@ -5,16 +5,9 @@
     boards: [A],
     keep_layout: true,
     chip: Calco((revision: B, date_code: 7630)),
-    serial: "6A-03158",
-    remarks: [
-        "Angry squiggles in the little window every time it wakes up.",
-        "Still has its first thinking, version 1.0.",
-    ],
+    unit: "03158",
+    remarks: ["squiggles", "first-thinking"],
     rom: (kind: Eprom, blank_available: true),
-    customer: (
-        name: "Zib, bookkeeper",
-        complaint: "When I wake it up, the little window shows angry squiggles. The C button chases them away.",
-    ),
     tests: [
         (keys: "", display: "000000"),
         (keys: "5", display: "000005"),

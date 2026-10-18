@@ -1,10 +1,11 @@
 use std::error::Error;
 
 use bevy::prelude::*;
-use ld60_levels::{CATALOG, GAME_SEED, Level, LevelError, Variant};
+use ld60_levels::{Catalog, GAME_SEED, Level, LevelError, LevelSource, Variant};
 use ld60_machine::Isa;
 
 use super::counter::CounterLayout;
+use super::levels::Levels;
 use super::pickup::{Complaint, Earnings, Pickup, TRIES};
 use super::receipt::Receipt;
 use super::ticket::JobTicket;
@@ -19,15 +20,11 @@ pub(crate) struct JobPlugin;
 
 impl Plugin for JobPlugin {
     fn build(&self, app: &mut App) {
-        match Job::load(0) {
-            Some(Ok(job)) => {
-                app.insert_resource(job);
-            }
-            Some(Err(err)) => error!(error = &err as &dyn Error, "first job does not load"),
-            None => {}
-        }
         app.init_resource::<Earnings>()
-            .add_systems(Startup, Job::spawn_items)
+            .add_systems(
+                Update,
+                Job::follow_levels.run_if(resource_exists_and_changed::<Levels>),
+            )
             .add_observer(HandIn::pick_up);
     }
 }
@@ -39,8 +36,10 @@ impl Plugin for JobPlugin {
 /// it fails, they hand it back and the steps start over.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {
-    /// Position in [`CATALOG`].
+    /// Position in the [`Catalog`].
     pub(crate) index: usize,
+    /// The files the job is built from.
+    source: LevelSource,
     pub(crate) level: Level,
     /// The firmware the device comes in with.
     pub(crate) buggy: String,
@@ -63,12 +62,13 @@ pub(crate) struct JobItem;
 pub(crate) struct HandIn;
 
 impl Job {
-    /// The job at `index` in [`CATALOG`], or `None` after the last one.
-    pub(crate) fn load(index: usize) -> Option<Result<Self, LevelError>> {
-        let source = CATALOG.get(index)?;
+    /// The job at `index` in `catalog`, or `None` after the last one.
+    pub(crate) fn load(catalog: &Catalog, index: usize) -> Option<Result<Self, LevelError>> {
+        let source = catalog.levels().get(index)?;
         let variant = Variant::new(source, GAME_SEED);
         Some(variant.map(|Variant { level, buggy, .. }| Self {
             index,
+            source: source.clone(),
             level,
             buggy,
             flashed: false,
@@ -111,6 +111,43 @@ impl Job {
         }
     }
 
+    /// Puts the first job on the bench once the levels are loaded. Rebuilds
+    /// the current job when the files of its level change.
+    fn follow_levels(
+        levels: Res<Levels>,
+        job: Option<ResMut<Job>>,
+        items: Query<Entity, With<JobItem>>,
+        mut started: Local<bool>,
+        mut commands: Commands,
+    ) {
+        let index = match job {
+            None if *started => return,
+            None => 0,
+            Some(mut job) => match levels.position(&job.source.path) {
+                None => return,
+                Some(index) if levels.levels()[index] == job.source => {
+                    if job.index != index {
+                        job.index = index;
+                    }
+                    return;
+                }
+                Some(index) => index,
+            },
+        };
+        match Job::load(&levels, index) {
+            Some(Ok(job)) => {
+                *started = true;
+                for item in &items {
+                    commands.entity(item).despawn();
+                }
+                commands.insert_resource(job);
+                commands.run_system_cached(Job::spawn_items);
+            }
+            Some(Err(err)) => error!(error = &err as &dyn Error, "job does not load"),
+            None => {}
+        }
+    }
+
     fn spawn_items(job: Option<Res<Job>>, mut commands: Commands) {
         let Some(job) = job else {
             return;
@@ -132,9 +169,11 @@ impl Job {
 }
 
 impl HandIn {
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn pick_up(
         _: On<HandIn>,
         job: Option<ResMut<Job>>,
+        levels: Res<Levels>,
         items: Query<Entity, With<JobItem>>,
         emulators: Query<&Emulator, With<JobItem>>,
         receipts: Query<Entity, With<Receipt>>,
@@ -158,7 +197,8 @@ impl HandIn {
         for item in &items {
             commands.entity(item).despawn();
         }
-        match Job::load(job.index + 1) {
+        let index = levels.position(&job.source.path).unwrap_or(job.index);
+        match Job::load(&levels, index + 1) {
             Some(Ok(next)) => {
                 commands.insert_resource(next);
                 commands.run_system_cached(Job::spawn_items);
@@ -179,7 +219,19 @@ mod tests {
     use super::*;
 
     fn job(index: usize) -> Job {
-        Job::load(index).unwrap().unwrap()
+        Job::load(&Levels::on_disk(), index).unwrap().unwrap()
+    }
+
+    /// The levels on disk with the files at `index` changed by `edit`.
+    fn edited(index: usize, edit: impl FnOnce(&mut LevelSource)) -> Levels {
+        let mut levels = Levels::on_disk().levels().to_vec();
+        edit(&mut levels[index]);
+        Levels::new(Catalog::new(levels))
+    }
+
+    fn follow(world: &mut World, levels: Levels) {
+        world.insert_resource(levels);
+        world.run_system_cached(Job::follow_levels).unwrap();
     }
 
     fn paying(reward: u32) -> Job {
@@ -192,7 +244,8 @@ mod tests {
     /// running the fixed firmware if `fixed`, else the buggy one.
     fn bench(index: usize, fixed: bool) -> World {
         let mut job = job(index);
-        let variant = Variant::new(&CATALOG[index], GAME_SEED).unwrap();
+        let levels = Levels::on_disk();
+        let variant = Variant::new(&levels.levels()[index], GAME_SEED).unwrap();
         let mut rom = initial_rom(&job.level, &job.buggy).unwrap();
         if fixed {
             let image = assemble(&job.level, &variant.fixed).unwrap().image;
@@ -204,6 +257,7 @@ mod tests {
         let mut world = World::new();
         world.add_observer(HandIn::pick_up);
         world.insert_resource(job);
+        world.insert_resource(levels);
         world.init_resource::<Earnings>();
         world.spawn((JobItem, Emulator::power_on(device)));
         world
@@ -282,7 +336,7 @@ mod tests {
 
     #[test]
     fn last_failed_try_moves_on_unpaid() {
-        let last = CATALOG.len() - 1;
+        let last = Levels::on_disk().levels().len() - 1;
         for (index, next) in [(0, Some(1)), (last, None)] {
             let mut world = bench(index, false);
             let items: Vec<_> = world
@@ -307,5 +361,50 @@ mod tests {
             );
             assert_eq!(*world.resource::<Earnings>(), Earnings(0), "job {index}");
         }
+    }
+
+    #[test]
+    fn fixing_the_first_level_starts_it() {
+        let mut world = World::new();
+        follow(&mut world, edited(0, |source| source.level.clear()));
+        assert!(!world.contains_resource::<Job>());
+        follow(&mut world, Levels::on_disk());
+        assert_eq!(world.resource::<Job>().index, 0);
+    }
+
+    #[test]
+    fn no_job_starts_after_the_last() {
+        let mut world = World::new();
+        follow(&mut world, Levels::on_disk());
+        world.remove_resource::<Job>();
+        follow(&mut world, Levels::on_disk());
+        assert!(!world.contains_resource::<Job>());
+    }
+
+    #[test]
+    fn editing_the_current_level_rebuilds_its_job() {
+        let mut world = World::new();
+        follow(&mut world, Levels::on_disk());
+        world.resource_mut::<Job>().returns = 1;
+        let edit = |source: &mut LevelSource| {
+            source.level = source.level.replace("reward: 3", "reward: 9");
+        };
+        follow(&mut world, edited(0, edit));
+        let job = world.resource::<Job>();
+        assert_eq!((job.level.reward, job.returns), (9, 0));
+        assert_eq!(world.query::<&JobItem>().iter(&world).count(), 2);
+    }
+
+    #[test]
+    fn reordering_the_catalog_keeps_the_next_job() {
+        let mut world = bench(0, true);
+        let mut levels = Levels::on_disk().levels().to_vec();
+        let next = levels[2].path.clone();
+        levels.swap(0, 1);
+        world.insert_resource(Levels::new(Catalog::new(levels)));
+        world.trigger(HandIn);
+        world.flush();
+        let job = world.resource::<Job>();
+        assert_eq!((job.index, &job.source.path), (2, &next));
     }
 }

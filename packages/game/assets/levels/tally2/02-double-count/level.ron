@@ -3,16 +3,9 @@
     title: "Double count",
     device: Tally2,
     chip: Calco((revision: B, date_code: 7630)),
-    serial: "2A-00412",
-    remarks: [
-        "Both buttons and the little window work fine.",
-        "Still has its first thinking, version 1.0.",
-    ],
+    unit: "00412",
+    remarks: ["works-fine", "first-thinking"],
     rom: (kind: Eprom, blank_available: true),
-    customer: (
-        name: "Ploof, seat finder",
-        complaint: "My counter said 40 guests tonight. We have 20 chairs and nobody had to stand.",
-    ),
     tests: [
         (keys: "", display: "00"),
         (keys: "+", display: "01"),

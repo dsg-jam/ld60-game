@@ -244,7 +244,7 @@ mod tests {
     use ld60_devices::{BoardRev, DeviceKind};
 
     use super::*;
-    use crate::CATALOG;
+    use crate::Catalog;
 
     fn rewire(source: &str, kind: DeviceKind, to: BoardRev) -> Option<String> {
         let mut firmware = Firmware::new(source);
@@ -254,9 +254,9 @@ mod tests {
 
     #[test]
     fn same_board_changes_nothing() {
-        for source in CATALOG {
+        for source in Catalog::on_disk().unwrap().levels() {
             let device = source.load().unwrap().device;
-            for text in [source.buggy, source.fixed] {
+            for text in [source.buggy.as_str(), source.fixed.as_str()] {
                 let expected = Firmware::new(text).to_string();
                 assert_eq!(rewire(text, device, BoardRev::A).unwrap(), expected);
             }

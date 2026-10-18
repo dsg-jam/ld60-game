@@ -147,9 +147,10 @@ impl From<&Outcome> for Complaint {
 
 #[cfg(test)]
 mod tests {
-    use ld60_levels::{CATALOG, GAME_SEED, LevelSource, Variant, assemble, burn, initial_rom};
+    use ld60_levels::{GAME_SEED, LevelSource, Variant, assemble, burn, initial_rom};
 
     use super::*;
+    use crate::workshop::levels::Levels;
 
     /// The job as the game loads it.
     fn job(source: &LevelSource) -> Variant {
@@ -172,7 +173,7 @@ mod tests {
 
     #[test]
     fn fixed_firmware_has_no_complaint() {
-        for source in CATALOG {
+        for source in Levels::on_disk().levels() {
             let (level, rom) = fixed(source);
             assert_eq!(Complaint::find(&level, &rom), None, "{}", level.id);
         }
@@ -180,7 +181,7 @@ mod tests {
 
     #[test]
     fn untouched_firmware_has_a_complaint() {
-        for source in CATALOG {
+        for source in Levels::on_disk().levels() {
             let (level, rom) = buggy(source);
             assert!(Complaint::find(&level, &rom).is_some(), "{}", level.id);
         }
