@@ -7,6 +7,8 @@ use crate::parts::paper::Paper;
 
 const KEY_WIDTH: f32 = 120.0;
 const CODE_WIDTH: f32 = 120.0;
+const STEPS_WIDTH: f32 = 200.0;
+const DISPLAY_WIDTH: f32 = 160.0;
 
 pub(super) fn footer(device: DeviceKind) -> &'static str {
     match device {
@@ -59,6 +61,29 @@ pub(super) fn write(page: &mut ChildSpawnerCommands, board: &Board) {
     page.spawn(Paper::heading("KNOWN FAULTS"));
     page.spawn(Paper::text("- Liquid can leave a RAM bit stuck at 0 or 1."));
     page.spawn(Paper::text("- Old EPROMs can lose bits."));
+}
+
+/// The factory checklist, on its own page.
+pub(super) fn write_line_tests(page: &mut ChildSpawnerCommands, device: DeviceKind) {
+    page.spawn(Paper::title("END OF LINE TESTS"));
+    page.spawn(Paper::faded("Every unit passes these at the factory."));
+    page.spawn(Paper::text(
+        "Power on, then press the keys of each line and check the display.",
+    ));
+    page.spawn(Paper::text("Spaces only group the keys."));
+    page.spawn(Paper::row([
+        ("KEYS".into(), STEPS_WIDTH),
+        ("DISPLAY".into(), DISPLAY_WIDTH),
+    ]));
+    for test in device.line_tests() {
+        page.spawn(Paper::row([
+            (test.steps().into(), STEPS_WIDTH),
+            (test.display.into(), DISPLAY_WIDTH),
+        ]));
+    }
+    page.spawn(Paper::faded(
+        "Flashing the firmware also powers the unit on.",
+    ));
 }
 
 /// Digit keys share one row, the other keys get a row each.

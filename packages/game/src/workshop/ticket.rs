@@ -78,15 +78,22 @@ impl JobTicket {
         let level = &ticket.level;
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let pages = vec![
-            Paper::spawn_page(&mut commands, &canvas, (1, 2), FOOTER, |page| {
+            Paper::spawn_page(&mut commands, &canvas, (1, 3), FOOTER, |page| {
                 Self::write(page, level);
             }),
             Paper::spawn_page(
                 &mut commands,
                 &canvas,
-                (2, 2),
+                (2, 3),
                 service::footer(level.device),
                 |page| service::write(page, level.board()),
+            ),
+            Paper::spawn_page(
+                &mut commands,
+                &canvas,
+                (3, 3),
+                service::footer(level.device),
+                |page| service::write_line_tests(page, level.device),
             ),
         ];
         let board = Block::new(BOARD_SIZE);
