@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use crate::ast::{self, AssignOp, BinOp, BlockKind, ExprKind, File, Item, StmtKind};
@@ -34,8 +35,13 @@ struct Resolver<'a> {
     owners: BTreeMap<String, String>,
     /// The block being resolved.
     current: String,
+    /// Passes of the loop being resolved, if known.
+    loop_count: Option<u8>,
+    /// Passes of a `repeat` that starts with the next statement, if known.
+    next_count: Option<u8>,
     table: Labels,
     errors: Vec<Diagnostic>,
+    warnings: RefCell<Vec<Diagnostic>>,
 }
 
 impl Resolver<'_> {
@@ -324,6 +330,14 @@ impl Resolver<'_> {
                     return Err(Diagnostic::error(pos, format!("'{name}' is not an array")));
                 };
                 if is_name(index, "i") {
+                    if let Some(count) = self.loop_count
+                        && count > len
+                    {
+                        self.warnings.borrow_mut().push(Diagnostic::warning(
+                            pos,
+                            format!("the loop runs {count} times, but {name} has {len} elements"),
+                        ));
+                    }
                     let cells = self.target.backend.features().ram_cells;
                     return Ok(Place::Indexed((addr + cells - 1) % cells));
                 }
@@ -363,12 +377,13 @@ impl Resolver<'_> {
                 if start.value == 0 {
                     return Err(Diagnostic::error(start_pos(stmt), ZERO_LOOP));
                 }
+                let label = label.as_ref().map(|l| self.label(l, pos)).transpose()?;
+                let outer = self.loop_count.replace(start.value);
+                let body = self.stmts(body, kind);
+                self.loop_count = outer;
                 vec![
                     Stmt::Prim(Prim::SetIndex(start)),
-                    Stmt::Repeat {
-                        label: label.as_ref().map(|l| self.label(l, pos)).transpose()?,
-                        body: self.stmts(body, kind),
-                    },
+                    Stmt::Repeat { label, body },
                 ]
             }
             StmtKind::Goto(name) => vec![Stmt::Prim(Prim::Jump(self.jump_target(name, pos)?))],
@@ -407,10 +422,11 @@ impl Resolver<'_> {
                 body,
             } => {
                 check_counter(counter, pos)?;
-                vec![Stmt::Repeat {
-                    label: label.as_ref().map(|l| self.label(l, pos)).transpose()?,
-                    body: self.stmts(body, kind),
-                }]
+                let label = label.as_ref().map(|l| self.label(l, pos)).transpose()?;
+                let outer = std::mem::replace(&mut self.loop_count, self.next_count);
+                let body = self.stmts(body, kind);
+                self.loop_count = outer;
+                vec![Stmt::Repeat { label, body }]
             }
             StmtKind::Return if kind == BlockKind::Routine => vec![Stmt::Prim(Prim::Return)],
             StmtKind::Return => {
@@ -470,6 +486,7 @@ impl Resolver<'_> {
             if matches!(stmt.kind, StmtKind::Repeat { .. }) && index == Some(0) {
                 self.errors.push(Diagnostic::error(stmt.pos, ZERO_LOOP));
             }
+            self.next_count = index;
             let more = match self.stmt(stmt, kind) {
                 Ok(more) => more,
                 Err(error) => {
@@ -565,8 +582,11 @@ pub(crate) fn resolve(
         routines: BTreeMap::new(),
         owners: BTreeMap::new(),
         current: String::new(),
+        loop_count: None,
+        next_count: None,
         table: Labels::default(),
         errors: Vec::new(),
+        warnings: RefCell::new(Vec::new()),
     };
     let mut title = None;
     let mut ram = Vec::new();
@@ -594,6 +614,13 @@ pub(crate) fn resolve(
                 title = Some(decl.title.clone());
             }
             Item::Cell(decl) => {
+                if decl.len == Some(0) {
+                    resolver.errors.push(Diagnostic::error(
+                        decl.pos,
+                        format!("'{}' needs at least 1 element", decl.name),
+                    ));
+                    continue;
+                }
                 let len = decl.len.unwrap_or(1);
                 let addr = parse_cell(&decl.addr)
                     .filter(|&a| len > 0 && u16::from(a) + u16::from(len) <= u16::from(ram_cells));
@@ -716,5 +743,6 @@ pub(crate) fn resolve(
         notes,
         blocks,
         labels: resolver.table,
+        warnings: resolver.warnings.into_inner(),
     })
 }

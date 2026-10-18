@@ -397,6 +397,32 @@ routine z {
 }
 
 #[test]
+fn empty_arrays_are_named() {
+    let body = "cells x[0] at M4\nentry main {\n    wait\n    goto main\n}\n";
+    let diagnostic = error(tally(Revision::B, body));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (3, "'x' needs at least 1 element")
+    );
+}
+
+#[test]
+fn loops_longer_than_their_array_warn() {
+    for body in [
+        "cells x[2] at M4\nentry main {\n    for i = 3 downto 1 {\n        x[i] = a\n    }\n    wait\n    goto main\n}\n",
+        "cells x[2] at M4\nentry main {\n    i = 3\n    carry = 0\n    repeat i {\n        x[i] = a\n    }\n    wait\n    goto main\n}\n",
+    ] {
+        let output = tally(Revision::B, body).unwrap();
+        let found: Vec<_> = output.warnings.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(
+            found,
+            ["the loop runs 3 times, but x has 2 elements"],
+            "{body}"
+        );
+    }
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {
