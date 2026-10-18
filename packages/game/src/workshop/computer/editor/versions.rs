@@ -12,7 +12,7 @@ use bevy::{
 use ld60_levels::LevelError;
 
 use self::list::{MAX_VERSIONS, SaveError, VersionList};
-use super::footer::{Command, Run, Status};
+use super::footer::{Flashed, Status};
 use super::page::{ActivePage, Page};
 use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
 #[cfg(feature = "debug_port")]
@@ -129,19 +129,9 @@ impl Versions {
         }
     }
 
-    /// Marks the flashed source, if it assembles.
-    fn mark_flashed(
-        run: On<Run>,
-        job: Option<Res<Job>>,
-        editor: Single<&EditableText, With<Editor>>,
-        mut versions: ResMut<Versions>,
-    ) {
-        let (Command::Flash, Some(job), Some(list)) = (run.0, job, versions.list.as_mut()) else {
-            return;
-        };
-        let source = editor.value().to_string();
-        if ld60_levels::assemble(&job.level, &source).is_ok() {
-            list.mark_flashed(&source);
+    fn mark_flashed(flashed: On<Flashed>, mut versions: ResMut<Versions>) {
+        if let Some(list) = versions.list.as_mut() {
+            list.mark_flashed(&flashed.0);
         }
     }
 
