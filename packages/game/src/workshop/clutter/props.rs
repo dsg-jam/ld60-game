@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
-use crate::parts::liquid::Liquid;
+use crate::parts::liquid::{Foam, Liquid};
 use crate::parts::steam::Steam;
 
 const MUG_RADIUS: f32 = 0.04;
@@ -40,6 +40,9 @@ const SCREW_SHANK_LENGTH: f32 = 0.012;
 
 const CERAMIC: Color = Color::srgb_u8(0xe8, 0xe0, 0xd0);
 const STRIPE: Color = Color::srgb_u8(0x3a, 0x55, 0x7a);
+/// Light brown bubbles from brewing.
+const FOAM: Color = Color::srgb_u8(0x9a, 0x6c, 0x44);
+const FOAM_COVER: f32 = 0.4;
 const COFFEE: Color = Color::srgb_u8(0x12, 0x09, 0x05);
 const GRIP: Color = Color::srgb_u8(0xb0, 0x2e, 0x24);
 const STEEL: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
@@ -110,7 +113,10 @@ impl Props<'_> {
         // clean line. It also keeps light from shining through the mug.
         parent.spawn((
             Mesh3d(self.meshes.add(Circle::new(MUG_RADIUS - MUG_WALL / 2.0))),
-            Liquid::new(MUG_RADIUS - MUG_WALL, coffee_level, COFFEE),
+            Liquid::new(MUG_RADIUS - MUG_WALL, coffee_level, COFFEE).with_foam(Foam {
+                color: FOAM,
+                cover: FOAM_COVER,
+            }),
             Transform::from_xyz(0.0, coffee_level, 0.0)
                 .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         ));

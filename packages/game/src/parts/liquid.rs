@@ -12,6 +12,11 @@ const GRAVITY: f32 = 9.81;
 const TENSION: f32 = 7.2e-5;
 /// Share of critical damping. A shaken mug rings for a few seconds.
 const DAMPING: f32 = 0.03;
+/// Foam along the wall damps the waves more, up to this many times, after
+/// Sauret et al., "Damping of liquid sloshing by foams".
+const FOAM_DAMPING: f32 = 2.0;
+/// The liquid turns slowly in the container, in radians per second.
+const SWIRL: f32 = 0.03;
 /// Sloshing modes of a liquid in an upright round container, after
 /// Abramson, "The Dynamic Behavior of Liquids in Moving Containers": how
 /// many times the surface rises and falls around the container, and the
@@ -69,7 +74,17 @@ pub(crate) struct Liquid {
     radius: f32,
     depth: f32,
     color: Color,
+    foam: Foam,
+    turn: f32,
     waves: [Wave; WAVES],
+}
+
+/// Bubbles floating on a [`Liquid`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Foam {
+    pub(crate) color: Color,
+    /// How much of the surface it covers, from 0 to 1.
+    pub(crate) cover: f32,
 }
 
 /// One sloshing mode of a [`Liquid`], as two waves turned a quarter turn
@@ -92,7 +107,11 @@ pub(crate) struct LiquidSurface {
 /// Matches `Liquid` in `liquid.wesl`.
 #[derive(ShaderType, Reflect, Debug, Clone)]
 struct LiquidParams {
+    /// Its alpha is how much of the surface the foam covers.
+    foam: Vec4,
     radius: f32,
+    /// How far the liquid has turned in the container, in radians.
+    turn: f32,
     /// Per mode: the heights of its two waves, its Bessel root and its
     /// number of waves around.
     waves: [Vec4; WAVES],
@@ -111,8 +130,14 @@ impl Liquid {
             radius,
             depth,
             color,
+            foam: Foam { color, cover: 0.0 },
+            turn: 0.0,
             waves: [Wave::default(); WAVES],
         }
+    }
+
+    pub(crate) fn with_foam(self, foam: Foam) -> Self {
+        Self { foam, ..self }
     }
 
     fn on_add(
@@ -146,7 +171,14 @@ impl Liquid {
 
     fn params(&self) -> LiquidParams {
         LiquidParams {
+            foam: self
+                .foam
+                .color
+                .to_linear()
+                .to_vec3()
+                .extend(self.foam.cover),
             radius: self.radius,
+            turn: self.turn,
             waves: std::array::from_fn(|index| {
                 let (around, root) = MODES[index];
                 let height = self.waves[index].height;
@@ -173,6 +205,8 @@ impl Liquid {
         // White noise with unit variance per second, whatever the step.
         let spread = 3.0_f32.sqrt() / step.sqrt();
         for (mut liquid, material) in &mut liquids {
+            liquid.turn = (liquid.turn + SWIRL * dt) % std::f32::consts::TAU;
+            let damping = DAMPING * (1.0 + FOAM_DAMPING * liquid.foam.cover);
             for (index, &(around, _)) in MODES.iter().enumerate() {
                 let omega = liquid.frequency(index);
                 let gain = if around == 1 { 1.0 } else { IMPERFECTION };
@@ -183,7 +217,7 @@ impl Liquid {
                         Vec2::new(noise.random_range(-1.0..1.0), noise.random_range(-1.0..1.0))
                             * strength;
                     let accel =
-                        push - 2.0 * DAMPING * omega * wave.speed - omega * omega * wave.height;
+                        push - 2.0 * damping * omega * wave.speed - omega * omega * wave.height;
                     wave.speed += accel * step;
                     wave.height += wave.speed * step;
                 }
