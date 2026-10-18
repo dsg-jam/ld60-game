@@ -11,6 +11,7 @@ use bevy::{
 };
 
 use self::clicks::Clicks;
+use crate::audio::KeyClicks;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 
@@ -40,9 +41,38 @@ impl Plugin for EditorPlugin {
             Clicks::correct_edits.before(EditableTextSystems),
         )
         .add_observer(Editor::indent_on_tab)
+        .add_observer(Footer::toggle_clicks)
         .add_observer(Editor::scroll_on_wheel);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.editor", Editor::debug_state);
+    }
+}
+
+/// Key hints below the editor.
+#[derive(Component)]
+struct Footer;
+
+impl Footer {
+    fn text(clicks: bool) -> String {
+        let clicks = if clicks { "ON" } else { "OFF" };
+        format!("F5 ASSEMBLE   F6 FLASH   F8 CLICKS {clicks}")
+    }
+
+    /// F8 in the editor switches key clicks on or off.
+    fn toggle_clicks(
+        mut input: On<FocusedInput<KeyboardInput>>,
+        editors: Query<(), With<Editor>>,
+        mut clicks: ResMut<KeyClicks>,
+        mut footer: Single<&mut Text, With<Footer>>,
+    ) {
+        if !editors.contains(input.focused_entity) || input.input.key_code != KeyCode::F8 {
+            return;
+        }
+        input.propagate(false);
+        if input.input.state.is_pressed() && !input.input.repeat {
+            clicks.0 = !clicks.0;
+            footer.0 = Self::text(clicks.0);
+        }
     }
 }
 
@@ -104,7 +134,8 @@ impl Editor {
                     TabIndex(0),
                 ),
                 (
-                    Text::new("F5 ASSEMBLE   F6 FLASH"),
+                    Footer,
+                    Text::new(Footer::text(true)),
                     font,
                     TextColor(PHOSPHOR_DIM),
                 ),

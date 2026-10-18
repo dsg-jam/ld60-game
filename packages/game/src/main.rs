@@ -6,6 +6,7 @@
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
+mod audio;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod device;
@@ -41,6 +42,7 @@ fn main() -> AppExit {
     app.add_plugins(debug_port::DebugPortPlugin);
     app.add_plugins((
         MeshPickingPlugin,
+        audio::AudioPlugin,
         geometry::shape::ShapePlugin,
         parts::PartsPlugin,
         player::PlayerPlugin,
