@@ -16,6 +16,7 @@ use self::changes::LineChanges;
 use self::list::{MAX_VERSIONS, Removal, SaveError, Version, VersionList};
 use super::footer::{Flashed, Status};
 use super::page::{ActivePage, Page};
+use super::undo::Undo;
 use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
@@ -320,10 +321,11 @@ impl Perform {
         job: Option<Res<Job>>,
         time: Res<Time<Real>>,
         mut versions: ResMut<Versions>,
-        mut editor: Single<&mut EditableText, With<Editor>>,
+        editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
         mut status: Single<&mut Text, With<Status>>,
         mut active: ResMut<ActivePage>,
     ) {
+        let (mut editor, mut undo) = editor.into_inner();
         let on_job = time.elapsed().saturating_sub(versions.started);
         let (Some(job), Some(list)) = (job, versions.list.as_mut()) else {
             status.0 = "NO JOB ON THE BENCH".into();
@@ -346,7 +348,8 @@ impl Perform {
                 let (number, text) = (version.number, version.text.clone());
                 match list.keep(&source, label) {
                     Ok(kept) => {
-                        Editor::replace_text(&mut editor, &text);
+                        editor.viewport.offset.y = 0.0;
+                        undo.replace(&mut editor, &text);
                         active.0 = Page::Source;
                         match kept {
                             Some(kept) => {
