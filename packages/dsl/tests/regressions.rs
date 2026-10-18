@@ -77,6 +77,7 @@ entry main {
     }
     n = a
     wait
+    goto main
 }
 routine s {
     a += 1
@@ -85,7 +86,7 @@ routine s {
     let output = tally(Revision::A, body).unwrap();
     assert_eq!(
         code(&output),
-        "main:\ns:      INC\n        INC\n        INC\n        ST   M1\n        HLT\n"
+        "main:\ns:      INC\n        INC\n        INC\n        ST   M1\n        HLT\n        JMP  main\n"
     );
 }
 
@@ -167,6 +168,7 @@ entry main {
         p()
     }
     wait
+    goto main
 }
 routine p {
     q()
@@ -232,6 +234,29 @@ fn gotos_cannot_enter_routines() {
 }
 
 #[test]
+fn blocks_cannot_fall_into_a_routine() {
+    let body = "\
+entry main {
+    a = 4
+}
+routine r {
+    a = 9
+}
+block next {
+    n = a
+    wait
+}
+";
+    for revision in [Revision::A, Revision::B] {
+        let diagnostic = error(tally(revision, body));
+        assert_eq!(
+            (diagnostic.line, diagnostic.message.as_str()),
+            (6, "main falls through into routine r. End main with a goto")
+        );
+    }
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {
@@ -253,6 +278,7 @@ entry main {
     s()
     s()
     wait
+    goto main
 }
 routine s {
     asm {
