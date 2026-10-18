@@ -7,19 +7,29 @@ It is the first job on the bench.
 Early units have a CalCo Rev A, which only supports a few instructions. Later
 units have a Rev B. Check the chip sticker before you change the firmware.
 
+## Board revisions
+
+The board around the chip comes in three revisions. They wire the display and
+the keys differently. The sticker under the device shows the revision, for
+example `BOARD 2B`. The serial number starts with it too. The service sheet of
+a job lists the I/O of its board.
+
+| Board | Display   | `+` | `C` |
+| ----- | --------- | --- | --- |
+| 2A    | `M1`-`M2` | 0A  | 0D  |
+| 2B    | `M4`-`M5` | 0B  | 0C  |
+| 2C    | `M0`-`M1` | 01  | 02  |
+
+The codes of board 2A match the Summa 6 board 6A, so firmware habits carry
+over.
+
 ## Display
 
-`M1` and `M2` are shown on the display, left to right. `M2` is the rightmost
-digit. Values above 9 show broken segment patterns.
+The display shows two RAM cells, left to right. On board 2A these are `M1` and
+`M2`, and `M2` is the rightmost digit. Values above 9 show broken segment
+patterns.
 
-## Key codes
-
-| Code | Key |
-| ---- | --- |
-| 0A   | +   |
-| 0D   | C   |
-
-The codes match the Summa 6, so firmware habits carry over.
+The Tally 2 has no annunciators.
 
 ## Power on
 

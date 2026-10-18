@@ -166,8 +166,9 @@ label:  MNEMONIC operand   ; comment
 
 ## Example
 
-Add the Summa 6 display to a total stored in `M9` to `ME`. Both numbers have the most
-significant digit first, so the loop runs from the rightmost digit to the left.
+Add the Summa 6 display of board 6A to a total stored in `M9` to `ME`. Both
+numbers have the most significant digit first, so the loop runs from the
+rightmost digit to the left.
 
 ```
 ADDR  BYTES   SOURCE
