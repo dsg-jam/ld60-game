@@ -19,7 +19,7 @@ pub(crate) struct AudioPlugin;
 pub(crate) enum Sound {
     /// A switch flipping.
     Click,
-    /// Firmware passed all of the customer's tests.
+    /// A customer paid for a repair.
     Chime,
     /// The rubber stamp hitting the ticket.
     Thunk,
