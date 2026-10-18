@@ -1,5 +1,6 @@
 use std::io::{BufRead, Write};
 
+use ld60_devices::Device;
 use ld60_machine::Step;
 
 use crate::render;
@@ -32,6 +33,7 @@ pub fn run(session: &mut Session, input: impl BufRead, out: &mut impl Write) -> 
         "{}: \"{}\"",
         level.customer.name, level.customer.complaint
     )?;
+    render::board(out, session.device.board())?;
     writeln!(out, "Type h for help.")?;
     render::state(out, session)?;
 
