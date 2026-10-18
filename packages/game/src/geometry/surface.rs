@@ -63,6 +63,9 @@ pub(crate) enum Form {
     Cylinder(Vec3),
     /// Any other mesh. It has no edges to wear.
     Freeform,
+    /// Any number of unit cubes, each scaled to the size of a box. The
+    /// material can be shared between them.
+    Scaled,
 }
 
 /// Detail and signs of use on a surface: grain, bumps, worn edges, grime,
@@ -108,12 +111,18 @@ impl Finish {
         self.over(base, form, seed)
     }
 
+    /// A material in `color` with this finish for any number of unit cubes,
+    /// each scaled to the size of a box.
+    pub(crate) fn scaled(self, color: Color) -> SurfaceMaterial {
+        self.material(color, Form::Scaled, 0.0)
+    }
+
     /// Like [`Self::material`], over a `base` that sets more than the color,
     /// like the gloss of car paint.
     pub(crate) fn over(self, base: StandardMaterial, form: Form, seed: f32) -> SurfaceMaterial {
         let half_size = match form {
             Form::Box(size) | Form::Cylinder(size) => size / 2.0,
-            Form::Freeform => Vec3::ZERO,
+            Form::Freeform | Form::Scaled => Vec3::ZERO,
         };
         ExtendedMaterial {
             base,
@@ -157,6 +166,7 @@ impl Form {
             Self::Box(_) => 0,
             Self::Cylinder(_) => 1,
             Self::Freeform => 2,
+            Self::Scaled => 3,
         }
     }
 }

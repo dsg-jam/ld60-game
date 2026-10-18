@@ -7,6 +7,7 @@
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
 mod audio;
+mod city;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod device;
@@ -43,6 +44,7 @@ fn main() -> AppExit {
     app.add_plugins((
         MeshPickingPlugin,
         audio::AudioPlugin,
+        city::CityPlugin,
         geometry::GeometryPlugin,
         parts::PartsPlugin,
         player::PlayerPlugin,

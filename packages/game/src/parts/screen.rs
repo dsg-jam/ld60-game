@@ -12,7 +12,7 @@ use bevy::{
     },
     prelude::*,
     render::render_resource::TextureFormat,
-    window::{PrimaryWindow, WindowEvent},
+    window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
 pub(crate) use self::crt::{CrtGlass, CrtMaterial};
@@ -134,7 +134,7 @@ impl ScreenSurface {
     fn drive_pointers(
         mut raycast: MeshRayCast,
         window: Single<&Window, With<PrimaryWindow>>,
-        cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+        cameras: Query<(&Camera, &GlobalTransform, &RenderTarget), With<Camera3d>>,
         mut surfaces: Query<(Entity, &mut ScreenSurface, &PointerId)>,
         mut window_events: MessageReader<WindowEvent>,
         mut inputs: MessageWriter<PointerInput>,
@@ -152,7 +152,11 @@ impl ScreenSurface {
             early_exit_test: &|_| true,
         };
         let hit = window.cursor_position().and_then(|cursor| {
-            cameras.iter().find_map(|(camera, transform)| {
+            cameras.iter().find_map(|(camera, transform, target)| {
+                // Only cameras that draw to the window see the cursor.
+                if !matches!(target, RenderTarget::Window(WindowRef::Primary)) {
+                    return None;
+                }
                 let ray = camera.viewport_to_world(transform, cursor).ok()?;
                 let (entity, hit) = raycast.cast_ray(ray, &settings).first()?;
                 Some((*entity, hit.uv?))
