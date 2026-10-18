@@ -1,8 +1,8 @@
 # Tally 2
 
 The Tally 2 is a 2-digit tally counter by DSG Electronics. It runs a
-[CalCo](../isa/calco.md) chip with the firmware in a 256 byte EPROM socket.
-It is the first job on the bench.
+[CalCo](../isa/calco.md) chip with the firmware in a 256 byte EPROM socket. It
+is the first job on the bench.
 
 Early units have a CalCo Rev A, which only supports a few instructions. Later
 units have a Rev B. Check the chip sticker before you change the firmware.
@@ -11,9 +11,9 @@ units have a Rev B. Check the chip sticker before you change the firmware.
 
 The board around the chip comes in three revisions. They wire the display and
 the keys differently. The sticker under the device shows the revision, for
-example `BOARD 2B`. The serial number starts with it too. The service sheet of
-a job lists the I/O of its board. The board revision does not depend on the
-chip revision.
+example `BOARD 2B`. The serial number starts with it too. The service sheet of a
+job lists the I/O of its board. The board revision does not depend on the chip
+revision.
 
 | Board | Display   | `+` | `C` |
 | ----- | --------- | --- | --- |
@@ -21,8 +21,7 @@ chip revision.
 | 2B    | `M4`-`M5` | 0B  | 0C  |
 | 2C    | `M0`-`M1` | 01  | 02  |
 
-The codes of board 2A match the Summa 6 board 6A, so firmware habits carry
-over.
+The codes of board 2A match the Summa 6 board 6A, so firmware habits carry over.
 
 ## Display
 
@@ -38,8 +37,8 @@ RAM holds random values after power on. The firmware has to clear the display.
 
 ## End of line tests
 
-The factory runs these tests on every unit. Power on the device, then press
-the keys of each line and check the display. Spaces only group the keys.
+The factory runs these tests on every unit. Power on the device, then press the
+keys of each line and check the display. Spaces only group the keys.
 
 | Keys       | Display |
 | ---------- | ------- |
