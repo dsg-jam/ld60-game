@@ -44,15 +44,20 @@ impl Undo {
     }
 
     /// Ctrl+Z undoes. Ctrl+Y and Ctrl+Shift+Z redo. Cmd works as Ctrl.
+    ///
+    /// The keys belong to the IME while it composes text.
     pub(super) fn on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         keys: Res<ButtonInput<Key>>,
-        mut editors: Query<&mut Undo>,
+        mut editors: Query<(&mut Undo, &EditableText)>,
     ) {
-        let Ok(mut undo) = editors.get_mut(input.focused_entity) else {
+        let Ok((mut undo, text)) = editors.get_mut(input.focused_entity) else {
             return;
         };
-        if !keys.any_pressed([Key::Control, Key::Super]) || keys.pressed(Key::Alt) {
+        if text.is_composing()
+            || !keys.any_pressed([Key::Control, Key::Super])
+            || keys.pressed(Key::Alt)
+        {
             return;
         }
         let shift = keys.pressed(Key::Shift);
@@ -80,6 +85,11 @@ impl Undo {
         for (mut undo, mut text) in &mut editors {
             let undo = &mut *undo;
             if !text.is_changed() && !undo.reset && undo.requests.is_empty() {
+                continue;
+            }
+            // The selection counts text the IME has not committed yet.
+            if text.is_composing() {
+                undo.requests.clear();
                 continue;
             }
             let snapshot = Snapshot::of(&text);
