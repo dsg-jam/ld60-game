@@ -1,4 +1,5 @@
 use bevy::{
+    input::keyboard::Key,
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
@@ -21,42 +22,54 @@ impl Plugin for KeypadPlugin {
 
 /// A key with a printed label, pressed by the pointer or by `bindings` on
 /// the keyboard.
-pub(crate) struct KeyDef {
+pub(crate) struct KeyDef<K> {
     label: &'static str,
+    key: K,
     bindings: &'static [KeyBinding],
     width: f32,
 }
 
 /// A keyboard key that presses a [`PressableKey`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum KeyBinding {
     /// A key by its position, whatever the layout prints on it.
     Code(KeyCode),
+    /// Whatever key types this text in the current layout.
+    Typed(&'static str),
+    /// A named key like Enter, in the current layout.
+    Named(Key),
 }
 
 impl KeyBinding {
-    fn is_pressed(&self, codes: &ButtonInput<KeyCode>) -> bool {
+    fn is_pressed(&self, codes: &ButtonInput<KeyCode>, keys: &ButtonInput<Key>) -> bool {
         // A tap can press and release within one frame. `just_pressed` still
         // shows it for that frame.
         match self {
             Self::Code(code) => codes.pressed(*code) || codes.just_pressed(*code),
+            Self::Typed(text) => {
+                let key = Key::Character((*text).into());
+                keys.pressed(key.clone()) || keys.just_pressed(key)
+            }
+            Self::Named(key) => keys.pressed(key.clone()) || keys.just_pressed(key.clone()),
         }
     }
 }
 
-impl KeyDef {
+impl<K> KeyDef<K> {
     /// A key that is one unit wide.
-    pub(crate) const fn unit(label: &'static str, bindings: &'static [KeyBinding]) -> Self {
-        Self::wide(label, bindings, 1.0)
+    pub(crate) const fn unit(label: &'static str, key: K, bindings: &'static [KeyBinding]) -> Self {
+        Self::wide(label, key, bindings, 1.0)
     }
 
     pub(crate) const fn wide(
         label: &'static str,
+        key: K,
         bindings: &'static [KeyBinding],
         width: f32,
     ) -> Self {
         Self {
             label,
+            key,
             bindings,
             width,
         }
@@ -100,30 +113,31 @@ pub(crate) struct KeypadStyle {
 ///
 /// The labels are rendered into one texture laid out like the keys, so each
 /// key top shows its own region of it.
-pub(crate) struct Keypad {
-    rows: &'static [&'static [KeyDef]],
+pub(crate) struct Keypad<K: 'static> {
+    rows: &'static [&'static [KeyDef<K>]],
     style: &'static KeypadStyle,
-    keys: Vec<PlacedKey>,
+    keys: Vec<PlacedKey<K>>,
 }
 
 /// A key of a [`Keypad`], resting on its surface.
-pub(crate) struct PlacedKey {
+pub(crate) struct PlacedKey<K> {
     pub(crate) block: Block,
+    pub(crate) key: K,
     bindings: &'static [KeyBinding],
     /// Part of the label texture shown on the key top.
     label_region: Rect,
 }
 
-impl Keypad {
+impl<K: Copy> Keypad<K> {
     /// Area covered by the keys, in x and z.
-    pub(crate) fn area(rows: &[&[KeyDef]], style: &KeypadStyle) -> Vec2 {
+    pub(crate) fn area(rows: &[&[KeyDef<K>]], style: &KeypadStyle) -> Vec2 {
         Vec2::new(Self::max_units(rows), rows.len() as f32) * style.pitch
     }
 
     /// Lays out the keys resting on `surface`, with their area centered on
     /// `spot` (see [`Block::top_spot`]).
     pub(crate) fn new(
-        rows: &'static [&'static [KeyDef]],
+        rows: &'static [&'static [KeyDef<K>]],
         style: &'static KeypadStyle,
         surface: &Block,
         spot: Vec2,
@@ -159,6 +173,7 @@ impl Keypad {
 
                 keys.push(PlacedKey {
                     block,
+                    key: def.key,
                     bindings: def.bindings,
                     label_region,
                 });
@@ -175,7 +190,7 @@ impl Keypad {
         parent: &mut ChildSpawnerCommands,
         labels: &Handle<Image>,
         active: bool,
-        extra: impl Fn(&PlacedKey) -> B,
+        extra: impl Fn(&PlacedKey<K>) -> B,
     ) {
         for key in &self.keys {
             parent.spawn((
@@ -239,11 +254,11 @@ impl Keypad {
         canvas.image
     }
 
-    fn units(row: &[KeyDef]) -> f32 {
+    fn units(row: &[KeyDef<K>]) -> f32 {
         row.iter().map(|def| def.width).sum()
     }
 
-    fn max_units(rows: &[&[KeyDef]]) -> f32 {
+    fn max_units(rows: &[&[KeyDef<K>]]) -> f32 {
         rows.iter().map(|row| Self::units(row)).fold(0.0, f32::max)
     }
 }
@@ -264,6 +279,10 @@ pub(crate) struct PressableKey {
 }
 
 impl PressableKey {
+    pub(crate) fn is_pressed(&self) -> bool {
+        self.pressed
+    }
+
     /// The press keeps bubbling, so a click on a key still reaches its
     /// device or computer.
     fn press_with_pointer(press: On<PointerPress>, mut keys: Query<&mut PressableKey>) {
@@ -288,6 +307,7 @@ impl PressableKey {
 
     pub(crate) fn update(
         codes: Res<ButtonInput<KeyCode>>,
+        keys: Res<ButtonInput<Key>>,
         mut caps: Query<(&mut PressableKey, &mut Transform)>,
     ) {
         for (mut cap, mut transform) in &mut caps {
@@ -297,7 +317,7 @@ impl PressableKey {
                     && cap
                         .bindings
                         .iter()
-                        .any(|binding| binding.is_pressed(&codes)));
+                        .any(|binding| binding.is_pressed(&codes, &keys)));
             if cap.tapped_by_pointer {
                 cap.tapped_by_pointer = false;
             }

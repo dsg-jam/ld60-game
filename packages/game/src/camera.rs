@@ -1,6 +1,6 @@
 use bevy::{
     core_pipeline::tonemapping::DebandDither,
-    picking::{events::PointerClick, pointer::PointerButton},
+    picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
 
@@ -26,7 +26,7 @@ impl Plugin for CameraPlugin {
                 (Focused::leave_on_right_click, PlayerCamera::follow).chain(),
             )
             .add_observer(FocusOn::apply)
-            .add_observer(FocusTarget::focus_on_click);
+            .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.focus", Focused::debug_focus);
     }
@@ -38,6 +38,7 @@ pub(crate) enum Focus {
     #[default]
     Desk,
     Computer,
+    Device,
 }
 
 /// The camera of the seated player.
@@ -53,6 +54,10 @@ impl PlayerCamera {
         (Self { seat }, seat)
     }
 
+    pub(crate) fn seat(&self) -> Transform {
+        self.seat
+    }
+
     fn follow(
         time: Res<Time>,
         focused: Res<Focused>,
@@ -61,10 +66,14 @@ impl PlayerCamera {
         camera: Single<(&PlayerCamera, &mut Transform)>,
     ) {
         let (camera, mut transform) = camera.into_inner();
-        let focus_view = focused
-            .0
-            .and_then(|entity| targets.get(entity).ok())
-            .map(|(target, global)| global.mul_transform(target.view).compute_transform());
+        let focus_view =
+            focused
+                .0
+                .and_then(|entity| targets.get(entity).ok())
+                .map(|(target, global)| match target.view {
+                    View::Local(view) => global.mul_transform(view).compute_transform(),
+                    View::Seated => camera.seat,
+                });
         let (goal, decay_rate) = match focus_view {
             Some(view) => (view, DECAY_RATE),
             None => {
@@ -88,26 +97,34 @@ impl PlayerCamera {
 #[derive(Component, Clone, Copy, Debug)]
 pub(crate) struct FocusTarget {
     pub(crate) focus: Focus,
-    /// Camera pose while focused, relative to the target.
-    pub(crate) view: Transform,
+    pub(crate) view: View,
+}
+
+/// Camera pose while focused on a [`FocusTarget`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum View {
+    /// Relative to the target.
+    Local(Transform),
+    /// Back at the seat, looking straight ahead.
+    Seated,
 }
 
 impl FocusTarget {
-    fn focus_on_click(
-        mut click: On<PointerClick>,
+    fn focus_on_press(
+        mut press: On<PointerPress>,
         targets: Query<(), With<FocusTarget>>,
         state: Res<State<Focus>>,
         mut commands: Commands,
     ) {
-        if click.button != PointerButton::Primary
+        if press.button != PointerButton::Primary
             || *state.get() != Focus::Desk
-            || !targets.contains(click.entity)
+            || !targets.contains(press.entity)
         {
             return;
         }
-        click.propagate(false);
+        press.propagate(false);
         commands.trigger(FocusOn {
-            entity: click.entity,
+            entity: press.entity,
         });
     }
 }
@@ -137,6 +154,10 @@ impl FocusOn {
 pub(crate) struct Focused(Option<Entity>);
 
 impl Focused {
+    pub(crate) fn get(&self) -> Option<Entity> {
+        self.0
+    }
+
     fn leave(&mut self, next: &mut NextState<Focus>) {
         self.0 = None;
         next.set(Focus::Desk);

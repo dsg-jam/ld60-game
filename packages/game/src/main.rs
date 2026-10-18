@@ -11,6 +11,7 @@ mod computer;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod desk;
+mod device;
 mod keypad;
 mod lamp;
 mod layout;
@@ -54,6 +55,7 @@ fn main() -> AppExit {
         desk::DeskPlugin,
         lamp::LampPlugin,
         computer::ComputerPlugin,
+        device::DevicePlugin,
         stage::StagePlugin,
     ));
     app.run()

@@ -7,7 +7,7 @@ use bevy::{mesh::MeshBuilder, prelude::*};
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
-use crate::camera::{Focus, FocusTarget};
+use crate::camera::{Focus, FocusTarget, View};
 use crate::keypad::PressableKey;
 use crate::layout::Block;
 use crate::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
@@ -77,7 +77,7 @@ impl Computer {
             .entity(add.entity)
             .insert(FocusTarget {
                 focus: Focus::Computer,
-                view: layout.screen_view(),
+                view: View::Local(layout.screen_view()),
             })
             .with_children(|parent| {
                 layout.monitor.spawn(
