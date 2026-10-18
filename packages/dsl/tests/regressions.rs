@@ -1,13 +1,138 @@
 mod common;
 
-use common::{build, code, error, target};
-use ld60_calco::Revision;
+use std::collections::VecDeque;
+
+use common::{SUMMA, build, code, error, target};
+use ld60_calco::{ChipInfo, Cpu, DateCode, Revision};
 use ld60_devices::DeviceKind;
 use ld60_dsl::{Diagnostic, Flavor, Output, compile_pair};
+use ld60_machine::{Bus, Cpu as _, Isa, Step};
+
+struct Board {
+    rom: Vec<u16>,
+    keys: VecDeque<u8>,
+}
+
+impl Bus for Board {
+    fn port_in(&mut self, _port: u8) -> u8 {
+        self.keys.pop_front().unwrap_or(0xFF)
+    }
+
+    fn port_out(&mut self, _port: u8, _value: u8) {}
+
+    fn rom(&self, addr: u16) -> u16 {
+        self.rom.get(usize::from(addr)).copied().unwrap_or(0)
+    }
+
+    fn wake_requested(&self) -> bool {
+        !self.keys.is_empty()
+    }
+}
 
 fn tally(revision: Revision, body: &str) -> Result<Output, Vec<Diagnostic>> {
     let source = format!("firmware \"T\" for tally2\ncell n at M1\n{body}");
     build(&source, revision, DeviceKind::Tally2, Flavor::Fixed, &[])
+}
+
+/// RAM after running `body` until it halts with no keys left.
+fn run(revision: Revision, body: &str, keys: &[u8]) -> Vec<u8> {
+    let output = tally(revision, body).unwrap();
+    let chip = ChipInfo {
+        revision,
+        date_code: DateCode::new(76, 30),
+    };
+    let image = revision.isa().assemble(&output.asm).unwrap().image;
+    let mut board = Board {
+        rom: image.words().to_vec(),
+        keys: keys.iter().copied().collect(),
+    };
+    let mut cpu = Cpu::new(chip);
+    for _ in 0..10_000 {
+        if cpu.step(&mut board) == Step::Halted && board.keys.is_empty() {
+            return cpu.ram().cells().to_vec();
+        }
+    }
+    panic!("no halt\n{}", output.asm);
+}
+
+/// Runs `body` on Rev A and Rev B and checks that both end with the same RAM.
+fn same_on_a_and_b(body: &str, keys: &[u8]) -> Vec<u8> {
+    let a = run(Revision::A, body, keys);
+    assert_eq!(a, run(Revision::B, body, keys), "{body}");
+    a
+}
+
+#[test]
+fn rev_a_and_rev_b_builds_agree() {
+    let branches = "\
+cell k at M2
+entry main {
+    a = KEY
+    k = a
+    if a == 5 goto go
+go:
+    a = k
+    if !zero goto yes
+    a = 2
+    goto done
+yes:
+    a = 1
+done:
+    n = a
+    wait
+    goto main
+}
+";
+    assert_eq!(same_on_a_and_b(branches, &[0x05])[..3], [0, 2, 5]);
+    let calls = "\
+cell m at M2
+entry main {
+    a = KEY
+    s()
+    n = a
+    a = KEY
+    s()
+    m = a
+    wait
+    goto main
+}
+routine s {
+    t()
+    if a == 3 goto x
+    a += 1
+    return
+x:
+    a = 9
+}
+routine t {
+    if a == 0 {
+        return
+    }
+    a += 1
+}
+";
+    let ram = same_on_a_and_b(calls, &[0x02, 0x00]);
+    assert_eq!(ram[1..3], [9, 1]);
+    let unrolled = "\
+cells arr[3] at M4
+entry main {
+    a = 0
+    arr[2] = a
+    a = 7
+    arr[1] = a
+    arr[3] = a
+    for i = 3 downto 1 as lp {
+        a = arr[i]
+        if a == 0 {
+            a = 5
+        }
+        arr[i] = a
+    }
+    wait
+    goto main
+}
+";
+    assert_eq!(same_on_a_and_b(unrolled, &[])[4..7], [7, 5, 7]);
 }
 
 #[test]
@@ -457,4 +582,145 @@ routine s {
         diagnostic.message,
         "s has asm labels and more than one call, so it cannot be copied"
     );
+}
+
+#[test]
+fn returns_belong_to_routines_and_stacks_are_counted() {
+    let goto_block = "\
+entry main {
+    p()
+    wait
+    goto main
+}
+routine p {
+    q()
+}
+routine q {
+    goto r
+}
+block r {
+    w()
+    return
+}
+routine w {
+    a += 1
+}
+";
+    let diagnostic = error(tally(Revision::B, goto_block));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (16, "return is only allowed in a routine")
+    );
+    let deep = "\
+entry main {
+    p()
+    n = a
+    wait
+    goto main
+}
+routine p {
+    q()
+}
+routine q {
+    y()
+}
+routine y {
+    a += 1
+}
+";
+    let diagnostic = error(tally(Revision::B, deep));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (4, "this call nests 3 deep, but the stack holds 2")
+    );
+    assert!(tally(Revision::A, deep).is_ok());
+}
+
+#[test]
+fn a_routine_loop_needs_a_known_count_on_rev_a() {
+    let body = "\
+cells arr[3] at M4
+entry main {
+    i = 3
+    s()
+    wait
+    goto main
+}
+routine s {
+    repeat i {
+        a = arr[i]
+        a += 1
+        arr[i] = a
+    }
+}
+";
+    let diagnostic = error(tally(Revision::A, body));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (
+            11,
+            "CalCo Rev A cannot run this loop. Set i to a number right before it so it can be \
+             unrolled"
+        )
+    );
+    assert!(tally(Revision::B, body).is_ok());
+}
+
+#[test]
+fn labels_cannot_take_port_names() {
+    let body = "entry main {\n    goto REV\nREV:\n    wait\n}\n";
+    let errors = tally(Revision::B, body).unwrap_err();
+    let found: Vec<_> = errors
+        .iter()
+        .map(|d| (d.line, d.message.as_str()))
+        .collect();
+    assert_eq!(found, [(5, "'REV' is already used")]);
+}
+
+#[test]
+fn unrolled_comments_appear_once() {
+    let body = "\
+entry main {
+    for i = 3 downto 1 { ; count
+        a += 1
+    }
+    n = a ; save
+    wait
+    goto main
+}
+";
+    let output = tally(Revision::A, body).unwrap();
+    assert_eq!(
+        code(&output),
+        "\
+main:
+        ; count
+        INC
+        INC
+        INC
+        ST   M1             ; save
+        HLT
+        JMP  main
+"
+    );
+}
+
+#[test]
+fn long_straight_code_fits() {
+    let body = format!("entry main {{\n{}    wait\n}}\n", "    a = n\n".repeat(135));
+    for revision in [Revision::A, Revision::B] {
+        assert!(tally(revision, &body).is_ok());
+    }
+}
+
+#[test]
+fn tabs_and_crlf_give_the_same_output() {
+    let build_summa = |source: &str| {
+        build(source, Revision::B, DeviceKind::Summa6, Flavor::Fixed, &[])
+            .unwrap()
+            .asm
+    };
+    let expected = build_summa(SUMMA);
+    assert_eq!(build_summa(&SUMMA.replace('\n', "\r\n")), expected);
+    assert_eq!(build_summa(&SUMMA.replace("    ", "\t")), expected);
 }
