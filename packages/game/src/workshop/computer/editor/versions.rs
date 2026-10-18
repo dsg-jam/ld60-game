@@ -11,7 +11,7 @@ use bevy::{
 };
 use ld60_levels::LevelError;
 
-use self::list::{MAX_VERSIONS, SaveError, VersionList};
+use self::list::{MAX_VERSIONS, Removal, SaveError, VersionList};
 use super::footer::{Flashed, Status};
 use super::page::{ActivePage, Page};
 use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
@@ -19,7 +19,7 @@ use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
 use crate::debug_port::DebugMethods;
 use crate::workshop::job::Job;
 
-/// Width of the label column, so the flash mark lines up.
+/// Width of the label column, so the marks line up.
 const LABEL_WIDTH: usize = 20;
 
 pub(super) struct VersionsPlugin;
@@ -31,6 +31,7 @@ impl Plugin for VersionsPlugin {
                 Update,
                 (
                     Versions::load_job,
+                    Versions::disarm.run_if(resource_changed::<ActivePage>),
                     Versions::render.run_if(resource_changed::<Versions>),
                 )
                     .chain(),
@@ -94,6 +95,13 @@ impl Versions {
         }
     }
 
+    /// A removal waits for its second press only while the page stays open.
+    fn disarm(mut versions: ResMut<Versions>) {
+        if let Some(list) = versions.bypass_change_detection().list.as_mut() {
+            list.disarm();
+        }
+    }
+
     fn render(
         versions: Res<Versions>,
         mut rows: Query<(
@@ -114,13 +122,14 @@ impl Versions {
                 continue;
             };
             node.display = Display::Flex;
+            let auto = if version.auto { "AUTO " } else { "" };
             let flashed = if list.is_flashed(version) {
                 "FLASHED"
             } else {
                 ""
             };
             text.0 = format!(
-                "{:>2}  {:<LABEL_WIDTH$}{flashed}",
+                "{:>2}  {:<LABEL_WIDTH$}{auto}{flashed}",
                 version.number, version.label
             );
             let selected = list.selected() == row.0;
@@ -168,6 +177,7 @@ impl Versions {
                     "number": version.number,
                     "label": version.label,
                     "flashed": list.is_flashed(version),
+                    "auto": version.auto,
                     "text": version.text,
                 })
             })
@@ -330,14 +340,28 @@ impl Perform {
                 }
             }
             Action::Restore => {
+                let source = editor.value().to_string();
+                let label = Versions::label(&job, &source, time.elapsed());
                 let version = list.selected_version();
-                Editor::replace_text(&mut editor, &version.text);
-                active.0 = Page::Source;
-                format!("RESTORED VERSION {}", version.number)
+                let (number, text) = (version.number, version.text.clone());
+                match list.keep(&source, label) {
+                    Ok(kept) => {
+                        Editor::replace_text(&mut editor, &text);
+                        active.0 = Page::Source;
+                        match kept {
+                            Some(kept) => {
+                                format!("RESTORED VERSION {number}. KEPT YOUR CHANGES AS {kept}.")
+                            }
+                            None => format!("RESTORED VERSION {number}"),
+                        }
+                    }
+                    Err(_) => "NO ROOM TO KEEP YOUR CHANGES. REMOVE A VERSION FIRST.".into(),
+                }
             }
             Action::Remove => match list.remove_selected() {
-                Some(number) => format!("REMOVED VERSION {number}"),
-                None => "THE FACTORY VERSION STAYS".into(),
+                Removal::Factory => "THE FACTORY VERSION STAYS".into(),
+                Removal::Armed(number) => format!("PRESS DEL AGAIN TO REMOVE VERSION {number}"),
+                Removal::Removed(number) => format!("REMOVED VERSION {number}"),
             },
         };
     }
