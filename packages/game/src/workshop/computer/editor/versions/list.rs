@@ -66,6 +66,10 @@ impl VersionList {
         &self.versions
     }
 
+    pub(super) fn factory(&self) -> &Version {
+        &self.versions[0]
+    }
+
     pub(super) fn selected(&self) -> usize {
         self.selected
     }
