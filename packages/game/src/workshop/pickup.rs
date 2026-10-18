@@ -113,21 +113,27 @@ impl From<&Outcome> for Complaint {
 
 #[cfg(test)]
 mod tests {
-    use ld60_levels::{CATALOG, LevelSource, assemble, burn, initial_rom};
+    use ld60_levels::{CATALOG, GAME_SEED, LevelSource, Variant, assemble, burn, initial_rom};
 
     use super::*;
 
+    /// The job as the game loads it.
+    fn job(source: &LevelSource) -> Variant {
+        Variant::new(source, GAME_SEED).unwrap()
+    }
+
     fn buggy(source: &LevelSource) -> (Level, Rom) {
-        let level = source.load().unwrap();
-        let rom = initial_rom(&level, source.buggy).unwrap();
-        (level, rom)
+        let job = job(source);
+        let rom = initial_rom(&job.level, &job.buggy).unwrap();
+        (job.level, rom)
     }
 
     fn fixed(source: &LevelSource) -> (Level, Rom) {
-        let (level, initial) = buggy(source);
-        let image = assemble(&level, source.fixed).unwrap().image;
-        let rom = burn(&level, &initial, image).unwrap();
-        (level, rom)
+        let job = job(source);
+        let initial = initial_rom(&job.level, &job.buggy).unwrap();
+        let image = assemble(&job.level, &job.fixed).unwrap().image;
+        let rom = burn(&job.level, &initial, image).unwrap();
+        (job.level, rom)
     }
 
     #[test]
