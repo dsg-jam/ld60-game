@@ -14,9 +14,11 @@ mod errata;
 mod isa;
 mod op;
 pub mod ports;
+mod revision;
 
-pub use chip::{ChipInfo, DateCode, Revision};
+pub use chip::{ChipInfo, DateCode};
 pub use cpu::{Cpu, RAM_LEN, ROM_LEN};
 pub use errata::{Errata, Erratum};
 pub use isa::Calco;
 pub use op::{Addr, Cond, Op};
+pub use revision::Revision;

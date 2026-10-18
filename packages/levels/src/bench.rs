@@ -4,7 +4,7 @@ use ld60_machine::{Assembly, Image};
 use crate::{Level, LevelError};
 
 pub fn assemble(level: &Level, source: &str) -> Result<Assembly, LevelError> {
-    Ok(level.chip.isa().isa().assemble(source)?)
+    Ok(level.chip.isa().assemble(source)?)
 }
 
 /// The ROM as the customer brings it in: the buggy firmware plus ROM damage.

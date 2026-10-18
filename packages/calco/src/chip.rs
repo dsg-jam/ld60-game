@@ -1,21 +1,6 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Revision {
-    A,
-    B,
-}
-
-impl Revision {
-    /// Value returned by `IN REV`.
-    pub fn id(self) -> u8 {
-        match self {
-            Self::A => 0x10,
-            Self::B => 0x20,
-        }
-    }
-}
+use crate::Revision;
 
 /// Year and week of manufacture, printed on the chip as `YYWW`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,6 +1,9 @@
-use ld60_asm::{Encoder, Instruction, Labels, Operand};
+use std::fmt;
 
-use crate::{Addr, Cond, Op, ROM_LEN, ports};
+use ld60_asm::{Encoder, Instruction, Labels, Operand};
+use ld60_machine::Isa;
+
+use crate::{Addr, Cond, Op, ROM_LEN, Revision, ports};
 
 pub(crate) const MNEMONICS: &[&str] = &[
     "NOP", "HLT", "RET", "SWP", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI",
@@ -10,7 +13,13 @@ pub(crate) const MNEMONICS: &[&str] = &[
 const IN_PORTS: &[(&str, u8)] = &[("KEY", ports::KEY), ("REV", ports::REV)];
 const OUT_PORTS: &[(&str, u8)] = &[("ANN", ports::ANN)];
 
-pub(crate) struct CalcoEncoder;
+pub(crate) struct CalcoEncoder(pub(crate) Revision);
+
+impl CalcoEncoder {
+    fn unsupported(&self, what: impl fmt::Display) -> String {
+        format!("'{what}' is not supported by {}", self.0.isa().name())
+    }
+}
 
 impl Encoder for CalcoEncoder {
     fn word_bits(&self) -> u8 {
@@ -22,15 +31,24 @@ impl Encoder for CalcoEncoder {
     }
 
     fn size(&self, instruction: &Instruction) -> Result<usize, String> {
-        match instruction.mnemonic.as_str() {
+        let m = instruction.mnemonic.as_str();
+        if !MNEMONICS.contains(&m) {
+            return Err(format!("unknown mnemonic '{m}'"));
+        }
+        if !self.0.mnemonics().contains(&m) {
+            return Err(self.unsupported(m));
+        }
+        match m {
             "LDI" | "CPI" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "DJNZ" => Ok(2),
-            m if MNEMONICS.contains(&m) => Ok(1),
-            m => Err(format!("unknown mnemonic '{m}'")),
+            _ => Ok(1),
         }
     }
 
     fn encode(&self, instruction: &Instruction, labels: &Labels) -> Result<Vec<u16>, String> {
         let op = to_op(instruction, labels)?;
+        if !self.0.supports(op) {
+            return Err(self.unsupported(op));
+        }
         Ok(op.encode().into_iter().map(u16::from).collect())
     }
 }

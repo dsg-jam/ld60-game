@@ -2,7 +2,7 @@
     id: "summa6-03",
     title: "The 9 key",
     device: Summa6,
-    chip: Calco((revision: A, date_code: 7630)),
+    chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-03911",
     remarks: [
         "9 key contact measured, fine.",

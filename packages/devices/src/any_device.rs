@@ -68,10 +68,10 @@ pub enum AnyDevice {
 
 impl AnyDevice {
     pub fn new(kind: DeviceKind, chip: ChipSpec, rom: Rom) -> Result<Self, DeviceError> {
-        if chip.isa() != kind.isa() {
+        if chip.isa_kind() != kind.isa() {
             return Err(DeviceError::ChipMismatch {
                 device: kind,
-                chip: chip.isa(),
+                chip: chip.isa_kind(),
             });
         }
         let ChipSpec::Calco(info) = chip;
@@ -84,8 +84,8 @@ impl Device for AnyDevice {
         each!(self, d => d.kind())
     }
 
-    fn isa(&self) -> IsaKind {
-        each!(self, d => d.isa())
+    fn chip(&self) -> ChipSpec {
+        each!(self, d => d.chip())
     }
 
     fn cpu(&self) -> &dyn Cpu {

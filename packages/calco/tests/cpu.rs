@@ -60,7 +60,7 @@ f3:     RET
 #[test]
 fn in_rev_reports_the_revision() {
     let (cpu, _) = run("IN REV\nHLT", LATE, 100);
-    assert_eq!(cpu.a(), 0x10);
+    assert_eq!(cpu.a(), 0x20);
 }
 
 #[test]

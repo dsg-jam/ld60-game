@@ -2,7 +2,7 @@ use ld60_calco::{ChipInfo, ROM_LEN, ports};
 use ld60_machine::{Bus, Cpu as _, Step};
 
 use crate::rng::Rng;
-use crate::{Device, DeviceError, DeviceKind, IsaKind, Readout, Rom};
+use crate::{ChipSpec, Device, DeviceError, DeviceKind, Readout, Rom};
 
 /// A device built around a CalCo chip. The kind decides the keys and the
 /// display.
@@ -69,8 +69,8 @@ impl Device for CalcoDevice {
         self.kind
     }
 
-    fn isa(&self) -> IsaKind {
-        IsaKind::Calco
+    fn chip(&self) -> ChipSpec {
+        ChipSpec::Calco(self.cpu.chip())
     }
 
     fn cpu(&self) -> &dyn ld60_machine::Cpu {

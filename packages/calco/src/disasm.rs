@@ -2,7 +2,7 @@ use std::fmt;
 
 use ld60_machine::{DisasmLine, Image};
 
-use crate::{Addr, Op, ports};
+use crate::{Addr, Op, Revision, ports};
 
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -48,12 +48,12 @@ impl fmt::Display for Addr {
     }
 }
 
-pub(crate) fn disassemble(image: &Image) -> Vec<DisasmLine> {
+pub(crate) fn disassemble(image: &Image, revision: Revision) -> Vec<DisasmLine> {
     let mut lines = Vec::new();
     let mut addr = 0;
     while addr < image.len() {
         let byte = |a: usize| image.get(a % image.len()) as u8;
-        let op = match Op::decode(byte(addr), byte(addr + 1)) {
+        let op = match revision.decode(byte(addr), byte(addr + 1)) {
             op if addr + usize::from(op.size()) > image.len() => Op::Reserved(byte(addr)),
             op => op,
         };

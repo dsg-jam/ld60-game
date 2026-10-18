@@ -130,7 +130,10 @@ impl ld60_machine::Cpu for Cpu {
     }
 
     fn step(&mut self, bus: &mut dyn Bus) -> Step {
-        let op = Op::decode(self.fetch(bus, 0), self.fetch(bus, 1));
+        let op = self
+            .chip
+            .revision
+            .decode(self.fetch(bus, 0), self.fetch(bus, 1));
         let next = self.pc.wrapping_add(op.size());
         let mut target = next;
         match op {
