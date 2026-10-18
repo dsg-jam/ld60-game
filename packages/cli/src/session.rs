@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
-use devices::{AnyDevice, Device, MAX_STEPS, Rom};
-use levels::{Level, LevelSource, Report, TEST_SEEDS, assemble, burn, device, initial_rom};
-use machine::{Assembly, Step};
+use ld60_devices::{AnyDevice, Device, MAX_STEPS, Rom};
+use ld60_levels::{Level, LevelSource, Report, TEST_SEEDS, assemble, burn, device, initial_rom};
+use ld60_machine::{Assembly, Step};
 
 /// A level on the bench: the device, the firmware it runs and the breakpoints.
 pub struct Session {
@@ -91,7 +91,11 @@ impl Session {
     }
 
     pub fn test(&self) -> crate::Result<Report> {
-        Ok(levels::run(&self.level, self.device.rom(), TEST_SEEDS)?)
+        Ok(ld60_levels::run(
+            &self.level,
+            self.device.rom(),
+            TEST_SEEDS,
+        )?)
     }
 
     pub fn label(&self, name: &str) -> Option<u16> {

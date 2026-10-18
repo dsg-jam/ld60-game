@@ -1,5 +1,5 @@
-use calco::{ChipInfo, ROM_LEN, ports};
-use machine::{Bus, Cpu as _, Step};
+use ld60_calco::{ChipInfo, ROM_LEN, ports};
+use ld60_machine::{Bus, Cpu as _, Step};
 
 use crate::rng::Rng;
 use crate::{Device, DeviceError, DeviceKind, IsaKind, Readout, Rom};
@@ -26,7 +26,7 @@ const DISPLAY_CELLS: std::ops::RangeInclusive<usize> = 1..=6;
 /// 6-digit adding machine with a CalCo chip.
 #[derive(Clone, Debug)]
 pub struct Summa6 {
-    cpu: calco::Cpu,
+    cpu: ld60_calco::Cpu,
     board: Board,
 }
 
@@ -70,7 +70,7 @@ impl Summa6 {
             });
         }
         Ok(Self {
-            cpu: calco::Cpu::new(chip),
+            cpu: ld60_calco::Cpu::new(chip),
             board: Board {
                 rom,
                 key: None,
@@ -89,11 +89,11 @@ impl Device for Summa6 {
         IsaKind::Calco
     }
 
-    fn cpu(&self) -> &dyn machine::Cpu {
+    fn cpu(&self) -> &dyn ld60_machine::Cpu {
         &self.cpu
     }
 
-    fn cpu_mut(&mut self) -> &mut dyn machine::Cpu {
+    fn cpu_mut(&mut self) -> &mut dyn ld60_machine::Cpu {
         &mut self.cpu
     }
 

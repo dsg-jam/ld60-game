@@ -1,6 +1,6 @@
 use std::fmt;
 
-use devices::{AnyDevice, Device, MAX_STEPS, Rom, RunError};
+use ld60_devices::{AnyDevice, Device, MAX_STEPS, Rom, RunError};
 
 use crate::{Level, LevelError, TestCase, device};
 

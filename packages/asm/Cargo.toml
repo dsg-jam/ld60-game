@@ -1,5 +1,5 @@
 [package]
-name = "asm"
+name = "ld60-asm"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,7 +10,7 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
-machine = { workspace = true }
+ld60-machine = { workspace = true }
 
 [lints]
 workspace = true

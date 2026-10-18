@@ -1,6 +1,6 @@
-use calco::{Calco, ChipInfo, DateCode, Revision};
-use devices::{AnyDevice, ChipSpec, Device, DeviceKind, MAX_STEPS, Rom, RomKind, RunError};
-use machine::Isa;
+use ld60_calco::{Calco, ChipInfo, DateCode, Revision};
+use ld60_devices::{AnyDevice, ChipSpec, Device, DeviceKind, MAX_STEPS, Rom, RomKind, RunError};
+use ld60_machine::Isa;
 
 const CHIP: ChipSpec = ChipSpec::Calco(ChipInfo {
     revision: Revision::A,

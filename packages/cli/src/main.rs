@@ -13,11 +13,11 @@ fn main() -> ExitCode {
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     let mut out = io::stdout().lock();
     let result = match args.as_slice() {
-        ["list"] => cli::list::run(&mut out).map(|()| true),
-        ["check", level] => cli::check::run(&mut out, level, None),
-        ["check", level, file] => cli::check::run(&mut out, level, Some(file)),
+        ["list"] => ld60_cli::list::run(&mut out).map(|()| true),
+        ["check", level] => ld60_cli::check::run(&mut out, level, None),
+        ["check", level, file] => ld60_cli::check::run(&mut out, level, Some(file)),
         ["play", level, options @ ..] => play(&mut out, level, options).map(|()| true),
-        ["asm", file] => cli::listing::run(&mut out, file).map(|()| true),
+        ["asm", file] => ld60_cli::listing::run(&mut out, file).map(|()| true),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -41,9 +41,9 @@ fn is_broken_pipe(error: &(dyn std::error::Error + 'static)) -> bool {
         .is_some_and(|e| e.kind() == io::ErrorKind::BrokenPipe)
 }
 
-fn play(out: &mut impl Write, level: &str, options: &[&str]) -> cli::Result<()> {
+fn play(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result<()> {
     let mut fixed = false;
-    let mut seed = cli::seed::random();
+    let mut seed = ld60_cli::seed::random();
     let mut rest = options.iter();
     while let Some(&option) = rest.next() {
         match option {
@@ -55,6 +55,6 @@ fn play(out: &mut impl Write, level: &str, options: &[&str]) -> cli::Result<()> 
             other => return Err(format!("unknown option '{other}'").into()),
         }
     }
-    let mut session = cli::Session::new(cli::find_level(level)?, fixed, seed)?;
-    cli::play::run(&mut session, io::stdin().lock(), out)
+    let mut session = ld60_cli::Session::new(ld60_cli::find_level(level)?, fixed, seed)?;
+    ld60_cli::play::run(&mut session, io::stdin().lock(), out)
 }

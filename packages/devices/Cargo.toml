@@ -1,5 +1,5 @@
 [package]
-name = "devices"
+name = "ld60-devices"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,11 +10,11 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [features]
-serde = ["dep:serde", "calco/serde", "machine/serde"]
+serde = ["dep:serde", "ld60-calco/serde", "ld60-machine/serde"]
 
 [dependencies]
-calco = { workspace = true }
-machine = { workspace = true }
+ld60-calco = { workspace = true }
+ld60-machine = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 
 [lints]

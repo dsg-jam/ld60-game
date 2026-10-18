@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use devices::IsaKind;
+use ld60_devices::IsaKind;
 
 use crate::render::hex_words;
 

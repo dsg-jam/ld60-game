@@ -1,9 +1,9 @@
-use cli::{Session, find_level};
+use ld60_cli::{Session, find_level};
 
 fn play(level: &str, fixed: bool, input: &str) -> String {
     let mut session = Session::new(find_level(level).unwrap(), fixed, 1).unwrap();
     let mut out = Vec::new();
-    cli::play::run(&mut session, input.as_bytes(), &mut out).unwrap();
+    ld60_cli::play::run(&mut session, input.as_bytes(), &mut out).unwrap();
     String::from_utf8(out).unwrap()
 }
 

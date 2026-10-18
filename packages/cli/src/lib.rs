@@ -10,7 +10,7 @@ mod session;
 
 pub use session::{Session, Stop};
 
-use levels::{CATALOG, LevelSource};
+use ld60_levels::{CATALOG, LevelSource};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

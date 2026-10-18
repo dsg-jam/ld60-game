@@ -1,5 +1,5 @@
-use devices::{ProgramError, Rom, RomKind, can_program};
-use machine::Image;
+use ld60_devices::{ProgramError, Rom, RomKind, can_program};
+use ld60_machine::Image;
 
 fn image(words: &[u16]) -> Image {
     let mut image = Image::blank(words.len(), 8);

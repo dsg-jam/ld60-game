@@ -1,4 +1,4 @@
-use devices::{ChipSpec, DeviceKind, Fault, RomKind};
+use ld60_devices::{ChipSpec, DeviceKind, Fault, RomKind};
 use serde::{Deserialize, Serialize};
 
 use crate::LevelError;

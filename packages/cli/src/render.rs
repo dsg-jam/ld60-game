@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
-use devices::Device;
-use machine::DisasmLine;
+use ld60_devices::Device;
+use ld60_machine::DisasmLine;
 
 use crate::{Session, Stop};
 

@@ -1,5 +1,5 @@
-use devices::{AnyDevice, Device, Fault, ProgramError, Rom};
-use machine::{Assembly, Image};
+use ld60_devices::{AnyDevice, Device, Fault, ProgramError, Rom};
+use ld60_machine::{Assembly, Image};
 
 use crate::{Level, LevelError};
 

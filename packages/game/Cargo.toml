@@ -1,5 +1,5 @@
 [package]
-name = "game"
+name = "ld60-game"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

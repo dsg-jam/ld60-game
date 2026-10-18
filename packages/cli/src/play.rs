@@ -1,6 +1,6 @@
 use std::io::{BufRead, Write};
 
-use machine::Step;
+use ld60_machine::Step;
 
 use crate::render;
 use crate::{Session, Stop};

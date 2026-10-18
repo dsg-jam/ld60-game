@@ -1,4 +1,4 @@
-use machine::{Image, Ram, StuckBit};
+use ld60_machine::{Image, Ram, StuckBit};
 
 #[test]
 fn stuck_bits_override_writes() {

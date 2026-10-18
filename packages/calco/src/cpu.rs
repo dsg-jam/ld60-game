@@ -1,4 +1,4 @@
-use machine::{Bus, Ram, Register, Step};
+use ld60_machine::{Bus, Ram, Register, Step};
 
 use crate::{Addr, ChipInfo, Cond, Errata, Erratum, Op, ports};
 
@@ -120,7 +120,7 @@ impl Cpu {
     }
 }
 
-impl machine::Cpu for Cpu {
+impl ld60_machine::Cpu for Cpu {
     fn reset(&mut self) {
         self.a = 0;
         self.b = 0;

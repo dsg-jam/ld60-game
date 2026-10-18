@@ -1,4 +1,4 @@
-use machine::Image;
+use ld60_machine::Image;
 
 use crate::ProgramError;
 

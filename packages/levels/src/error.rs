@@ -1,7 +1,7 @@
 use std::fmt;
 
-use devices::DeviceError;
-use machine::AsmError;
+use ld60_devices::DeviceError;
+use ld60_machine::AsmError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LevelError {

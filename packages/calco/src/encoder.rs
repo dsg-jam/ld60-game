@@ -1,4 +1,4 @@
-use asm::{Encoder, Instruction, Labels, Operand};
+use ld60_asm::{Encoder, Instruction, Labels, Operand};
 
 use crate::{Addr, Cond, Op, ROM_LEN, ports};
 

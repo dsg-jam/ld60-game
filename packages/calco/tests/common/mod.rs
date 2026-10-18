@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use calco::{Calco, ChipInfo, Cpu, DateCode, Revision};
-use machine::{Bus, Cpu as _, Image, Isa, Step};
+use ld60_calco::{Calco, ChipInfo, Cpu, DateCode, Revision};
+use ld60_machine::{Bus, Cpu as _, Image, Isa, Step};
 
 pub(crate) const LATE: ChipInfo = ChipInfo {
     revision: Revision::A,

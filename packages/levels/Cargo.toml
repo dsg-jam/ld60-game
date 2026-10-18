@@ -1,5 +1,5 @@
 [package]
-name = "levels"
+name = "ld60-levels"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,8 +10,8 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
-devices = { workspace = true, features = ["serde"] }
-machine = { workspace = true }
+ld60-devices = { workspace = true, features = ["serde"] }
+ld60-machine = { workspace = true }
 ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
 

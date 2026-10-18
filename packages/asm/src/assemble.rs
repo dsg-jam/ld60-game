@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
-use machine::{AsmError, Assembly, Image, SourceLine};
+use ld60_machine::{AsmError, Assembly, Image, SourceLine};
 
 use crate::Encoder;
 use crate::Labels;

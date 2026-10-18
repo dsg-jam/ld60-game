@@ -1,4 +1,4 @@
-use machine::{AsmError, Assembly, DisasmLine, Image, Isa};
+use ld60_machine::{AsmError, Assembly, DisasmLine, Image, Isa};
 
 use crate::disasm::disassemble;
 use crate::encoder::{CalcoEncoder, MNEMONICS};
@@ -15,7 +15,7 @@ impl Isa for Calco {
     }
 
     fn assemble(&self, source: &str) -> Result<Assembly, Vec<AsmError>> {
-        asm::assemble(source, &CalcoEncoder)
+        ld60_asm::assemble(source, &CalcoEncoder)
     }
 
     fn disassemble(&self, image: &Image) -> Vec<DisasmLine> {

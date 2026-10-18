@@ -3,7 +3,7 @@ use crate::IsaKind;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ChipSpec {
-    Calco(calco::ChipInfo),
+    Calco(ld60_calco::ChipInfo),
 }
 
 impl ChipSpec {

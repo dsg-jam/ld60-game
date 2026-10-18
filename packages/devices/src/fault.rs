@@ -1,4 +1,4 @@
-use machine::StuckBit;
+use ld60_machine::StuckBit;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

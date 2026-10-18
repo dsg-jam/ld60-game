@@ -13,11 +13,11 @@ readme = "README.md"
 publish = false
 
 [workspace.dependencies]
-asm = { path = "packages/asm" }
-calco = { path = "packages/calco" }
-devices = { path = "packages/devices" }
-levels = { path = "packages/levels" }
-machine = { path = "packages/machine" }
+ld60-asm = { path = "packages/asm" }
+ld60-calco = { path = "packages/calco" }
+ld60-devices = { path = "packages/devices" }
+ld60-levels = { path = "packages/levels" }
+ld60-machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
 ron = { version = "0.12.2", default-features = false }

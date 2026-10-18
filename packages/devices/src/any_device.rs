@@ -1,4 +1,4 @@
-use machine::{Cpu, Step};
+use ld60_machine::{Cpu, Step};
 
 use crate::{ChipSpec, Device, DeviceError, IsaKind, Readout, Rom, Summa6};
 

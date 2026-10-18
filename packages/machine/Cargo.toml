@@ -1,5 +1,5 @@
 [package]
-name = "machine"
+name = "ld60-machine"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use machine::{DisasmLine, Image};
+use ld60_machine::{DisasmLine, Image};
 
 use crate::{Addr, Op, ports};
 

@@ -1,7 +1,7 @@
 mod common;
 
 use common::{EARLY, LATE, run};
-use machine::Cpu as _;
+use ld60_machine::Cpu as _;
 
 #[test]
 fn da_carries_to_the_next_digit() {

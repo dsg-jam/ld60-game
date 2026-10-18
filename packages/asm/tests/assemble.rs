@@ -1,4 +1,4 @@
-use asm::{Encoder, Instruction, Labels, assemble};
+use ld60_asm::{Encoder, Instruction, Labels, assemble};
 
 struct Toy;
 

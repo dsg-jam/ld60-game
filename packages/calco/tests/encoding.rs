@@ -1,7 +1,7 @@
 mod common;
 
-use calco::{Calco, Op};
-use machine::{Image, Isa};
+use ld60_calco::{Calco, Op};
+use ld60_machine::{Image, Isa};
 
 #[test]
 fn every_opcode_encodes_back_to_itself() {
@@ -18,7 +18,7 @@ fn every_opcode_encodes_back_to_itself() {
 
 #[test]
 fn disassembly_reassembles_to_the_same_image() {
-    let mut image = Image::blank(calco::ROM_LEN, 8);
+    let mut image = Image::blank(ld60_calco::ROM_LEN, 8);
     for addr in 0..image.len() {
         image.set(addr, addr as u16);
     }

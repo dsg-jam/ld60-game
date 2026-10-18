@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use levels::{TEST_SEEDS, assemble, burn, initial_rom};
+use ld60_levels::{TEST_SEEDS, assemble, burn, initial_rom};
 
 use crate::find_level;
 
@@ -16,7 +16,7 @@ pub fn run(out: &mut impl Write, level: &str, file: Option<&str>) -> crate::Resu
             burn(&level, &initial, image)?
         }
     };
-    let report = levels::run(&level, &rom, TEST_SEEDS)?;
+    let report = ld60_levels::run(&level, &rom, TEST_SEEDS)?;
     write!(out, "{report}")?;
     Ok(report.passed())
 }

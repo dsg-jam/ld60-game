@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use levels::CATALOG;
+use ld60_levels::CATALOG;
 
 pub fn run(out: &mut impl Write) -> crate::Result<()> {
     for source in CATALOG {

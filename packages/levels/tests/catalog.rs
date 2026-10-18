@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use levels::{CATALOG, Level, LevelSource, TEST_SEEDS, assemble, burn, initial_rom, run};
+use ld60_levels::{CATALOG, Level, LevelSource, TEST_SEEDS, assemble, burn, initial_rom, run};
 
 fn verify(source: &LevelSource) -> Result<Level, String> {
     let level = source.load().map_err(|e| e.to_string())?;
