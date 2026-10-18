@@ -5,9 +5,10 @@ mod monitor;
 use bevy::{mesh::MeshBuilder, prelude::*};
 
 use self::editor::Editor;
-use self::keyboard::{KeyCap, Keyboard};
+use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use crate::camera::{Focus, FocusTarget};
+use crate::keypad::PressableKey;
 use crate::layout::Block;
 use crate::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
 
@@ -24,14 +25,13 @@ pub(crate) struct ComputerPlugin;
 impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(editor::EditorPlugin)
-            .add_systems(Update, KeyCap::follow_input)
             .add_systems(
                 OnEnter(Focus::Computer),
-                (Computer::activate_screen::<true>, Editor::take_focus),
+                (Computer::activate::<true>, Editor::take_focus),
             )
             .add_systems(
                 OnExit(Focus::Computer),
-                (Computer::activate_screen::<false>, Editor::release_focus),
+                (Computer::activate::<false>, Editor::release_focus),
             )
             .add_observer(Computer::on_add);
     }
@@ -43,11 +43,17 @@ impl Plugin for ComputerPlugin {
 pub(crate) struct Computer;
 
 impl Computer {
-    fn activate_screen<const ACTIVE: bool>(
+    /// The screen and the keyboard only react while the player sits at the
+    /// computer.
+    fn activate<const ACTIVE: bool>(
         mut screens: Query<&mut ScreenSurface, With<ComputerScreen>>,
+        mut keys: Query<&mut PressableKey, With<KeyboardKey>>,
     ) {
         for mut screen in &mut screens {
             screen.active = ACTIVE;
+        }
+        for mut key in &mut keys {
+            key.active = ACTIVE;
         }
     }
 
@@ -61,8 +67,7 @@ impl Computer {
         let layout = ComputerLayout::new();
         let canvas = UiCanvas::spawn(&mut commands, &mut images, editor::CANVAS_SIZE);
         Editor::spawn(&mut commands, canvas.camera);
-        let labels = UiCanvas::spawn(&mut commands, &mut images, keyboard::LABELS_SIZE);
-        Keyboard::spawn_labels(&mut commands, labels.camera);
+        let labels = layout.keyboard.spawn_labels(&mut commands, &mut images);
 
         let glass = CrtGlass {
             size: monitor::GLASS_SIZE,
@@ -88,7 +93,7 @@ impl Computer {
                 layout.keyboard.spawn(
                     parent,
                     Transform::from_translation(layout.keyboard_placement.bottom()),
-                    labels.image,
+                    labels,
                 );
             });
     }
@@ -109,12 +114,13 @@ struct ComputerLayout {
 impl ComputerLayout {
     fn new() -> Self {
         let monitor = Monitor::new();
-        let keyboard_placement = Block::new(keyboard::BASE_SIZE)
+        let keyboard = Keyboard::new();
+        let keyboard_placement = Block::new(keyboard.base.size)
             .in_front_of(&monitor.body)
             .translated(Vec3::Z * KEYBOARD_GAP);
         Self {
             monitor,
-            keyboard: Keyboard::new(),
+            keyboard,
             keyboard_placement,
         }
     }

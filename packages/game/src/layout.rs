@@ -69,8 +69,13 @@ impl Block {
     /// Rests the block on the top face of `other` at `spot`, see
     /// [`Block::top_spot`].
     pub(crate) fn resting_on(self, other: &Block, spot: Vec2) -> Self {
+        self.standing_at(other.top_spot(spot))
+    }
+
+    /// Places the block so the center of its bottom face is at `point`.
+    pub(crate) fn standing_at(self, point: Vec3) -> Self {
         Self {
-            center: other.top_spot(spot) + Vec3::Y * self.size.y / 2.0,
+            center: point + Vec3::Y * self.size.y / 2.0,
             ..self
         }
     }

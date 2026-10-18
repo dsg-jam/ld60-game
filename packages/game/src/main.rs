@@ -11,6 +11,7 @@ mod computer;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod desk;
+mod keypad;
 mod lamp;
 mod layout;
 mod look;
@@ -46,6 +47,7 @@ fn main() -> AppExit {
     app.add_plugins((
         MeshPickingPlugin,
         shape::ShapePlugin,
+        keypad::KeypadPlugin,
         screen::ScreenPlugin,
         camera::CameraPlugin,
         look::LookPlugin,
