@@ -29,10 +29,7 @@ impl Plugin for CameraPlugin {
         // Deferred shading, so many lights stay cheap and screen space
         // effects get the normals and roughness they need.
         app.insert_resource(DefaultOpaqueRendererMethod::deferred())
-            .add_systems(
-                Update,
-                PlayerCamera::follow.after(Focused::leave_on_right_click),
-            );
+            .add_systems(Update, PlayerCamera::follow.after(Focused::leave_on_input));
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(Update, CameraOverride::apply.after(PlayerCamera::follow))

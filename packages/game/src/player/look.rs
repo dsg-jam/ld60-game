@@ -16,6 +16,7 @@ use super::{
     cursor,
     focus::{self, Clickable, Focus},
 };
+use crate::menu::AppState;
 
 const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.
@@ -145,17 +146,19 @@ impl Crosshair {
 
 /// Locks the cursor while looking around and frees it otherwise.
 ///
-/// Escape always frees the cursor. Browsers only allow the lock after a
-/// click, so a click in the desk view locks it again.
+/// Browsers only allow the lock after a click, so a click in the desk view
+/// locks it again.
 fn update_cursor(
+    app: Res<State<AppState>>,
     state: Res<State<Focus>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    keys: Res<ButtonInput<KeyCode>>,
     mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    let desk = *state.get() == Focus::Desk;
-    let free = keys.just_pressed(KeyCode::Escape) || (!desk && state.is_changed());
-    let lock = desk && (state.is_changed() || mouse.just_pressed(MouseButton::Left));
+    let playing = *app.get() == AppState::Playing;
+    let desk = playing && *state.get() == Focus::Desk;
+    let changed = app.is_changed() || state.is_changed();
+    let free = !desk && changed;
+    let lock = desk && (changed || mouse.just_pressed(MouseButton::Left));
     if free {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
