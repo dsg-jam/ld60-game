@@ -106,16 +106,25 @@ impl Kind {
         Sprite::dot(diameter, DOT_OUTLINE, DOT_FILL, DOT_INK)
     }
 
+    fn diameter(self) -> Option<f32> {
+        match self {
+            Self::Dot => Some(DOT_SIZE),
+            Self::HoverDot => Some(DOT_HOVER_SIZE),
+            _ => None,
+        }
+    }
+
+    /// The web skips crossfades, since Firefox miscolors their translucent
+    /// frames.
+    fn animates_to(self, to: Self) -> bool {
+        cfg!(not(target_family = "wasm")) || (self.diameter().is_some() && to.diameter().is_some())
+    }
+
     /// The image `t` of the way from `self` to `to`.
     ///
     /// Dots change size instead of fading.
     fn between(self, to: Self, t: f32) -> Sprite {
-        let diameter = |kind| match kind {
-            Self::Dot => Some(DOT_SIZE),
-            Self::HoverDot => Some(DOT_HOVER_SIZE),
-            _ => None,
-        };
-        match (diameter(self), diameter(to)) {
+        match (self.diameter(), to.diameter()) {
             (Some(from), Some(to)) => Self::dot(from + (to - from) * t),
             _ => self.sprite().blend(&to.sprite(), t),
         }
@@ -144,7 +153,10 @@ impl Cursors {
             .collect();
         let mut transitions = HashMap::default();
         for from in Kind::ALL {
-            for to in Kind::ALL.into_iter().filter(|&to| to != from) {
+            for to in Kind::ALL
+                .into_iter()
+                .filter(|&to| to != from && from.animates_to(to))
+            {
                 let frames = (1..=TRANSITION_FRAMES)
                     .map(|i| {
                         let t = i as f32 / (TRANSITION_FRAMES + 1) as f32;
