@@ -44,6 +44,12 @@ pub(crate) enum Finish {
     Grip = 9,
     /// Metal sheet with rows of round holes, like a speaker grille.
     Perforated = 10,
+    /// Bare concrete, for pillars, curbs and sidewalks.
+    Concrete = 11,
+    /// Steel left out in the rain, rusted in patches.
+    Rust = 12,
+    /// A knotted rug lying flat, long along Z.
+    Rug = 13,
 }
 
 /// The shape a [`Finish`] covers, which decides where its edges wear.
@@ -92,18 +98,25 @@ impl Finish {
         form: Form,
         seed: f32,
     ) -> SurfaceMaterial {
+        let base = StandardMaterial {
+            base_color: color,
+            base_color_texture: texture,
+            perceptual_roughness: self.roughness(),
+            metallic: self.metallic(),
+            ..default()
+        };
+        self.over(base, form, seed)
+    }
+
+    /// Like [`Self::material`], over a `base` that sets more than the color,
+    /// like the gloss of car paint.
+    pub(crate) fn over(self, base: StandardMaterial, form: Form, seed: f32) -> SurfaceMaterial {
         let half_size = match form {
             Form::Box(size) | Form::Cylinder(size) => size / 2.0,
             Form::Freeform => Vec3::ZERO,
         };
         ExtendedMaterial {
-            base: StandardMaterial {
-                base_color: color,
-                base_color_texture: texture,
-                perceptual_roughness: self.roughness(),
-                metallic: self.metallic(),
-                ..default()
-            },
+            base,
             extension: Surface {
                 params: SurfaceParams {
                     half_size,
@@ -124,14 +137,14 @@ impl Finish {
             Self::Paint | Self::Grip => 0.6,
             Self::Wood | Self::Planks => 0.65,
             Self::Paper => 0.9,
-            Self::Plaster => 0.95,
-            Self::Fabric => 1.0,
+            Self::Plaster | Self::Concrete | Self::Rust => 0.95,
+            Self::Fabric | Self::Rug => 1.0,
         }
     }
 
     fn metallic(self) -> f32 {
         match self {
-            Self::Metal | Self::Perforated => 1.0,
+            Self::Metal | Self::Perforated | Self::Rust => 1.0,
             _ => 0.0,
         }
     }

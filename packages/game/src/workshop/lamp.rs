@@ -1,44 +1,86 @@
-use bevy::{light::NotShadowCaster, prelude::*};
+mod dust;
 
-use super::switch::LightSwitch;
+use bevy::{
+    asset::RenderAssetUsages,
+    light::{NotShadowCaster, VolumetricLight},
+    material::OpaqueRendererMethod,
+    mesh::{Indices, PrimitiveTopology},
+    picking::{events::PointerPress, pointer::PointerButton},
+    prelude::*,
+};
+
+use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
+use crate::player::focus::{Clickable, Focus};
 
 const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
 const POLE_SIZE: Vec3 = Vec3::new(0.016, 0.46, 0.016);
 const ARM_SIZE: Vec3 = Vec3::new(0.3, 0.016, 0.016);
-const SHADE_SIZE: Vec3 = Vec3::new(0.15, 0.09, 0.15);
-/// How far the bulb hangs below the shade.
-const BULB_DROP: f32 = 0.025;
+const SHADE_TOP: f32 = 0.04;
+const SHADE_BOTTOM: f32 = 0.08;
+const SHADE_HEIGHT: f32 = 0.12;
+const SHADE_SEGMENTS: u32 = 32;
+/// Light that shines through the fabric.
+const SHADE_TRANSMISSION: f32 = 0.15;
+const SOCKET: Vec3 = Vec3::new(0.026, 0.03, 0.026);
+const BULB_RADIUS: f32 = 0.024;
+/// The bulb hangs from the socket, inside the shade.
+const BULB_DROP: f32 = SOCKET.y + BULB_RADIUS * 0.8;
+const FILAMENT_RADIUS: f32 = 0.006;
+const FILAMENT_WIRE: f32 = 0.0008;
+const FILAMENT_GLOW: f32 = 400.0;
+/// The frosted glass glows a little around the filament.
+const GLASS_GLOW: f32 = 6.0;
 
 const LIGHT_COLOR: Color = Color::srgb(1.0, 0.85, 0.65);
 const LIGHT_INTENSITY: f32 = 6_000.0;
 const LIGHT_RANGE: f32 = 4.0;
-/// Much smaller than the default, so thin walls cast solid shadows.
-const SHADOW_DEPTH_BIAS: f32 = 0.01;
-const SHADOW_NORMAL_BIAS: f32 = 0.3;
-const BULB_RADIUS: f32 = 0.022;
-/// Bright enough to bloom.
-const BULB_GLOW: LinearRgba = LinearRgba::rgb(12.0, 9.0, 6.0);
+/// Share of the light cone at full strength, before it fades out at the
+/// rim of the shade.
+const SOFT_EDGE: f32 = 0.75;
+/// Soft light that comes through the shade all around.
+const FILL_INTENSITY: f32 = 1_200.0;
 
 const SHADE: Color = Color::srgb_u8(0xe0, 0x8a, 0x4f);
 const METAL: Color = Color::srgb_u8(0x7d, 0x86, 0x8c);
+const GLASS: Color = Color::srgba(1.0, 0.98, 0.95, 0.2);
+const TUNGSTEN: Color = Color::srgb_u8(0x30, 0x2c, 0x28);
 
 pub(crate) struct LampPlugin;
 
 impl Plugin for LampPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(Lamp::on_add);
+        app.add_plugins(dust::DustPlugin)
+            .add_observer(Lamp::on_add)
+            .add_observer(Lamp::toggle_on_press);
     }
 }
 
-/// A desk lamp with its arm reaching towards +X.
-///
-/// Clicking it in the desk view switches it on or off.
+/// A desk lamp with its arm reaching towards +X. A click switches it.
 #[derive(Component, Debug)]
-#[require(Transform, Visibility)]
-pub(crate) struct Lamp;
+#[require(Transform, Visibility, Clickable)]
+pub(crate) struct Lamp {
+    on: bool,
+}
+
+impl Default for Lamp {
+    fn default() -> Self {
+        Self { on: true }
+    }
+}
+
+/// The light of a [`Lamp`], hidden while it is off.
+#[derive(Component, Debug)]
+struct LampLight;
+
+/// The parts of a [`Lamp`]'s bulb that glow while it is on.
+#[derive(Component, Debug)]
+struct Bulb {
+    glass: Handle<StandardMaterial>,
+    filament: Handle<StandardMaterial>,
+}
 
 impl Lamp {
     fn on_add(
@@ -52,48 +94,179 @@ impl Lamp {
         let arm = Block::new(ARM_SIZE)
             .on_top_of(&pole)
             .translated(Vec3::X * (ARM_SIZE.x - POLE_SIZE.x) / 2.0);
-        let shade = Block::new(SHADE_SIZE)
-            .below(&arm)
-            .translated(Vec3::X * (arm.max().x - SHADE_SIZE.x / 2.0));
-        let bulb = shade.bottom() - Vec3::Y * BULB_DROP;
+        let top = Vec3::new(arm.max().x - SHADE_BOTTOM, arm.min().y, 0.0);
+        let socket = Block::new(SOCKET).standing_at(top - Vec3::Y * SOCKET.y);
+        let bulb = top - Vec3::Y * BULB_DROP;
 
-        let bulb_material = materials.add(StandardMaterial {
-            base_color: LIGHT_COLOR,
-            emissive: BULB_GLOW,
+        let glass = materials.add(StandardMaterial {
+            base_color: GLASS,
+            alpha_mode: AlphaMode::Blend,
+            perceptual_roughness: 0.05,
             ..default()
         });
-        let mut light = Entity::PLACEHOLDER;
-        commands.entity(add.entity).with_children(|lamp| {
-            lamp.spawn(Shape::cylinder(&base, SHADE));
-            lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));
-            lamp.spawn((Shape::cuboid(&arm, METAL), Finish::Metal));
-            lamp.spawn((Shape::cylinder(&shade, SHADE), Finish::Fabric));
-            lamp.spawn((
-                Mesh3d(meshes.add(Sphere::new(BULB_RADIUS))),
-                MeshMaterial3d(bulb_material.clone()),
-                NotShadowCaster,
-                Transform::from_translation(bulb),
-            ));
-            light = lamp
-                .spawn((
+        let filament = materials.add(StandardMaterial {
+            base_color: TUNGSTEN,
+            metallic: 1.0,
+            ..default()
+        });
+        let parts = Bulb {
+            glass: glass.clone(),
+            filament: filament.clone(),
+        };
+        parts.light(true, &mut materials);
+        commands
+            .entity(add.entity)
+            .insert(parts)
+            .with_children(|lamp| {
+                lamp.spawn(Shape::cylinder(&base, SHADE));
+                lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));
+                lamp.spawn((Shape::cuboid(&arm, METAL), Finish::Metal));
+                lamp.spawn((
+                    Mesh3d(meshes.add(Self::shade())),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: SHADE,
+                        perceptual_roughness: 0.9,
+                        diffuse_transmission: SHADE_TRANSMISSION,
+                        double_sided: true,
+                        cull_mode: None,
+                        // Deferred rendering has no room for transmission.
+                        opaque_render_method: OpaqueRendererMethod::Forward,
+                        ..default()
+                    })),
+                    Transform::from_translation(top - Vec3::Y * SHADE_HEIGHT),
+                ));
+                lamp.spawn((Shape::cylinder(&socket, METAL), Finish::Metal));
+                lamp.spawn((
+                    Mesh3d(meshes.add(Sphere::new(BULB_RADIUS))),
+                    MeshMaterial3d(glass),
+                    Transform::from_translation(bulb),
+                    NotShadowCaster,
+                ));
+                lamp.spawn((
+                    Mesh3d(meshes.add(Torus::new(
+                        FILAMENT_RADIUS - FILAMENT_WIRE,
+                        FILAMENT_RADIUS + FILAMENT_WIRE,
+                    ))),
+                    MeshMaterial3d(filament),
+                    Transform::from_translation(bulb)
+                        .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+                    NotShadowCaster,
+                ));
+                lamp.spawn((
+                    LampLight,
                     PointLight {
-                        color: LIGHT_COLOR,
-                        intensity: LIGHT_INTENSITY,
+                        color: SHADE.mix(&LIGHT_COLOR, 0.5),
+                        intensity: FILL_INTENSITY,
                         range: LIGHT_RANGE,
-                        shadow_maps_enabled: true,
-                        shadow_depth_bias: SHADOW_DEPTH_BIAS,
-                        shadow_normal_bias: SHADOW_NORMAL_BIAS,
                         ..default()
                     },
                     Transform::from_translation(bulb),
-                ))
-                .id();
-        });
-        commands.entity(add.entity).insert(LightSwitch::new(
-            light,
-            LIGHT_INTENSITY,
-            bulb_material,
-            BULB_GLOW,
-        ));
+                ));
+                // Out of the bottom of the shade, as far as its rim lets it.
+                let rim = SHADE_HEIGHT - BULB_DROP;
+                let cone = (SHADE_BOTTOM / rim).atan();
+                lamp.spawn((
+                    LampLight,
+                    SpotLight {
+                        color: LIGHT_COLOR,
+                        intensity: LIGHT_INTENSITY,
+                        range: LIGHT_RANGE,
+                        radius: BULB_RADIUS,
+                        shadow_maps_enabled: true,
+                        // The shade is close to the bulb.
+                        shadow_map_near_z: SOCKET.y / 2.0,
+                        outer_angle: cone,
+                        inner_angle: cone * SOFT_EDGE,
+                        ..default()
+                    },
+                    VolumetricLight,
+                    Transform::from_translation(bulb).looking_to(Vec3::NEG_Y, Vec3::X),
+                ));
+            });
+    }
+
+    /// The fabric of the shade: a cone open at the bottom and closed at the
+    /// top, from Y = 0 up to its height.
+    fn shade() -> Mesh {
+        let mut positions = Vec::new();
+        let mut normals = Vec::new();
+        let mut indices = Vec::new();
+        // Outwards and slightly up, along the slanted side.
+        let slope = (SHADE_BOTTOM - SHADE_TOP) / SHADE_HEIGHT;
+        for index in 0..=SHADE_SEGMENTS {
+            let angle = index as f32 / SHADE_SEGMENTS as f32 * std::f32::consts::TAU;
+            let around = Vec3::new(angle.cos(), 0.0, angle.sin());
+            let normal = (around + Vec3::Y * slope).normalize();
+            positions.push(around * SHADE_BOTTOM);
+            positions.push(around * SHADE_TOP + Vec3::Y * SHADE_HEIGHT);
+            normals.extend([normal, normal]);
+        }
+        for index in 0..SHADE_SEGMENTS {
+            let i = index * 2;
+            indices.extend([i, i + 1, i + 2, i + 2, i + 1, i + 3]);
+        }
+        let center = positions.len() as u32;
+        positions.push(Vec3::Y * SHADE_HEIGHT);
+        normals.push(Vec3::Y);
+        for index in 0..=SHADE_SEGMENTS {
+            let angle = index as f32 / SHADE_SEGMENTS as f32 * std::f32::consts::TAU;
+            positions.push(
+                Vec3::new(angle.cos(), 0.0, angle.sin()) * SHADE_TOP + Vec3::Y * SHADE_HEIGHT,
+            );
+            normals.push(Vec3::Y);
+        }
+        for index in 0..SHADE_SEGMENTS {
+            indices.extend([center, center + index + 2, center + index + 1]);
+        }
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_indices(Indices::U32(indices))
+    }
+
+    fn toggle_on_press(
+        mut press: On<PointerPress>,
+        state: Res<State<Focus>>,
+        mut lamps: Query<(&mut Lamp, &Bulb, &Children)>,
+        mut lights: Query<&mut Visibility, With<LampLight>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+        mut commands: Commands,
+    ) {
+        if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
+            return;
+        }
+        let Ok((mut lamp, bulb, children)) = lamps.get_mut(press.entity) else {
+            return;
+        };
+        press.propagate(false);
+        lamp.on = !lamp.on;
+        for &child in children {
+            if let Ok(mut visibility) = lights.get_mut(child) {
+                visibility.toggle_inherited_hidden();
+            }
+        }
+        bulb.light(lamp.on, &mut materials);
+        commands.trigger(Play(Sound::Click));
+    }
+}
+
+impl Bulb {
+    fn light(&self, on: bool, materials: &mut Assets<StandardMaterial>) {
+        let glow = |strength: f32| {
+            if on {
+                LIGHT_COLOR.to_linear() * strength
+            } else {
+                LinearRgba::BLACK
+            }
+        };
+        if let Some(mut glass) = materials.get_mut(&self.glass) {
+            glass.emissive = glow(GLASS_GLOW);
+        }
+        if let Some(mut filament) = materials.get_mut(&self.filament) {
+            filament.emissive = glow(FILAMENT_GLOW);
+        }
     }
 }

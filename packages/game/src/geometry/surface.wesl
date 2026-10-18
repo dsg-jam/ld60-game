@@ -14,7 +14,7 @@ import bevy_pbr::render::{
 };
 import package::geometry::{
     bump::bumped,
-    floor::{plank, plank_color, plank_height},
+    floor::{plank, plank_color, plank_height, rug_color, rug_height},
     noise::{PI, hash1, noise, visible},
     wear::{dings, floor_marks, grip_ridge, rust, scratches, scuffs},
     wood::{fiber_sheen, wood},
@@ -44,6 +44,9 @@ const CERAMIC: u32 = 7u;
 const PLANKS: u32 = 8u;
 const GRIP: u32 = 9u;
 const PERFORATED: u32 = 10u;
+const CONCRETE: u32 = 11u;
+const RUST: u32 = 12u;
+const RUG: u32 = 13u;
 /// Matches `Form::code` in `surface.rs`.
 const BOX: u32 = 0u;
 const CYLINDER: u32 = 1u;
@@ -126,7 +129,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let s = surface.seed;
     let shaped = surface.form != FREEFORM;
     var uv = face_coords(p, local_n, h);
-    let flooring = surface.finish == PLANKS;
+    let flooring = surface.finish == PLANKS || surface.finish == RUG;
     if flooring {
         // Floors keep their own directions.
         uv = p.xz;
@@ -215,6 +218,23 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             rough = mix(rough * 1.25, rough * 0.6, ridge * w);
             bumps = 0.0005 * ridge;
         }
+        case CONCRETE: {
+            color *= mix(0.8, 1.1, noise(uv * 2.0, s)) * mix(0.9, 1.05, noise(uv * 25.0, s + 1.0));
+            pbr_input.material.reflectance = vec3<f32>(0.25);
+            let pores = step(0.93, hash1(floor(uv * 300.0), s)) * visible(0.0033, pixel);
+            bumps = -0.0006 * pores + 0.0006 * noise(uv * 40.0, s + 1.0);
+        }
+        case RUST: {
+            let patches = smoothstep(0.4, 0.75, noise(uv * 6.0, s) * 0.7 + noise(uv * 30.0, s + 1.0) * 0.3);
+            color = mix(color, RUST_COLOR * mix(0.7, 1.2, noise(uv * 50.0, s + 2.0)), patches);
+            metallic *= 1.0 - patches;
+            bumps = (0.0006 * noise(uv * 60.0, s + 2.0) + 0.0003 * noise(uv * 200.0, s + 3.0)) * visible(0.005, pixel);
+        }
+        case RUG: {
+            color = rug_color(uv, h.xz, color, s);
+            pbr_input.material.reflectance = vec3<f32>(0.2);
+            bumps = rug_height(uv, pixel);
+        }
         case PERFORATED: {
             let open = hole(uv, pixel);
             color = mix(color, color * CLOTH, open);
@@ -233,7 +253,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         let chipped = edge * step(0.45, noise(uv * 25.0, s + 7.0));
         color = mix(mix(color, color * 1.3 + 0.05, edge), PRIMER, chipped);
         rough = mix(rough, 0.6, chipped);
-    } else if surface.finish != FABRIC && surface.finish != PAPER {
+    } else if surface.finish != FABRIC && surface.finish != PAPER && surface.finish != RUG {
         color = mix(color, color * 1.3 + 0.05, edge * 0.7);
         rough = mix(rough, rough * 0.7, edge);
     }

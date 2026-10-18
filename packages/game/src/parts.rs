@@ -6,6 +6,7 @@ pub(crate) mod latch_button;
 pub(crate) mod lcd;
 pub(crate) mod paper;
 pub(crate) mod screen;
+pub(crate) mod script;
 pub(crate) mod sticker;
 
 use bevy::prelude::*;
