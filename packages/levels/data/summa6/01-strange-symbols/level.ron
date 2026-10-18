@@ -7,13 +7,13 @@
     chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-03158",
     remarks: [
-        "Display shows random segments after power on.",
-        "Factory firmware 1.0.",
+        "Angry squiggles in the little window every time it wakes up.",
+        "Still has its first thinking, version 1.0.",
     ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
-        name: "Bookkeeper",
-        complaint: "It shows strange symbols when I switch it on. They go away when I press C.",
+        name: "Zib, bookkeeper",
+        complaint: "When I wake it up, the little window shows angry squiggles. The C button chases them away.",
     ),
     tests: [
         (keys: "", display: "000000"),

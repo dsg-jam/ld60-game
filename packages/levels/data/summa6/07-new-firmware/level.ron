@@ -5,13 +5,13 @@
     chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-05102",
     remarks: [
-        "Firmware 1.1, installed by the sales office.",
-        "Hangs after +, - or =. Only a power cycle helps.",
+        "Thinking 1.1, put in by the trader's office.",
+        "Gets stuck after +, - or =. Only putting it to sleep and waking it up again helps.",
     ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
-        name: "Shop owner",
-        complaint: "The salesman installed firmware 1.1. It is shorter, he said. Now it freezes when I press +, - or =.",
+        name: "Brakka, shop keeper",
+        complaint: "A trader gave it new thinking, version 1.1. It is shorter, he said. Now it freezes when I press +, - or =.",
     ),
     tests: [
         (keys: "12+34=", display: "000046"),
