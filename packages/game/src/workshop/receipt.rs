@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_levels::Level;
 
-use super::desk::DeskLayout;
+use super::counter::CounterLayout;
 use super::pickup::{Earnings, Pickup};
 use crate::audio::{Play, Sound};
 use crate::parts::paper::Paper;
@@ -60,7 +60,7 @@ impl Receipt {
             .spawn((
                 Name::new("receipt"),
                 self,
-                DeskLayout::new().place(SPOT, YAW),
+                CounterLayout::new().place(SPOT, YAW),
                 FocusTarget {
                     focus: Focus::Paper,
                     view: View::Local(Paper::reading_view(Self::sheet_center())),

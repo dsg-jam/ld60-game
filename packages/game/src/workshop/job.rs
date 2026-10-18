@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use ld60_levels::{CATALOG, GAME_SEED, Level, LevelError, Variant};
 use ld60_machine::Isa;
 
-use super::desk::DeskLayout;
+use super::counter::CounterLayout;
 use super::pickup::{Complaint, Earnings, Pickup, TRIES};
 use super::receipt::Receipt;
 use super::ticket::JobTicket;
@@ -115,18 +115,18 @@ impl Job {
         let Some(job) = job else {
             return;
         };
-        let desk = DeskLayout::new();
+        let counter = CounterLayout::new();
         commands.spawn((
             Name::new("device"),
             JobItem,
             Handheld::for_job(&job.level, &job.buggy),
-            desk.place(DEVICE_SPOT, DEVICE_YAW),
+            counter.place(DEVICE_SPOT, DEVICE_YAW),
         ));
         commands.spawn((
             Name::new("job ticket"),
             JobItem,
             JobTicket::for_level(&job.level),
-            desk.place(TICKET_SPOT, TICKET_YAW),
+            counter.place(TICKET_SPOT, TICKET_YAW),
         ));
     }
 }

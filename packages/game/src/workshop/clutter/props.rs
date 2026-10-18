@@ -12,8 +12,14 @@ const COFFEE_DROP: f32 = 0.014;
 const STRIPE_HEIGHT: f32 = 0.008;
 /// From the rim to the top of the stripe.
 const STRIPE_DROP: f32 = 0.012;
-const HANDLE_RADIUS: f32 = 0.022;
-const HANDLE_THICKNESS: f32 = 0.006;
+/// The handle is a ring around this circle, thick enough for a grip.
+const HANDLE_RADIUS: f32 = 0.025;
+const HANDLE_THICKNESS: f32 = 0.012;
+/// The ring's middle sits this far out of the wall, so its ends grow out of
+/// the wall and two fingers fit through it.
+const HANDLE_OUT: f32 = 0.002;
+/// Low enough that the ring stays under the coffee inside the mug.
+const HANDLE_HEIGHT: f32 = 0.045;
 
 const GRIP_RADIUS: f32 = 0.012;
 const GRIP_LENGTH: f32 = 0.07;
@@ -97,10 +103,13 @@ impl Props<'_> {
                     .with_rotation(upright),
             ),
             (
-                self.meshes
-                    .add(Torus::new(HANDLE_RADIUS - HANDLE_THICKNESS, HANDLE_RADIUS)),
+                self.meshes.add(Torus::new(
+                    HANDLE_RADIUS - HANDLE_THICKNESS / 2.0,
+                    HANDLE_RADIUS + HANDLE_THICKNESS / 2.0,
+                )),
                 &self.finishes.ceramic,
-                Transform::from_xyz(MUG_RADIUS, MUG_HEIGHT * 0.55, 0.0).with_rotation(upright),
+                Transform::from_xyz(MUG_RADIUS + HANDLE_OUT, HANDLE_HEIGHT, 0.0)
+                    .with_rotation(upright),
             ),
         ];
         Self::spawn(parent, parts);

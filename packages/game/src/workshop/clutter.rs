@@ -1,9 +1,10 @@
 mod props;
+mod sides;
 
 use bevy::prelude::*;
 
 use self::props::{Finishes, Props};
-use super::desk::DeskLayout;
+use super::counter::CounterLayout;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
@@ -11,7 +12,7 @@ use crate::geometry::surface::{Finish, SurfaceMaterial};
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);
 const SCREWDRIVER_YAW: f32 = 0.4;
-/// Spots on the mat, see [`DeskLayout::place_on_mat`], and yaws.
+/// Spots on the mat, see [`CounterLayout::place_on_mat`], and yaws.
 const SCREWS: [(Vec2, f32); 3] = [
     (Vec2::new(0.32, 0.62), 0.4),
     (Vec2::new(0.4, 0.74), 2.1),
@@ -40,7 +41,7 @@ impl Plugin for ClutterPlugin {
     }
 }
 
-/// Small things lying around on the desk.
+/// Small things lying around on the counter.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Clutter;
@@ -53,7 +54,7 @@ impl Clutter {
         mut materials: ResMut<Assets<StandardMaterial>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
-        let desk = DeskLayout::new();
+        let counter = CounterLayout::new();
         let finishes = Finishes::new(&mut materials, &mut surfaces);
         let mut props = Props {
             meshes: &mut meshes,
@@ -61,26 +62,27 @@ impl Clutter {
         };
         commands.entity(add.entity).with_children(|clutter| {
             clutter
-                .spawn((desk.place(MUG_SPOT, 0.0), Visibility::default()))
+                .spawn((counter.place(MUG_SPOT, 0.0), Visibility::default()))
                 .with_children(|mug| props.mug(mug));
             clutter
                 .spawn((
-                    desk.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW),
+                    counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW),
                     Visibility::default(),
                 ))
                 .with_children(|screwdriver| props.screwdriver(screwdriver));
             for (spot, yaw) in SCREWS {
                 clutter
-                    .spawn((desk.place_on_mat(spot, yaw), Visibility::default()))
+                    .spawn((counter.place_on_mat(spot, yaw), Visibility::default()))
                     .with_children(|screw| props.screw(screw));
             }
             for (spot, yaw, color) in NOTES {
                 clutter
-                    .spawn((desk.place(spot, yaw), Visibility::default()))
+                    .spawn((counter.place(spot, yaw), Visibility::default()))
                     .with_children(|note| {
                         note.spawn((Shape::cuboid(&Block::new(NOTE_SIZE), color), Finish::Paper));
                     });
             }
+            sides::spawn(clutter, props.meshes, &mut materials);
         });
     }
 }
