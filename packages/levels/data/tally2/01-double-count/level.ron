@@ -1,0 +1,24 @@
+(
+    id: "tally2-01",
+    title: "Double count",
+    device: Tally2,
+    chip: Calco((revision: A, date_code: 7630)),
+    serial: "2A-00412",
+    remarks: [
+        "Both keys and the display test fine.",
+        "Factory firmware 1.0.",
+    ],
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Usher",
+        complaint: "My counter said 40 guests tonight. We have 20 chairs and nobody had to stand.",
+    ),
+    tests: [
+        (keys: "", display: "00"),
+        (keys: "+", display: "01"),
+        (keys: "+++", display: "03"),
+        (keys: "++++++++++", display: "10"),
+        (keys: "+++C+", display: "01"),
+    ],
+    reward: 5,
+)

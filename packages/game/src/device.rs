@@ -1,5 +1,5 @@
 mod emulator;
-mod summa6;
+mod handheld;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -8,7 +8,8 @@ use bevy::{
     prelude::*,
 };
 
-pub(crate) use self::summa6::Summa6;
+pub(crate) use self::emulator::Emulator;
+pub(crate) use self::handheld::Handheld;
 use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
@@ -25,7 +26,7 @@ pub(crate) struct DevicePlugin;
 impl Plugin for DevicePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DeviceKey>()
-            .add_plugins((emulator::EmulatorPlugin, summa6::Summa6Plugin))
+            .add_plugins((emulator::EmulatorPlugin, handheld::HandheldPlugin))
             .add_systems(
                 Update,
                 (

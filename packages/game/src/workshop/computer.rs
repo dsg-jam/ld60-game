@@ -7,6 +7,7 @@ use bevy::{mesh::MeshBuilder, prelude::*};
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
+use super::job::Job;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
 use crate::parts::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
@@ -69,10 +70,12 @@ impl Computer {
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut crt_materials: ResMut<Assets<CrtMaterial>>,
+        job: Option<Res<Job>>,
     ) {
         let layout = ComputerLayout::new();
         let canvas = UiCanvas::spawn(&mut commands, &mut images, editor::CANVAS_SIZE);
-        Editor::spawn(&mut commands, canvas.camera);
+        let source = job.as_ref().map_or("", |job| job.source.buggy);
+        Editor::spawn(&mut commands, canvas.camera, source);
         let labels = layout.keyboard.spawn_labels(&mut commands, &mut images);
 
         let glass = CrtGlass {

@@ -12,6 +12,7 @@ macro_rules! level {
 }
 
 pub const CATALOG: &[LevelSource] = &[
+    level!("tally2/01-double-count"),
     level!("summa6/01-strange-symbols"),
     level!("summa6/02-last-digit"),
     level!("summa6/03-nine-equals"),

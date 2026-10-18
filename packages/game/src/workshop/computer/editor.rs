@@ -1,20 +1,18 @@
 mod clicks;
+mod footer;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
     input::mouse::MouseScrollUnit,
-    input_focus::{AcquireFocus, FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
-    picking::{
-        events::{PointerClick, PointerScroll},
-        pointer::PointerButton,
-    },
+    input_focus::{FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
+    picking::events::PointerScroll,
     prelude::*,
     text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
     ui_widgets::TextInput,
 };
 
 use self::clicks::Clicks;
-use crate::audio::KeyClicks;
+use self::footer::{Command, Run, Status};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 
@@ -32,9 +30,6 @@ const SCROLL_LINES: f32 = 3.0;
 /// Matches the default line height of 1.2 times the font size.
 const LINE_HEIGHT: f32 = FONT_SIZE * 1.2;
 
-/// Draft firmware until jobs provide the real source.
-const PLACEHOLDER_SOURCE: &str = include_str!("placeholder.asm");
-
 pub(super) struct EditorPlugin;
 
 impl Plugin for EditorPlugin {
@@ -44,61 +39,13 @@ impl Plugin for EditorPlugin {
             Clicks::correct_edits.before(EditableTextSystems),
         )
         .add_observer(Editor::indent_on_tab)
-        .add_observer(ClicksToggle::toggle_on_key)
-        .add_observer(ClicksToggle::toggle_on_click)
-        .add_observer(ClicksToggle::keep_editor_focus)
+        .add_observer(Command::run_on_key)
+        .add_observer(Command::run_on_click)
+        .add_observer(Command::keep_editor_focus)
+        .add_observer(Run::apply)
         .add_observer(Editor::scroll_on_wheel);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.editor", Editor::debug_state);
-    }
-}
-
-/// Switches key clicks on or off when clicked or on F8.
-#[derive(Component)]
-struct ClicksToggle;
-
-impl ClicksToggle {
-    fn text(clicks: bool) -> String {
-        let clicks = if clicks { "ON" } else { "OFF" };
-        format!("F8 CLICKS {clicks}")
-    }
-
-    fn toggle(clicks: &mut KeyClicks, text: &mut Text) {
-        clicks.0 = !clicks.0;
-        text.0 = Self::text(clicks.0);
-    }
-
-    fn toggle_on_key(
-        mut input: On<FocusedInput<KeyboardInput>>,
-        editors: Query<(), With<Editor>>,
-        mut clicks: ResMut<KeyClicks>,
-        mut text: Single<&mut Text, With<ClicksToggle>>,
-    ) {
-        if !editors.contains(input.focused_entity) || input.input.key_code != KeyCode::F8 {
-            return;
-        }
-        input.propagate(false);
-        if input.input.state.is_pressed() && !input.input.repeat {
-            Self::toggle(&mut clicks, &mut text);
-        }
-    }
-
-    fn toggle_on_click(
-        click: On<PointerClick>,
-        mut toggles: Query<&mut Text, With<ClicksToggle>>,
-        mut clicks: ResMut<KeyClicks>,
-    ) {
-        if click.button == PointerButton::Primary
-            && let Ok(mut text) = toggles.get_mut(click.entity)
-        {
-            Self::toggle(&mut clicks, &mut text);
-        }
-    }
-
-    fn keep_editor_focus(mut acquire: On<AcquireFocus>, toggles: Query<(), With<ClicksToggle>>) {
-        if toggles.contains(acquire.focused_entity) {
-            acquire.propagate(false);
-        }
     }
 }
 
@@ -107,8 +54,9 @@ impl ClicksToggle {
 pub(super) struct Editor;
 
 impl Editor {
-    /// Spawns the editor UI into the canvas rendered by `camera`.
-    pub(super) fn spawn(commands: &mut Commands, camera: Entity) {
+    /// Spawns the editor UI with `source` into the canvas rendered by
+    /// `camera`.
+    pub(super) fn spawn(commands: &mut Commands, camera: Entity, source: &str) {
         let font = TextFont {
             font_size: FontSize::Px(FONT_SIZE),
             ..default()
@@ -117,7 +65,7 @@ impl Editor {
         let mut source = EditableText {
             visible_lines: None,
             allow_newlines: true,
-            ..EditableText::new(PLACEHOLDER_SOURCE)
+            ..EditableText::new(source)
         };
         source.queue_edit(TextEdit::TextStart(false));
         commands.spawn((
@@ -159,24 +107,20 @@ impl Editor {
                     },
                     TabIndex(0),
                 ),
+                (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
                 (
                     Node {
                         column_gap: px(FONT_SIZE * 2.0),
                         ..default()
                     },
-                    children![
+                    Children::spawn(SpawnIter(Command::ALL.into_iter().map(move |command| {
                         (
-                            Text::new("F5 ASSEMBLE   F6 FLASH"),
+                            command,
+                            Text::new(command.label(true)),
                             font.clone(),
                             TextColor(PHOSPHOR_DIM),
-                        ),
-                        (
-                            ClicksToggle,
-                            Text::new(ClicksToggle::text(true)),
-                            font,
-                            TextColor(PHOSPHOR),
-                        ),
-                    ],
+                        )
+                    }))),
                 ),
             ],
         ));

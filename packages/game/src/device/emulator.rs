@@ -1,12 +1,15 @@
 use std::error::Error;
 
 use bevy::prelude::*;
-use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout};
+use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, Rom};
 
 use super::{DeviceButton, DeviceKey};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::parts::lcd::LcdDisplay;
+
+/// Decides the random RAM contents at power on.
+const POWER_ON_SEED: u64 = 1;
 
 pub(super) struct EmulatorPlugin;
 
@@ -35,11 +38,15 @@ pub(crate) struct Emulator {
 
 impl Emulator {
     /// Powers the device on and runs it until it waits for a key.
-    pub(crate) fn power_on(mut device: AnyDevice, seed: u64) -> Self {
-        device.power_on(seed);
+    pub(crate) fn power_on(mut device: AnyDevice) -> Self {
+        device.power_on(POWER_ON_SEED);
         Self::run(&mut device);
         let readout = device.readout();
         Self { device, readout }
+    }
+
+    pub(crate) fn rom(&self) -> &Rom {
+        self.device.rom()
     }
 
     fn run(device: &mut AnyDevice) {

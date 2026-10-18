@@ -2,7 +2,7 @@ use std::error::Error;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{input::keyboard::Key, prelude::*};
-use ld60_devices::{AnyDevice, ChipSpec};
+use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
 use ld60_levels::{Level, LevelError, LevelSource};
 
 use super::emulator::Emulator;
@@ -14,35 +14,16 @@ use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use crate::parts::lcd;
 use crate::parts::screen::UiCanvas;
 
-const BODY_SIZE: Vec3 = Vec3::new(0.09, 0.014, 0.15);
-/// Width of the LCD. Its height follows the canvas.
-const LCD_WIDTH: f32 = 0.07;
 /// Dark frame around the LCD.
 const LCD_BORDER: f32 = 0.003;
 const WINDOW_HEIGHT: f32 = 0.0015;
 /// Keeps the LCD from fighting with the window top.
 const LCD_GAP: f32 = 0.0001;
-const DIGITS: usize = 6;
-/// RAM noise at power on. Fixed until jobs provide one.
-const POWER_ON_SEED: u64 = 1;
-/// Where the display window sits on the body, see [`Block::top_spot`].
-const WINDOW_SPOT: Vec2 = Vec2::new(0.0, -0.6);
-/// Where the keys sit on the body, see [`Block::top_spot`].
-const KEYPAD_SPOT: Vec2 = Vec2::new(0.0, 0.3);
-
-/// The label on the underside.
-const STICKER_SIZE: Vec2 = Vec2::new(0.06, 0.035);
-/// Where the sticker sits on the underside, see [`Block::top_spot`].
-const STICKER_SPOT: Vec2 = Vec2::new(0.0, 0.2);
 /// Keeps the sticker from fighting with the body bottom.
 const STICKER_GAP: f32 = 0.0002;
 const STICKER_CANVAS: UVec2 = UVec2::new(384, 224);
 const STICKER_FONT_SIZE: f32 = 26.0;
 const STICKER_PAPER: Color = Color::srgb_u8(0xf2, 0xea, 0xd8);
-/// Placeholder until the unit comes from a job.
-const SERIAL: &str = "6A-04417";
-
-const BODY: Color = Color::srgb_u8(0x3d, 0x44, 0x50);
 const WINDOW: Color = Color::srgb_u8(0x26, 0x2a, 0x30);
 
 const STYLE: KeypadStyle = KeypadStyle {
@@ -57,7 +38,7 @@ const STYLE: KeypadStyle = KeypadStyle {
 };
 
 /// Rows from the back to the front.
-const ROWS: &[&[KeyDef<char>]] = &[
+const SUMMA6_ROWS: &[&[KeyDef<char>]] = &[
     &[
         KeyDef::unit("7", '7', &[Typed("7")]),
         KeyDef::unit("8", '8', &[Typed("8")]),
@@ -82,30 +63,87 @@ const ROWS: &[&[KeyDef<char>]] = &[
     ],
 ];
 
-pub(super) struct Summa6Plugin;
+const TALLY2_ROWS: &[&[KeyDef<char>]] = &[&[
+    KeyDef::unit("C", 'C', &[Typed("c"), Typed("C"), Named(Key::Delete)]),
+    KeyDef::wide("+", '+', &[Typed("+"), Named(Key::Space)], 2.0),
+]];
 
-impl Plugin for Summa6Plugin {
-    fn build(&self, app: &mut App) {
-        app.add_observer(Summa6::on_add);
+const SUMMA6: Model = Model {
+    name: "SUMMA 6 ADDING MACHINE",
+    body_size: Vec3::new(0.09, 0.014, 0.15),
+    body: Color::srgb_u8(0x3d, 0x44, 0x50),
+    lcd_width: 0.07,
+    window_spot: Vec2::new(0.0, -0.6),
+    rows: SUMMA6_ROWS,
+    keypad_spot: Vec2::new(0.0, 0.3),
+    sticker_size: Vec2::new(0.06, 0.035),
+    sticker_spot: Vec2::new(0.0, 0.2),
+};
+
+const TALLY2: Model = Model {
+    name: "TALLY 2 COUNTER",
+    body_size: Vec3::new(0.065, 0.02, 0.085),
+    body: Color::srgb_u8(0x8a, 0x3b, 0x2e),
+    lcd_width: 0.03,
+    window_spot: Vec2::new(0.0, -0.45),
+    rows: TALLY2_ROWS,
+    keypad_spot: Vec2::new(0.0, 0.45),
+    sticker_size: Vec2::new(0.05, 0.029),
+    sticker_spot: Vec2::ZERO,
+};
+
+/// Shape and keys of one device kind.
+struct Model {
+    /// Printed on the sticker.
+    name: &'static str,
+    body_size: Vec3,
+    body: Color,
+    /// Width of the LCD. Its height follows the canvas.
+    lcd_width: f32,
+    /// Where the display window sits on the body, see [`Block::top_spot`].
+    window_spot: Vec2,
+    rows: &'static [&'static [KeyDef<char>]],
+    /// Where the keys sit on the body, see [`Block::top_spot`].
+    keypad_spot: Vec2,
+    sticker_size: Vec2,
+    /// Where the sticker sits on the underside, see [`Block::top_spot`].
+    sticker_spot: Vec2,
+}
+
+impl Model {
+    fn of(kind: DeviceKind) -> &'static Self {
+        match kind {
+            DeviceKind::Tally2 => &TALLY2,
+            DeviceKind::Summa6 => &SUMMA6,
+        }
     }
 }
 
-/// A 6-digit adding machine, resting on the ground.
+pub(super) struct HandheldPlugin;
+
+impl Plugin for HandheldPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_observer(Handheld::on_add);
+    }
+}
+
+/// A handheld device as it comes in for a job, resting on the ground. The
+/// level decides the model.
 #[derive(Component, Debug)]
 #[require(Holdable)]
-pub(crate) struct Summa6 {
+pub(crate) struct Handheld {
     level: &'static LevelSource,
 }
 
-impl Summa6 {
+impl Handheld {
     /// A unit as it comes in for `level`, with its faulty firmware.
     pub(crate) fn for_level(level: &'static LevelSource) -> Self {
         Self { level }
     }
 
     fn on_add(
-        add: On<Add<Summa6>>,
-        units: Query<&Summa6>,
+        add: On<Add<Handheld>>,
+        units: Query<&Handheld>,
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
@@ -125,17 +163,22 @@ impl Summa6 {
             }
         };
 
-        let lcd_canvas = lcd::canvas_size(DIGITS).as_vec2();
-        let lcd_size = Vec2::new(LCD_WIDTH, LCD_WIDTH * lcd_canvas.y / lcd_canvas.x);
-        let body = Block::new(BODY_SIZE);
+        let model = Model::of(level.device);
+        let digits = level.device.display_cells().count();
+        let lcd_canvas = lcd::canvas_size(digits).as_vec2();
+        let lcd_size = Vec2::new(
+            model.lcd_width,
+            model.lcd_width * lcd_canvas.y / lcd_canvas.x,
+        );
+        let body = Block::new(model.body_size);
         let window = Block::new((lcd_size + 2.0 * LCD_BORDER).extend(WINDOW_HEIGHT).xzy())
-            .resting_on(&body, WINDOW_SPOT);
-        let keypad = Keypad::new(ROWS, &STYLE, &body, KEYPAD_SPOT);
+            .resting_on(&body, model.window_spot);
+        let keypad = Keypad::new(model.rows, &STYLE, &body, model.keypad_spot);
         let labels = keypad.spawn_labels(&mut commands, &mut images);
-        let lcd = lcd::spawn(&mut commands, &mut images, add.entity, DIGITS);
-        let sticker = Self::spawn_sticker(&mut commands, &mut images, &level.chip);
+        let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
+        let sticker = Self::spawn_sticker(&mut commands, &mut images, model, &level);
         let sticker_spot = body
-            .top_spot(STICKER_SPOT)
+            .top_spot(model.sticker_spot)
             .with_y(body.min().y - STICKER_GAP);
         let unlit = |texture: Handle<Image>| StandardMaterial {
             base_color_texture: Some(texture),
@@ -146,7 +189,7 @@ impl Summa6 {
         let mut entity = commands.entity(add.entity);
         match Self::build_device(unit.level, &level) {
             Ok(device) => {
-                entity.insert(Emulator::power_on(device, POWER_ON_SEED));
+                entity.insert(Emulator::power_on(device));
             }
             Err(err) => error!(
                 error = &err as &dyn Error,
@@ -154,7 +197,7 @@ impl Summa6 {
             ),
         }
         entity.with_children(|device| {
-            device.spawn(Shape::cuboid(&body, BODY));
+            device.spawn(Shape::cuboid(&body, model.body));
             device.spawn(Shape::cuboid(&window, WINDOW));
             device.spawn((
                 Mesh3d(meshes.add(Rectangle::from_size(lcd_size))),
@@ -165,7 +208,7 @@ impl Summa6 {
             ));
             keypad.spawn_keys(device, &labels, false, |key| DeviceButton::new(key.key));
             device.spawn((
-                Mesh3d(meshes.add(Rectangle::from_size(STICKER_SIZE))),
+                Mesh3d(meshes.add(Rectangle::from_size(model.sticker_size))),
                 MeshMaterial3d(materials.add(unlit(sticker))),
                 // Faces down, readable when the device is flipped over
                 // sideways.
@@ -180,17 +223,21 @@ impl Summa6 {
         ld60_levels::device(level, rom)
     }
 
-    fn sticker_text(chip: &ChipSpec) -> String {
-        let chip = match chip {
+    fn sticker_text(model: &Model, level: &Level) -> String {
+        let chip = match level.chip {
             ChipSpec::Calco(info) => format!("CALCO REV {:?} {}", info.revision, info.date_code),
         };
-        format!("SUMMA 6 ADDING MACHINE\nS/N {SERIAL}\n{chip}\nDSG ELECTRONICS")
+        format!(
+            "{}\nS/N {}\n{chip}\nDSG ELECTRONICS",
+            model.name, level.serial
+        )
     }
 
     fn spawn_sticker(
         commands: &mut Commands,
         images: &mut Assets<Image>,
-        chip: &ChipSpec,
+        model: &Model,
+        level: &Level,
     ) -> Handle<Image> {
         let canvas = UiCanvas::spawn(commands, images, STICKER_CANVAS);
         commands.spawn((
@@ -205,7 +252,7 @@ impl Summa6 {
             BackgroundColor(STICKER_PAPER),
             UiTargetCamera(canvas.camera),
             children![(
-                Text::new(Self::sticker_text(chip)),
+                Text::new(Self::sticker_text(model, level)),
                 TextFont {
                     font_size: FontSize::Px(STICKER_FONT_SIZE),
                     ..default()

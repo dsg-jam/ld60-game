@@ -3590,6 +3590,7 @@ name = "ld60-game"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "ld60-calco",
  "ld60-devices",
  "ld60-levels",
  "serde_json",

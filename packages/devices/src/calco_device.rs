@@ -4,28 +4,11 @@ use ld60_machine::{Bus, Cpu as _, Step};
 use crate::rng::Rng;
 use crate::{Device, DeviceError, DeviceKind, IsaKind, Readout, Rom};
 
-const KEYS: [(char, u8); 14] = [
-    ('0', 0x00),
-    ('1', 0x01),
-    ('2', 0x02),
-    ('3', 0x03),
-    ('4', 0x04),
-    ('5', 0x05),
-    ('6', 0x06),
-    ('7', 0x07),
-    ('8', 0x08),
-    ('9', 0x09),
-    ('+', 0x0A),
-    ('-', 0x0B),
-    ('=', 0x0C),
-    ('C', 0x0D),
-];
-
-pub(crate) const DISPLAY_CELLS: std::ops::RangeInclusive<usize> = 1..=6;
-
-/// 6-digit adding machine with a CalCo chip.
+/// A device built around a CalCo chip. The kind decides the keys and the
+/// display.
 #[derive(Clone, Debug)]
-pub struct Summa6 {
+pub struct CalcoDevice {
+    kind: DeviceKind,
     cpu: ld60_calco::Cpu,
     board: Board,
 }
@@ -60,8 +43,8 @@ impl Bus for Board {
     }
 }
 
-impl Summa6 {
-    pub fn new(chip: ChipInfo, rom: Rom) -> Result<Self, DeviceError> {
+impl CalcoDevice {
+    pub fn new(kind: DeviceKind, chip: ChipInfo, rom: Rom) -> Result<Self, DeviceError> {
         let actual = rom.image().len();
         if actual != ROM_LEN {
             return Err(DeviceError::RomSize {
@@ -70,6 +53,7 @@ impl Summa6 {
             });
         }
         Ok(Self {
+            kind,
             cpu: ld60_calco::Cpu::new(chip),
             board: Board {
                 rom,
@@ -80,9 +64,9 @@ impl Summa6 {
     }
 }
 
-impl Device for Summa6 {
+impl Device for CalcoDevice {
     fn kind(&self) -> DeviceKind {
-        DeviceKind::Summa6
+        self.kind
     }
 
     fn isa(&self) -> IsaKind {
@@ -114,7 +98,9 @@ impl Device for Summa6 {
     }
 
     fn key_code(&self, key: char) -> Option<u8> {
-        KEYS.iter()
+        self.kind
+            .key_codes()
+            .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(&key))
             .map(|&(_, code)| code)
     }
@@ -130,7 +116,11 @@ impl Device for Summa6 {
     fn readout(&self) -> Readout {
         let ram = self.cpu.ram();
         Readout {
-            digits: DISPLAY_CELLS.map(|cell| ram.read(cell)).collect(),
+            digits: self
+                .kind
+                .display_cells()
+                .map(|cell| ram.read(cell))
+                .collect(),
             minus: self.board.ann & ports::ANN_MINUS != 0,
             error: self.board.ann & ports::ANN_ERROR != 0,
         }

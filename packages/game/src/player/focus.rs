@@ -33,6 +33,7 @@ pub(crate) enum Focus {
     Desk,
     Computer,
     Device,
+    Paper,
 }
 
 /// Something the player can click from the desk view.

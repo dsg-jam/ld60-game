@@ -1,18 +1,27 @@
 mod clutter;
 mod computer;
+mod datasheet;
 mod desk;
+pub(crate) mod job;
 mod lamp;
 mod room;
+mod service;
 mod switch;
+mod ticket;
+
+use std::error::Error;
 
 use bevy::prelude::*;
 
 use self::clutter::Clutter;
 use self::computer::Computer;
+use self::datasheet::Datasheet;
 use self::desk::{Desk, DeskLayout};
+use self::job::Job;
 use self::lamp::Lamp;
 use self::room::Room;
-use crate::device::Summa6;
+use self::ticket::JobTicket;
+use crate::device::Handheld;
 use crate::player::camera::PlayerCamera;
 
 const BACKGROUND: Color = Color::srgb_u8(0x14, 0x12, 0x11);
@@ -27,8 +36,13 @@ const COMPUTER_SPOT: Vec2 = Vec2::new(0.55, -0.3);
 const COMPUTER_YAW: f32 = -0.5;
 const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
 const LAMP_YAW: f32 = -0.7;
-const SUMMA6_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
-const SUMMA6_YAW: f32 = 0.15;
+const DEVICE_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
+const DEVICE_YAW: f32 = 0.15;
+const TICKET_SPOT: Vec2 = Vec2::new(-0.85, 0.5);
+const TICKET_YAW: f32 = 0.12;
+/// On the mat, see [`DeskLayout::place_on_mat`].
+const DATASHEET_SPOT: Vec2 = Vec2::new(-0.69, -0.19);
+const DATASHEET_YAW: f32 = 0.15;
 
 pub(crate) struct WorkshopPlugin;
 
@@ -40,6 +54,8 @@ impl Plugin for WorkshopPlugin {
             lamp::LampPlugin,
             room::RoomPlugin,
             switch::SwitchPlugin,
+            datasheet::DatasheetPlugin,
+            ticket::TicketPlugin,
             computer::ComputerPlugin,
         ))
         .insert_resource(ClearColor(BACKGROUND))
@@ -49,10 +65,16 @@ impl Plugin for WorkshopPlugin {
             ..default()
         })
         .add_systems(Startup, spawn_stage);
+        match Job::load(&ld60_levels::CATALOG[0]) {
+            Ok(job) => {
+                app.insert_resource(job);
+            }
+            Err(err) => error!(error = &err as &dyn Error, "first job does not load"),
+        }
     }
 }
 
-fn spawn_stage(mut commands: Commands) {
+fn spawn_stage(job: Option<Res<Job>>, mut commands: Commands) {
     let desk = DeskLayout::new();
     commands.spawn((Name::new("room"), Room));
     commands.spawn((Name::new("desk"), Desk));
@@ -63,10 +85,22 @@ fn spawn_stage(mut commands: Commands) {
         desk.place(COMPUTER_SPOT, COMPUTER_YAW),
     ));
     commands.spawn((Name::new("lamp"), Lamp, desk.place(LAMP_SPOT, LAMP_YAW)));
+    if let Some(job) = job {
+        commands.spawn((
+            Name::new("device"),
+            Handheld::for_level(job.source),
+            desk.place(DEVICE_SPOT, DEVICE_YAW),
+        ));
+        commands.spawn((
+            Name::new("job ticket"),
+            JobTicket::for_level(job.source),
+            desk.place(TICKET_SPOT, TICKET_YAW),
+        ));
+    }
     commands.spawn((
-        Name::new("summa6"),
-        Summa6::for_level(&ld60_levels::CATALOG[0]),
-        desk.place(SUMMA6_SPOT, SUMMA6_YAW),
+        Name::new("datasheet"),
+        Datasheet,
+        desk.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
     ));
     commands.spawn((
         Name::new("camera"),
