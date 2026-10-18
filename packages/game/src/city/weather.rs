@@ -3,6 +3,9 @@ use bevy::prelude::*;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 
+/// Wind at street level along X and Z, in meters per second. The rain
+/// drifts with it, and the clouds with the stronger wind up high.
+pub(super) const WIND: Vec2 = Vec2::new(1.2, 0.6);
 /// Rain strength at the start.
 const RAIN: f32 = 0.6;
 /// Seconds for the ground to get soaked, and to dry again.

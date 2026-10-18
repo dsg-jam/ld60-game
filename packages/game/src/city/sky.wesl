@@ -17,6 +17,8 @@ struct Sky {
     /// Towards the sun, which is below the horizon.
     sun: vec3<f32>,
     rain: f32,
+    /// Wind at the height of the clouds, in meters per second.
+    wind: vec2<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> sky: Sky;
@@ -24,10 +26,10 @@ struct Sky {
 /// Light pollution from the streets, warm and low.
 const CITY_GLOW: vec3<f32> = vec3<f32>(0.06, 0.025, 0.02);
 const CLOUD_GLOW: vec3<f32> = vec3<f32>(0.12, 0.075, 0.07);
-/// How fast the clouds drift across the sky.
-const WIND: vec2<f32> = vec2<f32>(0.05, 0.02);
-/// Clouds per unit of the layer they drift in.
-const CLOUD_SCALE: f32 = 2.5;
+/// Height of the cloud layer, in meters.
+const CLOUD_HEIGHT: f32 = 500.0;
+/// Size of a cloud, in meters.
+const CLOUD_SIZE: f32 = 200.0;
 const BAND_LIGHT: vec3<f32> = vec3<f32>(0.62, 0.5, 0.36);
 const BAND_DARK: vec3<f32> = vec3<f32>(0.26, 0.38, 0.42);
 const RING: vec3<f32> = vec3<f32>(0.55, 0.48, 0.4);
@@ -114,7 +116,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // Low clouds, lit from below by the city.
     // Projected onto a flat layer overhead, so they shrink towards the
     // horizon.
-    let p = d.xz / (up + 0.08) * CLOUD_SCALE + WIND * globals.time;
+    let p = (d.xz / (up + 0.08) * CLOUD_HEIGHT + sky.wind * globals.time) / CLOUD_SIZE;
     // Scattered clouds in clear weather, closing up in the rain.
     let edge = mix(0.58, 0.44, sky.rain);
     let cloud = smoothstep(edge, edge + 0.12, fbm(p, 80.0));

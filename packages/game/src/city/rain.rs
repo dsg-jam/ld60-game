@@ -10,7 +10,7 @@ use bevy::{
 };
 use rand::RngExt;
 
-use super::weather::Weather;
+use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
@@ -23,7 +23,7 @@ const HEIGHT: f32 = 14.0;
 const WIDTH: f32 = 0.006;
 const LENGTH: f32 = 0.4;
 /// Speed and direction in meters per second, tilted by the wind.
-const FALL: Vec3 = Vec3::new(1.2, -9.0, 0.6);
+const FALL: Vec3 = Vec3::new(WIND.x, -9.0, WIND.y);
 const AMBIENT: f32 = 0.03;
 /// Matches `LIGHTS` in `rain.wesl`.
 const LIGHTS: usize = 8;
