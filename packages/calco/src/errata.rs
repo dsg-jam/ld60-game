@@ -24,6 +24,13 @@ impl Erratum {
         }
     }
 
+    /// Which chips have the bug, as printed on the errata sheet.
+    pub fn affected_chips(self) -> &'static str {
+        match self {
+            Self::DsClearsCarryOnZero => "Rev A, date codes before 7624",
+        }
+    }
+
     pub fn affects(self, chip: ChipInfo) -> bool {
         match self {
             Self::DsClearsCarryOnZero => {

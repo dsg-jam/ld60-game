@@ -7,6 +7,7 @@
 
 mod chip;
 mod cpu;
+pub mod datasheet;
 mod disasm;
 mod encoder;
 mod errata;
