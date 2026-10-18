@@ -52,8 +52,9 @@ impl Receipt {
         for entity in old {
             commands.entity(entity).despawn();
         }
-        if matches!(self.pickup, Pickup::Paid(_)) {
-            commands.trigger(Play(Sound::Chime));
+        match self.pickup {
+            Pickup::Paid(_) => commands.trigger(Play(Sound::Chime)),
+            Pickup::HandedBack { .. } | Pickup::Left(_) => commands.trigger(Play(Sound::Thunk)),
         }
         let receipt = commands
             .spawn((
@@ -106,11 +107,12 @@ impl Receipt {
     }
 
     fn write(&self, page: &mut ChildSpawnerCommands) {
-        let paid = match &self.pickup {
-            Pickup::Paid(amount) => *amount,
-            Pickup::Refused(_) => 0,
+        let (title, paid) = match &self.pickup {
+            Pickup::Paid(amount) => ("PICKUP", *amount),
+            Pickup::HandedBack { .. } => ("HANDED BACK", 0),
+            Pickup::Left(_) => ("NOT REPAIRED", 0),
         };
-        page.spawn(Paper::title("PICKUP"));
+        page.spawn(Paper::title(title));
         page.spawn(Paper::faded("DSG service bench"));
         for (label, value) in [
             ("JOB", self.job.clone()),
@@ -122,12 +124,9 @@ impl Receipt {
                 (value, VALUE_WIDTH),
             ]));
         }
-        if let Pickup::Refused(complaint) = &self.pickup {
+        if let Some(note) = self.pickup.note() {
             page.spawn(Paper::heading("NOTE FROM THE CUSTOMER"));
-            page.spawn(Paper::text(format!(
-                "\"{} I am not paying for this.\"",
-                complaint.note()
-            )));
+            page.spawn(Paper::text(format!("\"{note}\"")));
         }
         page.spawn(Paper::heading("TILL"));
         page.spawn(Paper::text(format!(

@@ -24,7 +24,7 @@ pub(crate) enum Sound {
     Click,
     /// A customer paid for a repair.
     Chime,
-    /// The rubber stamp hitting the ticket.
+    /// The rubber stamp hitting the ticket, or a device put down hard.
     Thunk,
     /// The service bell for the customer.
     Ding,
