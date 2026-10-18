@@ -2,7 +2,7 @@ mod common;
 
 use common::{SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
 use ld60_calco::{ChipInfo, DateCode, Revision};
-use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
+use ld60_devices::{Annunciator, BoardRev, ChipSpec, DeviceKind};
 use ld60_dsl::{Flavor, Selection, Target, compile};
 use ld60_machine::Isa;
 
@@ -144,6 +144,46 @@ entry main {
             assert!(output.asm.contains(&check), "{rev:?} {key}\n{}", output.asm);
         }
     }
+}
+
+#[test]
+fn annunciator_names_use_the_bits_of_the_board() {
+    let source = "\
+firmware \"S\" for summa6
+entry main {
+    ANN = ann(minus)
+    ANN = ann(minus, error)
+    wait
+}
+";
+    let chip = ChipSpec::Calco(ChipInfo {
+        revision: Revision::B,
+        date_code: DateCode::new(76, 30),
+    });
+    let selection = Selection {
+        flavor: Flavor::Fixed,
+        switches: &[],
+    };
+    for rev in BoardRev::ALL {
+        let board = DeviceKind::Summa6.board(rev);
+        let output = compile(source, &Target::new(chip, board), &selection).unwrap();
+        let bit = |a| 1 << board.ann_bit(a).unwrap();
+        let minus = bit(Annunciator::Minus);
+        let both = minus | bit(Annunciator::Error);
+        let expected = format!(
+            "LDI  A, {minus}\n        OUT  ANN\n        LDI  A, {both}\n        OUT  ANN\n"
+        );
+        assert!(output.asm.contains(&expected), "{rev:?}\n{}", output.asm);
+    }
+    let tally = "firmware \"T\" for tally2\nentry main {\n    ANN = ann(minus)\n}\n";
+    let error = common::error(build(
+        tally,
+        Revision::B,
+        DeviceKind::Tally2,
+        Flavor::Fixed,
+        &[],
+    ));
+    assert_eq!(error.message, "tally2 has no annunciator 'minus'");
 }
 
 #[test]

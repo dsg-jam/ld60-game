@@ -35,6 +35,10 @@ pub enum Annunciator {
     Error,
 }
 
+impl Annunciator {
+    pub const ALL: [Self; 2] = [Self::Minus, Self::Error];
+}
+
 /// The circuit board around the chip. Board revisions of one model wire the
 /// keys, the display and the annunciators differently.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

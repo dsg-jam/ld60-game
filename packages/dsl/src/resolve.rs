@@ -10,7 +10,7 @@ use crate::{Diagnostic, Target};
 
 const ZERO_LOOP: &str = "loops run at least once, so i must start at 1 or more";
 
-const RESERVED: &[&str] = &["a", "i", "carry", "bcd_add", "bcd_sub"];
+const RESERVED: &[&str] = &["a", "ann", "i", "carry", "bcd_add", "bcd_sub"];
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -235,6 +235,27 @@ impl Resolver<'_> {
                 _ => {}
             }
         }
+    }
+
+    /// The `ANN` value that lights the annunciators named in `args`.
+    fn annunciators(&self, args: &[ast::Expr]) -> Result<Value> {
+        let mut bits = 0;
+        for arg in args {
+            let ExprKind::Name(name) = &arg.kind else {
+                return Err(Diagnostic::error(
+                    arg.pos,
+                    "expected an annunciator name, like ann(minus)",
+                ));
+            };
+            let bit = self.target.ann_bit(name).ok_or_else(|| {
+                Diagnostic::error(
+                    arg.pos,
+                    format!("{} has no annunciator '{name}'", self.target.device_name()),
+                )
+            })?;
+            bits |= 1 << bit;
+        }
+        Ok(Value::Imm(Literal::decimal(bits)))
     }
 
     fn check_free(&self, name: &str, pos: Pos) -> Result<()> {
@@ -533,6 +554,7 @@ impl Resolver<'_> {
             ExprKind::Name(name) if self.consts.contains_key(name) => {
                 Ok(Value::Imm(self.consts[name].clone()))
             }
+            ExprKind::Call(name, args) if name == "ann" => self.annunciators(args),
             ExprKind::Name(_) | ExprKind::Index(..) => self.place(expr, false).map(Value::Place),
             ExprKind::Range(..) => Err(Diagnostic::error(pos, "ranges are only allowed in match")),
             _ => Err(Diagnostic::error(

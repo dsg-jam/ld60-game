@@ -130,7 +130,7 @@ ashow:
                 a = bcd_sub(0, total[i])
                 display[i] = a
             }
-            ANN = 1
+            ANN = ann(minus)
             return
         apos:
             for i = 6 downto 1 as ashl {
