@@ -12,6 +12,7 @@ struct Crt {
     scanlines: f32,
     brightness: f32,
     scanline_darkness: f32,
+    black_level: vec3<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var screen_texture: texture_2d<f32>;
@@ -57,7 +58,6 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // Unlit glass outside the picture, and the faint glow of the phosphor
     // inside it, so scanlines also show on black.
     let glass = vec3<f32>(0.006, 0.012, 0.008);
-    let black_level = vec3<f32>(0.02, 0.045, 0.03);
-    let lit = (black_level + color * crt.brightness) * scanline * vignette;
+    let lit = (crt.black_level + color * crt.brightness) * scanline * vignette;
     return vec4<f32>(mix(glass, lit, inside) + dirt(in.uv), 1.0);
 }
