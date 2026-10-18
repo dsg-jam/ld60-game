@@ -54,6 +54,7 @@ pub enum VerifyError {
     Burn(ProgramError),
     Fixed(LevelError),
     FixedFails(Report),
+    FixedFailsLineTests(Report),
     Run(LevelError),
 }
 
@@ -65,6 +66,9 @@ impl fmt::Display for VerifyError {
             Self::Burn(error) => write!(f, "fixed.asm cannot be burned over the chip: {error}"),
             Self::Fixed(error) => write!(f, "fixed.asm: {error}"),
             Self::FixedFails(report) => write!(f, "fixed.asm fails\n{report}"),
+            Self::FixedFailsLineTests(report) => {
+                write!(f, "fixed.asm fails the end of line tests\n{report}")
+            }
             Self::Run(error) => error.fmt(f),
         }
     }
@@ -75,7 +79,7 @@ impl std::error::Error for VerifyError {
         match self {
             Self::Buggy(error) | Self::Fixed(error) | Self::Run(error) => Some(error),
             Self::Burn(error) => Some(error),
-            Self::BuggyPasses(_) | Self::FixedFails(_) => None,
+            Self::BuggyPasses(_) | Self::FixedFails(_) | Self::FixedFailsLineTests(_) => None,
         }
     }
 }
