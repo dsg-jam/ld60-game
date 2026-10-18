@@ -9,7 +9,7 @@ import bevy_pbr::render::{
     forward_io::{VertexOutput, FragmentOutput},
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
 };
-import package::geometry::noise::{TAU, hash, noise};
+import package::geometry::noise::{PI, TAU, hash, noise};
 
 struct Sticker {
     size: vec2<f32>,
@@ -33,7 +33,7 @@ fn scratch(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>, width: f32) -> f32 {
     let t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
     let d = length(p - a - ab * t);
     // Scratches start and end lightly.
-    let taper = sin(t * TAU / 2.0);
+    let taper = sin(t * PI);
     return (1.0 - smoothstep(0.0, width, d)) * taper;
 }
 

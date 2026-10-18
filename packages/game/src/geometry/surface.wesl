@@ -15,7 +15,7 @@ import bevy_pbr::render::{
 import package::geometry::{
     bump::bumped,
     floor::{plank, plank_color, plank_height},
-    noise::{hash1, noise, visible},
+    noise::{PI, hash1, noise, visible},
     wear::{dings, floor_marks, grip_ridge, rust, scratches, scuffs},
     wood::{fiber_sheen, wood},
 };
@@ -43,6 +43,7 @@ const PAPER: u32 = 6u;
 const CERAMIC: u32 = 7u;
 const PLANKS: u32 = 8u;
 const GRIP: u32 = 9u;
+const PERFORATED: u32 = 10u;
 /// Matches `Form::code` in `surface.rs`.
 const BOX: u32 = 0u;
 const CYLINDER: u32 = 1u;
@@ -59,6 +60,29 @@ const GRIP_DIRT: vec3<f32> = vec3<f32>(0.12, 0.1, 0.08);
 const GRIP_RIBS: f32 = 10.0;
 /// Most light comes from above, which is where the wood's sheen comes from.
 const SHEEN_LIGHT: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
+
+/// Holes of perforated metal, in staggered rows.
+const HOLE_PITCH: f32 = 0.005;
+const HOLE_DEPTH: f32 = 0.0015;
+const HOLE_RADIUS: f32 = 0.0017;
+/// Rows of staggered holes are this much closer than the holes in a row.
+const ROW_SPACING: f32 = 0.8660254;
+/// Dark cloth shows through the holes.
+const CLOTH: f32 = 0.06;
+
+/// How much of the point lies in a hole of a perforated sheet, with the
+/// holes in staggered rows. Fades to the share of holes in the sheet where
+/// they get smaller than a pixel.
+fn hole(uv: vec2<f32>, pixel: f32) -> f32 {
+    let row_pitch = HOLE_PITCH * ROW_SPACING;
+    let row = floor(uv.y / row_pitch);
+    let shifted = vec2<f32>(uv.x / HOLE_PITCH + 0.5 * (row % 2.0), uv.y / row_pitch);
+    let local = (fract(shifted) - 0.5) * vec2<f32>(HOLE_PITCH, row_pitch);
+    let d = length(local);
+    let inside = 1.0 - smoothstep(HOLE_RADIUS - pixel, HOLE_RADIUS + pixel, d);
+    let share = PI * HOLE_RADIUS * HOLE_RADIUS / (HOLE_PITCH * row_pitch);
+    return mix(share, inside, visible(HOLE_RADIUS * 2.0, pixel));
+}
 
 /// Distance from a point on the surface to the nearest edge.
 fn edge_distance(p: vec3<f32>, h: vec3<f32>) -> f32 {
@@ -190,6 +214,13 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             color = mix(color, GRIP_DIRT, dirt * 0.6);
             rough = mix(rough * 1.25, rough * 0.6, ridge * w);
             bumps = 0.0005 * ridge;
+        }
+        case PERFORATED: {
+            let open = hole(uv, pixel);
+            color = mix(color, color * CLOTH, open);
+            rough = mix(rough, 1.0, open);
+            metallic *= 1.0 - open;
+            bumps = -HOLE_DEPTH * open;
         }
         default: {}
     }

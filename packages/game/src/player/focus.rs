@@ -34,6 +34,7 @@ pub(crate) enum Focus {
     Computer,
     Device,
     Paper,
+    Radio,
 }
 
 /// Something the player can click from the desk view.
@@ -106,6 +107,16 @@ pub(crate) struct Focused(Option<Entity>);
 impl Focused {
     pub(crate) fn get(&self) -> Option<Entity> {
         self.0
+    }
+
+    /// Whether `entity` is the focused one or a part of it.
+    pub(crate) fn holds(&self, entity: Entity, parents: &Query<&ChildOf>) -> bool {
+        self.0.is_some_and(|focused| {
+            entity == focused
+                || parents
+                    .iter_ancestors(entity)
+                    .any(|parent| parent == focused)
+        })
     }
 
     fn leave(&mut self, next: &mut NextState<Focus>) {

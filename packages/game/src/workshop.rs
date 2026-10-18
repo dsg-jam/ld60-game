@@ -5,6 +5,7 @@ mod desk;
 pub(crate) mod job;
 mod lamp;
 mod pickup;
+mod radio;
 mod receipt;
 mod room;
 mod service;
@@ -19,6 +20,7 @@ use self::computer::Computer;
 use self::datasheet::Datasheet;
 use self::desk::{Desk, DeskLayout};
 use self::lamp::Lamp;
+use self::radio::Radio;
 use self::room::Room;
 use self::tools::Tool;
 use crate::player::camera::PlayerCamera;
@@ -35,6 +37,8 @@ const COMPUTER_SPOT: Vec2 = Vec2::new(0.55, -0.3);
 const COMPUTER_YAW: f32 = -0.5;
 const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
 const LAMP_YAW: f32 = -0.7;
+const RADIO_SPOT: Vec2 = Vec2::new(-0.5, -0.62);
+const RADIO_YAW: f32 = 0.25;
 const STAMP_SPOT: Vec2 = Vec2::new(0.1, -0.75);
 const STAMP_YAW: f32 = 0.3;
 const BELL_SPOT: Vec2 = Vec2::new(0.23, -0.75);
@@ -50,6 +54,7 @@ impl Plugin for WorkshopPlugin {
             desk::DeskPlugin,
             clutter::ClutterPlugin,
             lamp::LampPlugin,
+            radio::RadioPlugin,
             room::RoomPlugin,
             switch::SwitchPlugin,
             datasheet::DatasheetPlugin,
@@ -80,6 +85,11 @@ fn spawn_stage(mut commands: Commands) {
         desk.place(COMPUTER_SPOT, COMPUTER_YAW),
     ));
     commands.spawn((Name::new("lamp"), Lamp, desk.place(LAMP_SPOT, LAMP_YAW)));
+    commands.spawn((
+        Name::new("radio"),
+        Radio::default(),
+        desk.place(RADIO_SPOT, RADIO_YAW),
+    ));
     commands.spawn((
         Name::new("stamp"),
         Tool::Stamp,
