@@ -3,6 +3,11 @@
     title: "Last digit is always 0",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7630)),
+    serial: "6A-03702",
+    remarks: [
+        "Keypad contacts clean.",
+        "All six digits pass the segment test.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
         name: "Market stall owner",

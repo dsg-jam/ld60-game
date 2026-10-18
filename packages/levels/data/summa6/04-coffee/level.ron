@@ -3,6 +3,11 @@
     title: "Coffee break",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7630)),
+    serial: "6A-04417",
+    remarks: [
+        "Coffee residue on the board around the RAM. Cleaned.",
+        "Customer will not pay for a new chip.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     faults: [StuckRamBit((cell: 7, bit: 0, high: true))],
     customer: (

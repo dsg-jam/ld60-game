@@ -9,6 +9,11 @@ pub struct Level {
     pub title: String,
     pub device: DeviceKind,
     pub chip: ChipSpec,
+    /// Printed on the sticker under the device and on the job ticket.
+    pub serial: String,
+    /// Notes from the intake bench, shown on the job ticket.
+    #[serde(default)]
+    pub remarks: Vec<String>,
     pub rom: RomSpec,
     #[serde(default)]
     pub faults: Vec<Fault>,

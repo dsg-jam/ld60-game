@@ -3,6 +3,11 @@
     title: "Lost borrow",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7612)),
+    serial: "6A-01207",
+    remarks: [
+        "Early production chip.",
+        "Same firmware as unit 6A-05530, which works.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
         name: "Pharmacist",

@@ -3,6 +3,11 @@
     title: "Strange symbols",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7630)),
+    serial: "6A-03158",
+    remarks: [
+        "Display shows random segments after power on.",
+        "Factory firmware 1.0.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
         name: "Bookkeeper",

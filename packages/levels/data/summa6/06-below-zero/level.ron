@@ -3,6 +3,11 @@
     title: "Below zero",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7630)),
+    serial: "6A-04890",
+    remarks: [
+        "Minus annunciator lights in the segment test.",
+        "Customer wants negative results shown.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
         name: "Student",

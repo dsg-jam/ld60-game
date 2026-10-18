@@ -3,6 +3,11 @@
     title: "The update",
     device: Summa6,
     chip: Calco((revision: A, date_code: 7630)),
+    serial: "6A-05102",
+    remarks: [
+        "Firmware 1.1, installed by the sales office.",
+        "Hangs after +, - or =. Only a power cycle helps.",
+    ],
     rom: (kind: Eprom, blank_available: true),
     customer: (
         name: "Shop owner",
