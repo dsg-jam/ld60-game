@@ -91,7 +91,13 @@ impl Levels {
 impl Levels {
     /// The levels in the repository, for tests.
     pub(crate) fn on_disk() -> Self {
-        Self(Catalog::on_disk().unwrap())
+        Self(
+            Catalog::read(std::path::Path::new(concat!(
+                env!("LD60_ASSETS"),
+                "/levels"
+            )))
+            .unwrap(),
+        )
     }
 
     pub(crate) fn new(catalog: Catalog) -> Self {

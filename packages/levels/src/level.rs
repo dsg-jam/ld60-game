@@ -44,7 +44,7 @@ pub struct Level {
 /// A firmware source file and the switches a level turns on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FirmwareSource {
-    /// Path relative to [`DATA_DIR`](crate::DATA_DIR).
+    /// Path relative to the folder of all levels.
     pub source: String,
     #[serde(default)]
     pub switches: Vec<String>,

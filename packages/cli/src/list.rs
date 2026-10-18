@@ -1,12 +1,12 @@
 use std::io::Write;
 
-use ld60_levels::{Catalog, Level};
+use ld60_levels::Level;
 
 use crate::text::LevelText;
 
 pub fn run(out: &mut impl Write) -> crate::Result<()> {
     let text = LevelText::read()?;
-    for source in Catalog::on_disk()?.levels() {
+    for source in crate::catalog()?.levels() {
         let level = source.load()?;
         let boards: Vec<String> = level
             .allowed_boards()

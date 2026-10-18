@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn same_board_changes_nothing() {
-        for source in Catalog::on_disk().unwrap().levels() {
+        for source in Catalog::in_repository().levels() {
             let device = source.load().unwrap().device;
             for text in [source.buggy.as_str(), source.fixed.as_str()] {
                 let expected = Firmware::new(text).to_string();

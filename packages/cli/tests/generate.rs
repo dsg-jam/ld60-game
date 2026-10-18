@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use ld60_levels::DATA_DIR;
+use ld60_cli::LEVELS;
 
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
@@ -25,13 +25,13 @@ fn scratch(tag: &str) -> PathBuf {
     let name = format!("ld60-generate-{tag}-{}", std::process::id());
     let dir = std::env::temp_dir().join(name);
     let _ = std::fs::remove_dir_all(&dir);
-    copy_dir(Path::new(DATA_DIR), &dir);
+    copy_dir(Path::new(LEVELS), &dir);
     dir
 }
 
 #[test]
 fn check_passes_on_the_committed_files() {
-    let (current, _) = run(Path::new(DATA_DIR), true);
+    let (current, _) = run(Path::new(LEVELS), true);
     assert!(current);
 }
 

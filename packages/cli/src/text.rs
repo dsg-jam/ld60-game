@@ -1,7 +1,7 @@
 use std::{fmt, io};
 
 use fluent_bundle::{FluentArgs, FluentBundle, FluentError, FluentResource};
-use ld60_levels::{ENGLISH_TEXT, Level};
+use ld60_levels::Level;
 use unic_langid::langid;
 
 /// The English text of the levels, from the game's Fluent file.
@@ -28,7 +28,7 @@ pub enum TextError {
 
 impl LevelText {
     pub fn read() -> Result<Self, TextError> {
-        let path = ENGLISH_TEXT;
+        let path = concat!(env!("LD60_ASSETS"), "/locales/en/levels.ftl");
         let source =
             std::fs::read_to_string(path).map_err(|source| TextError::Read { path, source })?;
         let resource = FluentResource::try_new(source).map_err(|(_, errors)| TextError::Parse {

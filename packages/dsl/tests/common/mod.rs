@@ -4,11 +4,16 @@ use ld60_calco::{ChipInfo, DateCode, Revision};
 use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_dsl::{Diagnostic, Flavor, Output, Selection, Target, compile};
 
-pub(crate) const TALLY_0_9: &str =
-    include_str!("../../../game/assets/levels/tally2/firmware-0.9.fw");
-pub(crate) const TALLY_1_0: &str =
-    include_str!("../../../game/assets/levels/tally2/firmware-1.0.fw");
-pub(crate) const SUMMA: &str = include_str!("../../../game/assets/levels/summa6/firmware.fw");
+pub(crate) const TALLY_0_9: &str = include_str!(concat!(
+    env!("LD60_ASSETS"),
+    "/levels/tally2/firmware-0.9.fw"
+));
+pub(crate) const TALLY_1_0: &str = include_str!(concat!(
+    env!("LD60_ASSETS"),
+    "/levels/tally2/firmware-1.0.fw"
+));
+pub(crate) const SUMMA: &str =
+    include_str!(concat!(env!("LD60_ASSETS"), "/levels/summa6/firmware.fw"));
 
 pub(crate) fn target(revision: Revision, device: DeviceKind) -> Target {
     let chip = ChipSpec::Calco(ChipInfo {

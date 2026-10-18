@@ -1,10 +1,12 @@
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use ld60_devices::{BoardRev, Fault};
 use ld60_levels::{Catalog, GAME_SEED, LevelError, LevelSource, Variant};
 
-static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
+const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
 
 const SEEDS: std::ops::Range<u64> = 0..256;
 /// Levels whose buggy firmware checks a wrong key code.

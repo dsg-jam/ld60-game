@@ -15,10 +15,17 @@ pub use session::{Session, Stop};
 use ld60_devices::BoardRev;
 use ld60_levels::{Catalog, LevelSource, Variant};
 
+/// The level folders in the repository.
+pub const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
+
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+pub fn catalog() -> Result<Catalog> {
+    Ok(Catalog::read(std::path::Path::new(LEVELS))?)
+}
+
 pub fn find_level(path: &str) -> Result<LevelSource> {
-    Catalog::on_disk()?
+    catalog()?
         .find(path)
         .cloned()
         .ok_or_else(|| format!("unknown level '{path}'. Run 'cli list' to see all levels.").into())
