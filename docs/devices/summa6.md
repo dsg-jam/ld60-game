@@ -35,6 +35,23 @@ Each annunciator is lit by one `ANN` bit. The bit depends on the board.
 
 RAM holds random values after power on. The firmware has to clear the display.
 
+## End of line tests
+
+The factory runs these tests on every unit. Power on the device, then press
+the keys of each line and check the display. Spaces only group the keys.
+
+| Keys        | Display |
+| ----------- | ------- |
+| (power on)  | 000000  |
+| `C 123456`  | 123456  |
+| `C 7890`    | 007890  |
+| `C 12+34=`  | 000046  |
+| `C 99+1=`   | 000100  |
+| `C 1000-1=` | 000999  |
+| `C 50-8=`   | 000042  |
+
+The customer can test more than this list.
+
 ## Known faults
 
 - Liquid damage can leave a RAM bit stuck at 0 or 1.
