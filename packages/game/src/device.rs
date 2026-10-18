@@ -1,3 +1,4 @@
+mod emulator;
 mod summa6;
 
 use std::f32::consts::FRAC_PI_2;
@@ -24,7 +25,7 @@ pub(crate) struct DevicePlugin;
 impl Plugin for DevicePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DeviceKey>()
-            .add_plugins(summa6::Summa6Plugin)
+            .add_plugins((emulator::EmulatorPlugin, summa6::Summa6Plugin))
             .add_systems(
                 Update,
                 (

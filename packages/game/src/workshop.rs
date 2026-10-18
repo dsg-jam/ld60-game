@@ -40,7 +40,7 @@ fn spawn_stage(mut commands: Commands) {
     commands.spawn((Name::new("lamp"), Lamp, desk.place(LAMP_SPOT, LAMP_YAW)));
     commands.spawn((
         Name::new("summa6"),
-        Summa6,
+        Summa6::for_level(&ld60_levels::CATALOG[0]),
         desk.place(SUMMA6_SPOT, SUMMA6_YAW),
     ));
     commands.spawn((

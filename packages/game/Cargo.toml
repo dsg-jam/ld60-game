@@ -13,6 +13,8 @@ publish = { workspace = true }
 debug_port = ["bevy/bevy_remote", "dep:serde_json"]
 
 [dependencies]
+ld60-devices = { workspace = true }
+ld60-levels = { workspace = true }
 serde_json = { workspace = true, features = ["std"], optional = true }
 
 [dependencies.bevy]
