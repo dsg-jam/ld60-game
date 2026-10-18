@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use bevy::prelude::*;
-use ld60_levels::{CATALOG, Level, LevelError, LevelSource};
+use ld60_levels::{CATALOG, Level, LevelError, Variant};
 
 use super::desk::DeskLayout;
 use super::ticket::JobTicket;
@@ -11,6 +11,8 @@ const DEVICE_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
 const DEVICE_YAW: f32 = 0.15;
 const TICKET_SPOT: Vec2 = Vec2::new(-0.85, 0.5);
 const TICKET_YAW: f32 = 0.12;
+/// Picks the board and the firmware layout of every job.
+const VARIANT_SEED: u64 = 0x1D60;
 
 pub(crate) struct JobPlugin;
 
@@ -36,8 +38,9 @@ impl Plugin for JobPlugin {
 pub(crate) struct Job {
     /// Position in [`CATALOG`].
     pub(crate) index: usize,
-    pub(crate) source: &'static LevelSource,
     pub(crate) level: Level,
+    /// The firmware the device comes in with.
+    pub(crate) buggy: String,
     /// Set once flashed firmware passes all of the customer's tests.
     pub(crate) repaired: bool,
     /// Set once the repaired job's ticket carries the shop stamp.
@@ -57,10 +60,11 @@ impl Job {
     /// The job at `index` in [`CATALOG`], or `None` after the last one.
     pub(crate) fn load(index: usize) -> Option<Result<Self, LevelError>> {
         let source = CATALOG.get(index)?;
-        Some(source.load().map(|level| Self {
+        let variant = Variant::new(source, VARIANT_SEED);
+        Some(variant.map(|Variant { level, buggy, .. }| Self {
             index,
-            source,
             level,
+            buggy,
             repaired: false,
             stamped: false,
         }))
@@ -74,13 +78,13 @@ impl Job {
         commands.spawn((
             Name::new("device"),
             JobItem,
-            Handheld::for_level(job.source),
+            Handheld::for_job(&job.level, &job.buggy),
             desk.place(DEVICE_SPOT, DEVICE_YAW),
         ));
         commands.spawn((
             Name::new("job ticket"),
             JobItem,
-            JobTicket::for_level(job.source),
+            JobTicket::for_level(&job.level),
             desk.place(TICKET_SPOT, TICKET_YAW),
         ));
     }

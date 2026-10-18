@@ -154,7 +154,7 @@ impl Editor {
         text.viewport.offset.y = 0.0;
         match job {
             Some(job) => {
-                text.queue_edit(TextEdit::Insert(job.source.buggy.into()));
+                text.queue_edit(TextEdit::Insert(job.buggy.as_str().into()));
                 text.queue_edit(TextEdit::TextStart(false));
                 status.0.clear();
             }

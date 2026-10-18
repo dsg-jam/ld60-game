@@ -3,7 +3,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{input::keyboard::Key, prelude::*};
 use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
-use ld60_levels::{Level, LevelError, LevelSource};
+use ld60_levels::{Level, LevelError};
 
 use super::emulator::Emulator;
 use super::{DeviceButton, Holdable};
@@ -135,13 +135,18 @@ impl Plugin for HandheldPlugin {
 #[derive(Component, Debug)]
 #[require(Holdable)]
 pub(crate) struct Handheld {
-    level: &'static LevelSource,
+    level: Level,
+    /// The faulty firmware it comes in with.
+    buggy: String,
 }
 
 impl Handheld {
-    /// A unit as it comes in for `level`, with its faulty firmware.
-    pub(crate) fn for_level(level: &'static LevelSource) -> Self {
-        Self { level }
+    /// A unit as it comes in for `level`, running `buggy`.
+    pub(crate) fn for_job(level: &Level, buggy: &str) -> Self {
+        Self {
+            level: level.clone(),
+            buggy: buggy.into(),
+        }
     }
 
     fn on_add(
@@ -156,17 +161,7 @@ impl Handheld {
         let Ok(unit) = units.get(add.entity) else {
             return;
         };
-        let level = match unit.level.load() {
-            Ok(level) => level,
-            Err(err) => {
-                error!(
-                    error = &err as &dyn Error,
-                    "level {} does not load", unit.level.path
-                );
-                return;
-            }
-        };
-
+        let level = &unit.level;
         let model = Model::of(level.device);
         let digits = level.device.digits();
         let lcd_canvas = lcd::canvas_size(digits).as_vec2();
@@ -180,7 +175,7 @@ impl Handheld {
         let keypad = Keypad::new(model.rows, &STYLE, &body, model.keypad_spot);
         let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
         let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
-        let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, &level);
+        let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, level);
         let sticker_seed = Sticker::seed(&level.serial);
         let sticker_spot = body
             .top_spot(model.sticker_spot)
@@ -192,7 +187,7 @@ impl Handheld {
         };
 
         let mut entity = commands.entity(add.entity);
-        match Self::build_device(unit.level, &level) {
+        match unit.build_device() {
             Ok(device) => {
                 entity.insert(Emulator::power_on(device));
             }
@@ -228,9 +223,9 @@ impl Handheld {
         });
     }
 
-    fn build_device(source: &LevelSource, level: &Level) -> Result<AnyDevice, LevelError> {
-        let rom = ld60_levels::initial_rom(level, source.buggy)?;
-        ld60_levels::device(level, rom)
+    fn build_device(&self) -> Result<AnyDevice, LevelError> {
+        let rom = ld60_levels::initial_rom(&self.level, &self.buggy)?;
+        ld60_levels::device(&self.level, rom)
     }
 
     fn sticker_text(model: &Model, level: &Level) -> String {
