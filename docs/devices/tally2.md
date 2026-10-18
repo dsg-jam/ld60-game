@@ -34,3 +34,17 @@ The Tally 2 has no annunciators.
 ## Power on
 
 RAM holds random values after power on. The firmware has to clear the display.
+
+## End of line tests
+
+The factory runs these tests on every unit. Power on the device, then press
+the keys of each line and check the display. Spaces only group the keys.
+
+| Keys       | Display |
+| ---------- | ------- |
+| (power on) | 00      |
+| `C +`      | 01      |
+| `C +++`    | 03      |
+| `C +++C`   | 00      |
+
+The customer can test more than this list.
