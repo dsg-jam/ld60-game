@@ -4,6 +4,7 @@ use ld60_levels::Level;
 use super::counter::CounterLayout;
 use super::pickup::{Earnings, Pickup};
 use crate::audio::{Play, Sound};
+use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, View};
@@ -14,7 +15,6 @@ const SHEET_SIZE: Vec2 = Vec2::new(0.12, 0.163);
 const CANVAS_SIZE: UVec2 = UVec2::new(560, 760);
 /// Lifts the slip onto the sticky notes there.
 const SHEET_GAP: f32 = 0.0025;
-const FOOTER: &str = "DSG SERVICE BENCH";
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 344.0;
 
@@ -87,9 +87,15 @@ impl Receipt {
             return;
         };
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
-        let page = Paper::spawn_page(&mut commands, &canvas, (1, 1), FOOTER, |page| {
-            receipt.write(page);
-        });
+        let page = Paper::spawn_page(
+            &mut commands,
+            &canvas,
+            (1, 1),
+            Message::new("ticket-footer"),
+            |page| {
+                receipt.write(page);
+            },
+        );
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|slip| {
             sheet = slip
@@ -109,30 +115,32 @@ impl Receipt {
 
     fn write(&self, page: &mut ChildSpawnerCommands) {
         let (title, paid) = match &self.pickup {
-            Pickup::Paid(amount) => ("PICKUP", *amount),
-            Pickup::HandedBack { .. } => ("HANDED BACK", 0),
-            Pickup::Left(_) => ("NOT REPAIRED", 0),
+            Pickup::Paid(amount) => ("receipt-title-paid", *amount),
+            Pickup::HandedBack { .. } => ("receipt-title-handed-back", 0),
+            Pickup::Left(_) => ("receipt-title-left", 0),
         };
-        page.spawn(Paper::title(title));
-        page.spawn(Paper::faded("DSG service bench"));
+        page.spawn(Paper::title(Message::new(title)));
+        page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
-            ("JOB", self.job.clone()),
-            ("CUSTOMER", self.customer.clone()),
-            ("PAID", format!("${paid}")),
+            ("ticket-job", Localized::verbatim(&self.job)),
+            ("ticket-customer", Localized::verbatim(&self.customer)),
+            (
+                "receipt-paid",
+                Message::new("receipt-amount").with("amount", paid).into(),
+            ),
         ] {
             page.spawn(Paper::row([
-                (label.into(), LABEL_WIDTH),
+                (Message::new(label).into(), LABEL_WIDTH),
                 (value, VALUE_WIDTH),
             ]));
         }
         if let Some(note) = self.pickup.note() {
-            page.spawn(Paper::heading("NOTE FROM THE CUSTOMER"));
-            page.spawn(Paper::text(format!("\"{note}\"")));
+            page.spawn(Paper::heading(Message::new("receipt-note")));
+            page.spawn(Paper::text(Message::new("paper-quote").with("text", note)));
         }
-        page.spawn(Paper::heading("TILL"));
-        page.spawn(Paper::text(format!(
-            "${} taken in so far.",
-            self.earnings.0
-        )));
+        page.spawn(Paper::heading(Message::new("receipt-till")));
+        page.spawn(Paper::text(
+            Message::new("receipt-till-total").with("amount", self.earnings.0),
+        ));
     }
 }

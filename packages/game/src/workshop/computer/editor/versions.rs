@@ -13,13 +13,14 @@ use bevy::{
 use ld60_levels::LevelError;
 
 use self::changes::LineChanges;
-use self::list::{MAX_VERSIONS, Removal, SaveError, Version, VersionList};
+use self::list::{MAX_VERSIONS, Removal, SaveError, VersionList};
 use super::footer::{Flashed, Status};
 use super::page::{ActivePage, Page};
 use super::undo::Undo;
 use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+use crate::locale::{Locale, Localized, Message};
 use crate::workshop::job::Job;
 
 /// Width of the label column, so the marks line up.
@@ -35,7 +36,8 @@ impl Plugin for VersionsPlugin {
                 (
                     Versions::load_job,
                     Versions::disarm.run_if(resource_changed::<ActivePage>),
-                    Versions::render.run_if(resource_changed::<Versions>),
+                    Versions::render
+                        .run_if(resource_changed::<Versions>.or_eager(resource_changed::<Locale>)),
                 )
                     .chain(),
             )
@@ -110,6 +112,7 @@ impl Versions {
 
     fn render(
         versions: Res<Versions>,
+        locale: Res<Locale>,
         mut rows: Query<(
             &VersionRow,
             &mut Node,
@@ -118,18 +121,34 @@ impl Versions {
             &mut BackgroundColor,
         )>,
     ) {
-        for (row, mut node, mut text, mut color, mut background) in &mut rows {
+        for (version_row, mut node, mut text, mut color, mut background) in &mut rows {
             let Some((list, version)) = versions
                 .list
                 .as_ref()
-                .and_then(|list| Some((list, list.versions().get(row.0)?)))
+                .and_then(|list| Some((list, list.versions().get(version_row.0)?)))
             else {
                 node.display = Display::None;
                 continue;
             };
             node.display = Display::Flex;
-            text.0 = version.row(list.is_flashed(version));
-            let selected = list.selected() == row.0;
+            let text_of = |message: Message| locale.text(&message.into());
+            let auto = if version.auto {
+                text_of(Message::new("editor-version-auto"))
+            } else {
+                String::new()
+            };
+            let flashed = if list.is_flashed(version) {
+                text_of(Message::new("editor-version-flashed"))
+            } else {
+                String::new()
+            };
+            text.0 = VersionRow::text(
+                version.number,
+                &text_of(version.label.clone()),
+                &auto,
+                &flashed,
+            );
+            let selected = list.selected() == version_row.0;
             color.0 = if selected { Color::BLACK } else { PHOSPHOR };
             background.0 = if selected { PHOSPHOR } else { Color::NONE };
         }
@@ -143,20 +162,20 @@ impl Versions {
 
     /// The time on the job, the lines changed from the factory firmware and
     /// how the source assembles.
-    fn label(job: &Job, factory: &str, source: &str, on_job: Duration) -> String {
+    fn label(job: &Job, factory: &str, source: &str, on_job: Duration) -> Message {
         let seconds = on_job.as_secs();
         let changes = LineChanges::between(factory, source);
         let assembled = match ld60_levels::assemble(&job.level, source) {
-            Ok(assembly) => format!("{} BYTES", assembly.byte_len()),
-            Err(LevelError::Assemble(errors)) if errors.len() == 1 => "1 ERROR".into(),
-            Err(LevelError::Assemble(errors)) => format!("{} ERRORS", errors.len()),
-            Err(_) => "ERROR".into(),
+            Ok(assembly) => Message::new("editor-version-bytes").with("bytes", assembly.byte_len()),
+            Err(LevelError::Assemble(errors)) => {
+                Message::new("editor-version-errors").with("errors", errors.len())
+            }
+            Err(_) => Message::new("editor-version-error"),
         };
-        format!(
-            "{:02}:{:02}  {changes}  {assembled}",
-            seconds / 60,
-            seconds % 60
-        )
+        Message::new("editor-version-label")
+            .with("time", format!("{:02}:{:02}", seconds / 60, seconds % 60))
+            .with("changes", changes.to_string())
+            .with("result", assembled)
     }
 
     /// `ld60.versions` returns the versions of the current job and the
@@ -165,6 +184,7 @@ impl Versions {
     fn debug_state(
         In(_): In<Option<serde_json::Value>>,
         versions: Res<Versions>,
+        locale: Res<Locale>,
     ) -> bevy::remote::BrpResult {
         let Some(list) = &versions.list else {
             return Ok(serde_json::Value::Null);
@@ -175,7 +195,7 @@ impl Versions {
             .map(|version| {
                 serde_json::json!({
                     "number": version.number,
-                    "label": version.label,
+                    "label": locale.text(&version.label.clone().into()),
                     "flashed": list.is_flashed(version),
                     "auto": version.auto,
                     "text": version.text,
@@ -214,7 +234,7 @@ impl VersionsPage {
                     Children::spawn(SpawnIter(Action::ALL.into_iter().map(move |action| {
                         (
                             action,
-                            Text::new(action.label()),
+                            Localized::from(action.label()),
                             font.clone(),
                             TextColor(PHOSPHOR_DIM),
                         )
@@ -246,6 +266,15 @@ impl VersionsPage {
 }
 
 impl VersionRow {
+    /// The line of the version list. A long label is cut, so the marks line
+    /// up.
+    fn text(number: u32, label: &str, auto: &str, flashed: &str) -> String {
+        let label: String = label.chars().take(LABEL_WIDTH - 1).collect();
+        format!("{number:>2}  {label:<LABEL_WIDTH$}{auto:<5}{flashed}")
+            .trim_end()
+            .into()
+    }
+
     fn select_on_click(
         click: On<PointerClick>,
         rows: Query<&VersionRow>,
@@ -263,12 +292,12 @@ impl VersionRow {
 impl Action {
     const ALL: [Self; 3] = [Self::Save, Self::Restore, Self::Remove];
 
-    fn label(self) -> &'static str {
-        match self {
-            Self::Save => "S SAVE",
-            Self::Restore => "ENTER RESTORE",
-            Self::Remove => "DEL REMOVE",
-        }
+    fn label(self) -> Message {
+        Message::new(match self {
+            Self::Save => "editor-action-save",
+            Self::Restore => "editor-action-restore",
+            Self::Remove => "editor-action-remove",
+        })
     }
 
     /// Arrows move the selection. The page takes all other keys too, so
@@ -322,23 +351,25 @@ impl Perform {
         time: Res<Time<Real>>,
         mut versions: ResMut<Versions>,
         editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
-        mut status: Single<&mut Text, With<Status>>,
+        mut status: Single<&mut Localized, With<Status>>,
         mut active: ResMut<ActivePage>,
     ) {
         let (mut editor, mut undo) = editor.into_inner();
         let on_job = time.elapsed().saturating_sub(versions.started);
         let (Some(job), Some(list)) = (job, versions.list.as_mut()) else {
-            status.0 = "NO JOB ON THE BENCH".into();
+            **status = Message::new("editor-no-job").into();
             return;
         };
-        status.0 = match perform.0 {
+        let message = match perform.0 {
             Action::Save => {
                 let source = editor.value().to_string();
                 let label = Versions::label(&job, &list.factory().text, &source, on_job);
                 match list.save(&source, label) {
-                    Ok(number) => format!("SAVED AS VERSION {number}"),
-                    Err(SaveError::Duplicate(number)) => format!("SAME AS VERSION {number}"),
-                    Err(SaveError::Full) => "NO ROOM. REMOVE A VERSION FIRST.".into(),
+                    Ok(number) => Message::new("editor-saved").with("version", number),
+                    Err(SaveError::Duplicate(number)) => {
+                        Message::new("editor-duplicate").with("version", number)
+                    }
+                    Err(SaveError::Full) => Message::new("editor-full"),
                 }
             }
             Action::Restore => {
@@ -352,37 +383,24 @@ impl Perform {
                         undo.replace(&mut editor, &text);
                         active.0 = Page::Source;
                         match kept {
-                            Some(kept) => {
-                                format!("RESTORED VERSION {number}. KEPT YOUR CHANGES AS {kept}.")
-                            }
-                            None => format!("RESTORED VERSION {number}"),
+                            Some(kept) => Message::new("editor-restored-kept")
+                                .with("version", number)
+                                .with("kept", kept),
+                            None => Message::new("editor-restored").with("version", number),
                         }
                     }
-                    Err(_) => "NO ROOM TO KEEP YOUR CHANGES. REMOVE A VERSION FIRST.".into(),
+                    Err(_) => Message::new("editor-full-keep"),
                 }
             }
             Action::Remove => match list.remove_selected() {
-                Removal::Factory => "THE FACTORY VERSION STAYS".into(),
-                Removal::Armed(number) => format!("PRESS DEL AGAIN TO REMOVE VERSION {number}"),
-                Removal::Removed(number) => format!("REMOVED VERSION {number}"),
+                Removal::Factory => Message::new("editor-factory-stays"),
+                Removal::Armed(number) => {
+                    Message::new("editor-remove-armed").with("version", number)
+                }
+                Removal::Removed(number) => Message::new("editor-removed").with("version", number),
             },
         };
-    }
-}
-
-impl Version {
-    /// The line of the version list. A long label is cut, so the marks
-    /// line up.
-    fn row(&self, flashed: bool) -> String {
-        let label: String = self.label.chars().take(LABEL_WIDTH - 1).collect();
-        let auto = if self.auto { "AUTO" } else { "" };
-        let flashed = if flashed { "FLASHED" } else { "" };
-        format!(
-            "{:>2}  {label:<LABEL_WIDTH$}{auto:<5}{flashed}",
-            self.number
-        )
-        .trim_end()
-        .into()
+        **status = message.into();
     }
 }
 
@@ -392,14 +410,8 @@ mod tests {
 
     #[test]
     fn rows_keep_the_marks_in_line() {
-        let version = |label: &str, auto| Version {
-            number: 12,
-            label: label.into(),
-            text: String::new(),
-            auto,
-        };
-        let long = version("123:45  +100 -100  100 ERRORS", true).row(true);
-        let short = version("00:05  +1 -1  42 BYTES", false).row(true);
+        let long = VersionRow::text(12, "123:45  +100 -100  100 ERRORS", "AUTO", "FLASHED");
+        let short = VersionRow::text(12, "00:05  +1 -1  42 BYTES", "", "FLASHED");
         assert_eq!(long.find("AUTO"), Some(4 + LABEL_WIDTH));
         assert_eq!(long.find("FLASHED"), short.find("FLASHED"));
         assert_eq!(short.find("FLASHED"), Some(4 + LABEL_WIDTH + 5));
@@ -410,7 +422,7 @@ mod tests {
         let mut versions = Versions::default();
         assert!(versions.sync(Some((0, "first")), Duration::ZERO));
         let list = versions.list.as_mut().unwrap();
-        list.save("fix", "A".into()).unwrap();
+        list.save("fix", Message::new("A")).unwrap();
         assert!(!versions.sync(Some((0, "first")), Duration::ZERO));
         assert_eq!(versions.list.as_ref().unwrap().versions().len(), 2);
 

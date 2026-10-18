@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 use ld60_devices::{Annunciator, Board, DeviceKind};
 
+use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 
 const KEY_WIDTH: f32 = 120.0;
@@ -10,80 +11,86 @@ const CODE_WIDTH: f32 = 120.0;
 const STEPS_WIDTH: f32 = 200.0;
 const DISPLAY_WIDTH: f32 = 160.0;
 
-pub(super) fn footer(device: DeviceKind) -> &'static str {
-    match device {
+pub(super) fn footer(device: DeviceKind) -> Localized {
+    Localized::verbatim(match device {
         DeviceKind::Tally2 => "DSG ELECTRONICS   TALLY 2",
         DeviceKind::Summa6 => "DSG ELECTRONICS   SUMMA 6",
-    }
+    })
 }
 
 pub(super) fn write(page: &mut ChildSpawnerCommands, board: &Board) {
     let (title, summary) = match board.kind {
-        DeviceKind::Tally2 => ("TALLY 2", "2-digit tally counter"),
-        DeviceKind::Summa6 => ("SUMMA 6", "6-digit adding machine"),
+        DeviceKind::Tally2 => ("TALLY 2", "service-summary-tally2"),
+        DeviceKind::Summa6 => ("SUMMA 6", "service-summary-summa6"),
     };
-    page.spawn(Paper::title(title));
-    page.spawn(Paper::faded(format!(
-        "{summary}. Service sheet for board {}.",
-        board.name()
-    )));
+    page.spawn(Paper::title(Localized::verbatim(title)));
+    page.spawn(Paper::faded(
+        Message::new(summary).with("board", board.name()),
+    ));
 
-    page.spawn(Paper::heading("KEY CODES"));
+    page.spawn(Paper::heading(Message::new("service-key-codes")));
     key_codes(page, board);
 
     let cells = board.display_cells();
-    page.spawn(Paper::heading("DISPLAY"));
-    page.spawn(Paper::text(format!(
-        "{} digits, M{:X} to M{:X} from left to right.",
-        cells.clone().count(),
-        cells.start(),
-        cells.end()
-    )));
-    page.spawn(Paper::text("Values above 9 show broken segments."));
+    page.spawn(Paper::heading(Message::new("service-display")));
+    page.spawn(Paper::text(
+        Message::new("service-display-cells")
+            .with("digits", cells.clone().count())
+            .with("first", format!("M{:X}", cells.start()))
+            .with("last", format!("M{:X}", cells.end())),
+    ));
+    page.spawn(Paper::text(Message::new("service-display-broken")));
 
     if !board.annunciators.is_empty() {
-        page.spawn(Paper::heading("ANNUNCIATORS"));
+        page.spawn(Paper::heading(Message::new("service-annunciators")));
         for &(annunciator, bit) in board.annunciators {
-            let name = match annunciator {
-                Annunciator::Minus => "minus sign",
-                Annunciator::Error => "error mark",
+            let id = match annunciator {
+                Annunciator::Minus => "service-annunciator-minus",
+                Annunciator::Error => "service-annunciator-error",
             };
-            page.spawn(Paper::text(format!("ANN bit {bit} lights the {name}.")));
+            page.spawn(Paper::text(Message::new(id).with("bit", bit)));
         }
     }
 
-    page.spawn(Paper::heading(format!("BOARD {}", board.name())));
-    page.spawn(Paper::text(
-        "CalCo chip, firmware in a 256 byte EPROM socket.",
+    page.spawn(Paper::heading(
+        Message::new("service-board").with("board", board.name()),
     ));
-    page.spawn(Paper::text("RAM holds random values after power on."));
+    page.spawn(Paper::text(Message::new("service-board-chip")));
+    page.spawn(Paper::text(Message::new("service-board-ram")));
 
-    page.spawn(Paper::heading("KNOWN FAULTS"));
-    page.spawn(Paper::text("- Liquid can leave a RAM bit stuck at 0 or 1."));
-    page.spawn(Paper::text("- Old EPROMs can lose bits."));
+    page.spawn(Paper::heading(Message::new("service-known-faults")));
+    for fault in ["service-fault-liquid", "service-fault-eprom"] {
+        page.spawn(Paper::text(
+            Message::new("paper-bullet").with("text", Message::new(fault)),
+        ));
+    }
 }
 
 /// The factory checklist, on its own page.
 pub(super) fn write_line_tests(page: &mut ChildSpawnerCommands, device: DeviceKind) {
-    page.spawn(Paper::title("END OF LINE TESTS"));
-    page.spawn(Paper::faded("Every unit passes these at the factory."));
-    page.spawn(Paper::text(
-        "Power on, then press the keys of each line and check the display.",
-    ));
-    page.spawn(Paper::text("Spaces only group the keys."));
+    page.spawn(Paper::title(Message::new("service-line-tests")));
+    page.spawn(Paper::faded(Message::new("service-line-tests-factory")));
+    page.spawn(Paper::text(Message::new("service-line-tests-how")));
+    page.spawn(Paper::text(Message::new("service-line-tests-spaces")));
     page.spawn(Paper::row([
-        ("KEYS".into(), STEPS_WIDTH),
-        ("DISPLAY".into(), DISPLAY_WIDTH),
+        (Message::new("service-line-tests-keys").into(), STEPS_WIDTH),
+        (
+            Message::new("service-line-tests-display").into(),
+            DISPLAY_WIDTH,
+        ),
     ]));
     for test in device.line_tests() {
+        let steps = if test.keys.is_empty() {
+            Message::new("service-line-tests-power-on").into()
+        } else {
+            Localized::verbatim(test.keys)
+        };
         page.spawn(Paper::row([
-            (test.steps().into(), STEPS_WIDTH),
-            (test.display.into(), DISPLAY_WIDTH),
+            (steps, STEPS_WIDTH),
+            (Localized::verbatim(test.display), DISPLAY_WIDTH),
         ]));
     }
-    page.spawn(Paper::faded(
-        "Flashing the firmware also powers the unit on.",
-    ));
+    page.spawn(Paper::faded(Message::new("service-line-tests-flash")));
 }
 
 /// Digit keys share one row, the other keys get a row each.
@@ -92,14 +99,24 @@ fn key_codes(page: &mut ChildSpawnerCommands, board: &Board) {
         board.keys.iter().partition(|(key, _)| key.is_ascii_digit());
     if let (Some((first, low)), Some((last, high))) = (digits.first(), digits.last()) {
         page.spawn(Paper::row([
-            (format!("{first} to {last}"), KEY_WIDTH),
-            (format!("{low:02X} to {high:02X}"), CODE_WIDTH),
+            (range(first.to_string(), last.to_string()), KEY_WIDTH),
+            (
+                range(format!("{low:02X}"), format!("{high:02X}")),
+                CODE_WIDTH,
+            ),
         ]));
     }
     for (key, code) in others {
         page.spawn(Paper::row([
-            (key.to_string(), KEY_WIDTH),
-            (format!("{code:02X}"), CODE_WIDTH),
+            (Localized::verbatim(key.to_string()), KEY_WIDTH),
+            (Localized::verbatim(format!("{code:02X}")), CODE_WIDTH),
         ]));
     }
+}
+
+fn range(first: String, last: String) -> Localized {
+    Message::new("service-range")
+        .with("first", first)
+        .with("last", last)
+        .into()
 }

@@ -31,6 +31,7 @@ use self::undo::Undo;
 use self::versions::VersionsPage;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+use crate::locale::{Localized, Message};
 use crate::parts::screen::UiCanvas;
 use crate::workshop::job::Job;
 
@@ -100,7 +101,7 @@ impl Editor {
             font_size: FontSize::Px(FONT_SIZE),
             ..default()
         };
-        let title = |text| (Text::new(text), font.clone(), TextColor(Color::BLACK));
+        let title = |text: Localized| (text, font.clone(), TextColor(Color::BLACK));
         let source = EditableText {
             visible_lines: None,
             allow_newlines: true,
@@ -125,8 +126,8 @@ impl Editor {
                     },
                     BackgroundColor(PHOSPHOR),
                     children![
-                        (PageTitle, title("FIRMWARE EDITOR")),
-                        (title(ChipTitle::NONE), ChipTitle)
+                        (PageTitle, title(Page::Source.title().into())),
+                        (title(Localized::verbatim(ChipTitle::NONE)), ChipTitle)
                     ],
                 ),
                 (
@@ -155,7 +156,12 @@ impl Editor {
                 ),
                 Notes::bundle(font.clone()),
                 VersionsPage::bundle(font.clone()),
-                (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
+                (
+                    Status,
+                    Localized::verbatim(""),
+                    font.clone(),
+                    TextColor(PHOSPHOR)
+                ),
                 (
                     Node {
                         column_gap: px(FONT_SIZE * 2.0),
@@ -164,7 +170,7 @@ impl Editor {
                     Children::spawn(SpawnIter(Command::ALL.into_iter().map(move |command| {
                         (
                             command,
-                            Text::new(command.label(true)),
+                            Localized::from(command.label(true)),
                             font.clone(),
                             TextColor(PHOSPHOR_DIM),
                         )
@@ -179,7 +185,7 @@ impl Editor {
         job: Option<Res<Job>>,
         mut loaded: Local<Option<usize>>,
         editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
-        mut status: Single<&mut Text, With<Status>>,
+        mut status: Single<&mut Localized, With<Status>>,
     ) {
         let index = job.as_ref().map(|job| job.index);
         if index == *loaded {
@@ -192,9 +198,9 @@ impl Editor {
         match job {
             Some(job) => {
                 undo.replace(&mut text, &job.buggy);
-                status.0.clear();
+                **status = Localized::verbatim("");
             }
-            None => status.0 = "NO MORE JOBS TONIGHT.".into(),
+            None => **status = Message::new("editor-no-more-jobs").into(),
         }
         undo.reset();
     }

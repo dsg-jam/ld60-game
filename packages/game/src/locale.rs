@@ -4,15 +4,24 @@ mod messages;
 use std::sync::Arc;
 
 use bevy::prelude::*;
-use fluent_bundle::{FluentResource, concurrent::FluentBundle};
+use fluent_bundle::{FluentArgs, FluentResource, FluentValue, concurrent::FluentBundle};
 use unic_langid::{LanguageIdentifier, langid};
 
-pub(crate) use self::localized::Localized;
+pub(crate) use self::localized::{Arg, Localized, Message};
 use self::messages::{Messages, MessagesLoader};
 
 const LANGUAGE: LanguageIdentifier = langid!("en");
 /// The Fluent files of each language, in `locales/<language>/`.
-const FILES: &[&str] = &["ui.ftl"];
+const FILES: &[&str] = &[
+    "datasheet.ftl",
+    "device.ftl",
+    "editor.ftl",
+    "paper.ftl",
+    "receipt.ftl",
+    "service.ftl",
+    "ticket.ftl",
+    "ui.ftl",
+];
 
 pub(crate) struct LocalePlugin;
 
@@ -50,18 +59,35 @@ impl FromWorld for Locale {
 }
 
 impl Locale {
-    /// The message `id`. It's empty until the messages are loaded, and shows
-    /// the ID if there is no such message.
-    pub(crate) fn text(&self, id: &str) -> String {
+    /// The text in the player's language. A message is empty until the
+    /// messages are loaded, and shows its ID if there is no such message.
+    pub(crate) fn text(&self, localized: &Localized) -> String {
+        match localized {
+            Localized::Message(message) => self.message(message),
+            Localized::Verbatim(text) => text.clone(),
+        }
+    }
+
+    fn message(&self, message: &Message) -> String {
         let Some(bundle) = &self.bundle else {
             return String::new();
         };
-        let Some(pattern) = bundle.get_message(id).and_then(|message| message.value()) else {
+        let id = message.id;
+        let Some(pattern) = bundle.get_message(id).and_then(|found| found.value()) else {
             warn!("no message `{id}` in {}", self.language);
             return id.to_owned();
         };
+        let mut args = FluentArgs::new();
+        for (name, arg) in &message.args {
+            let value = match arg {
+                Arg::Number(number) => FluentValue::from(*number),
+                Arg::Text(text) => FluentValue::from(text.as_str()),
+                Arg::Message(message) => FluentValue::from(self.message(message)),
+            };
+            args.set(*name, value);
+        }
         let mut errors = Vec::new();
-        let text = bundle.format_pattern(pattern, None, &mut errors);
+        let text = bundle.format_pattern(pattern, Some(&args), &mut errors);
         for error in errors {
             warn!("message `{id}`: {error}");
         }

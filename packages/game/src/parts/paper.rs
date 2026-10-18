@@ -6,6 +6,7 @@ use bevy::{
 };
 
 use super::screen::UiCanvas;
+use crate::locale::{Localized, Message};
 use crate::player::focus::{Focus, Focused};
 
 pub(crate) const PAPER: Color = Color::srgb_u8(0xf2, 0xec, 0xdc);
@@ -64,9 +65,10 @@ impl Paper {
         commands: &mut Commands,
         canvas: &UiCanvas,
         (number, count): (usize, usize),
-        footer: &str,
+        footer: impl Into<Localized>,
         content: impl FnOnce(&mut ChildSpawnerCommands),
     ) -> Entity {
+        let footer: Localized = footer.into();
         commands
             .spawn((
                 Node {
@@ -99,7 +101,12 @@ impl Paper {
                             justify_content: JustifyContent::Center,
                             ..default()
                         },
-                        children![Self::faded(format!("{footer}   PAGE {number} OF {count}"))],
+                        children![Self::faded(
+                            Message::new("paper-footer")
+                                .with("footer", footer)
+                                .with("page", number)
+                                .with("pages", count)
+                        )],
                     ));
                     bottom.spawn(Self::corner_mark(">", number < count));
                 });
@@ -124,7 +131,7 @@ impl Paper {
             } else {
                 Visibility::Hidden
             },
-            children![Self::print(arrow, HEADING_SIZE, INK)],
+            children![Self::print(Localized::verbatim(arrow), HEADING_SIZE, INK)],
         )
     }
 
@@ -148,24 +155,24 @@ impl Paper {
         )
     }
 
-    pub(crate) fn title(text: impl Into<String>) -> impl Bundle {
+    pub(crate) fn title(text: impl Into<Localized>) -> impl Bundle {
         Self::print(text, TITLE_SIZE, INK)
     }
 
-    pub(crate) fn heading(text: impl Into<String>) -> impl Bundle {
+    pub(crate) fn heading(text: impl Into<Localized>) -> impl Bundle {
         Self::print(text, HEADING_SIZE, INK)
     }
 
-    pub(crate) fn text(text: impl Into<String>) -> impl Bundle {
+    pub(crate) fn text(text: impl Into<Localized>) -> impl Bundle {
         Self::print(text, TEXT_SIZE, INK)
     }
 
-    pub(crate) fn faded(text: impl Into<String>) -> impl Bundle {
+    pub(crate) fn faded(text: impl Into<Localized>) -> impl Bundle {
         Self::print(text, TEXT_SIZE, INK_FADED)
     }
 
     /// A table row with each cell `width` pixels wide.
-    pub(crate) fn row<const N: usize>(cells: [(String, f32); N]) -> impl Bundle {
+    pub(crate) fn row<const N: usize>(cells: [(Localized, f32); N]) -> impl Bundle {
         (
             Node::default(),
             Children::spawn(SpawnIter(cells.into_iter().map(|(text, width)| {
@@ -180,9 +187,9 @@ impl Paper {
         )
     }
 
-    fn print(text: impl Into<String>, size: f32, color: Color) -> impl Bundle {
+    fn print(text: impl Into<Localized>, size: f32, color: Color) -> impl Bundle {
         (
-            Text::new(text),
+            text.into(),
             TextFont {
                 font_size: FontSize::Px(size),
                 ..default()

@@ -9,6 +9,7 @@ use super::job::Job;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
+use crate::locale::{Localized, Message};
 use crate::parts::paper::{PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
@@ -124,7 +125,7 @@ impl Datasheet {
     }
 
     fn print(commands: &mut Commands, canvas: &UiCanvas, revision: Revision) -> Vec<Entity> {
-        let footer = format!("DSG ELECTRONICS   CALCO REV {revision}");
+        let footer = Message::new("datasheet-footer").with("revision", revision.to_string());
         let contents: [fn(&mut ChildSpawnerCommands, Revision); _] = [
             Self::overview,
             Self::instructions,
@@ -139,7 +140,7 @@ impl Datasheet {
                     commands,
                     canvas,
                     (index + 1, contents.len()),
-                    &footer,
+                    footer.clone(),
                     |page| content(page, revision),
                 )
             })
@@ -147,142 +148,150 @@ impl Datasheet {
     }
 
     fn overview(page: &mut ChildSpawnerCommands, revision: Revision) {
-        page.spawn(Paper::title("CALCO"));
-        page.spawn(Paper::faded(
-            "8-bit calculator coprocessor. One decimal digit per byte.",
-        ));
-        page.spawn(Paper::heading("REGISTERS"));
+        page.spawn(Paper::title(Localized::verbatim("CALCO")));
+        page.spawn(Paper::faded(Message::new("datasheet-subtitle")));
+        page.spawn(Paper::heading(Message::new("datasheet-registers")));
         for (name, text, op) in [
-            ("A", "Accumulator. All ALU results go here.", None),
+            (Localized::verbatim("A"), "datasheet-register-a", None),
             (
-                "B",
-                "Pointer for [B+n], counter for DJNZ.",
+                Localized::verbatim("B"),
+                "datasheet-register-b",
                 Some(Op::LdiB(0)),
             ),
-            ("PC", "Program counter. Wraps from FF to 00.", None),
-            ("Z, C", "Zero and carry flags. C is set on borrow.", None),
+            (Localized::verbatim("PC"), "datasheet-register-pc", None),
             (
-                "Stack",
-                "Two return addresses for CALL and RET.",
+                Localized::verbatim("Z, C"),
+                "datasheet-register-flags",
+                None,
+            ),
+            (
+                Message::new("datasheet-stack").into(),
+                "datasheet-register-stack",
                 Some(Op::Call(0)),
             ),
         ] {
             if op.is_none_or(|op| revision.supports(op)) {
-                page.spawn(Paper::row([(name.into(), 80.0), (text.into(), 480.0)]));
+                page.spawn(Paper::row([
+                    (name, 80.0),
+                    (Message::new(text).into(), 480.0),
+                ]));
             }
         }
-        page.spawn(Paper::heading("MEMORY"));
-        page.spawn(Paper::text(
-            "ROM: 256 bytes, 00 to FF. Code cannot read it as data.",
-        ));
-        page.spawn(Paper::text("RAM: 16 cells, M0 to MF."));
-        let registers = if revision.supports(Op::LdiB(0)) {
-            "PC, A, B, Z and C are"
-        } else {
-            "PC, A, Z and C are"
+        page.spawn(Paper::heading(Message::new("datasheet-memory")));
+        page.spawn(Paper::text(Message::new("datasheet-rom")));
+        page.spawn(Paper::text(Message::new("datasheet-ram")));
+        let reset = match (
+            revision.supports(Op::LdiB(0)),
+            revision.supports(Op::Call(0)),
+        ) {
+            (true, true) => "datasheet-reset-b-stack",
+            (true, false) => "datasheet-reset-b",
+            (false, true) => "datasheet-reset-stack",
+            (false, false) => "datasheet-reset",
         };
-        let memory = if revision.supports(Op::Call(0)) {
-            "RAM and stack are"
-        } else {
-            "RAM is"
-        };
-        page.spawn(Paper::text(format!(
-            "Reset: {registers} 0. {memory} undefined."
-        )));
-        page.spawn(Paper::heading("PORTS"));
+        page.spawn(Paper::text(Message::new(reset)));
+        page.spawn(Paper::heading(Message::new("datasheet-ports")));
         for port in PORTS.iter().filter(|port| revision.supports(port.op())) {
             let direction = if port.output { "OUT" } else { "IN" };
             page.spawn(Paper::row([
-                (port.name.into(), 60.0),
-                (direction.into(), 50.0),
-                (format!("{:X}", port.port), 30.0),
-                (port.function.into(), 420.0),
+                (Localized::verbatim(port.name), 60.0),
+                (Localized::verbatim(direction), 50.0),
+                (Localized::verbatim(format!("{:X}", port.port)), 30.0),
+                (Localized::verbatim(port.function), 420.0),
             ]));
         }
     }
 
     fn instructions(page: &mut ChildSpawnerCommands, revision: Revision) {
         const WIDTHS: [f32; 5] = [70.0, 120.0, 314.0, 28.0, 28.0];
-        let row = |cells: [String; 5]| {
+        let row = |cells: [Localized; 5]| {
             let mut widths = WIDTHS.into_iter();
             Paper::row(cells.map(|cell| (cell, widths.next().unwrap_or_default())))
         };
-        page.spawn(Paper::heading("INSTRUCTION SET"));
+        page.spawn(Paper::heading(Message::new("datasheet-instructions")));
         page.spawn(Node {
             flex_direction: FlexDirection::Column,
             row_gap: px(TABLE_ROW_GAP),
             ..default()
         })
         .with_children(|table| {
-            table.spawn(row(
-                ["HEX", "SYNTAX", "OPERATION", "Z", "C"].map(String::from)
-            ));
+            table.spawn(row([
+                Localized::verbatim("HEX"),
+                Message::new("datasheet-syntax").into(),
+                Message::new("datasheet-operation").into(),
+                Localized::verbatim("Z"),
+                Localized::verbatim("C"),
+            ]));
             for doc in INSTRUCTIONS.iter().filter(|doc| revision.supports(doc.op)) {
                 table.spawn(row([
-                    doc.hex.into(),
-                    doc.syntax.into(),
-                    doc.operation.into(),
-                    doc.z.symbol().into(),
-                    doc.c.symbol().into(),
+                    Localized::verbatim(doc.hex),
+                    Localized::verbatim(doc.syntax),
+                    Localized::verbatim(doc.operation),
+                    Localized::verbatim(doc.z.symbol()),
+                    Localized::verbatim(doc.c.symbol()),
                 ]));
             }
         });
-        page.spawn(Paper::faded(
-            "* from result   - unchanged   0 cleared   1 set",
-        ));
-        page.spawn(Paper::faded(
-            "n: cell or offset   ii: byte   aa: address   p: port",
-        ));
+        page.spawn(Paper::faded(Message::new("datasheet-flag-legend")));
+        page.spawn(Paper::faded(Message::new("datasheet-operand-legend")));
     }
 
     fn conditions(page: &mut ChildSpawnerCommands, revision: Revision) {
-        page.spawn(Paper::heading("CONDITIONS"));
+        page.spawn(Paper::heading(Message::new("datasheet-conditions")));
         for cond in Cond::ALL
             .into_iter()
             .filter(|&cond| revision.supports(Op::Jump(cond, 0)))
         {
             page.spawn(Paper::row([
-                (format!("{:X}", cond.code()), 40.0),
-                (cond.mnemonic().into(), 80.0),
-                (format!("jumps if {}", cond.description()), 440.0),
+                (Localized::verbatim(format!("{:X}", cond.code())), 40.0),
+                (Localized::verbatim(cond.mnemonic()), 80.0),
+                (
+                    Message::new("datasheet-condition")
+                        .with("condition", cond.description())
+                        .into(),
+                    440.0,
+                ),
             ]));
         }
         let compares = if revision.supports(Op::Cmp(Addr::Direct(0))) {
-            "CMP or CPI"
+            "datasheet-compare-cmp"
         } else {
-            "CPI"
+            "datasheet-compare-cpi"
         };
-        page.spawn(Paper::faded(format!(
-            "After {compares}, JC jumps if A is lower and JZ if A is equal."
-        )));
+        page.spawn(Paper::faded(Message::new(compares)));
         let notes: Vec<_> = NOTES
             .iter()
             .filter(|note| revision.supports(note.op))
             .collect();
         if !notes.is_empty() {
-            page.spawn(Paper::heading("NOTES"));
+            page.spawn(Paper::heading(Message::new("datasheet-notes")));
         }
         for note in notes {
-            page.spawn(Paper::text(format!("- {}", note.text)));
+            page.spawn(Paper::text(
+                Message::new("paper-bullet").with("text", note.text),
+            ));
         }
     }
 
     fn errata(page: &mut ChildSpawnerCommands, revision: Revision) {
-        page.spawn(Paper::heading("ERRATA"));
+        page.spawn(Paper::heading(Message::new("datasheet-errata")));
         let errata: Vec<_> = Erratum::ALL
             .iter()
             .filter(|erratum| erratum.revision() == revision)
             .collect();
         if errata.is_empty() {
-            page.spawn(Paper::text(format!("No known bugs in Rev {revision}.")));
+            page.spawn(Paper::text(
+                Message::new("datasheet-no-errata").with("revision", revision.to_string()),
+            ));
         }
         for erratum in errata {
-            page.spawn(Paper::text(erratum.title().to_uppercase()));
-            page.spawn(Paper::faded(format!(
-                "Affects: {}",
-                erratum.affected_chips()
+            page.spawn(Paper::text(Localized::verbatim(
+                erratum.title().to_uppercase(),
             )));
-            page.spawn(Paper::text(erratum.description()));
+            page.spawn(Paper::faded(
+                Message::new("datasheet-affects").with("chips", erratum.affected_chips()),
+            ));
+            page.spawn(Paper::text(Localized::verbatim(erratum.description())));
         }
     }
 }

@@ -6,6 +6,8 @@ use bevy::prelude::*;
 use ld60_devices::Rom;
 use ld60_levels::{Level, Outcome, TEST_SEEDS};
 
+use crate::locale::Message;
+
 /// How often a customer tries the device before they take it home broken.
 pub(crate) const TRIES: u32 = 3;
 
@@ -59,29 +61,23 @@ impl Pickup {
     }
 
     /// What the customer writes on the note if they are not happy.
-    pub(crate) fn note(&self) -> Option<String> {
-        let (complaint, angry) = match self {
+    pub(crate) fn note(&self) -> Option<Message> {
+        let (complaint, reaction) = match self {
             Self::Paid(_) => return None,
-            Self::HandedBack {
-                complaint,
-                tries_left: 1,
-            } => (
-                complaint,
-                "Grrr! No money for this. One more try, then I take it home.".to_owned(),
-            ),
             Self::HandedBack {
                 complaint,
                 tries_left,
             } => (
                 complaint,
-                format!("Grrr! No money for this. You get {tries_left} more tries."),
+                Message::new("note-tries-left").with("tries", *tries_left),
             ),
-            Self::Left(complaint) => (
-                complaint,
-                format!("{TRIES} tries is enough. I take it home broken. No money for you."),
-            ),
+            Self::Left(complaint) => (complaint, Message::new("note-gave-up").with("tries", TRIES)),
         };
-        Some(format!("{} {angry}", complaint.note()))
+        Some(
+            Message::new("note")
+                .with("complaint", complaint.note())
+                .with("reaction", reaction),
+        )
     }
 }
 
@@ -104,33 +100,28 @@ impl Complaint {
     }
 
     /// What the customer says they did and saw.
-    fn note(&self) -> String {
-        let did = |keys: &str| {
-            if keys.is_empty() {
-                "I woke it up".to_owned()
-            } else {
-                format!("I pressed {keys}")
-            }
-        };
+    fn note(&self) -> Message {
         match self {
-            Self::Dead => "It does not even wake up.".into(),
+            Self::Dead => Message::new("note-dead"),
             Self::Wrong {
                 keys,
                 expected,
                 shown,
             } => {
                 // The readout prints broken segments as `?`.
-                let shown = if shown.contains('?') {
-                    "showed angry squiggles".to_owned()
-                } else {
-                    format!("said {shown}")
+                let id = match (keys.is_empty(), shown.contains('?')) {
+                    (true, false) => "note-woke-said",
+                    (true, true) => "note-woke-squiggles",
+                    (false, false) => "note-pressed-said",
+                    (false, true) => "note-pressed-squiggles",
                 };
-                format!(
-                    "{} and the little window {shown}. It should say {expected}.",
-                    did(keys)
-                )
+                Message::new(id)
+                    .with("keys", keys.as_str())
+                    .with("shown", shown.as_str())
+                    .with("expected", expected.as_str())
             }
-            Self::Froze { keys } => format!("{} and it froze stiff.", did(keys)),
+            Self::Froze { keys } if keys.is_empty() => Message::new("note-woke-froze"),
+            Self::Froze { keys } => Message::new("note-pressed-froze").with("keys", keys.as_str()),
         }
     }
 }
@@ -209,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn notes_quote_the_keys() {
+    fn notes_pick_the_sentence() {
         let wrong = Complaint::Wrong {
             keys: "12+34=".into(),
             expected: "000046".into(),
@@ -217,7 +208,10 @@ mod tests {
         };
         assert_eq!(
             wrong.note(),
-            "I pressed 12+34= and the little window said 000040. It should say 000046."
+            Message::new("note-pressed-said")
+                .with("keys", "12+34=")
+                .with("shown", "000040")
+                .with("expected", "000046")
         );
         let garbage = Complaint::Wrong {
             keys: String::new(),
@@ -226,26 +220,35 @@ mod tests {
         };
         assert_eq!(
             garbage.note(),
-            "I woke it up and the little window showed angry squiggles. It should say 000000."
+            Message::new("note-woke-squiggles")
+                .with("keys", "")
+                .with("shown", "0?00?0")
+                .with("expected", "000000")
         );
         let froze = Complaint::Froze {
             keys: String::new(),
         };
-        assert_eq!(froze.note(), "I woke it up and it froze stiff.");
+        assert_eq!(froze.note(), Message::new("note-woke-froze"));
     }
 
     #[test]
     fn notes_count_the_tries_left() {
-        let note = |tries_left| {
-            Pickup::HandedBack {
-                complaint: Complaint::Dead,
-                tries_left,
-            }
-            .note()
-            .unwrap()
-        };
-        assert!(note(2).ends_with("You get 2 more tries."), "{}", note(2));
-        assert!(note(1).contains("One more try"), "{}", note(1));
+        let note = Pickup::HandedBack {
+            complaint: Complaint::Dead,
+            tries_left: 2,
+        }
+        .note();
+        assert_eq!(
+            note,
+            Some(
+                Message::new("note")
+                    .with("complaint", Message::new("note-dead"))
+                    .with(
+                        "reaction",
+                        Message::new("note-tries-left").with("tries", 2_u32)
+                    )
+            )
+        );
         assert_eq!(Pickup::Paid(10).note(), None);
     }
 }

@@ -1,7 +1,7 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
 
 use super::{cursor, look::Gaze};
-use crate::locale::Localized;
+use crate::locale::{Localized, Message};
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";
 const ICON_SIZE: f32 = 64.0;
@@ -144,7 +144,7 @@ impl BackHint {
             .with_children(|hint| {
                 Icon::MouseRight.spawn(hint, &font);
                 Icon::Escape.spawn(hint, &font);
-                hint.spawn((Caption, Localized("hint-back")));
+                hint.spawn((Caption, Localized::from(Message::new("hint-back"))));
             });
     }
 

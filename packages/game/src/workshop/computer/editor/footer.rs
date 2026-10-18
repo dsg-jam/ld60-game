@@ -5,12 +5,14 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
+use ld60_devices::{DeviceError, ProgramError};
 use ld60_levels::LevelError;
 
 use super::Editor;
 use super::page::Page;
 use crate::audio::KeyClicks;
 use crate::device::Emulator;
+use crate::locale::{Localized, Message};
 use crate::workshop::job::Job;
 
 /// A command in the footer below the editor.
@@ -49,14 +51,15 @@ impl Command {
         }
     }
 
-    pub(super) fn label(self, clicks: bool) -> String {
-        match self {
-            Self::Notes => "F2 NOTES".into(),
-            Self::Versions => "F3 VERSIONS".into(),
-            Self::Assemble => "F5 ASSEMBLE".into(),
-            Self::Flash => "F6 FLASH".into(),
-            Self::Clicks => format!("F8 CLICKS {}", if clicks { "ON" } else { "OFF" }),
-        }
+    pub(super) fn label(self, clicks: bool) -> Message {
+        Message::new(match self {
+            Self::Notes => "editor-command-notes",
+            Self::Versions => "editor-command-versions",
+            Self::Assemble => "editor-command-assemble",
+            Self::Flash => "editor-command-flash",
+            Self::Clicks if clicks => "editor-command-clicks-on",
+            Self::Clicks => "editor-command-clicks-off",
+        })
     }
 
     pub(super) fn run_on_key(
@@ -118,8 +121,8 @@ impl Run {
         job: Option<ResMut<Job>>,
         mut clicks: ResMut<KeyClicks>,
         mut emulators: Query<&mut Emulator>,
-        mut status: Single<&mut Text, (With<Status>, Without<Command>)>,
-        mut labels: Query<(&Command, &mut Text), Without<Status>>,
+        mut status: Single<&mut Localized, (With<Status>, Without<Command>)>,
+        mut labels: Query<(&Command, &mut Localized), Without<Status>>,
         mut commands: Commands,
     ) {
         let source = editor.value().to_string();
@@ -128,21 +131,21 @@ impl Run {
             (Command::Clicks, _) => {
                 clicks.0 = !clicks.0;
                 for (command, mut text) in &mut labels {
-                    text.0 = command.label(clicks.0);
+                    *text = command.label(clicks.0).into();
                 }
                 return;
             }
-            (_, None) => "NO JOB ON THE BENCH".into(),
+            (_, None) => Message::new("editor-no-job"),
             (Command::Assemble, Some(job)) => match ld60_levels::assemble(&job.level, &source) {
-                Ok(assembly) => format!("ASSEMBLED, {} BYTES", assembly.byte_len()),
+                Ok(assembly) => Message::new("editor-assembled").with("bytes", assembly.byte_len()),
                 Err(err) => Self::describe(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
                 Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source, &mut commands),
-                Err(_) => "NO DEVICE CONNECTED".into(),
+                Err(_) => Message::new("editor-no-device"),
             },
         };
-        status.0 = message;
+        **status = message.into();
     }
 
     /// Burns `source` into the device and powers it on. Testing it is up to
@@ -152,14 +155,14 @@ impl Run {
         emulator: &mut Emulator,
         source: &str,
         commands: &mut Commands,
-    ) -> String {
+    ) -> Message {
         let assembly = match ld60_levels::assemble(&job.level, source) {
             Ok(assembly) => assembly,
             Err(err) => return Self::describe(&err),
         };
         let rom = match ld60_levels::burn(&job.level, emulator.rom(), assembly.image) {
             Ok(rom) => rom,
-            Err(err) => return format!("BURN FAILED: {err}"),
+            Err(err) => return Self::burn_failed(err),
         };
         let device = match ld60_levels::device(&job.level, rom.clone()) {
             Ok(device) => device,
@@ -170,18 +173,51 @@ impl Run {
         if !job.flashed {
             job.flashed = true;
         }
-        "FLASHED. DEVICE RESTARTED.".into()
+        Message::new("editor-flashed")
     }
 
     /// The first assembler error with its line, or the error itself.
-    fn describe(err: &LevelError) -> String {
+    fn describe(err: &LevelError) -> Message {
         match err {
             LevelError::Assemble(errors) => match errors.as_slice() {
-                [] => "ASSEMBLY FAILED".into(),
-                [only] => only.to_string(),
-                [first, rest @ ..] => format!("{first} (+{} MORE)", rest.len()),
+                [] => Message::new("editor-assembly-failed"),
+                [only] => Message::new("editor-asm-error")
+                    .with("line", only.line)
+                    .with("message", only.message.as_str()),
+                [first, rest @ ..] => Message::new("editor-asm-error-more")
+                    .with("line", first.line)
+                    .with("message", first.message.as_str())
+                    .with("more", rest.len()),
             },
-            other => other.to_string(),
+            LevelError::Parse(message) => {
+                Message::new("editor-error-parse").with("message", message.as_str())
+            }
+            LevelError::BoardNotAllowed(rev) => {
+                Message::new("editor-error-board-not-allowed").with("board", format!("{rev:?}"))
+            }
+            LevelError::NoRewrite(rev) => {
+                Message::new("editor-error-no-rewrite").with("board", format!("{rev:?}"))
+            }
+            LevelError::Device(DeviceError::ChipMismatch { device, chip }) => {
+                Message::new("editor-error-chip-mismatch")
+                    .with("device", format!("{device:?}"))
+                    .with("chip", format!("{chip:?}"))
+            }
+            LevelError::Device(DeviceError::RomSize { expected, actual }) => {
+                Message::new("editor-error-rom-size")
+                    .with("expected", *expected)
+                    .with("actual", *actual)
+            }
+        }
+    }
+
+    fn burn_failed(err: ProgramError) -> Message {
+        match err {
+            ProgramError::MaskRom => Message::new("editor-burn-mask-rom"),
+            ProgramError::SizeMismatch => Message::new("editor-burn-size-mismatch"),
+            ProgramError::BitConflict { addr } => {
+                Message::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
+            }
         }
     }
 }
