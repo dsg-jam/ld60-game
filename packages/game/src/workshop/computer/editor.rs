@@ -4,7 +4,7 @@ mod footer;
 mod highlight;
 mod history;
 mod lexer;
-mod undo;
+pub(super) mod undo;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},

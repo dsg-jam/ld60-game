@@ -12,21 +12,21 @@ use super::history::{History, Snapshot};
 /// Any change to the text becomes an undo step, no matter where it comes
 /// from. Use [`Undo::replace`] to swap out all of the text as one step.
 #[derive(Component, Debug, Default)]
-pub(super) struct Undo {
+pub(crate) struct Undo {
     history: History,
     requests: Vec<Request>,
     reset: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Request {
+pub(crate) enum Request {
     Undo,
     Redo,
 }
 
 impl Undo {
     /// Queues `source` as the new text. Undo brings back the old text.
-    pub(super) fn replace(&mut self, text: &mut EditableText, source: &str) {
+    pub(crate) fn replace(&mut self, text: &mut EditableText, source: &str) {
         self.history.seal();
         text.queue_edit(TextEdit::SelectAll);
         text.queue_edit(TextEdit::Insert(source.into()));
@@ -34,12 +34,12 @@ impl Undo {
     }
 
     /// Forgets all steps. The text after the queued edits is the new start.
-    pub(super) fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.reset = true;
         self.requests.clear();
     }
 
-    pub(super) fn request(&mut self, request: Request) {
+    pub(crate) fn request(&mut self, request: Request) {
         self.requests.push(request);
     }
 
