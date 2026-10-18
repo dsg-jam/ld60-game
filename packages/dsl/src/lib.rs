@@ -78,6 +78,7 @@ pub fn compile(
     let file = parser::parse(source).map_err(|e| vec![e])?;
     let file = switch::select(file, selection).map_err(|e| vec![e])?;
     let program = resolve::resolve(&file, target)?;
+    lint::recursion(&program)?;
     let program = legalize::legalize(program, backend)?;
     let warnings = lint::lint(&program, backend.features(), selection.flavor)?;
     let emitted = emit::emit(&program, backend).map_err(|e| vec![e])?;
