@@ -9,7 +9,7 @@ use bevy::{
     shader::ShaderRef,
 };
 
-use super::atmosphere::HAZE;
+use super::atmosphere::SKY;
 use super::weather::Weather;
 use crate::player::camera::PlayerCamera;
 
@@ -99,7 +99,7 @@ impl SkyMaterial {
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(materials.add(SkyMaterial {
                 params: SkyParams {
-                    horizon: HAZE.to_linear().to_vec3(),
+                    horizon: SKY.to_linear().to_vec3(),
                     zenith: ZENITH,
                     planet: PLANET.normalize(),
                     planet_size: PLANET_SIZE,

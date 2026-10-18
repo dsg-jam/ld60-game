@@ -1,3 +1,5 @@
+mod height_fog;
+
 use bevy::{
     camera::Exposure,
     light::{FogVolume, VolumetricFog},
@@ -6,6 +8,7 @@ use bevy::{
     prelude::*,
 };
 
+use self::height_fog::HeightFog;
 use super::FACADES;
 use super::sky::PLANET;
 use super::weather::Weather;
@@ -13,11 +16,16 @@ use crate::geometry::block::Block;
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
 
-/// Night sky, also the color everything fades into far away.
-pub(super) const HAZE: Color = Color::srgb_u8(0x3a, 0x2c, 0x58);
-const FOG_DENSITY: f32 = 0.007;
+/// Air lit by the city, which everything fades into far away.
+const HAZE: Color = Color::srgb_u8(0x42, 0x36, 0x3e);
+/// The clear night sky above the haze.
+pub(super) const SKY: Color = Color::srgb_u8(0x14, 0x18, 0x30);
+/// How much a meter of air hides at street level.
+const FOG_DENSITY: f32 = 0.016;
 /// Extra fog in full rain.
-const RAIN_FOG_DENSITY: f32 = 0.004;
+const RAIN_FOG_DENSITY: f32 = 0.008;
+/// The haze thins out to a third every this many meters up.
+const FOG_HEIGHT: f32 = 12.0;
 const AMBIENT: Color = Color::srgb_u8(0x6a, 0x60, 0xa0);
 const AMBIENT_BRIGHTNESS: f32 = 20.0;
 /// Light reflected by the planet in the sky.
@@ -41,7 +49,8 @@ pub(super) struct AtmospherePlugin;
 
 impl Plugin for AtmospherePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ClearColor(HAZE))
+        app.add_plugins(height_fog::HeightFogPlugin)
+            .insert_resource(ClearColor(SKY))
             .insert_resource(GlobalAmbientLight {
                 color: AMBIENT,
                 brightness: AMBIENT_BRIGHTNESS,
@@ -52,6 +61,10 @@ impl Plugin for AtmospherePlugin {
             .add_observer(dress_camera);
     }
 }
+
+/// Marks the [`FogVolume`] over the street, which thickens in the rain.
+#[derive(Component, Debug)]
+struct StreetHaze;
 
 fn spawn_planet_light(mut commands: Commands) {
     commands.spawn((
@@ -74,6 +87,7 @@ fn spawn_street_haze(mut commands: Commands) {
     );
     commands.spawn((
         Name::new("street haze"),
+        StreetHaze,
         FogVolume {
             fog_color: STREET_HAZE,
             density_factor: HAZE_DENSITY,
@@ -87,13 +101,11 @@ fn spawn_street_haze(mut commands: Commands) {
 /// Rain makes the air hazier.
 fn thicken_fog(
     weather: Res<Weather>,
-    mut fogs: Query<&mut DistanceFog, With<PlayerCamera>>,
-    mut volumes: Query<&mut FogVolume>,
+    mut fogs: Query<&mut HeightFog, With<PlayerCamera>>,
+    mut volumes: Query<&mut FogVolume, With<StreetHaze>>,
 ) {
     for mut fog in &mut fogs {
-        fog.falloff = FogFalloff::Exponential {
-            density: FOG_DENSITY + RAIN_FOG_DENSITY * weather.rain,
-        };
+        fog.density = FOG_DENSITY + RAIN_FOG_DENSITY * weather.rain;
     }
     for mut volume in &mut volumes {
         volume.density_factor = HAZE_DENSITY + RAIN_HAZE_DENSITY * weather.rain;
@@ -121,12 +133,11 @@ fn dress_camera(add: On<Add<PlayerCamera>>, mut commands: Commands) {
             ..default()
         },
         Exposure::INDOOR,
-        DistanceFog {
-            color: HAZE,
-            falloff: FogFalloff::Exponential {
-                density: FOG_DENSITY,
-            },
-            ..default()
+        HeightFog {
+            color: HAZE.to_linear().to_vec4(),
+            density: FOG_DENSITY,
+            falloff: 1.0 / FOG_HEIGHT,
+            ground: 0.0,
         },
     ));
 }
