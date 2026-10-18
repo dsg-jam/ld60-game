@@ -1,0 +1,18 @@
+(
+    id: "summa6-04",
+    title: "Coffee break",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    faults: [StuckRamBit((cell: 7, bit: 0, high: true))],
+    customer: (
+        name: "Night shift accountant",
+        complaint: "I spilled coffee on it. Now it only subtracts. The new chip costs more than the machine.",
+    ),
+    tests: [
+        (keys: "12+34=", display: "000046"),
+        (keys: "50-8=", display: "000042"),
+        (keys: "1+2+3=", display: "000006"),
+    ],
+    reward: 20,
+)

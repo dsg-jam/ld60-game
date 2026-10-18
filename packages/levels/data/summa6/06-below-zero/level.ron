@@ -1,0 +1,19 @@
+(
+    id: "summa6-06",
+    title: "Below zero",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Student",
+        complaint: "12 minus 34 is 999978? My bank account says otherwise. Where is the minus sign?",
+    ),
+    tests: [
+        (keys: "12-34=", display: "-000022"),
+        (keys: "34-12=", display: "000022"),
+        (keys: "12-34=5", display: "000005"),
+        (keys: "12-34=C", display: "000000"),
+        (keys: "5-10+3=", display: "-000002"),
+    ],
+    reward: 30,
+)

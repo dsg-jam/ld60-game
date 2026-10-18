@@ -14,6 +14,11 @@ macro_rules! level {
 pub const CATALOG: &[LevelSource] = &[
     level!("summa6/01-strange-symbols"),
     level!("summa6/02-last-digit"),
+    level!("summa6/03-nine-equals"),
+    level!("summa6/04-coffee"),
+    level!("summa6/05-errata"),
+    level!("summa6/06-below-zero"),
+    level!("summa6/07-new-firmware"),
 ];
 
 /// Level files, embedded at compile time so they also work on the web.

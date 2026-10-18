@@ -1,0 +1,17 @@
+(
+    id: "summa6-05",
+    title: "Lost borrow",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7612)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Pharmacist",
+        complaint: "100 minus 91 shows 109 on this machine. My other Summa says 9. Same firmware, I checked.",
+    ),
+    tests: [
+        (keys: "100-91=", display: "000009"),
+        (keys: "1000-1=", display: "000999"),
+        (keys: "50-8=", display: "000042"),
+    ],
+    reward: 25,
+)

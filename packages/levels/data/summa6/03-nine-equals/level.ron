@@ -1,0 +1,17 @@
+(
+    id: "summa6-03",
+    title: "The 9 key",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Tax office clerk",
+        complaint: "When I type 9 it gives me a total. I deal with a lot of 9s.",
+    ),
+    tests: [
+        (keys: "9", display: "000009"),
+        (keys: "19+1=", display: "000020"),
+        (keys: "99-9=", display: "000090"),
+    ],
+    reward: 10,
+)

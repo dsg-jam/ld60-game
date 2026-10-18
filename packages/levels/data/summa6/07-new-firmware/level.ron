@@ -1,0 +1,17 @@
+(
+    id: "summa6-07",
+    title: "The update",
+    device: Summa6,
+    chip: Calco((revision: A, date_code: 7630)),
+    rom: (kind: Eprom, blank_available: true),
+    customer: (
+        name: "Shop owner",
+        complaint: "The salesman installed firmware 1.1. It is shorter, he said. Now it freezes when I press +, - or =.",
+    ),
+    tests: [
+        (keys: "12+34=", display: "000046"),
+        (keys: "99+1=", display: "000100"),
+        (keys: "50-8=", display: "000042"),
+    ],
+    reward: 30,
+)
