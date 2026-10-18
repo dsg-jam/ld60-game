@@ -53,6 +53,14 @@ fn boards_show_their_io_and_keep_the_fix() {
 }
 
 #[test]
+fn own_board_alone_keeps_the_level_as_written() {
+    let level = "summa6/02-last-digit";
+    let original = Variant::original(find_level(level).unwrap()).unwrap();
+    let variant = find_variant(level, None, Some(BoardRev::A)).unwrap();
+    assert_eq!(variant, original);
+}
+
+#[test]
 fn variants_keep_the_symptom() {
     let variant = Variant::new(find_level("summa6/02-last-digit").unwrap(), 7).unwrap();
     let out = play_variant(variant, false, "k 12+34=\nq\n");
