@@ -1,6 +1,6 @@
 mod common;
 
-use ld60_calco::{Calco, Op};
+use ld60_calco::{Op, Revision};
 use ld60_machine::{Image, Isa};
 
 #[test]
@@ -22,12 +22,16 @@ fn disassembly_reassembles_to_the_same_image() {
     for addr in 0..image.len() {
         image.set(addr, addr as u16);
     }
-    let source: Vec<String> = Calco
-        .disassemble(&image)
-        .into_iter()
-        .map(|line| line.text)
-        .collect();
-    assert_eq!(common::assemble(&source.join("\n")), image);
+    for revision in Revision::ALL {
+        let isa = revision.isa();
+        let source: Vec<String> = isa
+            .disassemble(&image)
+            .into_iter()
+            .map(|line| line.text)
+            .collect();
+        let reassembled = isa.assemble(&source.join("\n")).map(|asm| asm.image);
+        assert_eq!(reassembled, Ok(image.clone()), "Rev {revision}");
+    }
 }
 
 #[test]
@@ -62,6 +66,6 @@ fn assembler_rejects_invalid_operands() {
         "LDI C, 1",
         "JMP 256",
     ] {
-        assert!(Calco.assemble(source).is_err(), "{source}");
+        assert!(Revision::B.isa().assemble(source).is_err(), "{source}");
     }
 }

@@ -1,15 +1,15 @@
 #![allow(dead_code)]
 
-use ld60_calco::{Calco, ChipInfo, Cpu, DateCode, Revision};
+use ld60_calco::{ChipInfo, Cpu, DateCode, Revision};
 use ld60_machine::{Bus, Cpu as _, Image, Isa, Step};
 
 pub(crate) const LATE: ChipInfo = ChipInfo {
-    revision: Revision::A,
+    revision: Revision::B,
     date_code: DateCode::new(76, 30),
 };
 
 pub(crate) const EARLY: ChipInfo = ChipInfo {
-    revision: Revision::A,
+    revision: Revision::B,
     date_code: DateCode::new(76, 14),
 };
 
@@ -35,7 +35,7 @@ impl Bus for TestBus {
 }
 
 pub(crate) fn assemble(source: &str) -> Image {
-    match Calco.assemble(source) {
+    match Revision::B.isa().assemble(source) {
         Ok(asm) => asm.image,
         Err(errors) => panic!("{errors:?}"),
     }

@@ -27,15 +27,22 @@ impl Erratum {
     /// Which chips have the bug, as printed on the errata sheet.
     pub fn affected_chips(self) -> &'static str {
         match self {
-            Self::DsClearsCarryOnZero => "Rev A, date codes before 7624",
+            Self::DsClearsCarryOnZero => "Rev B, date codes before 7624",
         }
     }
 
     pub fn affects(self, chip: ChipInfo) -> bool {
         match self {
             Self::DsClearsCarryOnZero => {
-                chip.revision == Revision::A && chip.date_code < DateCode::new(76, 24)
+                chip.revision == self.revision() && chip.date_code < DateCode::new(76, 24)
             }
+        }
+    }
+
+    /// The revision with the bug. Only some of its chips may be affected.
+    pub fn revision(self) -> Revision {
+        match self {
+            Self::DsClearsCarryOnZero => Revision::B,
         }
     }
 }

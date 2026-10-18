@@ -200,6 +200,12 @@ impl Paper {
         self.current = 0;
     }
 
+    /// Opens the first of `pages` and returns the old pages.
+    pub(crate) fn replace_pages(&mut self, pages: Vec<Entity>) -> Vec<Entity> {
+        self.current = 0;
+        std::mem::replace(&mut self.pages, pages)
+    }
+
     fn turn(&mut self, forward: bool) {
         let last = self.pages.len().saturating_sub(1);
         self.current = if forward {

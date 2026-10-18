@@ -1,12 +1,12 @@
 use std::io::Write;
 
-use ld60_devices::IsaKind;
+use ld60_machine::Isa;
 
 use crate::render::hex_words;
 
-pub fn run(out: &mut impl Write, path: &str) -> crate::Result<()> {
+pub fn run(out: &mut impl Write, path: &str, isa: &dyn Isa) -> crate::Result<()> {
     let source = std::fs::read_to_string(path)?;
-    let assembly = IsaKind::Calco.isa().assemble(&source).map_err(|errors| {
+    let assembly = isa.assemble(&source).map_err(|errors| {
         let lines: Vec<String> = errors.iter().map(|e| format!("{path}: {e}")).collect();
         lines.join("\n")
     })?;

@@ -1,0 +1,169 @@
+mod common;
+
+use std::collections::BTreeSet;
+
+use common::run;
+use ld60_calco::datasheet::INSTRUCTIONS;
+use ld60_calco::{ChipInfo, Cond, DateCode, Op, Revision};
+use ld60_machine::Isa;
+
+/// Supported instruction forms in datasheet syntax, like `LD Mn` or `JZ aa`.
+fn forms(revision: Revision) -> Vec<&'static str> {
+    let mut forms = Vec::new();
+    for doc in INSTRUCTIONS.iter().filter(|doc| revision.supports(doc.op)) {
+        match doc.op {
+            Op::Jump(..) => forms.extend(
+                Cond::ALL
+                    .into_iter()
+                    .filter(|&cond| revision.supports(Op::Jump(cond, 0)))
+                    .map(Cond::form),
+            ),
+            _ => forms.push(doc.syntax),
+        }
+    }
+    forms
+}
+
+fn chip(revision: Revision) -> ChipInfo {
+    ChipInfo {
+        revision,
+        date_code: DateCode::new(76, 30),
+    }
+}
+
+fn first_error(revision: Revision, source: &str) -> String {
+    match revision.isa().assemble(source) {
+        Ok(_) => panic!("Rev {revision} assembles {source:?}"),
+        Err(errors) => errors[0].message.clone(),
+    }
+}
+
+#[test]
+fn rev_a_rejects_ops_it_lacks() {
+    for (source, message) in [
+        ("CALL 0", "'CALL' is not supported by CalCo Rev A"),
+        ("call 0", "'CALL' is not supported by CalCo Rev A"),
+        ("JNZ 0", "'JNZ' is not supported by CalCo Rev A"),
+        ("OUT ANN", "'OUT' is not supported by CalCo Rev A"),
+        ("LDI B, 5", "'LDI B, 0x05' is not supported by CalCo Rev A"),
+        ("LD [B+2]", "'LD [B+2]' is not supported by CalCo Rev A"),
+        ("st [b]", "'ST [B]' is not supported by CalCo Rev A"),
+    ] {
+        assert_eq!(first_error(Revision::A, source), message, "{source}");
+    }
+}
+
+#[test]
+fn unknown_and_unsupported_differ() {
+    assert_eq!(first_error(Revision::A, "FOO"), "unknown mnemonic 'FOO'");
+    assert_eq!(first_error(Revision::B, "FOO"), "unknown mnemonic 'FOO'");
+    assert_eq!(
+        first_error(Revision::A, "DJNZ 0"),
+        "'DJNZ' is not supported by CalCo Rev A"
+    );
+}
+
+#[test]
+fn later_revisions_take_every_op() {
+    let source = "CALL f\nf: LDI B, 2\nLD [B+1]\nOUT ANN\nDJNZ f\nRET";
+    for revision in [Revision::B, Revision::C] {
+        assert!(revision.isa().assemble(source).is_ok(), "Rev {revision}");
+    }
+}
+
+#[test]
+fn labels_named_like_unsupported_ops_still_work() {
+    let source = "CALL: LDI A, 1\nJMP CALL";
+    assert!(Revision::A.isa().assemble(source).is_ok());
+}
+
+#[test]
+fn mnemonics_match_the_supported_ops() {
+    for revision in Revision::ALL {
+        let supported: BTreeSet<String> = (0..=u8::MAX)
+            .map(|first| Op::decode(first, 0))
+            .filter(|&op| revision.supports(op))
+            .filter_map(|op| op.to_string().split_whitespace().next().map(String::from))
+            .collect();
+        let listed: BTreeSet<String> = revision
+            .isa()
+            .mnemonics()
+            .iter()
+            .map(|m| m.to_string())
+            .collect();
+        assert_eq!(listed, supported, "Rev {revision}");
+    }
+}
+
+#[test]
+fn rev_a_has_the_minimal_set() {
+    assert_eq!(
+        Revision::A.isa().mnemonics(),
+        [
+            "NOP", "HLT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC"
+        ]
+    );
+    assert_eq!(Revision::B.isa().mnemonics(), Revision::C.isa().mnemonics());
+}
+
+#[test]
+fn forms_tell_addressing_modes_apart() {
+    assert_eq!(
+        forms(Revision::A),
+        [
+            "NOP",
+            "HLT",
+            "INC",
+            "LD Mn",
+            "ST Mn",
+            "LDI A, ii",
+            "CPI ii",
+            "IN p",
+            "JMP aa",
+            "JZ aa",
+            "JC aa"
+        ]
+    );
+    let rev_b = forms(Revision::B);
+    for form in ["LD [B+n]", "ADC Mn", "LDI B, ii", "JNC aa", "CALL aa"] {
+        assert!(rev_b.contains(&form), "{form}");
+    }
+    assert!(!rev_b.contains(&"Jcc aa"));
+}
+
+#[test]
+fn rev_a_runs_unsupported_ops_as_reserved() {
+    let source = ".db 0x31, 0x07\nHLT";
+    let (rev_a, _) = run(source, chip(Revision::A), 100);
+    let (rev_b, _) = run(source, chip(Revision::B), 100);
+    assert_eq!((rev_a.a(), rev_a.b()), (0, 0));
+    assert_eq!((rev_b.a(), rev_b.b()), (0, 7));
+}
+
+#[test]
+fn rev_a_runs_the_address_byte_of_a_call() {
+    let (cpu, _) = run(".db 0xF0, 0x06\nINC\nHLT", chip(Revision::A), 100);
+    assert_eq!(cpu.a(), 2, "0x06 is INC");
+}
+
+#[test]
+fn disassembler_agrees_with_the_cpu() {
+    let image = Revision::B.isa().assemble("LDI B, 7\nINC").unwrap().image;
+    let text = |revision: Revision| -> Vec<String> {
+        revision.isa().disassemble(&image)[..3]
+            .iter()
+            .map(|line| line.text.clone())
+            .collect()
+    };
+    assert_eq!(text(Revision::A), [".db 0x31", ".db 0x07", "INC"]);
+    assert_eq!(text(Revision::B), ["LDI B, 0x07", "INC", ".db 0xFF"]);
+}
+
+#[test]
+fn in_rev_tells_the_revisions_apart() {
+    let ids: Vec<u8> = Revision::ALL
+        .into_iter()
+        .map(|revision| run("IN REV\nHLT", chip(revision), 100).0.a())
+        .collect();
+    assert_eq!(ids, [0x10, 0x20, 0x30]);
+}

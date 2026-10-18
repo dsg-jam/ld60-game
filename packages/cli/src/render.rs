@@ -88,7 +88,7 @@ fn instruction(
 
 fn disassembly(session: &Session) -> Vec<DisasmLine> {
     let device = &session.device;
-    device.isa().isa().disassemble(device.rom().image())
+    device.chip().isa().disassemble(device.rom().image())
 }
 
 fn line_index(lines: &[DisasmLine], addr: u16) -> Option<usize> {

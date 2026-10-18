@@ -2,7 +2,7 @@
     id: "summa6-06",
     title: "Below zero",
     device: Summa6,
-    chip: Calco((revision: A, date_code: 7630)),
+    chip: Calco((revision: B, date_code: 7630)),
     serial: "6A-04890",
     remarks: [
         "Minus annunciator lights in the segment test.",

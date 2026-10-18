@@ -1,13 +1,15 @@
 use std::io::{self, Write};
 use std::process::ExitCode;
 
+use ld60_calco::Revision;
+
 const USAGE: &str = "\
 Usage:
   cli list                               List all levels
   cli check <level> [file.asm]           Run level tests on the buggy ROM or a file
   cli play <level> [--fixed] [--seed N] [--variant N]
                                          Open a level on the bench
-  cli asm <file.asm>                     Print the listing of a CalCo file";
+  cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -18,7 +20,8 @@ fn main() -> ExitCode {
         ["check", level] => ld60_cli::check::run(&mut out, level, None),
         ["check", level, file] => ld60_cli::check::run(&mut out, level, Some(file)),
         ["play", level, options @ ..] => play(&mut out, level, options).map(|()| true),
-        ["asm", file] => ld60_cli::listing::run(&mut out, file).map(|()| true),
+        ["asm", file] => listing(&mut out, file, "C").map(|()| true),
+        ["asm", file, "--rev", revision] => listing(&mut out, file, revision).map(|()| true),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -40,6 +43,14 @@ fn is_broken_pipe(error: &(dyn std::error::Error + 'static)) -> bool {
     error
         .downcast_ref::<io::Error>()
         .is_some_and(|e| e.kind() == io::ErrorKind::BrokenPipe)
+}
+
+fn listing(out: &mut impl Write, file: &str, revision: &str) -> ld60_cli::Result<()> {
+    let revision = Revision::ALL
+        .into_iter()
+        .find(|r| r.to_string().eq_ignore_ascii_case(revision))
+        .ok_or_else(|| format!("unknown revision '{revision}'"))?;
+    ld60_cli::listing::run(out, file, revision.isa())
 }
 
 fn play(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result<()> {

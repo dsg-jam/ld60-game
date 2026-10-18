@@ -20,7 +20,13 @@ Commands:
 
 pub fn run(session: &mut Session, input: impl BufRead, out: &mut impl Write) -> crate::Result<()> {
     let level = &session.level;
-    writeln!(out, "{} {}", level.id, level.title)?;
+    writeln!(
+        out,
+        "{} {} ({})",
+        level.id,
+        level.title,
+        level.chip.isa().name()
+    )?;
     writeln!(
         out,
         "{}: \"{}\"",
