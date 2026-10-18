@@ -213,6 +213,7 @@ impl Unroller<'_> {
                             attach(&mut copy, std::mem::take(&mut notes), pos);
                         } else {
                             drop_labels(&mut copy, &|id| self.refs.contains_key(&id));
+                            copy.retain(|n| !matches!(n.stmt, Stmt::Comment(_)));
                             relabel(self.labels, &mut copy, &defined);
                         }
                         out.extend(copy);

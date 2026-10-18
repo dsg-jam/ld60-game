@@ -205,7 +205,6 @@ impl Resolver<'_> {
         }
         if let Err(error) = self.check_free(name, pos) {
             self.errors.push(error);
-            return;
         }
         let id = self.table.add(LabelName::Fixed(name.into()));
         self.labels.insert(name.into(), id);
