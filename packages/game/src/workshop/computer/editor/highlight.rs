@@ -396,6 +396,24 @@ mod tests {
     }
 
     #[test]
+    fn underlines_ops_the_revision_lacks() {
+        use ld60_calco::Revision;
+        use ld60_machine::Isa;
+        let source = "INC\nADC M1\n";
+        assert!(Revision::B.isa().assemble(source).is_ok());
+        let isa = Revision::A.isa();
+        let errors = isa.assemble(source).unwrap_err();
+        assert_eq!(errors[0].message, "'ADC' is not supported by CalCo Rev A");
+        let lexicon = Lexicon::new(isa, source);
+        let underlined: Vec<&str> = Segment::split(source, &lexicon, &Marks::new(&errors), ALL)
+            .into_iter()
+            .filter(|segment| segment.error)
+            .map(|segment| &source[segment.range])
+            .collect();
+        assert_eq!(underlined, ["ADC"]);
+    }
+
+    #[test]
     fn widens_empty_spans() {
         assert_eq!(mark("LDI A,", 6..6), Some(5..6));
         assert_eq!(mark("A\u{fc}", 3..9), Some(1..3));
