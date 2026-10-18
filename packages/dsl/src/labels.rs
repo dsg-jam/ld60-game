@@ -68,6 +68,10 @@ impl Labels {
                 LabelName::Fixed(name) => Some(name.clone()),
                 _ => None,
             })
+            .chain(lines.iter().filter_map(|line| match line {
+                Line::Raw(raw) => asm_label(raw).map(|(name, _)| name.to_string()),
+                _ => None,
+            }))
             .collect();
         let mut names = BTreeMap::new();
         for (index, name) in self.0.iter().enumerate() {
@@ -153,4 +157,17 @@ fn unique(wanted: &str, taken: &BTreeSet<String>) -> String {
         })
         .find(|name| !taken.contains(name))
         .unwrap_or(base)
+}
+
+/// The label and the rest of an `asm { }` line, if it starts with `name:`.
+pub(crate) fn asm_label(line: &str) -> Option<(&str, &str)> {
+    let code = line.split(';').next().unwrap_or_default();
+    if !code.contains(':') {
+        return None;
+    }
+    let (name, rest) = line.split_once(':')?;
+    let name = name.trim();
+    let valid = name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+    valid.then_some((name, rest.trim()))
 }
