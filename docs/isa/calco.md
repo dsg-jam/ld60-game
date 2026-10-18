@@ -17,7 +17,7 @@ machine. It works with decimal digits, one digit per byte.
 Memory:
 
 - ROM: 256 bytes of program, 0x00 to 0xFF. Code cannot read ROM as data.
-- RAM: 16 bytes, named `M0` to `MF`. `M1` to `M6` are the display.
+- RAM: 16 bytes, named `M0` to `MF`. The board decides which cells it shows.
 
 The stack is a ring of two entries. A third `CALL` overwrites the oldest return
 address.
@@ -116,28 +116,25 @@ DS:  if C = 1:    A <- A + 10
 `DA` expects A in the range 0 to 19. `DS` keeps C set so the borrow moves to the
 next digit.
 
-## Display
-
-`M1` to `M6` are shown on the display, left to right. `M6` is the rightmost
-digit. Values above 9 are invalid segment patterns.
-
 ## Ports
 
-| Port | Name  | Dir | Function                                           |
-| ---- | ----- | --- | -------------------------------------------------- |
-| 0    | `KEY` | in  | Last key code, or 0xFF if none. Reading clears it. |
-| F    | `REV` | in  | Chip revision. Rev A returns 0x10.                 |
-| 0    | `ANN` | out | Bit 0 minus sign, bit 1 error.                     |
+| Port | Name  | Dir | Function                                            |
+| ---- | ----- | --- | --------------------------------------------------- |
+| 0    | `KEY` | in  | Last key code, or 0xFF if none. Reading clears it.  |
+| F    | `REV` | in  | Chip revision. Rev A returns 0x10.                  |
+| 0    | `ANN` | out | Annunciators. The board decides what each bit does. |
 
-Key codes:
+The board defines the key codes and the annunciators. See the device docs,
+for example [Summa 6](../devices/summa6.md).
 
-| Code  | Key    |
-| ----- | ------ |
-| 00-09 | 0 to 9 |
-| 0A    | +      |
-| 0B    | -      |
-| 0C    | =      |
-| 0D    | C      |
+## Errata
+
+| Bug                                | Affects                       |
+| ---------------------------------- | ----------------------------- |
+| `DS` clears C when the result is 0 | Rev A, date codes before 7624 |
+
+When `DS` adds 10 and the result is 0, C is cleared instead of kept. The borrow
+to the next digit is lost.
 
 ## Assembly syntax
 
@@ -151,7 +148,7 @@ label:  MNEMONIC operand   ; comment
 
 ## Example
 
-Add the display to a total stored in `M9` to `ME`. Both numbers have the most
+Add the Summa 6 display to a total stored in `M9` to `ME`. Both numbers have the most
 significant digit first, so the loop runs from the rightmost digit to the left.
 
 ```
