@@ -1,16 +1,18 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::ops::Range;
 
 use ld60_machine::{AsmError, Assembly, Image, SourceLine};
 
 use crate::Encoder;
 use crate::Labels;
-use crate::parse::{Body, Directive, parse_line};
+use crate::parse::{Body, Directive, Spans, parse_line};
 
 struct Placed {
     line: usize,
     addr: usize,
     body: Body,
+    spans: Spans,
 }
 
 pub fn assemble(source: &str, encoder: &dyn Encoder) -> Result<Assembly, Vec<AsmError>> {
@@ -39,20 +41,32 @@ fn place(
     let mut addr = 0usize;
     for (index, text) in source.lines().enumerate() {
         let line = index + 1;
-        let mut fail = |message: String| errors.push(AsmError { line, message });
+        let mut fail = |span: Range<usize>, message: String| {
+            errors.push(AsmError {
+                line,
+                span: Some(span),
+                message,
+            });
+        };
         let parsed = match parse_line(text) {
             Ok(parsed) => parsed,
-            Err(message) => {
-                fail(message);
+            Err(fault) => {
+                fail(fault.span, fault.message);
                 continue;
             }
         };
+        let spans = parsed.spans;
         if let Some(name) = parsed.label {
             match labels.entry(name) {
                 Entry::Vacant(e) => {
                     e.insert(u16::try_from(addr).unwrap_or(u16::MAX));
                 }
-                Entry::Occupied(e) => fail(format!("duplicate label '{}'", e.key())),
+                Entry::Occupied(e) => {
+                    fail(
+                        spans.label.clone(),
+                        format!("duplicate label '{}'", e.key()),
+                    );
+                }
             }
         }
         let Some(body) = parsed.body else { continue };
@@ -60,7 +74,10 @@ fn place(
             Body::Directive(Directive::Org(target)) => {
                 match usize::try_from(*target) {
                     Ok(target) if target <= encoder.rom_len() => addr = target,
-                    _ => fail(format!("address {target} is outside the ROM")),
+                    _ => fail(
+                        spans.operands,
+                        format!("address {target} is outside the ROM"),
+                    ),
                 }
                 continue;
             }
@@ -68,12 +85,17 @@ fn place(
             Body::Instruction(instruction) => match encoder.size(instruction) {
                 Ok(size) => size,
                 Err(message) => {
-                    fail(message);
+                    fail(spans.head, message);
                     continue;
                 }
             },
         };
-        placed.push(Placed { line, addr, body });
+        placed.push(Placed {
+            line,
+            addr,
+            body,
+            spans,
+        });
         addr += size;
     }
     (placed, labels)
@@ -90,11 +112,12 @@ fn emit(
     let mut lines = Vec::new();
     let labels = Labels::new(labels);
     for item in placed {
-        let mut fail = |message: String| {
+        let mut fail = |span: Range<usize>, message: String| {
             errors.push(AsmError {
                 line: item.line,
+                span: Some(span),
                 message,
-            })
+            });
         };
         let words = match &item.body {
             Body::Directive(Directive::Db(values)) => values
@@ -107,17 +130,17 @@ fn emit(
         let words = match words {
             Ok(words) => words,
             Err(message) => {
-                fail(message);
+                fail(item.spans.operands_or_head(), message);
                 continue;
             }
         };
         let end = item.addr + words.len();
         if end > image.len() {
-            fail("code does not fit in the ROM".into());
+            fail(item.spans.body(), "code does not fit in the ROM".into());
             continue;
         }
         if let Some(addr) = (item.addr..end).find(|&a| used[a]) {
-            fail(format!("overlaps code at 0x{addr:02X}"));
+            fail(item.spans.body(), format!("overlaps code at 0x{addr:02X}"));
             continue;
         }
         for (offset, &w) in words.iter().enumerate() {

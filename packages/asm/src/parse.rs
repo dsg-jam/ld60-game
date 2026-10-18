@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::parse_number;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,30 +32,93 @@ pub(crate) enum Body {
 pub(crate) struct Line {
     pub label: Option<String>,
     pub body: Option<Body>,
+    pub spans: Spans,
 }
 
-pub(crate) fn parse_line(text: &str) -> Result<Line, String> {
+/// Byte ranges of the parts of a [`Line`]. Missing parts are empty.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Spans {
+    pub label: Range<usize>,
+    /// The mnemonic or the directive with its dot.
+    pub head: Range<usize>,
+    pub operands: Range<usize>,
+}
+
+impl Spans {
+    /// From the start of the head to the end of the operands.
+    pub(crate) fn body(&self) -> Range<usize> {
+        self.head.start..self.operands.end.max(self.head.end)
+    }
+
+    /// The operands, or the head if there are none.
+    pub(crate) fn operands_or_head(&self) -> Range<usize> {
+        if self.operands.is_empty() {
+            self.head.clone()
+        } else {
+            self.operands.clone()
+        }
+    }
+}
+
+/// A parse error and the byte range of the line it is about.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Fault {
+    pub message: String,
+    pub span: Range<usize>,
+}
+
+pub(crate) fn parse_line(text: &str) -> Result<Line, Fault> {
+    let span = |part: &str| {
+        let start = part.as_ptr().addr() - text.as_ptr().addr();
+        start..start + part.len()
+    };
+    let fault = |message: String, part: &str| Fault {
+        message,
+        span: span(part),
+    };
     let code = text.split(';').next().unwrap_or_default().trim();
+    let mut spans = Spans::default();
     let (label, rest) = match code.split_once(':') {
         Some((name, rest)) => {
             let name = name.trim();
             if !is_identifier(name) {
-                return Err(format!("invalid label '{name}'"));
+                return Err(fault(format!("invalid label '{name}'"), name));
             }
+            spans.label = span(name);
             (Some(name.to_string()), rest.trim())
         }
         None => (None, code),
     };
     if rest.is_empty() {
-        return Ok(Line { label, body: None });
+        return Ok(Line {
+            label,
+            body: None,
+            spans,
+        });
     }
     let (head, tail) = match rest.split_once(char::is_whitespace) {
         Some((head, tail)) => (head, tail.trim()),
-        None => (rest, ""),
+        None => (rest, &rest[rest.len()..]),
     };
-    let operands = parse_operands(tail)?;
+    spans.head = span(head);
+    spans.operands = span(tail);
+    let operands = tail
+        .split(',')
+        .filter(|_| !tail.is_empty())
+        .map(|part| {
+            let part = part.trim();
+            parse_operand(part).map_err(|message| {
+                // An empty operand has no text to point at.
+                fault(message, if part.is_empty() { tail } else { part })
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let body = if let Some(directive) = head.strip_prefix('.') {
-        Body::Directive(parse_directive(directive, operands)?)
+        let directive = parse_directive(directive, operands).map_err(|message| Fault {
+            message,
+            span: spans.operands_or_head(),
+        })?;
+        Body::Directive(directive)
     } else {
         Body::Instruction(Instruction {
             mnemonic: head.to_ascii_uppercase(),
@@ -63,6 +128,7 @@ pub(crate) fn parse_line(text: &str) -> Result<Line, String> {
     Ok(Line {
         label,
         body: Some(body),
+        spans,
     })
 }
 
@@ -83,15 +149,6 @@ fn parse_directive(name: &str, operands: Vec<Operand>) -> Result<Directive, Stri
         "db" => Err(".db expects at least one value".into()),
         _ => Err(format!("unknown directive '.{name}'")),
     }
-}
-
-fn parse_operands(text: &str) -> Result<Vec<Operand>, String> {
-    if text.is_empty() {
-        return Ok(Vec::new());
-    }
-    text.split(',')
-        .map(|part| parse_operand(part.trim()))
-        .collect()
 }
 
 fn parse_operand(text: &str) -> Result<Operand, String> {
@@ -136,6 +193,10 @@ mod tests {
         }
     }
 
+    fn fault_span(text: &str) -> Range<usize> {
+        parse_line(text).unwrap_err().span
+    }
+
     #[test]
     fn parses_label_mnemonic_and_operands() {
         let line = parse_line("loop:  ld [B+8]   ; total digit").unwrap();
@@ -149,6 +210,14 @@ mod tests {
                     offset: 8
                 }],
             }))
+        );
+        assert_eq!(
+            line.spans,
+            Spans {
+                label: 0..4,
+                head: 7..9,
+                operands: 10..15,
+            }
         );
     }
 
@@ -185,5 +254,14 @@ mod tests {
         assert!(parse_line("LDI A,").is_err());
         assert!(parse_line(".org").is_err());
         assert!(parse_line(".fill 3").is_err());
+    }
+
+    #[test]
+    fn points_at_the_bad_part() {
+        assert_eq!(fault_span(" 1x: NOP"), 1..3);
+        assert_eq!(fault_span("LD A, 12a ; x"), 6..9);
+        assert_eq!(fault_span("LDI A,"), 4..6);
+        assert_eq!(fault_span("  .org"), 2..6);
+        assert_eq!(fault_span(".org 1, 2"), 5..9);
     }
 }
