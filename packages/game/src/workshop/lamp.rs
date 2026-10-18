@@ -1,6 +1,6 @@
 use bevy::{
     asset::RenderAssetUsages,
-    light::{NotShadowCaster, VolumetricLight},
+    light::VolumetricLight,
     material::OpaqueRendererMethod,
     mesh::{Indices, PrimitiveTopology},
     picking::{events::PointerPress, pointer::PointerButton},
@@ -12,6 +12,7 @@ use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
+use crate::parts::bulb::Bulb;
 use crate::player::focus::{Clickable, Focus};
 
 const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
@@ -27,9 +28,6 @@ const SOCKET: Vec3 = Vec3::new(0.026, 0.03, 0.026);
 const BULB_RADIUS: f32 = 0.024;
 /// The bulb hangs from the socket, inside the shade.
 const BULB_DROP: f32 = SOCKET.y + BULB_RADIUS * 0.8;
-const FILAMENT_RADIUS: f32 = 0.006;
-const FILAMENT_WIRE: f32 = 0.0008;
-const FILAMENT_GLOW: f32 = 400.0;
 /// The frosted glass glows a little around the filament.
 const GLASS_GLOW: f32 = 6.0;
 
@@ -53,8 +51,6 @@ const FILL_INTENSITY: f32 = 1_200.0;
 
 const SHADE: Color = Color::srgb_u8(0xe0, 0x8a, 0x4f);
 const METAL: Color = Color::srgb_u8(0x7d, 0x86, 0x8c);
-const GLASS: Color = Color::srgba(1.0, 0.98, 0.95, 0.2);
-const TUNGSTEN: Color = Color::srgb_u8(0x30, 0x2c, 0x28);
 
 pub(crate) struct LampPlugin;
 
@@ -82,13 +78,6 @@ impl Default for Lamp {
 #[derive(Component, Debug)]
 struct LampLight;
 
-/// The parts of a [`Lamp`]'s bulb that glow while it is on.
-#[derive(Component, Debug)]
-struct Bulb {
-    glass: Handle<StandardMaterial>,
-    filament: Handle<StandardMaterial>,
-}
-
 impl Lamp {
     fn on_add(
         add: On<Add<Lamp>>,
@@ -105,25 +94,9 @@ impl Lamp {
         let socket = Block::new(SOCKET).standing_at(top - Vec3::Y * SOCKET.y);
         let bulb = top - Vec3::Y * BULB_DROP;
 
-        let glass = materials.add(StandardMaterial {
-            base_color: GLASS,
-            alpha_mode: AlphaMode::Blend,
-            perceptual_roughness: 0.05,
-            ..default()
-        });
-        let filament = materials.add(StandardMaterial {
-            base_color: TUNGSTEN,
-            metallic: 1.0,
-            ..default()
-        });
-        let parts = Bulb {
-            glass: glass.clone(),
-            filament: filament.clone(),
-        };
-        parts.light(true, &mut materials);
         commands
             .entity(add.entity)
-            .insert((parts, DUST))
+            .insert(DUST)
             .with_children(|lamp| {
                 lamp.spawn(Shape::cylinder(&base, SHADE));
                 lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));
@@ -144,20 +117,13 @@ impl Lamp {
                 ));
                 lamp.spawn((Shape::cylinder(&socket, METAL), Finish::Metal));
                 lamp.spawn((
-                    Mesh3d(meshes.add(Sphere::new(BULB_RADIUS))),
-                    MeshMaterial3d(glass),
+                    Bulb {
+                        radius: BULB_RADIUS,
+                        color: LIGHT_COLOR,
+                        glow: GLASS_GLOW,
+                        on: true,
+                    },
                     Transform::from_translation(bulb),
-                    NotShadowCaster,
-                ));
-                lamp.spawn((
-                    Mesh3d(meshes.add(Torus::new(
-                        FILAMENT_RADIUS - FILAMENT_WIRE,
-                        FILAMENT_RADIUS + FILAMENT_WIRE,
-                    ))),
-                    MeshMaterial3d(filament),
-                    Transform::from_translation(bulb)
-                        .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
-                    NotShadowCaster,
                 ));
                 lamp.spawn((
                     LampLight,
@@ -237,15 +203,15 @@ impl Lamp {
     fn toggle_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        mut lamps: Query<(&mut Lamp, &Bulb, &Children)>,
+        mut lamps: Query<(&mut Lamp, &Children)>,
         mut lights: Query<&mut Visibility, With<LampLight>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
+        mut bulbs: Query<&mut Bulb>,
         mut commands: Commands,
     ) {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let Ok((mut lamp, bulb, children)) = lamps.get_mut(press.entity) else {
+        let Ok((mut lamp, children)) = lamps.get_mut(press.entity) else {
             return;
         };
         press.propagate(false);
@@ -254,26 +220,10 @@ impl Lamp {
             if let Ok(mut visibility) = lights.get_mut(child) {
                 visibility.toggle_inherited_hidden();
             }
-        }
-        bulb.light(lamp.on, &mut materials);
-        commands.trigger(Play(Sound::Click));
-    }
-}
-
-impl Bulb {
-    fn light(&self, on: bool, materials: &mut Assets<StandardMaterial>) {
-        let glow = |strength: f32| {
-            if on {
-                LIGHT_COLOR.to_linear() * strength
-            } else {
-                LinearRgba::BLACK
+            if let Ok(mut bulb) = bulbs.get_mut(child) {
+                bulb.on = lamp.on;
             }
-        };
-        if let Some(mut glass) = materials.get_mut(&self.glass) {
-            glass.emissive = glow(GLASS_GLOW);
         }
-        if let Some(mut filament) = materials.get_mut(&self.filament) {
-            filament.emissive = glow(FILAMENT_GLOW);
-        }
+        commands.trigger(Play(Sound::Click));
     }
 }
