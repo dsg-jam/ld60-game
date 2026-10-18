@@ -1,7 +1,10 @@
 use bevy::{
     asset::{embedded_asset, load_embedded_asset},
-    core_pipeline::{Core3dSystems, FullscreenShader, schedule::Core3d, tonemapping::tonemapping},
-    post_process::bloom::bloom,
+    core_pipeline::{
+        FullscreenShader,
+        core_3d::{main_opaque_pass_3d, main_transparent_pass_3d, prepare_core_3d_depth_textures},
+        schedule::Core3d,
+    },
     prelude::*,
     render::{
         Render, RenderApp, RenderStartup, RenderSystems,
@@ -15,7 +18,7 @@ use bevy::{
             PipelineCache, RenderPassColorAttachment, RenderPassDescriptor,
             RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
             ShaderType, SpecializedRenderPipeline, SpecializedRenderPipelines, TextureFormat,
-            TextureSampleType,
+            TextureSampleType, TextureUsages,
             binding_types::{sampler, texture_2d, texture_depth_2d, uniform_buffer},
         },
         renderer::{RenderContext, RenderDevice, ViewQuery},
@@ -41,13 +44,22 @@ impl Plugin for HeightFogPlugin {
         render_app
             .init_resource::<SpecializedRenderPipelines<FogPipeline>>()
             .add_systems(RenderStartup, FogPipeline::init)
-            .add_systems(Render, FogPipeline::prepare.in_set(RenderSystems::Prepare))
+            .add_systems(
+                Render,
+                (
+                    FogPipeline::prepare.in_set(RenderSystems::Prepare),
+                    HeightFog::read_depth
+                        .in_set(RenderSystems::Prepare)
+                        .before(prepare_core_3d_depth_textures),
+                ),
+            )
+            // Before the transparent pass, so rain close by doesn't get
+            // fogged like the sky behind it.
             .add_systems(
                 Core3d,
                 HeightFog::draw
-                    .in_set(Core3dSystems::PostProcess)
-                    .before(bloom)
-                    .before(tonemapping),
+                    .after(main_opaque_pass_3d)
+                    .before(main_transparent_pass_3d),
             );
     }
 }
@@ -148,6 +160,13 @@ impl FogPipeline {
 }
 
 impl HeightFog {
+    /// The fog needs to read the depth of what the camera sees.
+    fn read_depth(mut cameras: Query<&mut Camera3d, With<HeightFog>>) {
+        for mut camera in &mut cameras {
+            camera.depth_texture_usages.0 |= TextureUsages::TEXTURE_BINDING.bits();
+        }
+    }
+
     fn draw(
         view: ViewQuery<(
             &ViewUniformOffset,
