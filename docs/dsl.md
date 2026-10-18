@@ -24,7 +24,8 @@ cell  last at M3        ; last key
 const MINUS = 1
 ```
 
-- `firmware` sets the title and the device. The device gives the key codes.
+- `firmware` sets the title and the device. The board of the level gives the
+  key codes.
 - `cell` and `cells` name RAM. Arrays start at 1. The `;` text becomes the RAM
   map line in the header.
 - A `;` line at the top level goes into the header. `#` comments are dropped.

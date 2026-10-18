@@ -14,7 +14,7 @@ fn generated_firmware_is_current() {
             continue;
         };
         let text = read(&firmware.source);
-        let target = Target::new(level.chip, level.device);
+        let target = Target::new(level.chip, level.board());
         let pair = match compile_pair(&text, &target, &firmware.switches) {
             Ok(pair) => pair,
             Err(errors) => {
@@ -66,7 +66,7 @@ fn firmware_1_0_built_for_rev_a_fixes_the_clear_key_level() {
         flavor: Flavor::Fixed,
         switches: &[],
     };
-    let target = Target::new(level.chip, level.device);
+    let target = Target::new(level.chip, level.board());
     let fixed = compile(&read("tally2/firmware-1.0.fw"), &target, &selection).unwrap();
     let variant = Variant {
         level,

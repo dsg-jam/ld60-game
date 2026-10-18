@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use ld60_calco::{ChipInfo, DateCode, Revision};
-use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_dsl::{Diagnostic, Flavor, Output, Selection, Target, compile};
 
 pub(crate) const TALLY_0_9: &str = include_str!("../../../levels/data/tally2/firmware-0.9.fw");
@@ -13,7 +13,7 @@ pub(crate) fn target(revision: Revision, device: DeviceKind) -> Target {
         revision,
         date_code: DateCode::new(76, 30),
     });
-    Target::new(chip, device)
+    Target::new(chip, device.board(BoardRev::A))
 }
 
 pub(crate) fn build(

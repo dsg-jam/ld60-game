@@ -1,9 +1,9 @@
 mod common;
 
 use common::{SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
-use ld60_calco::Revision;
-use ld60_devices::DeviceKind;
-use ld60_dsl::Flavor;
+use ld60_calco::{ChipInfo, DateCode, Revision};
+use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
+use ld60_dsl::{Flavor, Selection, Target, compile};
 use ld60_machine::Isa;
 
 const SUMMA_SWITCHES: &[&str] = &[
@@ -113,6 +113,37 @@ entry main {
         "{}",
         output.asm
     );
+}
+
+#[test]
+fn key_literals_use_the_codes_of_the_board() {
+    let source = "\
+firmware \"T\" for tally2
+entry main {
+    a = KEY
+    match a {
+        '+' => goto main
+        'C' => goto main
+    }
+}
+";
+    let chip = ChipSpec::Calco(ChipInfo {
+        revision: Revision::B,
+        date_code: DateCode::new(76, 30),
+    });
+    let selection = Selection {
+        flavor: Flavor::Fixed,
+        switches: &[],
+    };
+    for rev in BoardRev::ALL {
+        let board = DeviceKind::Tally2.board(rev);
+        let output = compile(source, &Target::new(chip, board), &selection).unwrap();
+        for key in ['+', 'C'] {
+            let code = board.key_code(key).unwrap();
+            let check = format!("CPI  0x{code:02X}\n");
+            assert!(output.asm.contains(&check), "{rev:?} {key}\n{}", output.asm);
+        }
+    }
 }
 
 #[test]
