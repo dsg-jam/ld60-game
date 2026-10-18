@@ -1,5 +1,4 @@
-use std::fmt::Write;
-
+use crate::diagnostic::Pos;
 use crate::emit::{Instr, Line, Operand};
 use crate::hir::Program;
 use crate::labels::{Names, asm_label};
@@ -7,57 +6,81 @@ use crate::labels::{Names, asm_label};
 const CODE_COLUMN: usize = 8;
 const COMMENT_COLUMN: usize = 28;
 
+/// The printed firmware and the source position of each output line.
+pub(crate) struct Printed {
+    pub(crate) text: String,
+    /// Indexed by output line number minus 1.
+    pub(crate) positions: Vec<Pos>,
+}
+
+impl Printed {
+    fn push(&mut self, text: &str, pos: Pos) {
+        for line in text.split('\n') {
+            self.text.push_str(line.trim_end());
+            self.text.push('\n');
+            self.positions.push(pos);
+        }
+    }
+}
+
 /// Prints the header and the code in the layout of the hand-written files.
-pub(crate) fn print(program: &Program, lines: &[Line], names: &Names) -> String {
-    let mut out = format!("; {}\n;\n", program.title);
+pub(crate) fn print(program: &Program, lines: &[Line], names: &Names) -> Printed {
+    let mut out = Printed {
+        text: String::new(),
+        positions: Vec::new(),
+    };
+    let header = Pos::default();
+    out.push(&format!("; {}\n;", program.title), header);
     for ram in &program.ram {
         let cells = if ram.first == ram.last {
             format!("M{:X}", ram.first)
         } else {
             format!("M{:X}-M{:X}", ram.first, ram.last)
         };
-        let _ = writeln!(out, "; {cells:<6} {}", ram.text);
+        out.push(&format!("; {cells:<6} {}", ram.text), header);
     }
     if !program.notes.is_empty() {
-        out.push_str(";\n");
+        out.push(";", header);
         for note in &program.notes {
-            out.push_str(&comment_line(note));
-            out.push('\n');
+            out.push(&comment_line(note), header);
         }
     }
-    out.push('\n');
+    out.push("", header);
 
-    let mut label: Option<String> = None;
+    let mut label: Option<(String, Pos)> = None;
     for line in lines {
-        let text = match line {
+        let (text, pos) = match line {
             Line::Label(id) => {
                 if names.is_shown(*id)
-                    && let Some(previous) = label.replace(format!("{}:", names.get(*id)))
+                    && let Some((previous, pos)) =
+                        label.replace((format!("{}:", names.get(*id)), Pos::default()))
                 {
-                    out.push_str(&previous);
-                    out.push('\n');
+                    out.push(&previous, pos);
                 }
                 continue;
             }
-            Line::Blank => String::new(),
-            Line::Comment(text) => format!("{}{}", " ".repeat(CODE_COLUMN), comment_line(text)),
-            Line::Instr(instr) => code(
-                label.take(),
-                &instruction(instr, names),
-                instr.comment.as_deref(),
+            Line::Blank => (String::new(), Pos::default()),
+            Line::Comment(text) => (
+                format!("{}{}", " ".repeat(CODE_COLUMN), comment_line(text)),
+                Pos::default(),
             ),
-            Line::Raw(raw) => raw_line(label.take(), raw),
+            Line::Instr(instr) => (
+                code(
+                    label.take().map(|(l, _)| l),
+                    &instruction(instr, names),
+                    instr.comment.as_deref(),
+                ),
+                instr.pos,
+            ),
+            Line::Raw(raw, pos) => (raw_line(label.take().map(|(l, _)| l), raw), *pos),
         };
-        if let (Line::Blank | Line::Comment(_), Some(pending)) = (line, label.take()) {
-            out.push_str(&pending);
-            out.push('\n');
+        if let (Line::Blank | Line::Comment(_), Some((pending, pos))) = (line, label.take()) {
+            out.push(&pending, pos);
         }
-        out.push_str(text.trim_end());
-        out.push('\n');
+        out.push(&text, pos);
     }
-    if let Some(pending) = label {
-        out.push_str(&pending);
-        out.push('\n');
+    if let Some((pending, pos)) = label {
+        out.push(&pending, pos);
     }
     out
 }

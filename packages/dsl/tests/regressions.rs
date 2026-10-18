@@ -295,6 +295,32 @@ entry main {
 }
 
 #[test]
+fn oversized_firmware_gives_one_error() {
+    let calls = "    s()\n".repeat(60);
+    let body = format!(
+        "entry main {{\n{calls}    wait\n    goto main\n}}\nroutine s {{\n{}}}\n",
+        "    a = n\n".repeat(5)
+    );
+    let errors = tally(Revision::A, &body).unwrap_err();
+    let found: Vec<_> = errors
+        .iter()
+        .map(|d| (d.line, d.message.as_str()))
+        .collect();
+    assert_eq!(found, [(69, "firmware is 303 bytes, the ROM holds 256")]);
+}
+
+#[test]
+fn assembler_errors_point_at_the_source() {
+    let body = "entry main {\n    wait\n    asm {\n        FOO\n    }\n    goto main\n}\n";
+    let errors = tally(Revision::B, body).unwrap_err();
+    let found: Vec<_> = errors
+        .iter()
+        .map(|d| (d.line, d.message.as_str()))
+        .collect();
+    assert_eq!(found, [(5, "generated code: unknown mnemonic 'FOO'")]);
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {

@@ -84,18 +84,21 @@ pub fn compile(
     let names = emitted
         .labels
         .name(&emitted.lines, |instr| backend.label_role(instr));
-    let asm = print::print(&program, &emitted.lines, &names);
-    if let Err(errors) = target.chip.isa().assemble(&asm) {
+    check_size(&emitted.lines, backend.features().rom_len)?;
+    let printed = print::print(&program, &emitted.lines, &names);
+    if let Err(errors) = target.chip.isa().assemble(&printed.text) {
         return Err(errors
             .into_iter()
             .map(|e| {
+                let pos = printed.positions.get(e.line.wrapping_sub(1));
                 Diagnostic::error(
-                    diagnostic::Pos::default(),
-                    format!("generated line {}: {}", e.line, e.message),
+                    pos.copied().unwrap_or_default(),
+                    format!("generated code: {}", e.message),
                 )
             })
             .collect());
     }
+    let asm = printed.text;
     Ok(Output { asm, warnings })
 }
 
@@ -112,4 +115,29 @@ pub fn compile_pair(
         buggy: build(Flavor::Buggy)?,
         fixed: build(Flavor::Fixed)?,
     })
+}
+
+/// Fails with one error at the first instruction that does not fit in the ROM.
+fn check_size(lines: &[emit::Line], rom_len: usize) -> Result<(), Vec<Diagnostic>> {
+    let instrs = lines.iter().filter_map(|line| match line {
+        emit::Line::Instr(instr) => Some(instr),
+        _ => None,
+    });
+    let total: usize = instrs.clone().map(|i| i.size).sum();
+    if total <= rom_len {
+        return Ok(());
+    }
+    let mut used = 0;
+    let first = instrs
+        .clone()
+        .find(|i| {
+            used += i.size;
+            used > rom_len
+        })
+        .map(|i| i.pos)
+        .unwrap_or_default();
+    Err(vec![Diagnostic::error(
+        first,
+        format!("firmware is {total} bytes, the ROM holds {rom_len}"),
+    )])
 }

@@ -15,6 +15,8 @@ pub(crate) struct Features {
     /// `arr[i]` has an indexed addressing mode.
     pub(crate) indexed: bool,
     pub(crate) ram_cells: u8,
+    /// ROM size in words.
+    pub(crate) rom_len: usize,
     pub(crate) stack_depth: Option<u8>,
 }
 

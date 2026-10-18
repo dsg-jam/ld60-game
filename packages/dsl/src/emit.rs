@@ -16,6 +16,9 @@ pub(crate) struct Instr {
     pub(crate) mnemonic: &'static str,
     pub(crate) operands: Vec<Operand>,
     pub(crate) comment: Option<String>,
+    /// Bytes or words the instruction takes in ROM.
+    pub(crate) size: usize,
+    pub(crate) pos: Pos,
     /// Control never falls through to the next line.
     pub(crate) stops: bool,
     /// A generated jump that can go if its target is the next line.
@@ -28,7 +31,7 @@ pub(crate) enum Line {
     Comment(String),
     Instr(Instr),
     Label(LabelId),
-    Raw(String),
+    Raw(String, Pos),
 }
 
 /// Collects the output lines. Backends add instructions and labels here.
@@ -38,6 +41,7 @@ pub(crate) struct Emitter {
     comment: Option<String>,
     droppable: bool,
     prefix: String,
+    pos: Pos,
 }
 
 impl Emitter {
@@ -46,11 +50,13 @@ impl Emitter {
         self.labels.add(LabelName::Join(self.prefix.clone()))
     }
 
-    pub(crate) fn op(&mut self, mnemonic: &'static str, operands: Vec<Operand>) {
+    pub(crate) fn op(&mut self, mnemonic: &'static str, operands: Vec<Operand>, size: usize) {
         self.lines.push(Line::Instr(Instr {
             mnemonic,
             operands,
             comment: self.comment.take(),
+            size,
+            pos: self.pos,
             stops: false,
             droppable: self.droppable,
         }));
@@ -107,10 +113,11 @@ impl Walker<'_> {
             self.out.comment.clone_from(&node.comment);
         }
         let pos = node.pos;
+        self.out.pos = pos;
         match &node.stmt {
             Stmt::Asm(lines) => {
                 for line in lines {
-                    self.out.lines.push(Line::Raw(line.clone()));
+                    self.out.lines.push(Line::Raw(line.clone(), pos));
                 }
             }
             Stmt::Comment(text) => self.out.lines.push(Line::Comment(text.clone())),
@@ -187,6 +194,7 @@ pub(crate) fn emit(program: &Program, backend: &dyn Backend) -> Result<Emitter, 
             comment: None,
             droppable: false,
             prefix: String::new(),
+            pos: Pos::default(),
         },
     };
     let mut previous = None;
@@ -217,7 +225,7 @@ fn drop_jumps_to_next(lines: &mut Vec<Line>) {
         let lands_next = target.is_some_and(|target| {
             lines[index + 1..]
                 .iter()
-                .take_while(|l| !matches!(l, Line::Instr(_) | Line::Raw(_)))
+                .take_while(|l| !matches!(l, Line::Instr(_) | Line::Raw(..)))
                 .any(|l| *l == Line::Label(target))
         });
         if lands_next {

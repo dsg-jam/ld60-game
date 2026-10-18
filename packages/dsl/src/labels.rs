@@ -49,7 +49,7 @@ impl Labels {
                     group.push(*id);
                     order.push(*id);
                 }
-                Line::Instr(_) | Line::Raw(_) => {
+                Line::Instr(_) | Line::Raw(..) => {
                     for &id in &group {
                         next_instr.insert(id, index);
                     }
@@ -69,7 +69,7 @@ impl Labels {
                 _ => None,
             })
             .chain(lines.iter().filter_map(|line| match line {
-                Line::Raw(raw) => asm_label(raw).map(|(name, _)| name.to_string()),
+                Line::Raw(raw, _) => asm_label(raw).map(|(name, _)| name.to_string()),
                 _ => None,
             }))
             .collect();
