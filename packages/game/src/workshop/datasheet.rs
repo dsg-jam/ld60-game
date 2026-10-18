@@ -6,6 +6,7 @@ use ld60_calco::{Cond, Erratum};
 
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::paper::{PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
@@ -76,7 +77,7 @@ impl Datasheet {
 
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|datasheet| {
-            datasheet.spawn(Shape::cuboid(&stack, PAPER));
+            datasheet.spawn((Shape::cuboid(&stack, PAPER), Finish::Paper));
             sheet = datasheet
                 .spawn(Paper::sheet(
                     &canvas,
@@ -86,11 +87,13 @@ impl Datasheet {
                     &mut materials,
                 ))
                 .id();
-            datasheet.spawn(Shape::cuboid(&staple, STAPLE)).insert(
-                staple
-                    .transform()
-                    .with_rotation(Quat::from_rotation_y(FRAC_PI_4)),
-            );
+            datasheet
+                .spawn((Shape::cuboid(&staple, STAPLE), Finish::Metal))
+                .insert(
+                    staple
+                        .transform()
+                        .with_rotation(Quat::from_rotation_y(FRAC_PI_4)),
+                );
         });
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, pages),

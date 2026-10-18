@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 
 /// Height of the top surface above the ground.
 const HEIGHT: f32 = 0.75;
@@ -41,10 +42,10 @@ impl Desk {
     fn on_add(add: On<Add<Desk>>, mut commands: Commands) {
         let layout = DeskLayout::new();
         commands.entity(add.entity).with_children(|desk| {
-            desk.spawn(Shape::cuboid(&layout.top, WOOD));
-            desk.spawn(Shape::cuboid(&layout.mat, MAT));
+            desk.spawn((Shape::cuboid(&layout.top, WOOD), Finish::Wood));
+            desk.spawn((Shape::cuboid(&layout.mat, MAT), Finish::Plastic));
             for leg in &layout.legs {
-                desk.spawn(Shape::cuboid(leg, WOOD_DARK));
+                desk.spawn((Shape::cuboid(leg, WOOD_DARK), Finish::Wood));
             }
         });
     }

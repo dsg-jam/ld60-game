@@ -6,6 +6,7 @@ use self::props::{Finishes, Props};
 use super::desk::DeskLayout;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::{Finish, SurfaceMaterial};
 
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);
@@ -75,9 +76,10 @@ impl Clutter {
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
+        mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
         let desk = DeskLayout::new();
-        let finishes = Finishes::new(&mut materials);
+        let finishes = Finishes::new(&mut materials, &mut surfaces);
         let mut props = Props {
             meshes: &mut meshes,
             finishes: &finishes,
@@ -101,7 +103,7 @@ impl Clutter {
                 clutter
                     .spawn((desk.place(spot, yaw), Visibility::default()))
                     .with_children(|note| {
-                        note.spawn(Shape::cuboid(&Block::new(NOTE_SIZE), color));
+                        note.spawn((Shape::cuboid(&Block::new(NOTE_SIZE), color), Finish::Paper));
                     });
             }
             clutter
@@ -122,9 +124,9 @@ impl Clutter {
             end.translated(Vec3::Z * (outer.min().z + BOX_WALL / 2.0)),
             end.translated(Vec3::Z * (outer.max().z - BOX_WALL / 2.0)),
         ];
-        parts.spawn(Shape::cuboid(&bottom, CARDBOARD));
+        parts.spawn((Shape::cuboid(&bottom, CARDBOARD), Finish::Paper));
         for wall in walls {
-            parts.spawn(Shape::cuboid(&wall, CARDBOARD));
+            parts.spawn((Shape::cuboid(&wall, CARDBOARD), Finish::Paper));
         }
         for ((size, offset, tilt), color) in BROKEN.into_iter().zip(PLASTIC) {
             parts
@@ -134,7 +136,7 @@ impl Clutter {
                     Visibility::default(),
                 ))
                 .with_children(|device| {
-                    device.spawn(Shape::cuboid(&Block::new(size), color));
+                    device.spawn((Shape::cuboid(&Block::new(size), color), Finish::Plastic));
                 });
         }
     }

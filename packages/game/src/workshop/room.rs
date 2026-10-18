@@ -3,6 +3,7 @@ use bevy::{light::NotShadowCaster, prelude::*};
 use super::switch::LightSwitch;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 
 const FLOOR_SIZE: Vec3 = Vec3::new(4.0, 0.02, 4.0);
 const WALL_HEIGHT: f32 = 2.6;
@@ -174,11 +175,15 @@ impl Room {
                     Transform::from_translation(bulb - Vec3::Y * 2.0 * PENDANT_BULB_RADIUS),
                 ))
                 .id();
-            room.spawn(Shape::cuboid(&floor, FLOOR));
+            room.spawn((Shape::cuboid(&floor, FLOOR), Finish::Planks));
             for wall in [back, left, right] {
-                room.spawn((Shape::cuboid(&wall, WALL), NotShadowCaster));
+                room.spawn((Shape::cuboid(&wall, WALL), Finish::Plaster, NotShadowCaster));
             }
-            room.spawn((Shape::cuboid(&baseboard, BASEBOARD), NotShadowCaster));
+            room.spawn((
+                Shape::cuboid(&baseboard, BASEBOARD),
+                Finish::Wood,
+                NotShadowCaster,
+            ));
             room.spawn((
                 Mesh3d(meshes.add(Cuboid::from_size(pane.size))),
                 MeshMaterial3d(materials.add(StandardMaterial {
@@ -190,14 +195,14 @@ impl Room {
                 NotShadowCaster,
             ));
             for bar in frames {
-                room.spawn((Shape::cuboid(&bar, FRAME), NotShadowCaster));
+                room.spawn((Shape::cuboid(&bar, FRAME), Finish::Wood, NotShadowCaster));
             }
-            room.spawn(Shape::cuboid(&shelf, WOOD_DARK));
+            room.spawn((Shape::cuboid(&shelf, WOOD_DARK), Finish::Wood));
             for bracket in brackets {
-                room.spawn(Shape::cuboid(&bracket, WOOD_DARK));
+                room.spawn((Shape::cuboid(&bracket, WOOD_DARK), Finish::Wood));
             }
             for (book, color) in books {
-                room.spawn(Shape::cuboid(&book, color));
+                room.spawn((Shape::cuboid(&book, color), Finish::Paper));
             }
             room.spawn((
                 Shape::cuboid(&plate, SWITCH),

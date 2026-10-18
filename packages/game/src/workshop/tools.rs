@@ -12,6 +12,7 @@ use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::player::focus::{Clickable, Focus, FocusOn};
 
@@ -135,10 +136,10 @@ impl Tool {
                 let neck = Block::new(STAMP_NECK_SIZE).on_top_of(&base);
                 let knob = Block::new(STAMP_KNOB_SIZE).on_top_of(&neck);
                 entity.with_children(|stamp| {
-                    stamp.spawn(Shape::cuboid(&pad, STAMP_RUBBER));
-                    stamp.spawn(Shape::cuboid(&base, STAMP_WOOD));
-                    stamp.spawn(Shape::cylinder(&neck, STAMP_WOOD));
-                    stamp.spawn(Shape::cylinder(&knob, STAMP_HANDLE));
+                    stamp.spawn((Shape::cuboid(&pad, STAMP_RUBBER), Finish::Plastic));
+                    stamp.spawn((Shape::cuboid(&base, STAMP_WOOD), Finish::Wood));
+                    stamp.spawn((Shape::cylinder(&neck, STAMP_WOOD), Finish::Wood));
+                    stamp.spawn((Shape::cylinder(&knob, STAMP_HANDLE), Finish::Plastic));
                 });
             }
             Self::Bell => {
@@ -153,7 +154,7 @@ impl Tool {
                     ..default()
                 });
                 entity.with_children(|bell| {
-                    bell.spawn(Shape::cylinder(&base, BELL_BASE));
+                    bell.spawn((Shape::cylinder(&base, BELL_BASE), Finish::Wood));
                     bell.spawn((
                         Mesh3d(meshes.add(Sphere::new(BELL_DOME_RADIUS))),
                         MeshMaterial3d(brass.clone()),

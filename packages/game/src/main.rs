@@ -43,7 +43,7 @@ fn main() -> AppExit {
     app.add_plugins((
         MeshPickingPlugin,
         audio::AudioPlugin,
-        geometry::shape::ShapePlugin,
+        geometry::GeometryPlugin,
         parts::PartsPlugin,
         player::PlayerPlugin,
         workshop::WorkshopPlugin,

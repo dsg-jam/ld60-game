@@ -3,6 +3,7 @@ use bevy::{light::NotShadowCaster, prelude::*};
 use super::switch::LightSwitch;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 
 const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
 const POLE_SIZE: Vec3 = Vec3::new(0.016, 0.46, 0.016);
@@ -64,9 +65,9 @@ impl Lamp {
         let mut light = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|lamp| {
             lamp.spawn(Shape::cylinder(&base, SHADE));
-            lamp.spawn(Shape::cylinder(&pole, METAL));
-            lamp.spawn(Shape::cuboid(&arm, METAL));
-            lamp.spawn(Shape::cylinder(&shade, SHADE));
+            lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));
+            lamp.spawn((Shape::cuboid(&arm, METAL), Finish::Metal));
+            lamp.spawn((Shape::cylinder(&shade, SHADE), Finish::Fabric));
             lamp.spawn((
                 Mesh3d(meshes.add(Sphere::new(BULB_RADIUS))),
                 MeshMaterial3d(bulb_material.clone()),

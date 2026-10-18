@@ -9,6 +9,7 @@ use super::service;
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
@@ -106,7 +107,7 @@ impl JobTicket {
         let sheet_center = Vec3::new(0.0, board.max().y + SHEET_GAP, SHEET_OFFSET);
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|clipboard| {
-            clipboard.spawn(Shape::cuboid(&board, BOARD));
+            clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
             sheet = clipboard
                 .spawn(Paper::sheet(
                     &canvas,
@@ -116,7 +117,7 @@ impl JobTicket {
                     &mut materials,
                 ))
                 .id();
-            clipboard.spawn(Shape::cuboid(&clip, CLIP));
+            clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));
         });
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, pages),

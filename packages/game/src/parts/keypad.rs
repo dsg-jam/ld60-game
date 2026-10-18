@@ -6,6 +6,7 @@ use bevy::{
 
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::screen::UiCanvas;
 
 pub(crate) struct KeypadPlugin;
@@ -195,6 +196,7 @@ impl<K: Copy> Keypad<K> {
         for key in &self.keys {
             parent.spawn((
                 Shape::textured_cuboid(&key.block, labels.clone(), key.label_region),
+                Finish::Plastic,
                 PressableKey {
                     rest: key.block.center,
                     travel: self.style.travel,
