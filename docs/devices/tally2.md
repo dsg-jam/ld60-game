@@ -12,7 +12,8 @@ units have a Rev B. Check the chip sticker before you change the firmware.
 The board around the chip comes in three revisions. They wire the display and
 the keys differently. The sticker under the device shows the revision, for
 example `BOARD 2B`. The serial number starts with it too. The service sheet of
-a job lists the I/O of its board.
+a job lists the I/O of its board. The board revision does not depend on the
+chip revision.
 
 | Board | Display   | `+` | `C` |
 | ----- | --------- | --- | --- |
