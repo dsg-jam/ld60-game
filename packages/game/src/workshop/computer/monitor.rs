@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::{CASE, CASE_DARK};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 
 const STAND_SIZE: Vec3 = Vec3::new(0.2, 0.03, 0.2);
 const BODY_SIZE: Vec3 = Vec3::new(0.38, 0.32, 0.36);
@@ -70,11 +71,11 @@ impl Monitor {
         parent
             .spawn((Name::new("monitor"), transform, Visibility::default()))
             .with_children(|monitor| {
-                monitor.spawn(Shape::cylinder(&self.stand, CASE_DARK));
-                monitor.spawn(Shape::cuboid(&self.body, CASE));
-                monitor.spawn(Shape::cuboid(&self.neck, CASE_DARK));
+                monitor.spawn((Shape::cylinder(&self.stand, CASE_DARK), Finish::Plastic));
+                monitor.spawn((Shape::cuboid(&self.body, CASE), Finish::Plastic));
+                monitor.spawn((Shape::cuboid(&self.neck, CASE_DARK), Finish::Plastic));
                 for bar in &self.bezel {
-                    monitor.spawn(Shape::cuboid(bar, CASE_DARK));
+                    monitor.spawn((Shape::cuboid(bar, CASE_DARK), Finish::Plastic));
                 }
                 monitor.spawn((glass, self.glass.transform()));
             });

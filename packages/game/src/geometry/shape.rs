@@ -1,16 +1,22 @@
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 use super::block::Block;
+use super::surface::{Finish, Form, SurfaceMaterial, SurfacePlugin};
+
+/// Shapes get one of this many seeds, which vary their surfaces.
+const SEEDS: u32 = 997;
 
 pub(crate) struct ShapePlugin;
 
 impl Plugin for ShapePlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(Shape::on_add);
+        app.add_plugins(SurfacePlugin).add_observer(Shape::on_add);
     }
 }
 
-/// A primitive mesh with a plain color, placed by a [`Block`].
+/// A primitive mesh in one color, placed by a [`Block`].
+///
+/// Add a [`Finish`] next to it for anything other than paint.
 #[derive(Component, Clone, Debug)]
 #[require(Transform)]
 pub(crate) struct Shape {
@@ -87,22 +93,27 @@ impl Shape {
 
     fn on_add(
         add: On<Add<Shape>>,
-        shapes: Query<&Shape>,
+        shapes: Query<(&Shape, Option<&Finish>)>,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
+        mut materials: ResMut<Assets<SurfaceMaterial>>,
     ) {
-        let Ok(shape) = shapes.get(add.entity) else {
+        let Ok((shape, finish)) = shapes.get(add.entity) else {
             return;
         };
+        let form = match shape.kind {
+            Kind::Cuboid => Form::Box(shape.size),
+            Kind::Cylinder => Form::Cylinder(shape.size),
+        };
+        let seed = (add.entity.index_u32() % SEEDS) as f32;
         commands.entity(add.entity).insert((
             Mesh3d(meshes.add(shape.mesh())),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: shape.color,
-                base_color_texture: shape.texture.as_ref().map(|t| t.image.clone()),
-                perceptual_roughness: 0.8,
-                ..default()
-            })),
+            MeshMaterial3d(materials.add(finish.copied().unwrap_or_default().textured(
+                shape.color,
+                shape.texture.as_ref().map(|t| t.image.clone()),
+                form,
+                seed,
+            ))),
         ));
     }
 }

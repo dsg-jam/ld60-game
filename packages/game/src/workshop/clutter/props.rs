@@ -2,6 +2,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
+use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
+
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;
 const MUG_WALL: f32 = 0.004;
@@ -34,35 +36,33 @@ const STEEL: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
 
 /// Materials shared by the props.
 pub(super) struct Finishes {
-    ceramic: Handle<StandardMaterial>,
-    stripe: Handle<StandardMaterial>,
+    ceramic: Handle<SurfaceMaterial>,
+    stripe: Handle<SurfaceMaterial>,
     coffee: Handle<StandardMaterial>,
-    grip: Handle<StandardMaterial>,
-    steel: Handle<StandardMaterial>,
+    grip: Handle<SurfaceMaterial>,
+    steel: Handle<SurfaceMaterial>,
 }
 
 impl Finishes {
-    pub(super) fn new(materials: &mut Assets<StandardMaterial>) -> Self {
+    pub(super) fn new(
+        materials: &mut Assets<StandardMaterial>,
+        surfaces: &mut Assets<SurfaceMaterial>,
+    ) -> Self {
         let coffee = materials.add(StandardMaterial {
             base_color: COFFEE,
             perceptual_roughness: 0.6,
             reflectance: 0.2,
             ..default()
         });
-        let mut finish = |color: Color, roughness: f32, metallic: f32| {
-            materials.add(StandardMaterial {
-                base_color: color,
-                perceptual_roughness: roughness,
-                metallic,
-                ..default()
-            })
+        let mut finish = |finish: Finish, color: Color| {
+            surfaces.add(finish.material(color, Form::Freeform, 0.0))
         };
         Self {
-            ceramic: finish(CERAMIC, 0.25, 0.0),
-            stripe: finish(STRIPE, 0.25, 0.0),
+            ceramic: finish(Finish::Ceramic, CERAMIC),
+            stripe: finish(Finish::Ceramic, STRIPE),
             coffee,
-            grip: finish(GRIP, 0.3, 0.0),
-            steel: finish(STEEL, 0.3, 1.0),
+            grip: finish(Finish::Grip, GRIP),
+            steel: finish(Finish::Metal, STEEL),
         }
     }
 }
@@ -174,7 +174,7 @@ impl Props<'_> {
 
     fn spawn<const N: usize>(
         parent: &mut ChildSpawnerCommands,
-        parts: [(Handle<Mesh>, &Handle<StandardMaterial>, Transform); N],
+        parts: [(Handle<Mesh>, &Handle<SurfaceMaterial>, Transform); N],
     ) {
         for (mesh, material, transform) in parts {
             parent.spawn((Mesh3d(mesh), MeshMaterial3d(material.clone()), transform));

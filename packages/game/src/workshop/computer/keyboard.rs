@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::{CASE, CASE_DARK};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::keypad::KeyBinding::Code;
 use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 
@@ -127,7 +128,7 @@ impl Keyboard {
         parent
             .spawn((Name::new("keyboard"), transform, Visibility::default()))
             .with_children(|keyboard| {
-                keyboard.spawn(Shape::cuboid(&self.base, CASE_DARK));
+                keyboard.spawn((Shape::cuboid(&self.base, CASE_DARK), Finish::Plastic));
                 self.keypad
                     .spawn_keys(keyboard, &labels, false, |_| KeyboardKey);
             });
