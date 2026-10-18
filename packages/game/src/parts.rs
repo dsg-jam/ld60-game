@@ -2,6 +2,7 @@ pub(crate) mod keypad;
 pub(crate) mod lcd;
 pub(crate) mod paper;
 pub(crate) mod screen;
+pub(crate) mod sticker;
 
 use bevy::prelude::*;
 
@@ -15,6 +16,7 @@ impl Plugin for PartsPlugin {
             lcd::LcdPlugin,
             paper::PaperPlugin,
             screen::ScreenPlugin,
+            sticker::StickerPlugin,
         ));
     }
 }
