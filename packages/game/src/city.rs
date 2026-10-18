@@ -37,6 +37,8 @@ const CURB_HEIGHT: f32 = 0.15;
 const Z_SLICES: usize = 4096;
 /// The street ends this far to each side of the shop.
 const HALF_LENGTH: f32 = 90.0;
+/// Height of the player's eyes above the street.
+const EYE_HEIGHT: f32 = 1.5;
 /// The colors of the city's neon: signs, crowns on the towers and lights
 /// under the cars.
 const NEON: [Color; 6] = [

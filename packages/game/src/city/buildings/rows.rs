@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use super::super::market::MARKET_HEIGHT;
-use super::super::{FACADES, HALF_LENGTH};
+use super::super::{EYE_HEIGHT, FACADES, HALF_LENGTH};
 use super::PARAPET;
 use crate::geometry::block::Block;
 use crate::workshop::shop;
@@ -137,7 +137,6 @@ const LOW_ACROSS: Range<f32> = 6.5..7.5;
 /// view and its top, as angles from the player's eyes in radians.
 pub(super) const VIEW_CONE: f32 = 0.42;
 const VIEW_TOP: f32 = 0.49;
-pub(super) const EYE_HEIGHT: f32 = 1.5;
 
 const FLOOR_HEIGHT: Range<f32> = 3.0..3.8;
 

@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
+use crate::city::EYE_HEIGHT;
 use crate::city::buildings::{Backdrop, FacadeMaterial};
 use crate::parts::script::Word;
 use crate::workshop::shop;
@@ -28,7 +29,6 @@ const ROOFTOP_SETBACK: f32 = 1.0;
 /// Seen from the shop, the roofs across the street reach up to about this
 /// angle, in radians.
 const OVER_ROOFS: f32 = 0.42;
-const EYE_HEIGHT: f32 = 1.5;
 
 impl Sign {
     /// A large sign on a building behind the street, seen from afar, if it
