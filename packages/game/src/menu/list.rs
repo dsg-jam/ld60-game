@@ -63,6 +63,7 @@ pub(super) enum Action {
     Start,
     Resume,
     Settings,
+    Credits,
     /// Goes back from a page, or out of the pause menu.
     Back,
     /// Goes to the title screen.

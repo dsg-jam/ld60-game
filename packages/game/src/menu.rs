@@ -1,3 +1,4 @@
+mod credits;
 mod list;
 mod pause;
 mod settings;
@@ -5,6 +6,7 @@ mod title;
 
 use bevy::prelude::*;
 
+use self::credits::{Credits, CreditsHandle, CreditsPage};
 use self::list::{Action, Entries};
 pub(crate) use self::settings::Settings;
 use self::settings::SettingsPage;
@@ -28,6 +30,7 @@ impl Plugin for MenuPlugin {
             .add_sub_state::<Page>()
             .init_resource::<Started>()
             .add_plugins((
+                credits::CreditsPlugin,
                 list::ListPlugin,
                 pause::PausePlugin,
                 settings::SettingsPlugin,
@@ -64,6 +67,7 @@ pub(crate) enum Page {
     #[default]
     Entries,
     Settings,
+    Credits,
 }
 
 /// Whether the player has started playing.
@@ -116,11 +120,19 @@ impl Column {
         app_state: Res<State<AppState>>,
         page: Res<State<Page>>,
         started: Res<Started>,
+        credits: Res<Assets<Credits>>,
+        credits_handle: Res<CreditsHandle>,
         column: Single<Entity, With<Column>>,
         mut commands: Commands,
     ) {
         let mut column = commands.entity(*column);
         match (*app_state.get(), *page.get()) {
+            (_, Page::Credits) => {
+                column.with_child((
+                    DespawnOnExit(Page::Credits),
+                    CreditsPage::bundle(credits_handle.get(&credits)),
+                ));
+            }
             (_, Page::Settings) => {
                 column.with_child((DespawnOnExit(Page::Settings), SettingsPage::bundle()));
             }
@@ -160,8 +172,9 @@ impl Action {
                 next_state.set(AppState::Playing);
             }
             Self::Settings => next_page.set(Page::Settings),
+            Self::Credits => next_page.set(Page::Credits),
             Self::Back => match (*app_state.get(), page.map(|page| *page.get())) {
-                (_, Some(Page::Settings)) => next_page.set(Page::Entries),
+                (_, Some(Page::Settings | Page::Credits)) => next_page.set(Page::Entries),
                 // Browsers only lock the cursor after a click.
                 (AppState::Paused, _) if cfg!(not(target_arch = "wasm32")) => {
                     next_state.set(AppState::Playing);

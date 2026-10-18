@@ -3663,6 +3663,8 @@ dependencies = [
  "ld60-levels",
  "ld60-machine",
  "rand",
+ "ron",
+ "serde",
  "serde_json",
  "unic-langid",
  "web-sys",

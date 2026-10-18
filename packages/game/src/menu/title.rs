@@ -21,6 +21,7 @@ const DECAY_RATE: f32 = 1.5;
 pub(super) const START_ENTRIES: &[(Action, &str)] = &[
     (Action::Start, "menu-start"),
     (Action::Settings, "menu-settings"),
+    (Action::Credits, "menu-credits"),
     #[cfg(not(target_arch = "wasm32"))]
     (Action::Quit, "menu-quit"),
 ];
@@ -28,6 +29,7 @@ pub(super) const START_ENTRIES: &[(Action, &str)] = &[
 pub(super) const CONTINUE_ENTRIES: &[(Action, &str)] = &[
     (Action::Start, "menu-continue"),
     (Action::Settings, "menu-settings"),
+    (Action::Credits, "menu-credits"),
     #[cfg(not(target_arch = "wasm32"))]
     (Action::Quit, "menu-quit"),
 ];
