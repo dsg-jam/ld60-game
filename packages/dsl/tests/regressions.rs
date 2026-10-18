@@ -142,6 +142,61 @@ entry main {
 }
 
 #[test]
+fn setting_i_inside_a_loop_is_reported() {
+    let body = "\
+entry main {
+    for i = 3 downto 1 {
+        i = 5
+        n = a
+    }
+    wait
+}
+";
+    let diagnostic = error(tally(Revision::B, body));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (5, "i changes inside a loop")
+    );
+}
+
+#[test]
+fn asm_in_a_called_routine_may_change_i() {
+    let body = "\
+entry main {
+    for i = 3 downto 1 {
+        p()
+    }
+    wait
+}
+routine p {
+    q()
+}
+routine q {
+    asm {
+        LDI B, 7
+    }
+}
+";
+    let diagnostic = error(tally(Revision::B, body));
+    assert_eq!(
+        (diagnostic.line, diagnostic.message.as_str()),
+        (5, "p changes i inside a loop")
+    );
+    let direct = "\
+entry main {
+    for i = 3 downto 1 {
+        asm {
+            NOP
+        }
+    }
+    wait
+}
+";
+    let diagnostic = error(tally(Revision::B, direct));
+    assert_eq!(diagnostic.message, "asm inside a loop may change i");
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {

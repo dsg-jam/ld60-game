@@ -62,7 +62,9 @@ impl Linter<'_> {
         };
         let mut calls = Vec::new();
         Node::visit(&block.body, &mut |node| match &node.stmt {
-            Stmt::Prim(Prim::SetIndex(_)) | Stmt::Repeat { .. } => effects.writes_index = true,
+            Stmt::Asm(_) | Stmt::Prim(Prim::SetIndex(_)) | Stmt::Repeat { .. } => {
+                effects.writes_index = true;
+            }
             Stmt::Prim(Prim::Call(target)) => calls.push(*target),
             _ => {}
         });
@@ -82,7 +84,14 @@ impl Linter<'_> {
     }
 
     fn walk(&mut self, block: &Block, nodes: &[Node], in_loop: bool, features: &Features) {
-        for node in nodes {
+        for (index, node) in nodes.iter().enumerate() {
+            let starts_loop = matches!(
+                nodes.get(index + 1),
+                Some(Node {
+                    stmt: Stmt::Repeat { .. },
+                    ..
+                })
+            );
             match &node.stmt {
                 Stmt::Prim(Prim::Call(target)) => {
                     let name = self
@@ -109,6 +118,12 @@ impl Linter<'_> {
                             ),
                         );
                     }
+                }
+                Stmt::Prim(Prim::SetIndex(_)) if in_loop && !starts_loop => {
+                    self.report(node.pos, "i changes inside a loop".into());
+                }
+                Stmt::Asm(_) if in_loop => {
+                    self.report(node.pos, "asm inside a loop may change i".into());
                 }
                 Stmt::Repeat { body, .. } => {
                     if in_loop {
