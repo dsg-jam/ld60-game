@@ -6,7 +6,7 @@ use super::{
     hints::{Caption, Icon, IconFont},
     look::Gaze,
 };
-use crate::locale::Localized;
+use crate::locale::{Localized, Message};
 
 pub(super) struct CrosshairPlugin;
 
@@ -125,8 +125,9 @@ impl Crosshair {
         }
         if let Some(clickable) = hovered {
             let (entity, current) = *caption;
-            if current != Some(&Localized(clickable.prompt)) {
-                commands.entity(entity).insert(Localized(clickable.prompt));
+            let prompt = Localized::from(Message::new(clickable.prompt));
+            if current != Some(&prompt) {
+                commands.entity(entity).insert(prompt);
             }
         }
     }

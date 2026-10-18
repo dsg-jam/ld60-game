@@ -58,6 +58,7 @@ mod tests {
     use bevy::ecs::system::RunSystemOnce;
 
     use super::*;
+    use crate::locale::Localized;
     use crate::workshop::computer::editor::{Editor, footer::Status, undo::Undo};
     use crate::workshop::job::Job;
 
@@ -65,7 +66,7 @@ mod tests {
     fn notes_survive_a_new_job() {
         let mut world = World::new();
         world.spawn((Editor, EditableText::default(), Undo::default()));
-        world.spawn((Status, Text::default()));
+        world.spawn((Status, Localized::verbatim("")));
         let notes = world
             .spawn((Notes, EditableText::new("ADD IS 3 BYTES")))
             .id();

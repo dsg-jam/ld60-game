@@ -10,6 +10,7 @@ use super::{DeviceButton, Holdable};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
+use crate::locale::{Localized, Message};
 use crate::parts::keypad::KeyBinding::{Named, Typed};
 use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use crate::parts::lcd;
@@ -72,7 +73,7 @@ const TALLY2_ROWS: &[&[KeyDef<char>]] = &[&[
 ]];
 
 const SUMMA6: Model = Model {
-    name: "SUMMA 6 ADDING MACHINE",
+    name: "device-name-summa6",
     body_size: Vec3::new(0.09, 0.014, 0.15),
     body: Color::srgb_u8(0x3d, 0x44, 0x50),
     lcd_width: 0.07,
@@ -84,7 +85,7 @@ const SUMMA6: Model = Model {
 };
 
 const TALLY2: Model = Model {
-    name: "TALLY 2 COUNTER",
+    name: "device-name-tally2",
     body_size: Vec3::new(0.065, 0.02, 0.085),
     body: Color::srgb_u8(0x8a, 0x3b, 0x2e),
     lcd_width: 0.03,
@@ -97,7 +98,7 @@ const TALLY2: Model = Model {
 
 /// Shape and keys of one device kind.
 struct Model {
-    /// Printed on the sticker.
+    /// The message printed on the sticker.
     name: &'static str,
     body_size: Vec3,
     body: Color,
@@ -228,16 +229,17 @@ impl Handheld {
         ld60_levels::device(&self.level, rom)
     }
 
-    fn sticker_text(model: &Model, level: &Level) -> String {
+    fn sticker_text(model: &Model, level: &Level) -> Message {
         let chip = match level.chip {
-            ChipSpec::Calco(info) => format!("CALCO REV {:?} {}", info.revision, info.date_code),
+            ChipSpec::Calco(info) => Message::new("device-chip-calco")
+                .with("revision", format!("{:?}", info.revision))
+                .with("date-code", info.date_code.to_string()),
         };
-        format!(
-            "{}\nS/N {}\nBOARD {}\n{chip}\nDSG ELECTRONICS",
-            model.name,
-            level.serial,
-            level.board().name()
-        )
+        Message::new("device-sticker")
+            .with("name", Message::new(model.name))
+            .with("serial", level.serial.as_str())
+            .with("board", level.board().name())
+            .with("chip", chip)
     }
 
     fn spawn_sticker(
@@ -260,7 +262,7 @@ impl Handheld {
             BackgroundColor(STICKER_PAPER),
             canvas.target(),
             children![(
-                Text::new(Self::sticker_text(model, level)),
+                Localized::from(Self::sticker_text(model, level)),
                 TextFont {
                     font_size: FontSize::Px(STICKER_FONT_SIZE),
                     ..default()

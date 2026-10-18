@@ -8,6 +8,7 @@ use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
+use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
@@ -21,7 +22,6 @@ const SHEET_GAP: f32 = 0.0003;
 const CLIP_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.025);
 const BOARD: Color = Color::srgb_u8(0x7a, 0x5a, 0x3c);
 const CLIP: Color = Color::srgb_u8(0xa8, 0xac, 0xb0);
-const FOOTER: &str = "DSG SERVICE BENCH";
 /// Top left corner of the stamp on the canvas.
 const STAMP_POSITION: Vec2 = Vec2::new(300.0, 520.0);
 /// In degrees, clockwise.
@@ -79,9 +79,15 @@ impl JobTicket {
         let level = &ticket.level;
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let pages = vec![
-            Paper::spawn_page(&mut commands, &canvas, (1, 3), FOOTER, |page| {
-                Self::write(page, level);
-            }),
+            Paper::spawn_page(
+                &mut commands,
+                &canvas,
+                (1, 3),
+                Message::new("ticket-footer"),
+                |page| {
+                    Self::write(page, level);
+                },
+            ),
             Paper::spawn_page(
                 &mut commands,
                 &canvas,
@@ -129,46 +135,47 @@ impl JobTicket {
 
     fn write(page: &mut ChildSpawnerCommands, level: &Level) {
         let device = match level.device {
-            DeviceKind::Tally2 => "Tally 2 counter",
-            DeviceKind::Summa6 => "Summa 6 adding machine",
+            DeviceKind::Tally2 => "ticket-device-tally2",
+            DeviceKind::Summa6 => "ticket-device-summa6",
         };
         let chip = match level.chip {
-            ChipSpec::Calco(info) => {
-                format!(
-                    "CalCo rev {:?}, date code {}",
-                    info.revision, info.date_code
-                )
-            }
+            ChipSpec::Calco(info) => Message::new("ticket-chip-calco")
+                .with("revision", format!("{:?}", info.revision))
+                .with("date-code", info.date_code.to_string()),
         };
         let rom = match (level.rom.kind, level.rom.blank_available) {
-            (RomKind::Eprom, true) => "EPROM, blank in stock",
-            (RomKind::Eprom, false) => "EPROM, no blank. Burn over it.",
-            (RomKind::Mask, _) => "Mask ROM, cannot be burned",
+            (RomKind::Eprom, true) => "ticket-rom-blank",
+            (RomKind::Eprom, false) => "ticket-rom-no-blank",
+            (RomKind::Mask, _) => "ticket-rom-mask",
         };
 
-        page.spawn(Paper::title("JOB TICKET"));
-        page.spawn(Paper::faded("DSG service bench"));
+        page.spawn(Paper::title(Message::new("ticket-title")));
+        page.spawn(Paper::faded(Message::new("ticket-subtitle")));
         for (label, value) in [
-            ("JOB", level.id.to_uppercase()),
-            ("CUSTOMER", level.customer.name.clone()),
-            ("DEVICE", device.into()),
-            ("S/N", level.serial.clone()),
-            ("BOARD", level.board().name()),
-            ("CHIP", chip),
-            ("ROM", rom.into()),
+            ("ticket-job", Localized::verbatim(level.id.to_uppercase())),
+            ("ticket-customer", Localized::verbatim(&level.customer.name)),
+            ("ticket-device", Message::new(device).into()),
+            ("ticket-serial", Localized::verbatim(&level.serial)),
+            ("ticket-board", Localized::verbatim(level.board().name())),
+            ("ticket-chip", chip.into()),
+            ("ticket-rom", Message::new(rom).into()),
         ] {
             page.spawn(Paper::row([
-                (label.into(), LABEL_WIDTH),
+                (Message::new(label).into(), LABEL_WIDTH),
                 (value, VALUE_WIDTH),
             ]));
         }
-        page.spawn(Paper::heading("COMPLAINT"));
-        page.spawn(Paper::text(format!("\"{}\"", level.customer.complaint)));
-        page.spawn(Paper::heading("REMARKS"));
+        page.spawn(Paper::heading(Message::new("ticket-complaint")));
+        page.spawn(Paper::text(
+            Message::new("paper-quote").with("text", level.customer.complaint.as_str()),
+        ));
+        page.spawn(Paper::heading(Message::new("ticket-remarks")));
         for remark in &level.remarks {
-            page.spawn(Paper::text(format!("- {remark}")));
+            page.spawn(Paper::text(
+                Message::new("paper-bullet").with("text", remark.as_str()),
+            ));
         }
-        page.spawn(Paper::heading("STATUS"));
+        page.spawn(Paper::heading(Message::new("ticket-status")));
         page.spawn((TicketStatus, Paper::text(TicketStatus::text(None))));
         page.spawn(ShopStamp::bundle());
     }
@@ -179,25 +186,25 @@ impl JobTicket {
 struct TicketStatus;
 
 impl TicketStatus {
-    fn text(job: Option<&Job>) -> String {
+    fn text(job: Option<&Job>) -> Message {
         match job {
-            Some(job) if job.stamped => "Done. Ring the bell for pickup.".into(),
-            Some(job) if job.flashed => "Flashed. Stamp the ticket when it works.".into(),
+            Some(job) if job.stamped => Message::new("ticket-status-done"),
+            Some(job) if job.flashed => Message::new("ticket-status-flashed"),
             Some(job) if job.returns > 0 => {
-                format!("Came back. Tries left: {}.", job.tries_left())
+                Message::new("ticket-status-returned").with("tries", job.tries_left())
             }
-            _ => "Open".into(),
+            _ => Message::new("ticket-status-open"),
         }
     }
 
     fn update(
         job: Res<Job>,
-        mut texts: Query<&mut Text, With<TicketStatus>>,
+        mut texts: Query<&mut Localized, With<TicketStatus>>,
         mut stamps: Query<(Entity, &mut Visibility, Has<Landing>), With<ShopStamp>>,
         mut commands: Commands,
     ) {
         for mut text in &mut texts {
-            text.0 = Self::text(Some(&job));
+            *text = Self::text(Some(&job)).into();
         }
         for (stamp, mut visibility, landing) in &mut stamps {
             if !job.stamped {
@@ -249,9 +256,9 @@ struct ShopStamp;
 
 impl ShopStamp {
     fn bundle() -> impl Bundle {
-        let ink = |size: f32, text: &str| {
+        let ink = |size: f32, text: Localized| {
             (
-                Text::new(text),
+                text,
                 TextFont {
                     font_size: FontSize::Px(size),
                     ..default()
@@ -285,9 +292,9 @@ impl ShopStamp {
                 },
                 BorderColor::all(STAMP_INK),
                 children![
-                    ink(20.0, "AUTHORIZED"),
-                    ink(64.0, "DSG"),
-                    ink(22.0, "REPAIR SHOP"),
+                    ink(20.0, Message::new("stamp-authorized").into()),
+                    ink(64.0, Localized::verbatim("DSG")),
+                    ink(22.0, Message::new("stamp-shop").into()),
                     (
                         Node {
                             width: percent(100),
@@ -296,7 +303,7 @@ impl ShopStamp {
                         },
                         BackgroundColor(STAMP_INK),
                     ),
-                    ink(16.0, "FIXED WITH CARE"),
+                    ink(16.0, Message::new("stamp-care").into()),
                 ],
             )],
         )

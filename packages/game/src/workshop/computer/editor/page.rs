@@ -7,6 +7,7 @@ use super::footer::{Command, Run};
 use super::{PHOSPHOR, PHOSPHOR_DIM};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+use crate::locale::{Localized, Message};
 use crate::player::focus::Focus;
 
 pub(super) struct PagePlugin;
@@ -40,12 +41,12 @@ pub(super) struct ActivePage(pub(super) Page);
 pub(super) struct PageTitle;
 
 impl Page {
-    fn title(self) -> &'static str {
-        match self {
-            Self::Source => "FIRMWARE EDITOR",
-            Self::Notes => "NOTES",
-            Self::Versions => "FIRMWARE VERSIONS",
-        }
+    pub(super) fn title(self) -> Message {
+        Message::new(match self {
+            Self::Source => "editor-title-source",
+            Self::Notes => "editor-title-notes",
+            Self::Versions => "editor-title-versions",
+        })
     }
 
     /// The footer command that opens the page.
@@ -71,12 +72,12 @@ impl Page {
     fn show(
         active: Res<ActivePage>,
         mut pages: Query<(Entity, &Page, &mut Node)>,
-        mut title: Single<&mut Text, With<PageTitle>>,
+        mut title: Single<&mut Localized, With<PageTitle>>,
         mut labels: Query<(&Command, &mut TextColor)>,
         state: Res<State<Focus>>,
         mut focus: ResMut<InputFocus>,
     ) {
-        title.0 = active.0.title().into();
+        **title = active.0.title().into();
         for (command, mut color) in &mut labels {
             color.0 = if Some(*command) == active.0.command() {
                 PHOSPHOR

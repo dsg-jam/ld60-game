@@ -1,3 +1,5 @@
+use crate::locale::Message;
+
 /// Most versions a job keeps, including the factory firmware. The player
 /// can save one less, so a restore always has room to keep the changes.
 pub(super) const MAX_VERSIONS: usize = 16;
@@ -22,7 +24,7 @@ pub(super) struct Version {
     /// Stays the same when other versions are removed. The factory
     /// firmware is 0.
     pub(super) number: u32,
-    pub(super) label: String,
+    pub(super) label: Message,
     pub(super) text: String,
     /// Saved by a restore, not by the player.
     pub(super) auto: bool,
@@ -51,7 +53,7 @@ impl VersionList {
         Self {
             versions: vec![Version {
                 number: 0,
-                label: "FACTORY".into(),
+                label: Message::new("editor-version-factory"),
                 text: factory.into(),
                 auto: false,
             }],
@@ -95,7 +97,7 @@ impl VersionList {
 
     /// Saves `text` as a new version, selects it and returns its number.
     /// A duplicate selects the version with the same text instead.
-    pub(super) fn save(&mut self, text: &str, label: String) -> Result<u32, SaveError> {
+    pub(super) fn save(&mut self, text: &str, label: Message) -> Result<u32, SaveError> {
         self.disarm();
         if let Some(index) = self.position(text) {
             self.selected = index;
@@ -115,7 +117,7 @@ impl VersionList {
     /// A full list drops its oldest automatic save. It drops the selected
     /// version only if that is the only automatic save, so read the text to
     /// restore first. Otherwise the selection stays on the same version.
-    pub(super) fn keep(&mut self, text: &str, label: String) -> Result<Option<u32>, SaveError> {
+    pub(super) fn keep(&mut self, text: &str, label: Message) -> Result<Option<u32>, SaveError> {
         self.disarm();
         if self.position(text).is_some() {
             return Ok(None);
@@ -171,7 +173,7 @@ impl VersionList {
             .position(|version| version.text == text)
     }
 
-    fn push(&mut self, text: &str, label: String, auto: bool) -> u32 {
+    fn push(&mut self, text: &str, label: Message, auto: bool) -> u32 {
         let number = self.next_number;
         self.next_number += 1;
         self.versions.push(Version {
@@ -200,14 +202,17 @@ mod tests {
         let list = VersionList::new("factory");
         assert_eq!(saved(&list), [0]);
         assert_eq!(list.selected_version().text, "factory");
-        assert_eq!(list.selected_version().label, "FACTORY");
+        assert_eq!(
+            list.selected_version().label,
+            Message::new("editor-version-factory")
+        );
     }
 
     #[test]
     fn keeps_the_factory_firmware() {
         let mut list = VersionList::new("factory");
         assert_eq!(list.remove_selected(), Removal::Factory);
-        list.save("fix", "A".into()).unwrap();
+        list.save("fix", Message::new("A")).unwrap();
         list.select(0);
         assert_eq!(list.remove_selected(), Removal::Factory);
         assert_eq!(list.remove_selected(), Removal::Factory);
@@ -217,8 +222,8 @@ mod tests {
     #[test]
     fn numbers_stay_after_removal() {
         let mut list = VersionList::new("factory");
-        assert_eq!(list.save("one", "A".into()), Ok(1));
-        assert_eq!(list.save("two", "B".into()), Ok(2));
+        assert_eq!(list.save("one", Message::new("A")), Ok(1));
+        assert_eq!(list.save("two", Message::new("B")), Ok(2));
         list.select(1);
         assert_eq!(list.remove_selected(), Removal::Armed(1));
         assert_eq!(list.remove_selected(), Removal::Removed(1));
@@ -227,14 +232,14 @@ mod tests {
         assert_eq!(list.remove_selected(), Removal::Armed(2));
         assert_eq!(list.remove_selected(), Removal::Removed(2));
         assert_eq!(list.selected(), 0);
-        assert_eq!(list.save("three", "C".into()), Ok(3));
+        assert_eq!(list.save("three", Message::new("C")), Ok(3));
     }
 
     #[test]
     fn removal_needs_a_second_press() {
         let mut list = VersionList::new("factory");
-        list.save("one", "A".into()).unwrap();
-        list.save("two", "B".into()).unwrap();
+        list.save("one", Message::new("A")).unwrap();
+        list.save("two", Message::new("B")).unwrap();
         assert_eq!(list.remove_selected(), Removal::Armed(2));
         list.select_by(-1);
         assert_eq!(list.remove_selected(), Removal::Armed(1));
@@ -247,10 +252,10 @@ mod tests {
     #[test]
     fn keeps_unsaved_text_without_moving_the_selection() {
         let mut list = VersionList::new("factory");
-        list.save("one", "A".into()).unwrap();
+        list.save("one", Message::new("A")).unwrap();
         list.select(0);
-        assert_eq!(list.keep("one", "B".into()), Ok(None));
-        assert_eq!(list.keep("draft", "B".into()), Ok(Some(2)));
+        assert_eq!(list.keep("one", Message::new("B")), Ok(None));
+        assert_eq!(list.keep("draft", Message::new("B")), Ok(Some(2)));
         assert_eq!(list.selected_version().text, "factory");
         assert!(list.versions()[2].auto);
     }
@@ -258,12 +263,12 @@ mod tests {
     #[test]
     fn a_full_list_drops_the_oldest_automatic_save() {
         let mut list = VersionList::new("factory");
-        list.save("saved", "A".into()).unwrap();
+        list.save("saved", Message::new("A")).unwrap();
         for n in 2..MAX_VERSIONS {
-            list.keep(&n.to_string(), "B".into()).unwrap();
+            list.keep(&n.to_string(), Message::new("B")).unwrap();
         }
         list.select(2);
-        assert_eq!(list.keep("new", "B".into()), Ok(Some(16)));
+        assert_eq!(list.keep("new", Message::new("B")), Ok(Some(16)));
         assert_eq!(saved(&list)[..4], [0, 1, 2, 4]);
         assert_eq!(list.selected_version().number, 2);
     }
@@ -272,16 +277,16 @@ mod tests {
     fn a_full_list_still_keeps_the_changes_of_a_restore() {
         let mut list = VersionList::new("factory");
         for n in 1..MAX_VERSIONS - 1 {
-            list.save(&n.to_string(), "A".into()).unwrap();
+            list.save(&n.to_string(), Message::new("A")).unwrap();
         }
-        assert_eq!(list.save("more", "A".into()), Err(SaveError::Full));
+        assert_eq!(list.save("more", Message::new("A")), Err(SaveError::Full));
         list.select(0);
-        assert_eq!(list.keep("draft", "B".into()), Ok(Some(15)));
+        assert_eq!(list.keep("draft", Message::new("B")), Ok(Some(15)));
         assert_eq!(list.versions().len(), MAX_VERSIONS);
         assert_eq!(list.selected_version().text, "factory");
 
         list.select(MAX_VERSIONS - 1);
-        assert_eq!(list.keep("edit", "B".into()), Ok(Some(16)));
+        assert_eq!(list.keep("edit", Message::new("B")), Ok(Some(16)));
         assert_eq!(list.versions().len(), MAX_VERSIONS);
         assert_eq!(list.selected_version().text, "edit");
     }
@@ -289,8 +294,8 @@ mod tests {
     #[test]
     fn selection_picks_the_text_to_restore() {
         let mut list = VersionList::new("factory");
-        list.save("one", "A".into()).unwrap();
-        list.save("two", "B".into()).unwrap();
+        list.save("one", Message::new("A")).unwrap();
+        list.save("two", Message::new("B")).unwrap();
         list.select_by(-1);
         assert_eq!(list.selected_version().text, "one");
         list.select_by(-5);
@@ -303,21 +308,21 @@ mod tests {
     fn refuses_duplicates_and_overflow() {
         let mut list = VersionList::new("factory");
         assert_eq!(
-            list.save("factory", "A".into()),
+            list.save("factory", Message::new("A")),
             Err(SaveError::Duplicate(0))
         );
         for n in 1..MAX_VERSIONS - 1 {
-            list.save(&n.to_string(), "A".into()).unwrap();
+            list.save(&n.to_string(), Message::new("A")).unwrap();
         }
-        assert_eq!(list.save("more", "A".into()), Err(SaveError::Full));
+        assert_eq!(list.save("more", Message::new("A")), Err(SaveError::Full));
     }
 
     #[test]
     fn a_duplicate_selects_the_saved_version() {
         let mut list = VersionList::new("factory");
-        list.save("one", "A".into()).unwrap();
+        list.save("one", Message::new("A")).unwrap();
         assert_eq!(
-            list.save("factory", "B".into()),
+            list.save("factory", Message::new("B")),
             Err(SaveError::Duplicate(0))
         );
         assert_eq!(list.selected(), 0);
@@ -326,7 +331,7 @@ mod tests {
     #[test]
     fn marks_the_flashed_version() {
         let mut list = VersionList::new("factory");
-        list.save("one", "A".into()).unwrap();
+        list.save("one", Message::new("A")).unwrap();
         list.mark_flashed("one");
         let flashed: Vec<_> = list
             .versions()
