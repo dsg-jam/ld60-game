@@ -103,6 +103,17 @@ The compiler also checks that loops do not nest, that a call in a loop keeps
 `i`, and that calls fit the stack. These are errors for `fixed.asm` and
 warnings for `buggy.asm`, where the broken rule is often the bug.
 
+## Other instruction sets
+
+Each instruction set has a backend in `packages/dsl/src/backend/`. The backend
+names cells, flags and ports, wraps indexed addresses, prints instructions and
+lowers each statement.
+
+The compiler targets accumulator machines with one index register that also
+counts loops. `a` is the accumulator and `i` is the index register. A
+machine of another shape, like a stack machine or one with several general
+registers, needs changes to the compiler first, not only a new backend.
+
 ## Example
 
 ```
