@@ -3,8 +3,11 @@ mod clicks;
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
     input::mouse::MouseScrollUnit,
-    input_focus::{FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
-    picking::events::PointerScroll,
+    input_focus::{AcquireFocus, FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
+    picking::{
+        events::{PointerClick, PointerScroll},
+        pointer::PointerButton,
+    },
     prelude::*,
     text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
     ui_widgets::TextInput,
@@ -41,37 +44,60 @@ impl Plugin for EditorPlugin {
             Clicks::correct_edits.before(EditableTextSystems),
         )
         .add_observer(Editor::indent_on_tab)
-        .add_observer(Footer::toggle_clicks)
+        .add_observer(ClicksToggle::toggle_on_key)
+        .add_observer(ClicksToggle::toggle_on_click)
+        .add_observer(ClicksToggle::keep_editor_focus)
         .add_observer(Editor::scroll_on_wheel);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.editor", Editor::debug_state);
     }
 }
 
-/// Key hints below the editor.
+/// Switches key clicks on or off when clicked or on F8.
 #[derive(Component)]
-struct Footer;
+struct ClicksToggle;
 
-impl Footer {
+impl ClicksToggle {
     fn text(clicks: bool) -> String {
         let clicks = if clicks { "ON" } else { "OFF" };
-        format!("F5 ASSEMBLE   F6 FLASH   F8 CLICKS {clicks}")
+        format!("F8 CLICKS {clicks}")
     }
 
-    /// F8 in the editor switches key clicks on or off.
-    fn toggle_clicks(
+    fn toggle(clicks: &mut KeyClicks, text: &mut Text) {
+        clicks.0 = !clicks.0;
+        text.0 = Self::text(clicks.0);
+    }
+
+    fn toggle_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         editors: Query<(), With<Editor>>,
         mut clicks: ResMut<KeyClicks>,
-        mut footer: Single<&mut Text, With<Footer>>,
+        mut text: Single<&mut Text, With<ClicksToggle>>,
     ) {
         if !editors.contains(input.focused_entity) || input.input.key_code != KeyCode::F8 {
             return;
         }
         input.propagate(false);
         if input.input.state.is_pressed() && !input.input.repeat {
-            clicks.0 = !clicks.0;
-            footer.0 = Self::text(clicks.0);
+            Self::toggle(&mut clicks, &mut text);
+        }
+    }
+
+    fn toggle_on_click(
+        click: On<PointerClick>,
+        mut toggles: Query<&mut Text, With<ClicksToggle>>,
+        mut clicks: ResMut<KeyClicks>,
+    ) {
+        if click.button == PointerButton::Primary
+            && let Ok(mut text) = toggles.get_mut(click.entity)
+        {
+            Self::toggle(&mut clicks, &mut text);
+        }
+    }
+
+    fn keep_editor_focus(mut acquire: On<AcquireFocus>, toggles: Query<(), With<ClicksToggle>>) {
+        if toggles.contains(acquire.focused_entity) {
+            acquire.propagate(false);
         }
     }
 }
@@ -134,10 +160,23 @@ impl Editor {
                     TabIndex(0),
                 ),
                 (
-                    Footer,
-                    Text::new(Footer::text(true)),
-                    font,
-                    TextColor(PHOSPHOR_DIM),
+                    Node {
+                        column_gap: px(FONT_SIZE * 2.0),
+                        ..default()
+                    },
+                    children![
+                        (
+                            Text::new("F5 ASSEMBLE   F6 FLASH"),
+                            font.clone(),
+                            TextColor(PHOSPHOR_DIM),
+                        ),
+                        (
+                            ClicksToggle,
+                            Text::new(ClicksToggle::text(true)),
+                            font,
+                            TextColor(PHOSPHOR),
+                        ),
+                    ],
                 ),
             ],
         ));
