@@ -75,7 +75,7 @@ impl Undo {
 
     /// Records the edits of this frame, then undoes or redoes.
     ///
-    /// Runs after `EditableText` applies its edits.
+    /// Runs after `Editor::apply_edits`.
     pub(super) fn sync(
         time: Res<Time<Real>>,
         mut editors: Query<(&mut Undo, &mut EditableText)>,
