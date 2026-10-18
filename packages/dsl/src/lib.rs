@@ -80,7 +80,8 @@ pub fn compile(
     let program = resolve::resolve(&file, target)?;
     lint::recursion(&program)?;
     let program = legalize::legalize(program, backend)?;
-    let warnings = lint::lint(&program, backend.features(), selection.flavor)?;
+    let mut warnings = program.warnings.clone();
+    warnings.extend(lint::lint(&program, backend.features(), selection.flavor)?);
     let emitted = emit::emit(&program, backend).map_err(|e| vec![e])?;
     let names = emitted
         .labels

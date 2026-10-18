@@ -1,3 +1,4 @@
+use crate::Diagnostic;
 use crate::ast::BlockKind;
 use crate::diagnostic::Pos;
 use crate::labels::{LabelId, Labels};
@@ -12,6 +13,7 @@ pub(crate) struct Program {
     pub(crate) notes: Vec<String>,
     pub(crate) blocks: Vec<Block>,
     pub(crate) labels: Labels,
+    pub(crate) warnings: Vec<Diagnostic>,
 }
 
 impl Program {
