@@ -179,7 +179,7 @@ impl Cursors {
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn update(
         mut cursors: ResMut<Cursors>,
-        time: Res<Time>,
+        time: Res<Time<Real>>,
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,

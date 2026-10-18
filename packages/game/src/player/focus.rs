@@ -18,7 +18,7 @@ impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<Focus>()
             .init_resource::<Focused>()
-            .add_systems(Update, Focused::leave_on_right_click)
+            .add_systems(Update, Focused::leave_on_input)
             .add_observer(FocusOn::apply)
             .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
@@ -124,12 +124,15 @@ impl Focused {
         next.set(Focus::Desk);
     }
 
-    pub(super) fn leave_on_right_click(
+    /// Right click or Escape goes back to the desk.
+    pub(super) fn leave_on_input(
         mouse: Res<ButtonInput<MouseButton>>,
+        keys: Res<ButtonInput<KeyCode>>,
         mut focused: ResMut<Focused>,
         mut next: ResMut<NextState<Focus>>,
     ) {
-        if mouse.just_pressed(MouseButton::Right) && focused.0.is_some() {
+        let leave = mouse.just_pressed(MouseButton::Right) || keys.just_pressed(KeyCode::Escape);
+        if leave && focused.0.is_some() {
             focused.leave(&mut next);
         }
     }
