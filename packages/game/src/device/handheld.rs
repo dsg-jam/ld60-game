@@ -9,10 +9,12 @@ use super::emulator::Emulator;
 use super::{DeviceButton, Holdable};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::geometry::surface::Finish;
 use crate::parts::keypad::KeyBinding::{Named, Typed};
 use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use crate::parts::lcd;
 use crate::parts::screen::UiCanvas;
+use crate::parts::sticker::{Sticker, StickerMaterial};
 
 /// Dark frame around the LCD.
 const LCD_BORDER: f32 = 0.003;
@@ -24,6 +26,7 @@ const STICKER_GAP: f32 = 0.0002;
 const STICKER_CANVAS: UVec2 = UVec2::new(384, 224);
 const STICKER_FONT_SIZE: f32 = 26.0;
 const STICKER_PAPER: Color = Color::srgb_u8(0xf2, 0xea, 0xd8);
+const STICKER_WEAR: f32 = 0.8;
 const WINDOW: Color = Color::srgb_u8(0x26, 0x2a, 0x30);
 
 const STYLE: KeypadStyle = KeypadStyle {
@@ -148,6 +151,7 @@ impl Handheld {
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
+        mut stickers: ResMut<Assets<StickerMaterial>>,
     ) {
         let Ok(unit) = units.get(add.entity) else {
             return;
@@ -177,6 +181,7 @@ impl Handheld {
         let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
         let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
         let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, &level);
+        let sticker_seed = Sticker::seed(&level.serial);
         let sticker_spot = body
             .top_spot(model.sticker_spot)
             .with_y(body.min().y - STICKER_GAP);
@@ -197,8 +202,8 @@ impl Handheld {
             ),
         }
         entity.with_children(|device| {
-            device.spawn(Shape::cuboid(&body, model.body));
-            device.spawn(Shape::cuboid(&window, WINDOW));
+            device.spawn((Shape::cuboid(&body, model.body), Finish::Plastic));
+            device.spawn((Shape::cuboid(&window, WINDOW), Finish::Plastic));
             device.spawn((
                 Mesh3d(meshes.add(Rectangle::from_size(lcd_size))),
                 MeshMaterial3d(materials.add(unlit(lcd))),
@@ -208,8 +213,13 @@ impl Handheld {
             ));
             keypad.spawn_keys(device, &labels, false, |key| DeviceButton::new(key.key));
             device.spawn((
-                Mesh3d(meshes.add(Rectangle::from_size(model.sticker_size))),
-                MeshMaterial3d(materials.add(unlit(sticker))),
+                Mesh3d(meshes.add(Sticker::mesh(model.sticker_size, sticker_seed))),
+                MeshMaterial3d(stickers.add(Sticker::material(
+                    sticker,
+                    model.sticker_size,
+                    sticker_seed,
+                    STICKER_WEAR,
+                ))),
                 // Faces down, readable when the device is flipped over
                 // sideways.
                 Transform::from_translation(sticker_spot)

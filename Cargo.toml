@@ -20,6 +20,7 @@ ld60-levels = { path = "packages/levels" }
 ld60-machine = { path = "packages/machine" }
 
 bevy = { version = "0.20.0", default-features = false }
+rand = { version = "0.10.3", default-features = false }
 ron = { version = "0.12.2", default-features = false }
 serde = { version = "1.0.229", default-features = false }
 serde_json = { version = "1.0.154", default-features = false }
