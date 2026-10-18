@@ -39,7 +39,8 @@ const MINUS = 1
 | `routine name(i) { }` | Same, but it reads `i`. Call it with `name(i)`. |
 
 Blocks keep their source order. A blank line goes before a block that is not
-reached by falling through, except after the entry block.
+reached by falling through, except after the entry block. A block cannot fall
+through into a routine, and `goto` cannot jump into a routine. Call it instead.
 
 ## Statements
 
@@ -90,7 +91,8 @@ each switch takes its first side. When a level selects a name:
 - `fix`: `fixed.asm` takes the `after` side.
 - `change`: both files take the `after` side.
 
-All switches with the same name flip together. An unknown name is an error.
+All switches with the same name flip together and must be of the same kind. An
+unknown name is an error.
 
 ## Chip revisions
 
