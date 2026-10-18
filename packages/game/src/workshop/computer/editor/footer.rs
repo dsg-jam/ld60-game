@@ -5,10 +5,10 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
-use ld60_levels::{LevelError, TEST_SEEDS};
+use ld60_levels::LevelError;
 
 use super::Editor;
-use crate::audio::{KeyClicks, Play, Sound};
+use crate::audio::KeyClicks;
 use crate::device::Emulator;
 use crate::workshop::job::Job;
 
@@ -94,7 +94,6 @@ impl Command {
 pub(super) struct Run(Command);
 
 impl Run {
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
@@ -103,7 +102,6 @@ impl Run {
         mut emulators: Query<&mut Emulator>,
         mut status: Single<&mut Text, (With<Status>, Without<Command>)>,
         mut labels: Query<(&Command, &mut Text), Without<Status>>,
-        mut commands: Commands,
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
@@ -123,22 +121,15 @@ impl Run {
                 Err(err) => Self::describe(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
-                Ok(mut emulator) => {
-                    let was_repaired = job.repaired;
-                    let message = Self::flash(&mut job, &mut emulator, &source);
-                    if job.repaired && !was_repaired {
-                        commands.trigger(Play(Sound::Chime));
-                    }
-                    message
-                }
+                Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source),
                 Err(_) => "NO DEVICE CONNECTED".into(),
             },
         };
         status.0 = message;
     }
 
-    /// Burns `source` into the device, powers it on and runs the
-    /// customer's tests.
+    /// Burns `source` into the device and powers it on. Testing it is up to
+    /// the player.
     fn flash(job: &mut Job, emulator: &mut Emulator, source: &str) -> String {
         let assembly = match ld60_levels::assemble(&job.level, source) {
             Ok(assembly) => assembly,
@@ -153,18 +144,8 @@ impl Run {
             Err(err) => return Self::describe(&err),
         };
         *emulator = Emulator::power_on(device);
-        let report = match ld60_levels::run(&job.level, &rom, TEST_SEEDS) {
-            Ok(report) => report,
-            Err(err) => return Self::describe(&err),
-        };
-        let passed = report.outcomes.iter().filter(|o| o.passed()).count();
-        let total = report.outcomes.len();
-        if report.passed() {
-            job.repaired = true;
-            format!("FLASHED. ALL {total} TESTS PASS. STAMP THE TICKET.")
-        } else {
-            format!("FLASHED. {passed} OF {total} TESTS PASS")
-        }
+        job.flashed = true;
+        "FLASHED. DEVICE RESTARTED.".into()
     }
 
     /// The first assembler error with its line, or the error itself.

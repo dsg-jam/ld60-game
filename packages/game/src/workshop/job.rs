@@ -30,8 +30,8 @@ impl Plugin for JobPlugin {
 
 /// The repair job on the bench.
 ///
-/// A job is done in three steps: flash firmware that passes the customer's
-/// tests, stamp the ticket, then ring the bell to hand it in.
+/// A job is done in three steps: flash new firmware, stamp the ticket, then
+/// ring the bell to hand it in.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {
     /// Position in [`CATALOG`].
@@ -39,9 +39,9 @@ pub(crate) struct Job {
     pub(crate) level: Level,
     /// The firmware the device comes in with.
     pub(crate) buggy: String,
-    /// Set once flashed firmware passes all of the customer's tests.
-    pub(crate) repaired: bool,
-    /// Set once the repaired job's ticket carries the shop stamp.
+    /// Set once firmware was burned into the device.
+    pub(crate) flashed: bool,
+    /// Set once the ticket carries the shop stamp.
     pub(crate) stamped: bool,
 }
 
@@ -63,7 +63,7 @@ impl Job {
             index,
             level,
             buggy,
-            repaired: false,
+            flashed: false,
             stamped: false,
         }))
     }

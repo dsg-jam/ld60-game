@@ -51,7 +51,7 @@ impl Plugin for ToolsPlugin {
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 #[require(Transform, Visibility)]
 pub(crate) enum Tool {
-    /// Stamps the ticket of a repaired job.
+    /// Stamps the ticket of a flashed job.
     Stamp,
     /// Calls the customer for a stamped job.
     Bell,
@@ -60,7 +60,7 @@ pub(crate) enum Tool {
 impl Tool {
     fn usable(self, job: Option<&Job>) -> bool {
         match (self, job) {
-            (Self::Stamp, Some(job)) => job.repaired && !job.stamped,
+            (Self::Stamp, Some(job)) => job.flashed && !job.stamped,
             (Self::Bell, Some(job)) => job.stamped,
             (_, None) => false,
         }
