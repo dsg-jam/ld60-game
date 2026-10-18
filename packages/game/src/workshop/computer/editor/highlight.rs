@@ -70,7 +70,9 @@ impl Highlight {
             return;
         }
         let isa = job.as_ref().map(|job| job.isa());
-        let lexicon = isa.map(Lexicon::new).unwrap_or_default();
+        let lexicon = isa
+            .map(|isa| Lexicon::new(isa, &source))
+            .unwrap_or_default();
         let errors = isa
             .and_then(|isa| isa.assemble(&source).err())
             .unwrap_or_default();
@@ -228,7 +230,7 @@ mod tests {
     use super::*;
 
     fn lexicon() -> Lexicon {
-        Lexicon::new(ld60_calco::Revision::C.isa())
+        Lexicon::new(ld60_calco::Revision::C.isa(), "")
     }
 
     fn styles<'a>(source: &'a str, errors: &[AsmError]) -> Vec<(&'a str, Kind, bool)> {
