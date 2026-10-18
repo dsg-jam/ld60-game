@@ -12,6 +12,7 @@ use self::sky::SkyCar;
 use self::spray::Spray;
 use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng};
 use crate::geometry::surface::SurfaceMaterial;
+use crate::parts::liquid::Shake;
 
 const SEED: u64 = 4;
 
@@ -33,6 +34,10 @@ const LANES: [Lane; 2] = [
 /// Vehicles wrap around this far beyond the street ends.
 const WRAP: f32 = 1.5;
 const HOVER_BOB: f32 = 0.25;
+/// How hard a vehicle shakes the ground at the shop: m/s² per m/s of speed,
+/// divided by the squared distance plus [`RUMBLE_NEAR`].
+const RUMBLE: f32 = 0.4;
+const RUMBLE_NEAR: f32 = 4.0;
 
 pub(super) struct TrafficPlugin;
 
@@ -40,7 +45,7 @@ impl Plugin for TrafficPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((spray::SprayPlugin, sky::SkyPlugin))
             .add_systems(Startup, Vehicle::spawn_all)
-            .add_systems(Update, Vehicle::drive);
+            .add_systems(Update, (Vehicle::drive, Vehicle::rumble));
     }
 }
 
@@ -101,6 +106,15 @@ impl Vehicle {
             }
         }
         SkyCar::spawn_all(&mut commands, &fleet, &kit, &mut rng);
+    }
+
+    /// Passing vehicles shake the ground at the shop, the harder the closer
+    /// and faster they are.
+    fn rumble(vehicles: Query<(&Vehicle, &Transform)>, mut shake: ResMut<Shake>) {
+        for (vehicle, transform) in &vehicles {
+            let distance = transform.translation.length_squared() + RUMBLE_NEAR;
+            shake.0 += RUMBLE * vehicle.velocity.abs() / distance;
+        }
     }
 
     fn drive(time: Res<Time>, mut vehicles: Query<(&Vehicle, &mut Transform)>) {

@@ -55,7 +55,7 @@ impl Clutter {
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
         let counter = CounterLayout::new();
-        let finishes = Finishes::new(&mut materials, &mut surfaces);
+        let finishes = Finishes::new(&mut surfaces);
         let mut props = Props {
             meshes: &mut meshes,
             finishes: &finishes,
