@@ -24,6 +24,7 @@ fn deep_calls_are_errors_when_fixed_and_warnings_when_buggy() {
 entry main {
     one()
     wait
+    goto main
 }
 routine one {
     two()
@@ -103,6 +104,7 @@ entry main {
         clear()
     }
     wait
+    goto main
 }
 routine clear {
     for i = 6 downto 1 {
@@ -146,6 +148,7 @@ fn recursion_is_an_error() {
     let body = "\
 entry main {
     again()
+    goto main
 }
 routine again {
     again()

@@ -188,6 +188,7 @@ entry main {
     bump()
     bump()
     wait
+    goto main
 }
 routine bump {
     a = n + 1
@@ -214,6 +215,7 @@ bstore: ST   M1
         LDI  A, 0
 bstor2: ST   M1
         HLT
+        JMP  main
 "
     );
 }

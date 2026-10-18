@@ -653,6 +653,21 @@ pub(crate) fn resolve(
     }
     blocks.retain(|b| resolver.labels.contains_key(&b.name));
     let blocks: Vec<Block> = blocks.into_iter().map(|b| resolver.block(b)).collect();
+    for pair in blocks.windows(2) {
+        let [block, routine] = pair else { continue };
+        if block.kind != BlockKind::Routine
+            && routine.kind == BlockKind::Routine
+            && !Node::ends_in_transfer(&block.body)
+        {
+            resolver.errors.push(Diagnostic::error(
+                routine.pos,
+                format!(
+                    "{} falls through into routine {}. End {} with a goto",
+                    block.name, routine.name, block.name
+                ),
+            ));
+        }
+    }
     let Some(title) = title else {
         resolver.errors.push(Diagnostic::error(
             Pos::default(),
