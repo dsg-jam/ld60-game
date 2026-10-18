@@ -2,7 +2,7 @@ use ld60_machine::{AsmError, Assembly, DisasmLine, Image, Isa};
 
 use crate::Revision;
 use crate::disasm::disassemble;
-use crate::encoder::CalcoEncoder;
+use crate::encoder::{CalcoEncoder, PORTS, REGISTERS};
 
 /// The CalCo instruction set of one chip revision. Get it with [`Revision::isa`].
 #[derive(Debug)]
@@ -19,6 +19,14 @@ impl Isa for Calco {
 
     fn mnemonics(&self) -> &'static [&'static str] {
         self.0.mnemonics()
+    }
+
+    fn ports(&self) -> &'static [&'static str] {
+        PORTS
+    }
+
+    fn registers(&self) -> &'static [&'static str] {
+        REGISTERS
     }
 
     fn assemble(&self, source: &str) -> Result<Assembly, Vec<AsmError>> {

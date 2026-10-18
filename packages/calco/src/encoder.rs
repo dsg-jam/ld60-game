@@ -10,6 +10,12 @@ pub(crate) const MNEMONICS: &[&str] = &[
     "ADC", "SBC", "CMP", "IN", "OUT", "JMP", "JZ", "JNZ", "JC", "JNC", "CALL", "DJNZ",
 ];
 
+pub(crate) const PORTS: &[&str] = &["KEY", "REV", "ANN"];
+pub(crate) const REGISTERS: &[&str] = &[
+    "A", "B", "M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "MA", "MB", "MC", "MD",
+    "ME", "MF",
+];
+
 const IN_PORTS: &[(&str, u8)] = &[("KEY", ports::KEY), ("REV", ports::REV)];
 const OUT_PORTS: &[(&str, u8)] = &[("ANN", ports::ANN)];
 
@@ -153,4 +159,18 @@ fn port(operand: &Operand, names: &[(&str, u8)]) -> Result<u8, String> {
 
 fn byte(value: i64) -> Result<u8, String> {
     u8::try_from(value).map_err(|_| format!("value {value} is outside 0 to 255"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lists_every_port_and_cell() {
+        for (name, _) in IN_PORTS.iter().chain(OUT_PORTS) {
+            assert!(PORTS.contains(name), "{name}");
+        }
+        let cells = REGISTERS.iter().filter(|name| cell(name).is_some()).count();
+        assert_eq!(cells, 16);
+    }
 }
