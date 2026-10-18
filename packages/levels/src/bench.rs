@@ -30,7 +30,7 @@ pub fn burn(level: &Level, current: &Rom, image: Image) -> Result<Rom, ProgramEr
 
 /// The device with `rom` installed. Chip faults stay, whatever ROM is used.
 pub fn device(level: &Level, rom: Rom) -> Result<AnyDevice, LevelError> {
-    let mut device = AnyDevice::new(level.device, level.chip, rom)?;
+    let mut device = AnyDevice::new(level.board(), level.chip, rom)?;
     for &fault in &level.faults {
         if let Fault::StuckRamBit(_) = fault {
             device.apply_fault(fault);

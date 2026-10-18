@@ -168,7 +168,7 @@ impl Handheld {
         };
 
         let model = Model::of(level.device);
-        let digits = level.device.display_cells().count();
+        let digits = level.device.digits();
         let lcd_canvas = lcd::canvas_size(digits).as_vec2();
         let lcd_size = Vec2::new(
             model.lcd_width,
@@ -238,8 +238,10 @@ impl Handheld {
             ChipSpec::Calco(info) => format!("CALCO REV {:?} {}", info.revision, info.date_code),
         };
         format!(
-            "{}\nS/N {}\n{chip}\nDSG ELECTRONICS",
-            model.name, level.serial
+            "{}\nS/N {}\nBOARD {}\n{chip}\nDSG ELECTRONICS",
+            model.name,
+            level.serial,
+            level.board().name()
         )
     }
 

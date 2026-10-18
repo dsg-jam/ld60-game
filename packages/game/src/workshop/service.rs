@@ -1,7 +1,7 @@
-//! Service sheets: what the board around the chip does, per device model.
+//! Service sheets: what the board around the chip does, per board revision.
 
 use bevy::prelude::*;
-use ld60_devices::DeviceKind;
+use ld60_devices::{Annunciator, Board, DeviceKind};
 
 use crate::parts::paper::Paper;
 
@@ -15,34 +15,42 @@ pub(super) fn footer(device: DeviceKind) -> &'static str {
     }
 }
 
-pub(super) fn write(page: &mut ChildSpawnerCommands, device: DeviceKind) {
-    let (title, summary) = match device {
-        DeviceKind::Tally2 => ("TALLY 2", "2-digit tally counter. Service sheet."),
-        DeviceKind::Summa6 => ("SUMMA 6", "6-digit adding machine. Service sheet."),
+pub(super) fn write(page: &mut ChildSpawnerCommands, board: &Board) {
+    let (title, summary) = match board.kind {
+        DeviceKind::Tally2 => ("TALLY 2", "2-digit tally counter"),
+        DeviceKind::Summa6 => ("SUMMA 6", "6-digit adding machine"),
     };
     page.spawn(Paper::title(title));
-    page.spawn(Paper::faded(summary));
+    page.spawn(Paper::faded(format!(
+        "{summary}. Service sheet for board {}.",
+        board.name()
+    )));
 
     page.spawn(Paper::heading("KEY CODES"));
-    key_codes(page, device);
+    key_codes(page, board);
 
-    let cells = device.display_cells();
+    let cells = board.display_cells();
     page.spawn(Paper::heading("DISPLAY"));
     page.spawn(Paper::text(format!(
-        "{} digits, M{} to M{} from left to right.",
+        "{} digits, M{:X} to M{:X} from left to right.",
         cells.clone().count(),
         cells.start(),
         cells.end()
     )));
     page.spawn(Paper::text("Values above 9 show broken segments."));
 
-    if device == DeviceKind::Summa6 {
+    if !board.annunciators.is_empty() {
         page.spawn(Paper::heading("ANNUNCIATORS"));
-        page.spawn(Paper::text("ANN bit 0 lights the minus sign."));
-        page.spawn(Paper::text("ANN bit 1 lights the error mark."));
+        for &(annunciator, bit) in board.annunciators {
+            let name = match annunciator {
+                Annunciator::Minus => "minus sign",
+                Annunciator::Error => "error mark",
+            };
+            page.spawn(Paper::text(format!("ANN bit {bit} lights the {name}.")));
+        }
     }
 
-    page.spawn(Paper::heading("BOARD"));
+    page.spawn(Paper::heading(format!("BOARD {}", board.name())));
     page.spawn(Paper::text(
         "CalCo chip, firmware in a 256 byte EPROM socket.",
     ));
@@ -54,11 +62,9 @@ pub(super) fn write(page: &mut ChildSpawnerCommands, device: DeviceKind) {
 }
 
 /// Digit keys share one row, the other keys get a row each.
-fn key_codes(page: &mut ChildSpawnerCommands, device: DeviceKind) {
-    let (digits, others): (Vec<_>, Vec<_>) = device
-        .key_codes()
-        .iter()
-        .partition(|(key, _)| key.is_ascii_digit());
+fn key_codes(page: &mut ChildSpawnerCommands, board: &Board) {
+    let (digits, others): (Vec<_>, Vec<_>) =
+        board.keys.iter().partition(|(key, _)| key.is_ascii_digit());
     if let (Some((first, low)), Some((last, high))) = (digits.first(), digits.last()) {
         page.spawn(Paper::row([
             (format!("{first} to {last}"), KEY_WIDTH),

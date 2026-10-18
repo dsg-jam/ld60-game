@@ -1,5 +1,7 @@
 use ld60_calco::{ChipInfo, DateCode, Revision};
-use ld60_devices::{AnyDevice, ChipSpec, Device, DeviceKind, MAX_STEPS, Rom, RomKind, RunError};
+use ld60_devices::{
+    AnyDevice, BoardRev, ChipSpec, Device, DeviceKind, MAX_STEPS, Rom, RomKind, RunError,
+};
 
 const CHIP: ChipSpec = ChipSpec::Calco(ChipInfo {
     revision: Revision::B,
@@ -8,7 +10,12 @@ const CHIP: ChipSpec = ChipSpec::Calco(ChipInfo {
 
 fn device(source: &str) -> AnyDevice {
     let image = CHIP.isa().assemble(source).unwrap().image;
-    AnyDevice::new(DeviceKind::Summa6, CHIP, Rom::new(RomKind::Eprom, image)).unwrap()
+    AnyDevice::new(
+        DeviceKind::Summa6.board(BoardRev::A),
+        CHIP,
+        Rom::new(RomKind::Eprom, image),
+    )
+    .unwrap()
 }
 
 #[test]

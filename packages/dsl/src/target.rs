@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 
 use crate::backend::{Backend, CalcoBackend};
 
@@ -30,11 +30,7 @@ impl Target {
 
     /// The code the firmware reads from the key port for `key`.
     pub(crate) fn key_code(&self, key: char) -> Option<u8> {
-        self.device
-            .key_codes()
-            .iter()
-            .find(|&&(k, _)| k == key)
-            .map(|&(_, code)| code)
+        self.device.board(BoardRev::A).key_code(key)
     }
 }
 
