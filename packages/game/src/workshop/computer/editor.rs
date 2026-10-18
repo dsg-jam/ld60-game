@@ -1,5 +1,6 @@
 mod chip_title;
 mod clicks;
+mod edits;
 mod footer;
 mod highlight;
 mod history;
@@ -12,8 +13,8 @@ use bevy::{
     input_focus::{FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
     picking::events::PointerScroll,
     prelude::*,
-    text::{EditableText, EditableTextSystems, TextCursorStyle, TextEdit},
-    ui::UiSystems,
+    text::{EditableText, TextCursorStyle, TextEdit, detect_text_needs_rerender},
+    ui::{UiSystems, widget::update_editable_text_styles},
     ui_widgets::TextInput,
 };
 
@@ -50,17 +51,18 @@ impl Plugin for EditorPlugin {
         app.add_systems(
             PostUpdate,
             (
-                Clicks::correct_edits.before(EditableTextSystems),
-                Undo::sync
-                    .after(EditableTextSystems)
-                    .before(UiSystems::PostLayout),
-                Highlight::follow_scroll.before(UiSystems::Layout),
+                (
+                    Clicks::correct_edits,
+                    Editor::apply_edits.after(update_editable_text_styles),
+                    Undo::sync,
+                    Highlight::refresh,
+                )
+                    .chain()
+                    .before(detect_text_needs_rerender),
+                Highlight::place.after(UiSystems::PostLayout),
             ),
         )
-        .add_systems(
-            Update,
-            (Editor::load_job, Highlight::refresh.after(Editor::load_job)),
-        )
+        .add_systems(Update, Editor::load_job)
         .add_systems(
             Update,
             ChipTitle::update.run_if(resource_changed_or_removed::<Job>),

@@ -1,6 +1,12 @@
+use std::collections::HashMap;
 use std::ops::Range;
 
-use bevy::{prelude::*, text::EditableText};
+use bevy::{
+    math::Affine2,
+    prelude::*,
+    text::{EditableText, TextLineYBounds, TextViewport},
+    ui::UiGlobalTransform,
+};
 use ld60_machine::AsmError;
 
 use super::Editor;
@@ -18,17 +24,27 @@ const COMMENT: Color = Color::srgb(0.28, 0.68, 0.36);
 const PLAIN: Color = Color::srgb(0.35, 0.78, 0.43);
 /// Underlines source the assembler rejects.
 const ERROR: Color = Color::srgb(1.0, 0.8, 0.35);
+/// Lines styled above and below the visible ones. The styled lines only
+/// change when the view scrolls past a multiple of this.
+const MARGIN_LINES: usize = 16;
 
-/// The colored copy of the editor text.
+/// The colored copy of the visible editor text.
 ///
 /// `EditableText` draws all of its text in one color, so the editor text is
-/// transparent and this node draws it again on top, one `TextSpan` per
-/// [`Segment`].
+/// transparent and this node draws the visible lines again on top, one
+/// `TextSpan` per [`Segment`]. The root text holds the empty lines above
+/// them.
 #[derive(Component, Debug, Default)]
 #[require(Text, TextLayout = TextLayout::no_wrap(), Pickable = Pickable::IGNORE)]
 pub(super) struct Highlight {
     source: String,
     job: Option<usize>,
+    lexicon: Lexicon,
+    marks: Marks,
+    /// The source lines the spans show.
+    lines: Range<usize>,
+    /// Distance between two lines of the editor text, in physical pixels.
+    pitch: f32,
 }
 
 /// A run of source text drawn in one style.
@@ -39,6 +55,10 @@ pub(super) struct Segment {
     /// Part of the source the assembler rejects.
     pub(super) error: bool,
 }
+
+/// The byte ranges of assembler errors, by 0-based line.
+#[derive(Debug, Default)]
+pub(super) struct Marks(HashMap<usize, Vec<Range<usize>>>);
 
 impl Highlight {
     pub(super) fn bundle(font: TextFont) -> impl Bundle {
@@ -52,32 +72,54 @@ impl Highlight {
         )
     }
 
-    /// Restyles the spans when the source or the job changes.
+    /// Restyles the spans when the source, the job or the visible lines
+    /// change.
+    ///
+    /// Runs after the edits of this frame and before UI layout, so the spans
+    /// match the editor text in the same frame.
     pub(super) fn refresh(
         job: Option<Res<Job>>,
         editor: Single<Ref<EditableText>, With<Editor>>,
-        overlay: Single<(Entity, &mut Highlight, &TextFont, Option<&Children>)>,
+        overlay: Single<(
+            Entity,
+            &mut Highlight,
+            &mut Text,
+            &TextFont,
+            Option<&Children>,
+        )>,
         mut spans: Query<(&mut TextSpan, &mut TextColor, Has<Underline>)>,
         mut commands: Commands,
     ) {
-        let (root, mut highlight, font, children) = overlay.into_inner();
+        let (root, mut highlight, mut padding, font, children) = overlay.into_inner();
+        let highlight = &mut *highlight;
         let job_index = job.as_ref().map(|job| job.index);
-        if !editor.is_changed() && job_index == highlight.job {
-            return;
-        }
         // Includes text the IME is still composing.
-        let source = editor.editor().raw_text().to_owned();
-        if source == highlight.source && job_index == highlight.job {
+        let source = editor.editor().raw_text();
+        let changed =
+            job_index != highlight.job || (editor.is_changed() && source != highlight.source);
+        if changed {
+            let isa = job.as_ref().map(|job| job.isa());
+            highlight.lexicon = isa.map(|isa| Lexicon::new(isa, source)).unwrap_or_default();
+            let errors = isa
+                .and_then(|isa| isa.assemble(source).err())
+                .unwrap_or_default();
+            highlight.marks = Marks::new(&errors);
+            highlight.source = source.to_owned();
+            highlight.job = job_index;
+        }
+        let lines = highlight.visible(&editor.viewport);
+        if !changed && lines == highlight.lines {
             return;
         }
-        let isa = job.as_ref().map(|job| job.isa());
-        let lexicon = isa
-            .map(|isa| Lexicon::new(isa, &source))
-            .unwrap_or_default();
-        let errors = isa
-            .and_then(|isa| isa.assemble(&source).err())
-            .unwrap_or_default();
-        let segments = Segment::split(&source, &lexicon, &errors);
+        highlight.lines = lines.clone();
+        // Empty lines above the styled ones keep the line positions of the
+        // editor layout.
+        let padding_lines = lines.start.min(highlight.source.matches('\n').count());
+        if padding.0.len() != padding_lines {
+            padding.0 = "\n".repeat(padding_lines);
+        }
+        let source = &highlight.source;
+        let segments = Segment::split(source, &highlight.lexicon, &highlight.marks, lines);
 
         let children = children
             .map(|children| children.to_vec())
@@ -113,41 +155,73 @@ impl Highlight {
         for &entity in children.iter().skip(segments.len()) {
             commands.entity(entity).despawn();
         }
-
-        highlight.source = source;
-        highlight.job = job_index;
     }
 
-    /// Moves the spans with the scrolled editor text.
-    pub(super) fn follow_scroll(
-        editor: Single<&EditableText, With<Editor>>,
-        mut overlay: Single<&mut Node, With<Highlight>>,
+    /// Puts the spans over the editor text.
+    ///
+    /// The editor scrolls until late in the frame, after UI layout. This
+    /// runs after that and moves the laid out node to the final scroll
+    /// position, with the same transform the editor text gets.
+    pub(super) fn place(
+        editor: Single<(&EditableText, &ComputedNode, &UiGlobalTransform), With<Editor>>,
+        overlay: Single<(&mut Highlight, &ComputedNode, &mut UiGlobalTransform), Without<Editor>>,
     ) {
-        let offset = editor.viewport.offset;
-        let (left, top) = (px(-offset.x), px(-offset.y));
-        if overlay.left != left || overlay.top != top {
-            overlay.left = left;
-            overlay.top = top;
+        let (text, editor_node, editor_transform) = editor.into_inner();
+        let (mut highlight, node, mut transform) = overlay.into_inner();
+        if let Some(layout) = text.editor().try_layout() {
+            let mut tops = layout
+                .lines()
+                .map(|line| TextLineYBounds::from_line(&line).min);
+            if let (Some(first), Some(second)) = (tops.next(), tops.next()) {
+                highlight.pitch = second - first;
+            }
         }
+        let shift = editor_node.content_box().min - text.viewport.offset - node.content_box().min;
+        transform.set_if_neq(UiGlobalTransform::from(
+            **editor_transform * Affine2::from_translation(shift),
+        ));
+    }
+
+    /// The lines to style for the editor view. All lines until the line
+    /// height is known.
+    fn visible(&self, viewport: &TextViewport) -> Range<usize> {
+        if self.pitch <= 0.0 {
+            return 0..usize::MAX;
+        }
+        let first = (viewport.offset.y / self.pitch) as usize;
+        let count = (viewport.size.y / self.pitch).ceil() as usize + 1;
+        let start = first.saturating_sub(MARGIN_LINES) / MARGIN_LINES * MARGIN_LINES;
+        start..start + count + 3 * MARGIN_LINES
     }
 }
 
 impl Segment {
-    /// Splits `source` into segments that cover all of it.
-    pub(super) fn split(source: &str, lexicon: &Lexicon, errors: &[AsmError]) -> Vec<Self> {
+    /// Splits `lines` of `source` into segments that cover all of them,
+    /// including their line breaks.
+    pub(super) fn split(
+        source: &str,
+        lexicon: &Lexicon,
+        marks: &Marks,
+        lines: Range<usize>,
+    ) -> Vec<Self> {
         let mut segments = Vec::new();
         let mut offset = 0;
-        for (index, line) in source.split('\n').enumerate() {
+        for (index, line) in source.split('\n').enumerate().take(lines.end) {
+            let start = offset;
+            offset += line.len() + 1;
+            if index < lines.start {
+                continue;
+            }
             let tokens = lexicon.tokens(line);
-            let marks: Vec<_> = errors
+            let marked: Vec<_> = marks
+                .line(index)
                 .iter()
-                .filter(|error| error.line == index + 1)
-                .filter_map(|error| mark(line, error.span.clone()))
+                .filter_map(|span| mark(line, span.clone()))
                 .collect();
             let mut cuts: Vec<_> = tokens
                 .iter()
                 .map(|token| &token.range)
-                .chain(&marks)
+                .chain(&marked)
                 .flat_map(|range| [range.start, range.end])
                 .chain([0, line.len()])
                 .collect();
@@ -159,16 +233,15 @@ impl Segment {
                     .iter()
                     .find(|token| token.range.start <= range.start && range.end <= token.range.end)
                     .map_or(Kind::Text, |token| token.kind);
-                let error = marks
+                let error = marked
                     .iter()
                     .any(|mark| mark.start <= range.start && range.end <= mark.end);
-                let range = offset + range.start..offset + range.end;
+                let range = start + range.start..start + range.end;
                 push(&mut segments, source, range, kind, error);
             }
-            offset += line.len();
-            if offset < source.len() {
-                push(&mut segments, source, offset..offset + 1, Kind::Text, false);
-                offset += 1;
+            let end = start + line.len();
+            if end < source.len() {
+                push(&mut segments, source, end..end + 1, Kind::Text, false);
             }
         }
         segments
@@ -185,6 +258,23 @@ impl Segment {
             Kind::Register => REGISTER,
             Kind::Punctuation | Kind::Text => PLAIN,
         }
+    }
+}
+
+impl Marks {
+    pub(super) fn new(errors: &[AsmError]) -> Self {
+        let mut lines = HashMap::<usize, Vec<_>>::new();
+        for error in errors {
+            lines
+                .entry(error.line.saturating_sub(1))
+                .or_default()
+                .push(error.span.clone());
+        }
+        Self(lines)
+    }
+
+    fn line(&self, index: usize) -> &[Range<usize>] {
+        self.0.get(&index).map_or(&[], Vec::as_slice)
     }
 }
 
@@ -230,12 +320,11 @@ fn mark(line: &str, span: Range<usize>) -> Option<Range<usize>> {
 mod tests {
     use super::*;
 
-    fn lexicon() -> Lexicon {
-        Lexicon::new(ld60_calco::Revision::C.isa(), "")
-    }
+    const ALL: Range<usize> = 0..usize::MAX;
 
     fn styles<'a>(source: &'a str, errors: &[AsmError]) -> Vec<(&'a str, Kind, bool)> {
-        Segment::split(source, &lexicon(), errors)
+        let lexicon = Lexicon::new(ld60_calco::Revision::C.isa(), source);
+        Segment::split(source, &lexicon, &Marks::new(errors), ALL)
             .into_iter()
             .map(|segment| (&source[segment.range], segment.kind, segment.error))
             .collect()
@@ -249,18 +338,30 @@ mod tests {
         }
     }
 
+    fn joined(source: &str, lines: Range<usize>) -> String {
+        let lexicon = Lexicon::new(ld60_calco::Revision::C.isa(), source);
+        let segments = Segment::split(source, &lexicon, &Marks::default(), lines);
+        assert!(
+            segments
+                .windows(2)
+                .all(|w| w[0].range.end == w[1].range.start)
+        );
+        segments.iter().map(|s| &source[s.range.clone()]).collect()
+    }
+
     #[test]
     fn covers_the_whole_source() {
         for source in ["", "\n", "NOP\n\n  LDI A, 1 ; x\n", "\u{fc}:\u{e9}"] {
-            let segments = Segment::split(source, &lexicon(), &[]);
-            let joined: String = segments.iter().map(|s| &source[s.range.clone()]).collect();
-            assert_eq!(joined, source);
-            assert!(
-                segments
-                    .windows(2)
-                    .all(|w| w[0].range.end == w[1].range.start)
-            );
+            assert_eq!(joined(source, ALL), source);
         }
+    }
+
+    #[test]
+    fn covers_only_the_given_lines() {
+        let source = "a: NOP\nLDI A, 1\n\nJMP a\n";
+        assert_eq!(joined(source, 1..3), "LDI A, 1\n\n");
+        assert_eq!(joined(source, 3..9), "JMP a\n");
+        assert_eq!(joined(source, 7..9), "");
     }
 
     #[test]
