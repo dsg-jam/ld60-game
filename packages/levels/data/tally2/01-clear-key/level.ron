@@ -22,4 +22,5 @@
         (keys: "++++++++++", display: "10"),
     ],
     reward: 3,
+    firmware: Some((source: "tally2/firmware-0.9.fw", switches: ["clear-code"])),
 )

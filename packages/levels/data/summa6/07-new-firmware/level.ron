@@ -19,4 +19,5 @@
         (keys: "50-8=", display: "000042"),
     ],
     reward: 30,
+    firmware: Some((source: "summa6/firmware.fw", switches: ["1.1", "deep-call"])),
 )

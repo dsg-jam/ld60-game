@@ -21,4 +21,5 @@
         (keys: "+++C+", display: "01"),
     ],
     reward: 5,
+    firmware: Some((source: "tally2/firmware-1.0.fw", switches: ["double-count"])),
 )

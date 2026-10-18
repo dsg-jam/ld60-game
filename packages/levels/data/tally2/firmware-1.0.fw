@@ -1,0 +1,48 @@
+firmware "Tally-2 firmware 1.0" for tally2
+
+cells tally[2] at M1    ; count, M2 is the rightmost digit
+cell  last at M3        ; last key
+
+entry reset {
+    a = 0
+    tally[1] = a
+    tally[2] = a
+}
+
+block main {
+    wait
+    a = KEY
+    last = a
+    match a {
+        'C' => goto reset
+        '+' => goto count
+    }
+    goto main
+}
+
+block count {
+    a = tally[2] + 1
+    bug "double-count" {
+        buggy {
+            a += 1
+        }
+    }
+    if a < 10 goto ones
+    a = 0
+    tally[2] = a
+    tens()
+    goto main
+}
+
+block ones {
+    tally[2] = a
+    goto main
+}
+
+routine tens {
+    a = tally[1] + 1
+    if a >= 10 {
+        a = 0
+    }
+    tally[1] = a
+}

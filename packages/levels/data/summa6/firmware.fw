@@ -1,0 +1,206 @@
+change "1.1" {
+    before {
+        firmware "Summa-6 firmware 1.0" for summa6
+    }
+    after {
+        firmware "Summa-6 firmware 1.1" for summa6
+    }
+}
+
+cells display[6] at M1  ; display and entry, M6 is the rightmost digit
+fix "coffee" {
+    before {
+        cell op at M7   ; pending operation: 0 plus, 1 minus
+    }
+    after {
+        cell op at M0   ; pending operation: 0 plus, 1 minus
+        cell stuck at M7    ; unused, bit 0 is stuck at 1
+    }
+}
+cell  fresh at M8       ; 1 if the next digit starts a new number
+cells total[6] at M9    ; total
+cell  scratch at MF     ; scratch
+
+fix "negative" {
+    after {
+        ; A total with M9 at 5 or more is negative, in ten's complement.
+    }
+}
+
+const PLUS = 0
+const MINUS = 1
+
+entry reset {
+    bug "no-clear" {
+        fixed {
+            clear()
+        }
+        buggy {
+            goto main
+        }
+    }
+}
+
+block main {
+    wait
+    a = KEY
+    match a {
+        bug "nine-key" { fixed { 0 to 9 } buggy { 0 to 8 } } => goto digit
+        '+' => goto plus
+        '-' => goto minus
+        'C' => goto clrkey
+    }
+}
+
+block equals {
+    apply()
+    a = 0
+    for i = 6 downto 1 as eqclr {
+        total[i] = a
+    }
+    op = a
+    goto done
+}
+
+block plus {
+    apply()
+    a = PLUS
+    op = a
+    goto done
+}
+
+block minus {
+    apply()
+    a = MINUS
+    op = a
+}
+
+block done {
+    a = 1
+    fresh = a
+    goto main
+}
+
+block clrkey {
+    clear()
+    goto main
+}
+
+block digit {
+    scratch = a
+    a = fresh
+    if a != 0 {
+        a = 0
+        fix "negative" {
+            after {
+                ANN = a
+            }
+        }
+        for i = 6 downto 1 as dclr {
+            display[i] = a
+        }
+        fresh = a
+    }
+shift:
+    display[1] = display[2]
+    display[2] = display[3]
+    display[3] = display[4]
+    display[4] = display[5]
+    display[5] = display[6]
+    display[6] = scratch
+    goto main
+}
+
+routine apply {
+    a = op
+    a -= 1
+    if zero {
+        sub()
+    } else {
+        add()
+    }
+ashow:
+    fix "negative" {
+        after {
+            a = total[1]
+            if a < 5 goto apos
+            i = 6
+            carry = 0
+            repeat i as aneg {
+                a = bcd_sub(0, total[i])
+                display[i] = a
+            }
+            ANN = 1
+            return
+        apos:
+            for i = 6 downto 1 as ashl {
+                display[i] = total[i]
+            }
+            ANN = 0
+        }
+        before {
+            for i = 6 downto 1 as ashl {
+                display[i] = total[i]
+            }
+        }
+    }
+}
+
+routine add {
+    i = bug "short-add" { fixed { 6 } buggy { 5 } }
+    carry = 0
+    repeat i as aloop {
+        bug "deep-call" {
+            fixed {
+                a = bcd_add(total[i], display[i])
+            }
+            buggy {
+                adig(i)
+            }
+        }
+        total[i] = a
+    }
+}
+
+bug "deep-call" {
+    buggy {
+        routine adig(i) {
+            a = bcd_add(total[i], display[i])
+        }
+    }
+}
+
+routine sub {
+    i = 6
+    carry = 0
+    repeat i as sloop {
+        fix "ds-errata" {
+            before {
+                a = bcd_sub(total[i], display[i])
+            }
+            after {
+                a = total[i] - display[i] - carry
+                if carry {
+                    ds()
+                    carry = 1   ; DS may lose the borrow, see errata
+                }
+            }
+        }
+        total[i] = a
+    }
+}
+
+routine clear {
+    a = 0
+    fix "negative" {
+        after {
+            ANN = a
+        }
+    }
+    for i = 6 downto 1 as cloop {
+        display[i] = a
+        total[i] = a
+    }
+    op = a
+    fresh = a
+}
