@@ -117,6 +117,13 @@ fn planet(d: vec3<f32>, background: vec3<f32>) -> vec3<f32> {
     return color;
 }
 
+/// Noise from 0 to 1 that changes from pixel to pixel without clumping,
+/// after Jimenez, "Next Generation Post Processing in Call of Duty: Advanced
+/// Warfare".
+fn interleaved_gradient_noise(pixel: vec2<f32>) -> f32 {
+    return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
+}
+
 fn remap(v: f32, from_min: f32, from_max: f32, to_min: f32, to_max: f32) -> f32 {
     return to_min + (v - from_min) / (from_max - from_min) * (to_max - to_min);
 }
@@ -171,7 +178,7 @@ fn clouds(origin: vec3<f32>, d: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
     let step = (end - start) / f32(CLOUD_STEPS);
     // Starts each pixel at a different point, so the steps don't show as
     // bands.
-    let jitter = fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
+    let jitter = interleaved_gradient_noise(pixel);
     // Light scattered forward towards the planet glows a little brighter.
     let towards_planet = dot(d, sky.planet);
     let phase = 0.6 + 0.4 * towards_planet * towards_planet;

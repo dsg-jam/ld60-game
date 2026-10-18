@@ -207,8 +207,10 @@ fn window_light(id: vec2<f32>, h: vec4<f32>, h2: vec4<f32>, face: f32) -> vec4<f
     return vec4<f32>(color, strength * level);
 }
 
-/// What the camera sees of a room. A lamp at the ceiling lights it with
-/// `light`, and the street outside with `spill` through the window.
+/// What the camera sees of a room behind a window, by following the view ray
+/// into a box, after van Dongen, "Interior Mapping". A lamp at the ceiling
+/// lights it with `light`, and the street outside with `spill` through the
+/// window.
 fn room(origin: vec3<f32>, d: vec3<f32>, h: vec4<f32>, h2: vec4<f32>, light: vec4<f32>, spill: vec3<f32>) -> vec3<f32> {
     let depth = mix(3.0, 6.0, h2.x);
     var hit = room_wall(origin, d, vec3<f32>(cell, depth));
@@ -367,7 +369,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         wall *= (1.0 - 0.2 * wet) * surface.shade;
         pbr_input.material.base_color = vec4<f32>(mix(wall, GLASS, surface.glass), 1.0);
         pbr_input.material.perceptual_roughness = mix(mix(0.95, WET_ROUGHNESS, wet), 0.15, surface.glass);
-        // Concrete reflects little, glass the usual amount.
+        // Walls reflect little, glass the usual amount.
         pbr_input.material.reflectance = vec3<f32>(mix(0.25, 0.5, surface.glass));
         pbr_input.N = normalize(mix(rough_wall, n, surface.glass));
         let bounce = (UPLIGHT * exp(-in.world_position.y / UPLIGHT_HEIGHT) + SKYLIGHT) * wall * (1.0 - surface.glass);
