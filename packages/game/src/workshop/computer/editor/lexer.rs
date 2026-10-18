@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::Range;
 
 use ld60_machine::Isa;
@@ -7,7 +8,7 @@ use ld60_machine::Isa;
 pub(super) enum Kind {
     Comment,
     Directive,
-    /// A label definition or a name that is not a register or port.
+    /// A label definition, a reference to one, or an unknown name.
     Label,
     Mnemonic,
     Number,
@@ -25,21 +26,30 @@ pub(super) struct Token {
     pub(super) kind: Kind,
 }
 
-/// The names an ISA gives meaning to. The syntax around them is the same
-/// for every ISA.
-#[derive(Clone, Copy, Debug, Default)]
+/// The names an ISA and a source give meaning to. The syntax around them
+/// is the same for every ISA.
+#[derive(Clone, Debug, Default)]
 pub(super) struct Lexicon {
     mnemonics: &'static [&'static str],
     ports: &'static [&'static str],
     registers: &'static [&'static str],
+    /// Labels defined in the source. They win over registers and ports.
+    labels: HashSet<String>,
 }
 
 impl Lexicon {
-    pub(super) fn new(isa: &dyn Isa) -> Self {
+    pub(super) fn new(isa: &dyn Isa, source: &str) -> Self {
+        let labels = source
+            .lines()
+            .filter_map(|line| line.split(';').next()?.split_once(':'))
+            .map(|(name, _)| name.trim().to_owned())
+            .filter(|name| is_identifier(name))
+            .collect();
         Self {
             mnemonics: isa.mnemonics(),
             ports: isa.ports(),
             registers: isa.registers(),
+            labels,
         }
     }
 
@@ -113,6 +123,8 @@ impl Lexicon {
             Kind::Number
         } else if !is_identifier(text) {
             Kind::Text
+        } else if self.labels.contains(text) {
+            Kind::Label
         } else if contains(self.registers, text) {
             Kind::Register
         } else if contains(self.ports, text) {
@@ -157,14 +169,18 @@ fn is_identifier(text: &str) -> bool {
 mod tests {
     use super::*;
 
-    const TOY: Lexicon = Lexicon {
-        mnemonics: &["LDI", "JMP", "NOP", "IN"],
-        ports: &["KEY"],
-        registers: &["A", "B"],
-    };
+    fn toy() -> Lexicon {
+        Lexicon {
+            mnemonics: &["LDI", "JMP", "NOP", "IN"],
+            ports: &["KEY"],
+            registers: &["A", "B"],
+            labels: HashSet::new(),
+        }
+    }
 
     fn kinds(line: &str) -> Vec<(&str, Kind)> {
-        TOY.tokens(line)
+        toy()
+            .tokens(line)
             .into_iter()
             .map(|token| (&line[token.range], token.kind))
             .collect()
@@ -206,10 +222,26 @@ mod tests {
         use Kind::*;
         assert_eq!(kinds("CALL x"), vec![("CALL", Text), ("x", Label)]);
         assert_eq!(kinds("in key"), vec![("in", Mnemonic), ("key", Port)]);
-        let calco = Lexicon::new(ld60_calco::Revision::C.isa());
+        let calco = Lexicon::new(ld60_calco::Revision::C.isa(), "");
         let tokens = calco.tokens("CALL MF");
         assert_eq!(tokens[0].kind, Mnemonic);
         assert_eq!(tokens[1].kind, Register);
+    }
+
+    #[test]
+    fn names_defined_as_labels_are_labels() {
+        let calco = Lexicon::new(
+            ld60_calco::Revision::C.isa(),
+            "a: NOP\n key:  ; x\nb ; c: NOP",
+        );
+        let kinds: Vec<_> = ["JMP a", "JMP key", "JMP b", "IN KEY"]
+            .into_iter()
+            .map(|line| calco.tokens(line)[1].kind)
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![Kind::Label, Kind::Label, Kind::Register, Kind::Port]
+        );
     }
 
     #[test]
