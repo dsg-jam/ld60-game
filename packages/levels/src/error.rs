@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ld60_devices::{DeviceError, ProgramError};
+use ld60_devices::{BoardRev, DeviceError, ProgramError};
 use ld60_machine::AsmError;
 
 use crate::Report;
@@ -8,6 +8,7 @@ use crate::Report;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LevelError {
     Parse(String),
+    BoardNotAllowed(BoardRev),
     Assemble(Vec<AsmError>),
     Device(DeviceError),
 }
@@ -16,6 +17,9 @@ impl fmt::Display for LevelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse(message) => write!(f, "invalid level file: {message}"),
+            Self::BoardNotAllowed(rev) => {
+                write!(f, "the job does not allow board revision {rev:?}")
+            }
             Self::Assemble(errors) => {
                 f.write_str("assembly failed")?;
                 errors.iter().try_for_each(|e| write!(f, "\n  {e}"))

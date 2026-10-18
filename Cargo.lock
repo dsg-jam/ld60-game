@@ -3613,6 +3613,7 @@ name = "ld60-levels"
 version = "0.1.0"
 dependencies = [
  "ld60-asm",
+ "ld60-calco",
  "ld60-devices",
  "ld60-dsl",
  "ld60-machine",

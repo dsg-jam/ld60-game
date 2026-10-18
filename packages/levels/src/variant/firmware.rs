@@ -1,3 +1,5 @@
+mod rewire;
+
 use std::fmt;
 
 use super::effects::Effects;

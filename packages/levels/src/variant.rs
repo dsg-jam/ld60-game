@@ -4,7 +4,7 @@ mod line;
 mod ram_map;
 mod rng;
 
-use ld60_devices::Fault;
+use ld60_devices::{BoardRev, Fault};
 
 use self::firmware::Firmware;
 use self::ram_map::RamMap;
@@ -17,8 +17,9 @@ const TRIES: u64 = 8;
 
 /// A level with its firmware rewritten into an equivalent layout.
 ///
-/// The rewrite renames free RAM cells, swaps independent instructions and
-/// moves routines. Faults follow the renamed cells.
+/// The rewrite moves the job to another board revision, renames free RAM
+/// cells, swaps independent instructions and moves routines. Faults follow
+/// the renamed cells.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Variant {
     pub level: Level,
@@ -29,22 +30,22 @@ pub struct Variant {
 impl Variant {
     /// Returns a rewrite for `seed` that still starts broken and can be fixed.
     ///
-    /// Falls back to the original level if no rewrite passes.
+    /// The seed also picks one of the allowed boards. Falls back to the
+    /// original level if no rewrite passes.
     pub fn new(source: &LevelSource, seed: u64) -> Result<Self, LevelError> {
         let original = Self::original(source)?;
-        let rom_damage = original
-            .level
-            .faults
-            .iter()
-            .any(|f| matches!(f, Fault::FadedRomBits { .. }));
-        // ponytail: faded ROM bits sit at fixed addresses, so these levels keep their layout.
-        if rom_damage {
-            return Ok(original);
-        }
-        let variant = (0..TRIES)
-            .map(|n| original.rewrite(seed.wrapping_add(n)))
-            .find(|v| v.verify().is_ok());
-        Ok(variant.unwrap_or(original))
+        let boards = original.level.allowed_boards();
+        let pick = Rng::new(seed, &original.level.id).next_u64() % boards.len() as u64;
+        original.on_board(boards[pick as usize], seed)
+    }
+
+    /// Like [`Variant::new`], but on the given board.
+    pub fn with_board(
+        source: &LevelSource,
+        seed: u64,
+        board: BoardRev,
+    ) -> Result<Self, LevelError> {
+        Self::original(source)?.on_board(board, seed)
     }
 
     pub fn original(source: &LevelSource) -> Result<Self, LevelError> {
@@ -55,12 +56,28 @@ impl Variant {
         })
     }
 
-    fn rewrite(&self, seed: u64) -> Self {
+    fn on_board(self, board: BoardRev, seed: u64) -> Result<Self, LevelError> {
+        if !self.level.allowed_boards().contains(&board) {
+            return Err(LevelError::BoardNotAllowed(board));
+        }
+        // ponytail: faded ROM bits sit at fixed addresses, so these levels keep their layout.
+        if self.level.has_rom_damage() {
+            return Ok(self);
+        }
+        let variant = (0..TRIES)
+            .filter_map(|n| self.rewrite(board, seed.wrapping_add(n)))
+            .find(|v| v.verify().is_ok());
+        Ok(variant.unwrap_or(self))
+    }
+
+    /// Returns `None` if the firmware cannot move to `board`.
+    fn rewrite(&self, board: BoardRev, seed: u64) -> Option<Self> {
+        let (from, to) = (self.level.board(), self.level.device.board(board));
         let mut buggy = Firmware::new(&self.buggy);
         let mut fixed = Firmware::new(&self.fixed);
-        let pinned = self
-            .level
-            .board()
+        let rotation = buggy.rewire(from, to)?;
+        fixed.rewire(from, to)?;
+        let pinned = to
             .display_cells()
             .chain(buggy.indexed_cells())
             .chain(fixed.indexed_cells());
@@ -72,16 +89,20 @@ impl Variant {
             firmware.reorder_routines(seed);
         }
         let mut level = self.level.clone();
+        level.board = board;
+        if let Some(number) = level.serial.strip_prefix(&from.name()) {
+            level.serial = format!("{}{number}", to.name());
+        }
         for fault in &mut level.faults {
             if let Fault::StuckRamBit(bit) = fault {
-                bit.cell = map.get(bit.cell);
+                bit.cell = map.get(rotation.get(bit.cell));
             }
         }
-        Self {
+        Some(Self {
             level,
             buggy: buggy.to_string(),
             fixed: fixed.to_string(),
-        }
+        })
     }
 
     /// Checks that the buggy firmware fails a test and the fixed one passes all.
