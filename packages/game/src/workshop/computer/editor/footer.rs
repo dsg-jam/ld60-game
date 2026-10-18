@@ -8,6 +8,7 @@ use bevy::{
 use ld60_levels::LevelError;
 
 use super::Editor;
+use super::page::Page;
 use crate::audio::KeyClicks;
 use crate::device::Emulator;
 use crate::workshop::job::Job;
@@ -18,6 +19,7 @@ use crate::workshop::job::Job;
 /// keys to the media controls unless Fn is held, so the mouse always works.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Command {
+    Notes,
     Assemble,
     Flash,
     Clicks,
@@ -28,10 +30,11 @@ pub(super) enum Command {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 3] = [Self::Assemble, Self::Flash, Self::Clicks];
+    pub(super) const ALL: [Self; 4] = [Self::Notes, Self::Assemble, Self::Flash, Self::Clicks];
 
     fn key(self) -> KeyCode {
         match self {
+            Self::Notes => KeyCode::F2,
             Self::Assemble => KeyCode::F5,
             Self::Flash => KeyCode::F6,
             Self::Clicks => KeyCode::F8,
@@ -40,6 +43,7 @@ impl Command {
 
     pub(super) fn label(self, clicks: bool) -> String {
         match self {
+            Self::Notes => "F2 NOTES".into(),
             Self::Assemble => "F5 ASSEMBLE".into(),
             Self::Flash => "F6 FLASH".into(),
             Self::Clicks => format!("F8 CLICKS {}", if clicks { "ON" } else { "OFF" }),
@@ -48,10 +52,10 @@ impl Command {
 
     pub(super) fn run_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
-        editors: Query<(), With<Editor>>,
+        pages: Query<(), With<Page>>,
         mut commands: Commands,
     ) {
-        if !editors.contains(input.focused_entity) {
+        if !pages.contains(input.focused_entity) {
             return;
         }
         let Some(command) = Self::ALL
@@ -91,7 +95,7 @@ impl Command {
 
 /// Runs a footer [`Command`].
 #[derive(Event, Debug)]
-pub(super) struct Run(Command);
+pub(super) struct Run(pub(super) Command);
 
 impl Run {
     pub(super) fn apply(
@@ -105,6 +109,7 @@ impl Run {
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
+            (Command::Notes, _) => return,
             (Command::Clicks, _) => {
                 clicks.0 = !clicks.0;
                 for (command, mut text) in &mut labels {

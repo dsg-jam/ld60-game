@@ -5,12 +5,14 @@ mod footer;
 mod highlight;
 mod history;
 mod lexer;
+mod notes;
+mod page;
 pub(super) mod undo;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
     input::mouse::MouseScrollUnit,
-    input_focus::{FocusCause, FocusedInput, InputFocus, tab_navigation::TabIndex},
+    input_focus::{FocusedInput, InputFocus, tab_navigation::TabIndex},
     picking::events::PointerScroll,
     prelude::*,
     text::{EditableText, TextCursorStyle, TextEdit, detect_text_needs_rerender},
@@ -22,6 +24,8 @@ use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
+use self::notes::Notes;
+use self::page::{Page, PageTitle};
 use self::undo::Undo;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
@@ -74,8 +78,11 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
         .add_observer(Editor::scroll_on_wheel);
+        app.add_plugins(page::PagePlugin);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.editor", Editor::debug_state);
+        #[cfg(feature = "debug_port")]
+        app.add_debug_method("ld60.notes", Notes::debug_state);
     }
 }
 
@@ -116,12 +123,13 @@ impl Editor {
                     },
                     BackgroundColor(PHOSPHOR),
                     children![
-                        title("FIRMWARE EDITOR"),
+                        (PageTitle, title("FIRMWARE EDITOR")),
                         (title(ChipTitle::NONE), ChipTitle)
                     ],
                 ),
                 (
                     Editor,
+                    Page::Source,
                     Name::new("editor"),
                     Node {
                         flex_grow: 1.0,
@@ -143,6 +151,7 @@ impl Editor {
                     Undo::default(),
                     children![Highlight::bundle(font.clone())],
                 ),
+                Notes::bundle(font.clone()),
                 (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
                 (
                     Node {
@@ -187,10 +196,6 @@ impl Editor {
         undo.reset();
     }
 
-    pub(super) fn take_focus(editor: Single<Entity, With<Editor>>, mut focus: ResMut<InputFocus>) {
-        focus.set(*editor, FocusCause::Navigated);
-    }
-
     pub(super) fn release_focus(mut focus: ResMut<InputFocus>) {
         focus.clear();
     }
@@ -198,7 +203,7 @@ impl Editor {
     /// Inserts spaces instead of moving focus.
     fn indent_on_tab(
         mut input: On<FocusedInput<KeyboardInput>>,
-        mut editors: Query<&mut EditableText, With<Editor>>,
+        mut editors: Query<&mut EditableText, With<Page>>,
     ) {
         let Ok(mut text) = editors.get_mut(input.focused_entity) else {
             return;
@@ -215,7 +220,7 @@ impl Editor {
     /// Layout clamps the offset to the text.
     fn scroll_on_wheel(
         mut scroll: On<PointerScroll>,
-        mut editors: Query<&mut EditableText, With<Editor>>,
+        mut editors: Query<&mut EditableText, With<Page>>,
     ) {
         let Ok(mut text) = editors.get_mut(scroll.entity) else {
             return;

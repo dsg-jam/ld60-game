@@ -31,10 +31,7 @@ pub(crate) struct ComputerPlugin;
 impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(editor::EditorPlugin)
-            .add_systems(
-                OnEnter(Focus::Computer),
-                (Computer::activate::<true>, Editor::take_focus),
-            )
+            .add_systems(OnEnter(Focus::Computer), Computer::activate::<true>)
             .add_systems(
                 OnExit(Focus::Computer),
                 (Computer::activate::<false>, Editor::release_focus),

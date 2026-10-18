@@ -164,3 +164,33 @@ fn restore(
         layout.lines().map(|line| TextLineYBounds::from_line(&line)),
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use bevy::input::ButtonState;
+
+    use super::*;
+    use crate::workshop::computer::editor::notes::Notes;
+
+    #[test]
+    fn ctrl_z_undoes_on_the_notes_page() {
+        let mut world = World::new();
+        let mut keys = ButtonInput::<Key>::default();
+        keys.press(Key::Control);
+        world.insert_resource(keys);
+        world.add_observer(Undo::on_key);
+        let window = world.spawn_empty().id();
+        let notes = world.spawn(Notes::bundle(TextFont::default())).id();
+        let input = KeyboardInput {
+            key_code: KeyCode::KeyZ,
+            logical_key: Key::Character("z".into()),
+            state: ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window,
+        };
+        world.trigger(FocusedInput::new(notes, input, window));
+        let undo = world.get::<Undo>(notes).unwrap();
+        assert_eq!(undo.requests, [Request::Undo]);
+    }
+}
