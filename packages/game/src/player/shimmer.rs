@@ -13,7 +13,7 @@ use bevy::{
 
 use super::{
     camera::PlayerCamera,
-    focus::{self, Focus, FocusTarget},
+    focus::{self, Clickable, Focus},
 };
 
 const COLOR: LinearRgba = LinearRgba::new(1.0, 0.98, 0.9, 1.0);
@@ -40,7 +40,7 @@ impl Plugin for ShimmerPlugin {
     }
 }
 
-/// Light that sweeps over a hovered [`FocusTarget`].
+/// Light that sweeps over a hovered [`Clickable`].
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct ShimmerMaterial {
     #[uniform(0)]
@@ -87,7 +87,7 @@ impl Material for ShimmerMaterial {
 #[derive(Component)]
 struct ShimmerOverlay;
 
-/// Shimmer on a [`FocusTarget`] while it fades in or out.
+/// Shimmer on a [`Clickable`] while it fades in or out.
 #[derive(Component)]
 struct Shimmer {
     level: f32,
@@ -102,7 +102,7 @@ impl Shimmer {
     fn hovered(
         state: &State<Focus>,
         hovers: &HoverMap,
-        targets: &Query<(), With<FocusTarget>>,
+        targets: &Query<(), With<Clickable>>,
         parents: &Query<&ChildOf>,
     ) -> Option<Entity> {
         if *state.get() != Focus::Desk {
@@ -116,7 +116,7 @@ impl Shimmer {
     fn start(
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
-        targets: Query<(), With<FocusTarget>>,
+        targets: Query<(), With<Clickable>>,
         parents: Query<&ChildOf>,
         children: Query<&Children>,
         shimmers: Query<(), With<Shimmer>>,
@@ -206,7 +206,7 @@ impl Shimmer {
         time: Res<Time>,
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
-        targets: Query<(), With<FocusTarget>>,
+        targets: Query<(), With<Clickable>>,
         parents: Query<&ChildOf>,
         children: Query<&Children>,
         overlays: Query<(&Aabb, &GlobalTransform), With<ShimmerOverlay>>,

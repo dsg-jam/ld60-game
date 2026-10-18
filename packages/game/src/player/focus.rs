@@ -35,8 +35,15 @@ pub(crate) enum Focus {
     Device,
 }
 
-/// Makes an entity clickable from the seated view.
+/// Something the player can click from the desk view.
+///
+/// Hovering it shows the shimmer and the large dot.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct Clickable;
+
+/// Makes an entity focusable from the seated view.
 #[derive(Component, Clone, Copy, Debug)]
+#[require(Clickable)]
 pub(crate) struct FocusTarget {
     pub(crate) focus: Focus,
     pub(crate) view: View,

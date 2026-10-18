@@ -8,12 +8,12 @@ use bevy::{
 };
 
 use self::sprite::Sprite;
-use super::focus::{self, Focus, FocusTarget};
+use super::focus::{self, Clickable, Focus};
 use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
 
 /// Diameter of the dot cursor, in logical pixels.
 pub(crate) const DOT_SIZE: f32 = 10.0;
-/// Diameter of the dot cursor over a [`FocusTarget`] in the desk view.
+/// Diameter of the dot cursor over a [`Clickable`] in the desk view.
 pub(crate) const DOT_HOVER_SIZE: f32 = 16.0;
 pub(crate) const DOT_OUTLINE: f32 = 1.5;
 pub(crate) const DOT_FILL: Color = Color::srgba(1.0, 0.98, 0.9, 0.9);
@@ -172,7 +172,7 @@ impl Cursors {
         parents: Query<&ChildOf>,
         surfaces: Query<&ScreenSurface>,
         keys: Query<&PressableKey>,
-        targets: Query<(), With<FocusTarget>>,
+        targets: Query<(), With<Clickable>>,
         mut icon: Single<&mut CursorIcon, With<PrimaryWindow>>,
     ) {
         let under: Vec<Entity> = focus::under_mouse(&hovers, &parents).collect();

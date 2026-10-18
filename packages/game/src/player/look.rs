@@ -13,7 +13,7 @@ use bevy::{
 
 use super::{
     cursor,
-    focus::{self, Focus, FocusTarget},
+    focus::{self, Clickable, Focus},
 };
 
 const SENSITIVITY: f32 = 0.0025;
@@ -75,7 +75,7 @@ impl LookAngles {
 
 /// Dot in the middle of the view that marks what a click hits.
 ///
-/// It grows while it rests on a [`FocusTarget`].
+/// It grows while it rests on a [`Clickable`].
 #[derive(Component)]
 struct Crosshair;
 
@@ -111,7 +111,7 @@ impl Crosshair {
         state: Res<State<Focus>>,
         cursor: Single<&CursorOptions, With<PrimaryWindow>>,
         hovers: Res<HoverMap>,
-        targets: Query<(), With<FocusTarget>>,
+        targets: Query<(), With<Clickable>>,
         parents: Query<&ChildOf>,
         crosshair: Single<(&mut Visibility, &mut Node), With<Crosshair>>,
     ) {
