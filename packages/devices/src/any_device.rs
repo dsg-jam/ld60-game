@@ -74,6 +74,14 @@ impl DeviceKind {
         &self.boards()[rev as usize]
     }
 
+    /// Starts the name of each board of the model, like the `6` in `6B`.
+    pub fn board_prefix(self) -> &'static str {
+        match self {
+            Self::Tally2 => "2",
+            Self::Summa6 => "6",
+        }
+    }
+
     /// Every board revision of the model, in the order of [`BoardRev::ALL`].
     pub fn boards(self) -> &'static [Board; 3] {
         match self {

@@ -73,6 +73,6 @@ impl Board {
 
     /// Printed on the board and in the serial number, like `6B`.
     pub fn name(&self) -> String {
-        format!("{}{:?}", self.kind.digits(), self.rev)
+        format!("{}{:?}", self.kind.board_prefix(), self.rev)
     }
 }
