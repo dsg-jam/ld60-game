@@ -134,10 +134,7 @@ impl Run {
             }
             (_, None) => "NO JOB ON THE BENCH".into(),
             (Command::Assemble, Some(job)) => match ld60_levels::assemble(&job.level, &source) {
-                Ok(assembly) => {
-                    let bytes: u16 = assembly.lines.iter().map(|line| line.len).sum();
-                    format!("ASSEMBLED, {bytes} BYTES")
-                }
+                Ok(assembly) => format!("ASSEMBLED, {} BYTES", assembly.byte_len()),
                 Err(err) => Self::describe(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {

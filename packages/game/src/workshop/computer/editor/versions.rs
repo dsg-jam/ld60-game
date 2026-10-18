@@ -1,3 +1,4 @@
+mod changes;
 mod list;
 
 use std::time::Duration;
@@ -11,7 +12,8 @@ use bevy::{
 };
 use ld60_levels::LevelError;
 
-use self::list::{MAX_VERSIONS, Removal, SaveError, VersionList};
+use self::changes::LineChanges;
+use self::list::{MAX_VERSIONS, Removal, SaveError, Version, VersionList};
 use super::footer::{Flashed, Status};
 use super::page::{ActivePage, Page};
 use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
@@ -20,7 +22,7 @@ use crate::debug_port::DebugMethods;
 use crate::workshop::job::Job;
 
 /// Width of the label column, so the marks line up.
-const LABEL_WIDTH: usize = 20;
+const LABEL_WIDTH: usize = 26;
 
 pub(super) struct VersionsPlugin;
 
@@ -52,6 +54,8 @@ impl Plugin for VersionsPlugin {
 struct Versions {
     /// Position of the job in the catalog.
     job: Option<usize>,
+    /// When the job came on the bench, in real time.
+    started: Duration,
     list: Option<VersionList>,
 }
 
@@ -78,19 +82,20 @@ struct Perform(Action);
 
 impl Versions {
     /// Starts a new list when the job changes. Returns whether it did.
-    fn sync(&mut self, job: Option<(usize, &str)>) -> bool {
+    fn sync(&mut self, job: Option<(usize, &str)>, now: Duration) -> bool {
         let index = job.map(|(index, _)| index);
         if index == self.job {
             return false;
         }
         self.job = index;
+        self.started = now;
         self.list = job.map(|(_, factory)| VersionList::new(factory));
         true
     }
 
-    fn load_job(job: Option<Res<Job>>, mut versions: ResMut<Versions>) {
+    fn load_job(job: Option<Res<Job>>, time: Res<Time<Real>>, mut versions: ResMut<Versions>) {
         let job = job.as_ref().map(|job| (job.index, job.buggy.as_str()));
-        if versions.bypass_change_detection().sync(job) {
+        if versions.bypass_change_detection().sync(job, time.elapsed()) {
             versions.set_changed();
         }
     }
@@ -122,16 +127,7 @@ impl Versions {
                 continue;
             };
             node.display = Display::Flex;
-            let auto = if version.auto { "AUTO " } else { "" };
-            let flashed = if list.is_flashed(version) {
-                "FLASHED"
-            } else {
-                ""
-            };
-            text.0 = format!(
-                "{:>2}  {:<LABEL_WIDTH$}{auto}{flashed}",
-                version.number, version.label
-            );
+            text.0 = version.row(list.is_flashed(version));
             let selected = list.selected() == row.0;
             color.0 = if selected { Color::BLACK } else { PHOSPHOR };
             background.0 = if selected { PHOSPHOR } else { Color::NONE };
@@ -144,19 +140,22 @@ impl Versions {
         }
     }
 
-    /// The time of saving and how the source assembles.
-    fn label(job: &Job, source: &str, time: Duration) -> String {
-        let seconds = time.as_secs();
+    /// The time on the job, the lines changed from the factory firmware and
+    /// how the source assembles.
+    fn label(job: &Job, factory: &str, source: &str, on_job: Duration) -> String {
+        let seconds = on_job.as_secs();
+        let changes = LineChanges::between(factory, source);
         let assembled = match ld60_levels::assemble(&job.level, source) {
-            Ok(assembly) => {
-                let bytes: u16 = assembly.lines.iter().map(|line| line.len).sum();
-                format!("{bytes} BYTES")
-            }
+            Ok(assembly) => format!("{} BYTES", assembly.byte_len()),
             Err(LevelError::Assemble(errors)) if errors.len() == 1 => "1 ERROR".into(),
             Err(LevelError::Assemble(errors)) => format!("{} ERRORS", errors.len()),
             Err(_) => "ERROR".into(),
         };
-        format!("{:02}:{:02}  {assembled}", seconds / 60, seconds % 60)
+        format!(
+            "{:02}:{:02}  {changes}  {assembled}",
+            seconds / 60,
+            seconds % 60
+        )
     }
 
     /// `ld60.versions` returns the versions of the current job and the
@@ -325,6 +324,7 @@ impl Perform {
         mut status: Single<&mut Text, With<Status>>,
         mut active: ResMut<ActivePage>,
     ) {
+        let on_job = time.elapsed().saturating_sub(versions.started);
         let (Some(job), Some(list)) = (job, versions.list.as_mut()) else {
             status.0 = "NO JOB ON THE BENCH".into();
             return;
@@ -332,7 +332,7 @@ impl Perform {
         status.0 = match perform.0 {
             Action::Save => {
                 let source = editor.value().to_string();
-                let label = Versions::label(&job, &source, time.elapsed());
+                let label = Versions::label(&job, &list.factory().text, &source, on_job);
                 match list.save(&source, label) {
                     Ok(number) => format!("SAVED AS VERSION {number}"),
                     Err(SaveError::Duplicate(number)) => format!("SAME AS VERSION {number}"),
@@ -341,7 +341,7 @@ impl Perform {
             }
             Action::Restore => {
                 let source = editor.value().to_string();
-                let label = Versions::label(&job, &source, time.elapsed());
+                let label = Versions::label(&job, &list.factory().text, &source, on_job);
                 let version = list.selected_version();
                 let (number, text) = (version.number, version.text.clone());
                 match list.keep(&source, label) {
@@ -367,25 +367,57 @@ impl Perform {
     }
 }
 
+impl Version {
+    /// The line of the version list. A long label is cut, so the marks
+    /// line up.
+    fn row(&self, flashed: bool) -> String {
+        let label: String = self.label.chars().take(LABEL_WIDTH - 1).collect();
+        let auto = if self.auto { "AUTO" } else { "" };
+        let flashed = if flashed { "FLASHED" } else { "" };
+        format!(
+            "{:>2}  {label:<LABEL_WIDTH$}{auto:<5}{flashed}",
+            self.number
+        )
+        .trim_end()
+        .into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn rows_keep_the_marks_in_line() {
+        let version = |label: &str, auto| Version {
+            number: 12,
+            label: label.into(),
+            text: String::new(),
+            auto,
+        };
+        let long = version("123:45  +100 -100  100 ERRORS", true).row(true);
+        let short = version("00:05  +1 -1  42 BYTES", false).row(true);
+        assert_eq!(long.find("AUTO"), Some(4 + LABEL_WIDTH));
+        assert_eq!(long.find("FLASHED"), short.find("FLASHED"));
+        assert_eq!(short.find("FLASHED"), Some(4 + LABEL_WIDTH + 5));
+    }
+
+    #[test]
     fn a_new_job_starts_a_new_list() {
         let mut versions = Versions::default();
-        assert!(versions.sync(Some((0, "first"))));
+        assert!(versions.sync(Some((0, "first")), Duration::ZERO));
         let list = versions.list.as_mut().unwrap();
         list.save("fix", "A".into()).unwrap();
-        assert!(!versions.sync(Some((0, "first"))));
+        assert!(!versions.sync(Some((0, "first")), Duration::ZERO));
         assert_eq!(versions.list.as_ref().unwrap().versions().len(), 2);
 
-        assert!(versions.sync(Some((1, "second"))));
+        assert!(versions.sync(Some((1, "second")), Duration::from_secs(60)));
+        assert_eq!(versions.started, Duration::from_secs(60));
         let list = versions.list.as_ref().unwrap();
         assert_eq!(list.versions().len(), 1);
         assert_eq!(list.selected_version().text, "second");
 
-        assert!(versions.sync(None));
+        assert!(versions.sync(None, Duration::ZERO));
         assert!(versions.list.is_none());
     }
 }

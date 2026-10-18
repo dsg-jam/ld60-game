@@ -37,6 +37,11 @@ pub struct Assembly {
 }
 
 impl Assembly {
+    /// Bytes of all instructions and data.
+    pub fn byte_len(&self) -> u16 {
+        self.lines.iter().map(|line| line.len).sum()
+    }
+
     pub fn line_at(&self, addr: u16) -> Option<usize> {
         self.lines
             .iter()
