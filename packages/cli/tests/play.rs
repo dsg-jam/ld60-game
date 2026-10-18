@@ -1,7 +1,16 @@
 use ld60_cli::{Session, find_level};
+use ld60_levels::Variant;
 
 fn play(level: &str, fixed: bool, input: &str) -> String {
-    let mut session = Session::new(find_level(level).unwrap(), fixed, 1).unwrap();
+    play_variant(
+        Variant::original(find_level(level).unwrap()).unwrap(),
+        fixed,
+        input,
+    )
+}
+
+fn play_variant(variant: Variant, fixed: bool, input: &str) -> String {
+    let mut session = Session::new(variant, fixed, 1).unwrap();
     let mut out = Vec::new();
     ld60_cli::play::run(&mut session, input.as_bytes(), &mut out).unwrap();
     String::from_utf8(out).unwrap()
@@ -31,4 +40,11 @@ fn breakpoints_stop_on_labels() {
 fn stepping_reports_the_halt() {
     let out = play("summa6/01-strange-symbols", true, "s 3\n");
     assert!(out.contains("Waiting for a key."), "{out}");
+}
+
+#[test]
+fn variants_keep_the_symptom() {
+    let variant = Variant::new(find_level("summa6/02-last-digit").unwrap(), 7).unwrap();
+    let out = play_variant(variant, false, "k 12+34=\nq\n");
+    assert!(out.contains("[ 000040 ]"), "{out}");
 }

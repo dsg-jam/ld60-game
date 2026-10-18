@@ -5,7 +5,8 @@ const USAGE: &str = "\
 Usage:
   cli list                               List all levels
   cli check <level> [file.asm]           Run level tests on the buggy ROM or a file
-  cli play <level> [--fixed] [--seed N]  Open a level on the bench
+  cli play <level> [--fixed] [--seed N] [--variant N]
+                                         Open a level on the bench
   cli asm <file.asm>                     Print the listing of a CalCo file";
 
 fn main() -> ExitCode {
@@ -44,6 +45,7 @@ fn is_broken_pipe(error: &(dyn std::error::Error + 'static)) -> bool {
 fn play(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result<()> {
     let mut fixed = false;
     let mut seed = ld60_cli::seed::random();
+    let mut variant = None;
     let mut rest = options.iter();
     while let Some(&option) = rest.next() {
         match option {
@@ -52,9 +54,18 @@ fn play(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Result
                 let value = rest.next().ok_or("--seed needs a number")?;
                 seed = value.parse()?;
             }
+            "--variant" => {
+                let value = rest.next().ok_or("--variant needs a number")?;
+                variant = Some(value.parse()?);
+            }
             other => return Err(format!("unknown option '{other}'").into()),
         }
     }
-    let mut session = ld60_cli::Session::new(ld60_cli::find_level(level)?, fixed, seed)?;
+    let source = ld60_cli::find_level(level)?;
+    let variant = match variant {
+        Some(n) => ld60_levels::Variant::new(source, n)?,
+        None => ld60_levels::Variant::original(source)?,
+    };
+    let mut session = ld60_cli::Session::new(variant, fixed, seed)?;
     ld60_cli::play::run(&mut session, io::stdin().lock(), out)
 }

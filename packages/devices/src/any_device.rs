@@ -17,6 +17,13 @@ pub enum DeviceKind {
 }
 
 impl DeviceKind {
+    /// RAM cells the device shows to the user.
+    pub fn display_cells(self) -> std::ops::RangeInclusive<usize> {
+        match self {
+            Self::Summa6 => crate::summa6::DISPLAY_CELLS,
+        }
+    }
+
     pub fn isa(self) -> IsaKind {
         match self {
             Self::Summa6 => IsaKind::Calco,

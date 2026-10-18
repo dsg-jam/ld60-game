@@ -3593,6 +3593,7 @@ dependencies = [
 name = "ld60-levels"
 version = "0.1.0"
 dependencies = [
+ "ld60-asm",
  "ld60-devices",
  "ld60-machine",
  "ron",

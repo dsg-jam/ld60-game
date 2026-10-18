@@ -21,7 +21,7 @@ const KEYS: [(char, u8); 14] = [
     ('C', 0x0D),
 ];
 
-const DISPLAY_CELLS: std::ops::RangeInclusive<usize> = 1..=6;
+pub(crate) const DISPLAY_CELLS: std::ops::RangeInclusive<usize> = 1..=6;
 
 /// 6-digit adding machine with a CalCo chip.
 #[derive(Clone, Debug)]

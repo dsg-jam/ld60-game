@@ -1,39 +1,48 @@
 use std::collections::HashSet;
 
-use ld60_levels::{CATALOG, Level, LevelSource, TEST_SEEDS, assemble, burn, initial_rom, run};
-
-fn verify(source: &LevelSource) -> Result<Level, String> {
-    let level = source.load().map_err(|e| e.to_string())?;
-    let initial = initial_rom(&level, source.buggy).map_err(|e| format!("buggy.asm: {e}"))?;
-    let report = run(&level, &initial, TEST_SEEDS).map_err(|e| e.to_string())?;
-    if report.passed() {
-        return Err(format!("buggy.asm passes all tests\n{report}"));
-    }
-
-    let fixed = assemble(&level, source.fixed)
-        .map_err(|e| format!("fixed.asm: {e}"))?
-        .image;
-    let rom = burn(&level, &initial, fixed)
-        .map_err(|e| format!("fixed.asm cannot be burned over the chip: {e}"))?;
-    let report = run(&level, &rom, TEST_SEEDS).map_err(|e| e.to_string())?;
-    if !report.passed() {
-        return Err(format!("fixed.asm fails\n{report}"));
-    }
-    Ok(level)
-}
+use ld60_levels::{CATALOG, Variant};
 
 #[test]
 fn every_level_is_solvable_and_starts_broken() {
     let mut failures = Vec::new();
     let mut ids = HashSet::new();
     for source in CATALOG {
-        match verify(source) {
-            Ok(level) if !ids.insert(level.id.clone()) => {
-                failures.push(format!("{}: duplicate id {}", source.path, level.id));
-            }
-            Ok(_) => {}
-            Err(message) => failures.push(format!("{}: {message}", source.path)),
+        match Variant::original(source) {
+            Ok(original) => match original.verify() {
+                Ok(()) if !ids.insert(original.level.id.clone()) => {
+                    failures.push(format!(
+                        "{}: duplicate id {}",
+                        source.path, original.level.id
+                    ));
+                }
+                Ok(()) => {}
+                Err(error) => failures.push(format!("{}: {error}", source.path)),
+            },
+            Err(error) => failures.push(format!("{}: {error}", source.path)),
         }
     }
     assert!(failures.is_empty(), "\n{}", failures.join("\n\n"));
+}
+
+#[test]
+fn every_level_has_working_variants() {
+    for source in CATALOG {
+        let original = Variant::original(source).unwrap();
+        let variants: HashSet<String> = (0..16)
+            .map(|seed| {
+                let variant = Variant::new(source, seed).unwrap();
+                if let Err(error) = variant.verify() {
+                    panic!("{} seed {seed}: {error}\n{}", source.path, variant.buggy);
+                }
+                variant.buggy
+            })
+            .filter(|buggy| *buggy != original.buggy)
+            .collect();
+        assert!(
+            variants.len() > 8,
+            "{}: {} variants",
+            source.path,
+            variants.len()
+        );
+    }
 }

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use ld60_devices::{AnyDevice, Device, MAX_STEPS, Rom};
-use ld60_levels::{Level, LevelSource, Report, TEST_SEEDS, assemble, burn, device, initial_rom};
+use ld60_levels::{Level, Report, TEST_SEEDS, Variant, assemble, burn, device, initial_rom};
 use ld60_machine::{Assembly, Step};
 
 /// A level on the bench: the device, the firmware it runs and the breakpoints.
@@ -22,11 +22,15 @@ pub enum Stop {
 }
 
 impl Session {
-    pub fn new(source: &LevelSource, fixed: bool, seed: u64) -> crate::Result<Self> {
-        let level = source.load()?;
-        let initial = initial_rom(&level, source.buggy)?;
-        let firmware = if fixed { source.fixed } else { source.buggy };
-        let assembly = assemble(&level, firmware)?;
+    pub fn new(variant: Variant, fixed: bool, seed: u64) -> crate::Result<Self> {
+        let Variant {
+            level,
+            buggy,
+            fixed: solution,
+        } = variant;
+        let initial = initial_rom(&level, &buggy)?;
+        let firmware = if fixed { solution } else { buggy };
+        let assembly = assemble(&level, &firmware)?;
         let rom = if fixed {
             burn(&level, &initial, assembly.image.clone())?
         } else {
@@ -37,7 +41,7 @@ impl Session {
             level,
             breakpoints: BTreeSet::new(),
             seed,
-            source: firmware.to_string(),
+            source: firmware,
             assembly,
         };
         session.power_on(seed);
