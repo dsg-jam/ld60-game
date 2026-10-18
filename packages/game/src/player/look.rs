@@ -12,7 +12,7 @@ use bevy::{
 };
 
 use super::{camera::PlayerCamera, focus::Focus};
-use crate::menu::AppState;
+use crate::menu::{AppState, Settings};
 
 const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.
@@ -61,13 +61,14 @@ impl LookAngles {
     fn update(
         gaze: Gaze,
         motion: Res<AccumulatedMouseMotion>,
+        settings: Res<Settings>,
         camera: Single<&PlayerCamera>,
         mut angles: ResMut<LookAngles>,
     ) {
         if !gaze.looking_around() {
             return;
         }
-        let delta = motion.delta * SENSITIVITY;
+        let delta = motion.delta * SENSITIVITY * settings.sensitivity();
         let (_, seat_pitch, _) = camera.seat().rotation.to_euler(EulerRot::YXZ);
         angles.yaw -= delta.x;
         angles.pitch =

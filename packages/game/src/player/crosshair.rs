@@ -7,6 +7,7 @@ use super::{
     look::Gaze,
 };
 use crate::locale::{Localized, Message};
+use crate::menu::Settings;
 
 pub(super) struct CrosshairPlugin;
 
@@ -98,6 +99,7 @@ impl Crosshair {
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn update(
         gaze: Gaze,
+        settings: Res<Settings>,
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
         clickables: Query<&Clickable>,
@@ -111,8 +113,12 @@ impl Crosshair {
         } else {
             Visibility::Hidden
         });
-        let hovered =
-            focus::under_mouse(&hovers, &parents).find_map(|entity| clickables.get(entity).ok());
+        let hovered = settings
+            .hints()
+            .then(|| {
+                focus::under_mouse(&hovers, &parents).find_map(|entity| clickables.get(entity).ok())
+            })
+            .flatten();
         for (shape, mut node) in &mut shapes {
             let display = if (*shape == Shape::Prompt) == hovered.is_some() {
                 Display::Flex

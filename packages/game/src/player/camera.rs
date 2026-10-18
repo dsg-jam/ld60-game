@@ -14,6 +14,7 @@ use super::focus::{FocusTarget, Focused, View};
 use super::look::LookAngles;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+use crate::menu::AppState;
 
 /// How quickly the camera moves to a new view.
 const DECAY_RATE: f32 = 8.0;
@@ -21,6 +22,15 @@ const DECAY_RATE: f32 = 8.0;
 const LOOK_DECAY_RATE: f32 = 25.0;
 /// Distance from the seat below which the camera counts as seated.
 const SEATED_DISTANCE: f32 = 0.01;
+/// Slower rate for long moves, like from the street to the seat.
+const TRAVEL_DECAY_RATE: f32 = 2.0;
+/// Moves longer than this, in meters, use [`TRAVEL_DECAY_RATE`].
+const TRAVEL_DISTANCE: f32 = 1.5;
+/// On a long move the camera keeps facing ahead until it is this close, about
+/// over the counter, and only then turns.
+const TURN_DISTANCE: f32 = 1.0;
+/// A long move ends once the camera is this close to its goal, in meters.
+const ARRIVED: f32 = 0.02;
 
 pub(super) struct CameraPlugin;
 
@@ -29,7 +39,12 @@ impl Plugin for CameraPlugin {
         // Deferred shading, so many lights stay cheap and screen space
         // effects get the normals and roughness they need.
         app.insert_resource(DefaultOpaqueRendererMethod::deferred())
-            .add_systems(Update, PlayerCamera::follow.after(Focused::leave_on_input));
+            .add_systems(
+                Update,
+                PlayerCamera::follow
+                    .after(Focused::leave_on_input)
+                    .run_if(not(in_state(AppState::Title))),
+            );
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(Update, CameraOverride::apply.after(PlayerCamera::follow))
@@ -56,11 +71,19 @@ impl Plugin for CameraPlugin {
 pub(crate) struct PlayerCamera {
     /// Pose while sitting at the counter, before looking around.
     seat: Transform,
+    /// On a long move, like from the street to the seat.
+    traveling: bool,
 }
 
 impl PlayerCamera {
     pub(crate) fn seated_at(seat: Transform) -> impl Bundle {
-        (Self { seat }, seat)
+        (
+            Self {
+                seat,
+                traveling: false,
+            },
+            seat,
+        )
     }
 
     pub(crate) fn seat(&self) -> Transform {
@@ -72,9 +95,9 @@ impl PlayerCamera {
         focused: Res<Focused>,
         angles: Res<LookAngles>,
         targets: Query<(&FocusTarget, &GlobalTransform)>,
-        camera: Single<(&PlayerCamera, &mut Transform)>,
+        camera: Single<(&mut PlayerCamera, &mut Transform)>,
     ) {
-        let (camera, mut transform) = camera.into_inner();
+        let (mut camera, mut transform) = camera.into_inner();
         let focus_view = focused
             .get()
             .and_then(|entity| targets.get(entity).ok())
@@ -91,13 +114,26 @@ impl PlayerCamera {
             }
         };
 
+        let distance = transform.translation.distance(goal.translation);
+        if distance > TRAVEL_DISTANCE {
+            camera.traveling = true;
+        } else if distance < ARRIVED {
+            camera.traveling = false;
+        }
+        let (decay_rate, turning) = if camera.traveling {
+            (TRAVEL_DECAY_RATE, distance < TURN_DISTANCE)
+        } else {
+            (decay_rate, true)
+        };
         let dt = time.delta_secs();
         transform
             .translation
             .smooth_nudge(&goal.translation, decay_rate, dt);
-        transform
-            .rotation
-            .smooth_nudge(&goal.rotation, decay_rate, dt);
+        if turning {
+            transform
+                .rotation
+                .smooth_nudge(&goal.rotation, decay_rate, dt);
+        }
     }
 }
 

@@ -9,10 +9,21 @@ use bevy::{
     window::{PrimaryWindow, WindowFocused},
 };
 
-use super::AppState;
+use super::list::{Action, Navigation};
+use super::{AppState, Column};
+use crate::locale::Message;
 use crate::player::{focus::Focus, look::CursorLock};
 
-const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.6);
+const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
+
+/// The entries of the pause menu.
+pub(super) const ENTRIES: &[(Action, &str)] = &[
+    (Action::Resume, "menu-resume"),
+    (Action::Settings, "menu-settings"),
+    (Action::Title, "menu-title"),
+    #[cfg(not(target_arch = "wasm32"))]
+    (Action::Quit, "menu-quit"),
+];
 
 pub(super) struct PausePlugin;
 
@@ -26,14 +37,15 @@ impl Plugin for PausePlugin {
             PreUpdate,
             hold_input
                 .after(InputSystems)
-                .run_if(in_state(AppState::Paused)),
+                .after(Navigation)
+                .run_if(not(in_state(AppState::Playing))),
         )
         .add_systems(
             Update,
             (pause_on_escape, pause_on_blur, pause_on_lost_lock)
                 .run_if(in_state(AppState::Playing)),
         )
-        .add_systems(OnEnter(AppState::Paused), (spawn_shade, stop_time))
+        .add_systems(OnEnter(AppState::Paused), (spawn, stop_time))
         .add_systems(OnExit(AppState::Paused), start_time);
     }
 }
@@ -70,23 +82,15 @@ fn pause_on_lost_lock(lock: Res<CursorLock>, mut next: ResMut<NextState<AppState
     }
 }
 
-/// Keeps the game from seeing input while paused, up to and including the
-/// frame that resumes. A click or Escape goes back to the game.
-///
-/// Browsers only lock the cursor after a click, so there only a click
-/// resumes.
+/// Keeps the game from seeing input in a menu, up to and including the
+/// frame that goes back to the game.
 fn hold_input(
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut logical: ResMut<ButtonInput<Key>>,
     mut mouse: ResMut<ButtonInput<MouseButton>>,
     mut keyboard: ResMut<Messages<KeyboardInput>>,
     mut wheel: ResMut<Messages<MouseWheel>>,
-    mut next: ResMut<NextState<AppState>>,
 ) {
-    let escape = cfg!(not(target_arch = "wasm32")) && keys.just_pressed(KeyCode::Escape);
-    if mouse.just_pressed(MouseButton::Left) || escape {
-        next.set(AppState::Playing);
-    }
     // Held buttons stay held, so key repeats don't count as new presses.
     keys.clear();
     logical.clear();
@@ -97,9 +101,9 @@ fn hold_input(
     wheel.clear();
 }
 
-/// Darkens the view. It also catches the pointer, so nothing behind it
-/// reacts to clicks.
-fn spawn_shade(mut commands: Commands) {
+/// Darkens the view behind the pause menu. The shade also catches the
+/// pointer, so nothing behind it reacts to clicks.
+fn spawn(mut commands: Commands) {
     commands.spawn((
         DespawnOnExit(AppState::Paused),
         Node {
@@ -108,7 +112,10 @@ fn spawn_shade(mut commands: Commands) {
             ..default()
         },
         BackgroundColor(SHADE),
-        GlobalZIndex(1),
+    ));
+    commands.spawn(Column::screen(
+        AppState::Paused,
+        Message::new("menu-paused"),
     ));
 }
 

@@ -2,7 +2,7 @@ pub(crate) mod camera;
 mod crosshair;
 pub(crate) mod cursor;
 pub(crate) mod focus;
-mod hints;
+pub(crate) mod hints;
 pub(crate) mod look;
 mod shimmer;
 
