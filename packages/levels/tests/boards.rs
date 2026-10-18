@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
 use ld60_devices::{BoardRev, Fault};
-use ld60_levels::{CATALOG, LevelError, LevelSource, Variant};
+use ld60_levels::{CATALOG, GAME_SEED, LevelError, LevelSource, Variant};
 
 const SEEDS: std::ops::Range<u64> = 0..256;
+/// Levels whose buggy firmware checks a wrong key code.
+const WRONG_KEY_CODE: &[&str] = &["tally2/01-clear-key"];
 
 fn find(path: &str) -> &'static LevelSource {
     CATALOG.iter().find(|s| s.path == path).unwrap()
@@ -38,14 +40,15 @@ fn every_level_verifies_on_every_allowed_board() {
     for source in CATALOG {
         let level = source.load().unwrap();
         for board in level.allowed_boards() {
-            for seed in SEEDS {
-                let variant = Variant::with_board(source, seed, board).unwrap();
-                if variant.level.board != board {
-                    failures.push(format!(
-                        "{} board {board:?} seed {seed}: fell back",
-                        source.path
-                    ));
-                } else if let Err(error) = variant.verify() {
+            for seed in SEEDS.chain([GAME_SEED]) {
+                let result = Variant::with_board(source, seed, board)
+                    .map_err(|e| e.to_string())
+                    .and_then(|v| match v.verify() {
+                        Ok(()) if v.level.board == board => Ok(()),
+                        Ok(()) => Err(format!("on board {:?}", v.level.board)),
+                        Err(error) => Err(error.to_string()),
+                    });
+                if let Err(error) = result {
                     failures.push(format!(
                         "{} board {board:?} seed {seed}: {error}",
                         source.path
@@ -79,10 +82,14 @@ fn board_choice_is_deterministic_and_uses_every_board() {
 #[test]
 fn key_checks_use_the_board_codes() {
     for source in CATALOG {
-        for board in BoardRev::ALL {
+        for board in source.load().unwrap().allowed_boards() {
             let variant = Variant::with_board(source, 3, board).unwrap();
             let board = variant.level.board();
-            for firmware in [&variant.buggy, &variant.fixed] {
+            let mut firmwares = vec![&variant.fixed];
+            if !WRONG_KEY_CODE.contains(&source.path) {
+                firmwares.push(&variant.buggy);
+            }
+            for firmware in firmwares {
                 let checks = compares(firmware);
                 for key in ['+', 'C'] {
                     let code = board.key_code(key).unwrap();
@@ -96,7 +103,7 @@ fn key_checks_use_the_board_codes() {
 #[test]
 fn display_comment_names_the_board_cells() {
     for source in CATALOG {
-        for board in BoardRev::ALL {
+        for board in source.load().unwrap().allowed_boards() {
             let variant = Variant::with_board(source, 5, board).unwrap();
             let first = *variant.level.board().display_cells().start();
             for firmware in [&variant.buggy, &variant.fixed] {
@@ -135,6 +142,29 @@ fn serial_shows_the_board() {
     let source = find("summa6/02-last-digit");
     let variant = Variant::with_board(source, 1, BoardRev::C).unwrap();
     assert_eq!(variant.level.serial, "6C-03702");
+}
+
+#[test]
+fn remarks_name_units_on_the_new_board() {
+    let source = find("summa6/05-errata");
+    let variant = Variant::with_board(source, 1, BoardRev::B).unwrap();
+    assert!(
+        variant.level.remarks.iter().any(|r| r.contains("6B-05530")),
+        "{:?}",
+        variant.level.remarks
+    );
+}
+
+#[test]
+fn first_jobs_keep_board_a_and_their_layout() {
+    for path in ["tally2/01-clear-key", "summa6/01-strange-symbols"] {
+        let source = find(path);
+        let original = Variant::original(source).unwrap();
+        assert_eq!(original.level.board, BoardRev::A);
+        for seed in SEEDS.chain([GAME_SEED]) {
+            assert_eq!(Variant::new(source, seed).unwrap(), original, "{path}");
+        }
+    }
 }
 
 #[test]

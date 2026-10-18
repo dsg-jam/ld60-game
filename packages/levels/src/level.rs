@@ -14,6 +14,10 @@ pub struct Level {
     /// Boards a variant may move the job to. Empty allows every board.
     #[serde(default)]
     pub boards: Vec<BoardRev>,
+    /// Keeps the firmware layout as written. Variants then only move the job
+    /// to another board.
+    #[serde(default)]
+    pub keep_layout: bool,
     pub chip: ChipSpec,
     /// Printed on the sticker under the device and on the job ticket.
     pub serial: String,
@@ -80,6 +84,11 @@ impl Level {
         } else {
             self.boards.clone()
         }
+    }
+
+    /// Faded ROM bits sit at fixed addresses, so these jobs keep their layout too.
+    pub fn keeps_layout(&self) -> bool {
+        self.keep_layout || self.has_rom_damage()
     }
 
     pub fn has_rom_damage(&self) -> bool {

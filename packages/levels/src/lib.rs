@@ -10,4 +10,4 @@ pub use catalog::{CATALOG, DATA_DIR, LevelSource};
 pub use check::{Outcome, Report, TEST_SEEDS, run};
 pub use error::{LevelError, VerifyError};
 pub use level::{Customer, FirmwareSource, Level, RomSpec, TestCase};
-pub use variant::Variant;
+pub use variant::{GAME_SEED, Variant};
