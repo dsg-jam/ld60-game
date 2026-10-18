@@ -1,8 +1,7 @@
 use bevy::{
-    asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
+    asset::{AssetPath, embedded_asset, embedded_path},
     camera::visibility::NoFrustumCulling,
     light::NotShadowCaster,
-    mesh::{Indices, PrimitiveTopology},
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -12,6 +11,7 @@ use rand::RngExt;
 use super::super::rng;
 use super::super::weather::Weather;
 use super::models::WHEELBASE;
+use crate::geometry::quads::Quads;
 
 const SEED: u64 = 6;
 /// Droplets per rear wheel. The front wheels throw fewer.
@@ -94,10 +94,7 @@ impl Spray {
     /// throws them.
     fn droplets() -> Mesh {
         let mut rng = rng(SEED);
-        let mut anchors = Vec::new();
-        let mut uvs = Vec::new();
-        let mut randoms = Vec::new();
-        let mut indices = Vec::new();
+        let mut quads = Quads::default();
         let wheels = [
             (-WHEELBASE, -1.0, DROPLETS),
             (-WHEELBASE, 1.0, DROPLETS),
@@ -106,27 +103,16 @@ impl Spray {
         ];
         for (x, side, count) in wheels {
             for _ in 0..count {
-                let base = anchors.len() as u32;
                 let random = [
                     rng.random::<f32>(),
                     rng.random::<f32>(),
                     rng.random::<f32>(),
                     side,
                 ];
-                anchors.extend([[x - 0.3, 0.05, side * TRACK]; 4]);
-                randoms.extend([random; 4]);
-                uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
-                indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+                quads.push_with(Vec3::new(x - 0.3, 0.05, side * TRACK), [0.0; 3], random);
             }
         }
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, anchors)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, randoms)
-        .with_inserted_indices(Indices::U32(indices))
+        quads.into_mesh()
     }
 
     fn follow_weather(
