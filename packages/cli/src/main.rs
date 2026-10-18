@@ -21,7 +21,9 @@ fn main() -> ExitCode {
         ["check", level, file] => ld60_cli::check::run(&mut out, level, Some(file)),
         ["play", level, options @ ..] => play(&mut out, level, options).map(|()| true),
         ["asm", file] => listing(&mut out, file, "C").map(|()| true),
-        ["asm", file, "--rev", revision] => listing(&mut out, file, revision).map(|()| true),
+        ["asm", file, "--rev", revision] | ["asm", "--rev", revision, file] => {
+            listing(&mut out, file, revision).map(|()| true)
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
