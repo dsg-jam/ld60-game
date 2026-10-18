@@ -21,7 +21,8 @@ import package::geometry::{
 };
 
 struct Surface {
-    /// Half the size of a box or cylinder. Zero for freeform meshes.
+    /// Half the size of a box or cylinder. Zero for freeform meshes and
+    /// for scaled unit cubes, which take it from their scale.
     half_size: vec3<f32>,
     seed: f32,
     finish: u32,
@@ -51,6 +52,7 @@ const RUG: u32 = 13u;
 const BOX: u32 = 0u;
 const CYLINDER: u32 = 1u;
 const FREEFORM: u32 = 2u;
+const SCALED: u32 = 3u;
 
 const DUST: vec3<f32> = vec3<f32>(0.55, 0.52, 0.47);
 const PRIMER: vec3<f32> = vec3<f32>(0.32, 0.31, 0.3);
@@ -124,9 +126,21 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let n = normalize(in.world_normal);
     let local_n = normalize((get_local_from_world(in.instance_index) * vec4<f32>(n, 0.0)).xyz);
 
-    let h = surface.half_size;
-    let p = local;
-    let s = surface.seed;
+    var h = surface.half_size;
+    var p = local;
+    var s = surface.seed;
+    if surface.form == SCALED {
+        let world_from_local = get_world_from_local(in.instance_index);
+        let scale = vec3<f32>(
+            length(world_from_local[0].xyz),
+            length(world_from_local[1].xyz),
+            length(world_from_local[2].xyz),
+        );
+        h = scale * 0.5;
+        p = local * scale;
+        // Each box looks a little different.
+        s += hash1(floor(world_from_local[3].xz * 3.0), 31.0) * 100.0;
+    }
     let shaped = surface.form != FREEFORM;
     var uv = face_coords(p, local_n, h);
     let flooring = surface.finish == PLANKS || surface.finish == RUG;

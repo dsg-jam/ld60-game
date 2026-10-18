@@ -27,14 +27,6 @@ use self::shop::Shop;
 use self::tools::Tool;
 use crate::player::camera::PlayerCamera;
 
-const BACKGROUND: Color = Color::srgb_u8(0x14, 0x12, 0x11);
-/// Evening light from the window, much weaker than the desk lamp.
-const MOONLIGHT: Color = Color::srgb(0.65, 0.75, 1.0);
-const MOONLIGHT_ILLUMINANCE: f32 = 350.0;
-const AMBIENT: Color = Color::srgb(1.0, 0.85, 0.7);
-/// Stands in for light from the ceiling lamp bouncing off the walls.
-const AMBIENT_BRIGHTNESS: f32 = 90.0;
-
 const COMPUTER_SPOT: Vec2 = Vec2::new(0.55, -0.3);
 const COMPUTER_YAW: f32 = -0.5;
 const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
@@ -67,12 +59,6 @@ impl Plugin for WorkshopPlugin {
             tools::ToolsPlugin,
             computer::ComputerPlugin,
         ))
-        .insert_resource(ClearColor(BACKGROUND))
-        .insert_resource(GlobalAmbientLight {
-            color: AMBIENT,
-            brightness: AMBIENT_BRIGHTNESS,
-            ..default()
-        })
         .add_systems(Startup, spawn_stage);
     }
 }
@@ -112,15 +98,5 @@ fn spawn_stage(mut commands: Commands) {
     commands.spawn((
         Name::new("camera"),
         PlayerCamera::seated_at(counter.seated_view()),
-    ));
-    commands.spawn((
-        DirectionalLight {
-            color: MOONLIGHT,
-            illuminance: MOONLIGHT_ILLUMINANCE,
-            // Its shadows follow the camera and swim over small things.
-            shadow_maps_enabled: false,
-            ..default()
-        },
-        Transform::from_xyz(-1.5, 2.0, -1.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
