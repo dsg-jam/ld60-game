@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{light::FogVolume, prelude::*};
 
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -26,6 +26,11 @@ const SHELF_BOARDS: usize = 5;
 const BOARD: f32 = 0.025;
 const UPRIGHT: f32 = 0.03;
 const CABINET: Vec3 = Vec3::new(0.45, 1.3, 0.7);
+
+/// Dusty air, which the lamp's light shows up in.
+const HAZE: Color = Color::srgb_u8(0xd8, 0xcc, 0xb8);
+const HAZE_DENSITY: f32 = 0.012;
+const HAZE_GLOW: f32 = 1.0;
 
 const PLASTER: Color = Color::srgb_u8(0x5e, 0x55, 0x4c);
 const BOARDS: Color = Color::srgb_u8(0x5a, 0x40, 0x2c);
@@ -89,6 +94,16 @@ impl Shop {
         ));
 
         commands.entity(add.entity).with_children(|shop| {
+            shop.spawn((
+                Name::new("shop haze"),
+                FogVolume {
+                    fog_color: HAZE,
+                    density_factor: HAZE_DENSITY,
+                    light_intensity: HAZE_GLOW,
+                    ..default()
+                },
+                room.transform().with_scale(room.size),
+            ));
             shop.spawn((Shape::cuboid(&floor, BOARDS), Finish::Planks));
             shop.spawn((Rug, Transform::from_xyz(0.0, PLATFORM, RUG_Z)));
             for wall in [ceiling, left, right, back] {
