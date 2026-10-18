@@ -12,6 +12,9 @@ const RAIN: f32 = 0.6;
 const SOAK_TIME: f32 = 20.0;
 const DRY_TIME: f32 = 120.0;
 const TOGGLE_KEY: KeyCode = KeyCode::F9;
+/// Wetness changes in this many steps from dry to soaked, so everything that
+/// follows it only updates now and then.
+const WETNESS_STEPS: f32 = 50.0;
 
 pub(super) struct WeatherPlugin;
 
@@ -20,6 +23,7 @@ impl Plugin for WeatherPlugin {
         app.insert_resource(Weather {
             rain: RAIN,
             wetness: RAIN,
+            soaked: RAIN,
         })
         .add_systems(Update, (Weather::toggle_rain, Weather::settle).chain());
         #[cfg(feature = "debug_port")]
@@ -29,12 +33,14 @@ impl Plugin for WeatherPlugin {
 
 /// How hard it rains and how wet the ground is, both from 0 to 1.
 ///
-/// The ground follows the rain slowly: it soaks in a few seconds and dries
+/// The ground follows the rain slowly: it soaks in about 20 seconds and dries
 /// over minutes.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(super) struct Weather {
     pub(super) rain: f32,
     pub(super) wetness: f32,
+    /// The exact wetness, between the steps it is shown in.
+    soaked: f32,
 }
 
 impl Weather {
@@ -45,13 +51,15 @@ impl Weather {
     }
 
     fn settle(time: Res<Time>, mut weather: ResMut<Weather>) {
-        let time_to_settle = if weather.rain > weather.wetness {
+        let exact = weather.bypass_change_detection();
+        let time_to_settle = if exact.rain > exact.soaked {
             SOAK_TIME
         } else {
             DRY_TIME
         };
         let step = time.delta_secs() / time_to_settle;
-        let wetness = weather.wetness + (weather.rain - weather.wetness).clamp(-step, step);
+        exact.soaked += (exact.rain - exact.soaked).clamp(-step, step);
+        let wetness = (exact.soaked * WETNESS_STEPS).round() / WETNESS_STEPS;
         if wetness != weather.wetness {
             weather.wetness = wetness;
         }
@@ -75,6 +83,7 @@ impl Weather {
         }
         if let Some(wetness) = get("wetness") {
             weather.wetness = wetness;
+            weather.soaked = wetness;
         }
         Ok(serde_json::json!({ "rain": weather.rain, "wetness": weather.wetness }))
     }
