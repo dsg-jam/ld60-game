@@ -39,9 +39,9 @@ impl<'a> Line<'a> {
     }
 }
 
-/// Parses `M0` to `MF`.
+/// Parses `M0` to `MF`, in any case like the assembler.
 pub(crate) fn cell(token: &str) -> Option<u8> {
-    let digit = token.strip_prefix('M')?;
+    let digit = token.strip_prefix(['M', 'm'])?;
     let mut chars = digit.chars();
     let n = chars.next().filter(char::is_ascii_hexdigit)?.to_digit(16)?;
     chars.next().is_none().then_some(n as u8)
@@ -70,5 +70,13 @@ mod tests {
         assert_eq!(line.operands(), ["A", "0"]);
 
         assert_eq!(Line::new("; note: x").mnemonic(), None);
+    }
+
+    #[test]
+    fn parses_cells_in_any_case() {
+        assert_eq!(cell("MA"), Some(10));
+        assert_eq!(cell("m4"), Some(4));
+        assert_eq!(cell("MG"), None);
+        assert_eq!(cell("M10"), None);
     }
 }
