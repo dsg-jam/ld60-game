@@ -92,6 +92,12 @@ impl Word {
         self.0.len()
     }
 
+    /// The first `length` glyphs, at most.
+    pub(crate) fn truncated(mut self, length: usize) -> Self {
+        self.0.truncate(length);
+        self
+    }
+
     /// Strokes of all glyphs, written left to right or top to bottom.
     ///
     /// The word is centered on the origin, in grid steps.

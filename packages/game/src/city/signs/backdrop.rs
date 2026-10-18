@@ -15,10 +15,16 @@ const ROOFTOP_CHANCE: f64 = 0.5;
 const TALL_WIDTH: Range<f32> = 5.0..9.0;
 /// How far below the roof they start.
 const TALL_DROP: Range<f32> = 2.0..6.0;
+/// They keep this far from the sides of the building.
+const TALL_MARGIN: f32 = 1.0;
+/// And take up at most this share of its height.
+const TALL_SHARE: f32 = 0.7;
 /// Wide signs standing on a roof, on legs.
 const ROOFTOP_HEIGHT: Range<f32> = 3.0..8.0;
 const ROOFTOP_WIDTH: Range<f32> = 0.6..0.9;
 const LEGS: f32 = 1.2;
+/// Rooftop signs stand this far back from the front of the roof.
+const ROOFTOP_SETBACK: f32 = 1.0;
 /// Seen from the shop, the roofs across the street reach up to about this
 /// angle, in radians.
 const OVER_ROOFS: f32 = 0.42;
@@ -46,7 +52,7 @@ impl Sign {
             && rng.random_bool(ROOFTOP_CHANCE)
         {
             let word = Word::random(rng, GLYPHS);
-            let size = Sign::fit(
+            let size = Self::fit(
                 &word,
                 rng.random_range(ROOFTOP_HEIGHT),
                 roof.size.x * rng.random_range(ROOFTOP_WIDTH),
@@ -54,9 +60,9 @@ impl Sign {
             let center = Vec3::new(
                 roof.center.x,
                 roof.max().y + LEGS + size.y / 2.0,
-                roof.max().z - 1.0,
+                roof.max().z - ROOFTOP_SETBACK,
             );
-            return Some(Sign {
+            return Some(Self {
                 transform: Transform::from_translation(center),
                 size,
                 neon,
@@ -69,9 +75,11 @@ impl Sign {
             });
         }
         let word = Word::random(rng, GLYPHS);
-        let width = rng.random_range(TALL_WIDTH);
-        let height = Sign::fit_vertical(&word, width);
-        if height > building.size.y * 0.7 {
+        let width = rng
+            .random_range(TALL_WIDTH)
+            .min(building.size.x - 2.0 * TALL_MARGIN);
+        let height = Self::fit_vertical(&word, width);
+        if width <= 0.0 || height > building.size.y * TALL_SHARE {
             return None;
         }
         let mut side = if rng.random_bool(0.5) { -1.0 } else { 1.0 };
@@ -85,8 +93,7 @@ impl Sign {
             side = -building.center.x.signum();
         }
         let center = Vec3::new(
-            // Towards the side, but never past the edge of the building.
-            building.center.x + side * (building.size.x / 2.0 - width / 2.0 - 1.0).max(0.0),
+            building.center.x + side * (building.size.x / 2.0 - width / 2.0 - TALL_MARGIN),
             y,
             building.max().z + PANEL_DEPTH / 2.0,
         );
@@ -94,7 +101,7 @@ impl Sign {
             center.xy(),
             Vec2::new(width, height),
         ));
-        Some(Sign {
+        Some(Self {
             transform: Transform::from_translation(center),
             size: Vec2::new(width, height),
             neon,
