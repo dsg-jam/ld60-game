@@ -266,7 +266,7 @@ impl Editor {
                 .iter()
                 .map(|error| json!({
                     "line": error.line,
-                    "span": error.span.as_ref().map(|span| [span.start, span.end]),
+                    "span": [error.span.start, error.span.end],
                     "message": error.message,
                 }))
                 .collect::<Vec<_>>(),

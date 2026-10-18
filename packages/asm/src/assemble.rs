@@ -44,7 +44,7 @@ fn place(
         let mut fail = |span: Range<usize>, message: String| {
             errors.push(AsmError {
                 line,
-                span: Some(span),
+                span,
                 message,
             });
         };
@@ -115,7 +115,7 @@ fn emit(
         let mut fail = |span: Range<usize>, message: String| {
             errors.push(AsmError {
                 line: item.line,
-                span: Some(span),
+                span,
                 message,
             });
         };

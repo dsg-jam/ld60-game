@@ -8,8 +8,8 @@ use crate::Image;
 pub struct AsmError {
     /// 1-based source line.
     pub line: usize,
-    /// Byte range within the line that the error is about, if known.
-    pub span: Option<Range<usize>>,
+    /// Byte range within the line that the error is about.
+    pub span: Range<usize>,
     pub message: String,
 }
 

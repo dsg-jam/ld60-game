@@ -4,7 +4,7 @@ use bevy::{prelude::*, text::EditableText};
 use ld60_machine::AsmError;
 
 use super::Editor;
-use super::lexer::{Kind, Lexicon, Token};
+use super::lexer::{Kind, Lexicon};
 use crate::workshop::job::Job;
 
 const MNEMONIC: Color = Color::srgb(0.82, 1.0, 0.84);
@@ -139,7 +139,7 @@ impl Segment {
             let marks: Vec<_> = errors
                 .iter()
                 .filter(|error| error.line == index + 1)
-                .filter_map(|error| mark(line, error.span.clone(), &tokens))
+                .filter_map(|error| mark(line, error.span.clone()))
                 .collect();
             let mut cuts: Vec<_> = tokens
                 .iter()
@@ -205,15 +205,8 @@ fn push(segments: &mut Vec<Segment>, source: &str, range: Range<usize>, kind: Ki
     segments.push(Segment { range, kind, error });
 }
 
-/// The part of `line` to underline for an error. Without a span, that is
-/// the code before the comment.
-fn mark(line: &str, span: Option<Range<usize>>, tokens: &[Token]) -> Option<Range<usize>> {
-    let Some(span) = span else {
-        let code = tokens.iter().filter(|token| token.kind != Kind::Comment);
-        let start = code.clone().map(|token| token.range.start).min()?;
-        let end = code.map(|token| token.range.end).max()?;
-        return Some(start..end);
-    };
+/// The part of `line` to underline for an error at `span`.
+fn mark(line: &str, span: Range<usize>) -> Option<Range<usize>> {
     let floor = |mut index: usize| {
         index = index.min(line.len());
         while !line.is_char_boundary(index) {
@@ -245,7 +238,7 @@ mod tests {
             .collect()
     }
 
-    fn error(line: usize, span: Option<Range<usize>>) -> AsmError {
+    fn error(line: usize, span: Range<usize>) -> AsmError {
         AsmError {
             line,
             span,
@@ -287,7 +280,7 @@ mod tests {
         use Kind::*;
         let source = "NOP\nLDI A, 0x1FF ; big";
         assert_eq!(
-            styles(source, &[error(2, Some(7..12))]),
+            styles(source, &[error(2, 7..12)]),
             vec![
                 ("NOP\nLDI ", Mnemonic, false),
                 ("A", Register, false),
@@ -299,24 +292,10 @@ mod tests {
     }
 
     #[test]
-    fn underlines_the_code_without_a_span() {
-        use Kind::*;
-        assert_eq!(
-            styles("  JMP x ; y", &[error(1, None)]),
-            vec![
-                ("  ", Text, false),
-                ("JMP ", Mnemonic, true),
-                ("x", Label, true),
-                (" ; y", Comment, false),
-            ]
-        );
-    }
-
-    #[test]
     fn widens_empty_spans() {
-        assert_eq!(mark("LDI A,", Some(6..6), &[]), Some(5..6));
-        assert_eq!(mark("A\u{fc}", Some(3..9), &[]), Some(1..3));
-        assert_eq!(mark("A\u{fc}", Some(2..2), &[]), Some(0..1));
-        assert_eq!(mark("", Some(0..0), &[]), None);
+        assert_eq!(mark("LDI A,", 6..6), Some(5..6));
+        assert_eq!(mark("A\u{fc}", 3..9), Some(1..3));
+        assert_eq!(mark("A\u{fc}", 2..2), Some(0..1));
+        assert_eq!(mark("", 0..0), None);
     }
 }
