@@ -5,8 +5,8 @@ const PIXEL_ANGLE: f32 = 0.0012;
 
 struct Streak {
     world: vec3<f32>,
-    /// Streaks thinner than a pixel get wider and fainter instead. Scales
-    /// their brightness.
+    /// Streaks thinner than a pixel get wider and fainter instead, after
+    /// Persson's phone-wire anti-aliasing. Scales their brightness.
     thinning: f32,
 }
 

@@ -33,8 +33,8 @@ impl Plugin for WeatherPlugin {
 
 /// How hard it rains and how wet the ground is, both from 0 to 1.
 ///
-/// The ground follows the rain slowly: it soaks in about 20 seconds and dries
-/// over minutes.
+/// The ground follows the rain slowly: it soaks in [`SOAK_TIME`] seconds and
+/// dries in [`DRY_TIME`] seconds.
 #[derive(Resource, Debug, Clone, Copy, PartialEq)]
 pub(super) struct Weather {
     pub(super) rain: f32,

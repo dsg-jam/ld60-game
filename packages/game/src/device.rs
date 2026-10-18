@@ -93,6 +93,7 @@ impl Holdable {
         }
         commands.entity(add.entity).insert(FocusTarget {
             focus: Focus::Device,
+            // `Holdable::frame` keeps it in front of the seat.
             view: View::World(Transform::IDENTITY),
         });
     }
