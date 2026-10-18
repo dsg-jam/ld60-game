@@ -10,7 +10,7 @@ use rand::RngExt;
 use self::flying::SkyCar;
 use self::models::Fleet;
 use self::spray::Spray;
-use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng};
+use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng, turned_to};
 use crate::geometry::surface::SurfaceMaterial;
 use crate::parts::liquid::Shake;
 
@@ -33,7 +33,6 @@ const LANES: [Lane; 2] = [
 ];
 /// Vehicles wrap around this far beyond the street ends.
 const WRAP: f32 = 1.5;
-const HOVER_BOB: f32 = 0.25;
 /// How hard a vehicle shakes the ground at the shop: m/s² per m/s of speed,
 /// divided by the squared distance plus [`RUMBLE_NEAR`].
 const RUMBLE: f32 = 0.4;
@@ -88,11 +87,7 @@ impl Vehicle {
                     velocity: lane.velocity,
                 };
                 // Local +X is the front.
-                let facing = if lane.velocity > 0.0 {
-                    Quat::IDENTITY
-                } else {
-                    Quat::from_rotation_y(std::f32::consts::PI)
-                };
+                let facing = turned_to(lane.velocity);
                 commands
                     .spawn((
                         vehicle,

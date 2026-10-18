@@ -21,6 +21,8 @@ use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 
 const TITLE: &str = "LD60";
+/// Meters per second squared, down.
+const GRAVITY: f32 = 9.81;
 
 fn main() -> AppExit {
     let mut app = App::new();

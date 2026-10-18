@@ -9,7 +9,8 @@ use rand::{Rng, RngExt};
 
 use super::buildings::{Facade, FacadeMaterial, WindowGrid};
 use super::market::MARKET_HEIGHT;
-use super::{Kit, glow};
+use super::{Kit, Pick, glow};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 
@@ -36,7 +37,6 @@ const LAMP_CHANCE: f64 = 0.3;
 const TOWEL_CHANCE: f64 = 0.08;
 const TOWEL_WIDTH: Range<f32> = 0.35..0.6;
 const TOWEL_LENGTH: Range<f32> = 0.4..0.9;
-const PIPE: f32 = 0.12;
 
 const LAMP_GLOW: f32 = 15.0;
 
@@ -239,9 +239,7 @@ impl Additions {
         }
 
         self.spawn_services(parent, kit, &wall, rng);
-        if rng.random_bool(scaffold::SCAFFOLD_CHANCE) {
-            self.spawn_scaffold(parent, kit, &wall, rng);
-        }
+        self.spawn_scaffold(parent, kit, &wall, rng);
     }
 
     /// A towel or a small rug hanging over a window sill.
@@ -260,10 +258,7 @@ impl Additions {
             Vec3::new(x - width / 2.0, sill.y - length, sill.z + facing * 0.02),
             Vec3::new(x + width / 2.0, sill.y + 0.03, sill.z + facing * 0.04),
         );
-        parent.spawn(kit.cuboid(
-            &towel,
-            self.laundry[rng.random_range(0..self.laundry.len())].clone(),
-        ));
+        parent.spawn(kit.cuboid(&towel, self.laundry.pick(rng).clone()));
     }
 
     /// Two diagonal struts holding a pod up from the wall below it.
@@ -279,7 +274,7 @@ impl Additions {
         for x in [pod.min().x + 0.3, pod.max().x - 0.3] {
             let on_pod = Vec3::new(x, pod.min().y, front + facing * reach * 0.9);
             let on_wall = Vec3::new(x, pod.min().y - reach, front);
-            parent.spawn(kit.bar(on_wall, on_pod, STRUT, self.rail.clone()));
+            parent.spawn(kit.bar(&Bar::square(on_wall, on_pod, STRUT), self.rail.clone()));
         }
     }
 
@@ -369,10 +364,7 @@ impl Additions {
                     Vec3::new(x, corner.y + RAIL_HEIGHT - size.y, edge - facing * 0.15),
                     Vec3::new(x + size.x, corner.y + RAIL_HEIGHT, edge - facing * 0.17),
                 );
-                parent.spawn(kit.cuboid(
-                    &cloth,
-                    self.laundry[rng.random_range(0..self.laundry.len())].clone(),
-                ));
+                parent.spawn(kit.cuboid(&cloth, self.laundry.pick(rng).clone()));
                 x += size.x + rng.random_range(0.05..0.2);
             }
         }

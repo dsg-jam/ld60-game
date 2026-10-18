@@ -1,5 +1,6 @@
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
+use super::bar::Bar;
 use super::block::Block;
 use super::surface::{Finish, Form, SurfaceMaterial, SurfacePlugin};
 
@@ -45,6 +46,19 @@ enum Kind {
 impl Shape {
     pub(crate) fn cuboid(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Cuboid, block, color)
+    }
+
+    /// A cuboid filling `bar`.
+    pub(crate) fn bar(bar: &Bar, color: Color) -> impl Bundle {
+        (
+            Self {
+                kind: Kind::Cuboid,
+                size: bar.size(),
+                color,
+                texture: None,
+            },
+            bar.placement(),
+        )
     }
 
     pub(crate) fn cylinder(block: &Block, color: Color) -> impl Bundle {

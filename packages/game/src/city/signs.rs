@@ -7,7 +7,8 @@ use bevy::{light::VolumetricLight, prelude::*, shape::Aabb3d};
 use rand::{Rng, RngExt};
 
 use super::buildings::{FacadeMaterial, Skyline};
-use super::{Kit, glow, rng};
+use super::{Kit, NEON, glow, rng, turned_to};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::parts::script::{GLYPH_SIZE, Word};
@@ -32,14 +33,6 @@ const SPILL_RANGE: f32 = 12.0;
 const SPILL_DISTANCE: f32 = 1.2;
 
 const PANEL: Color = Color::srgb_u8(0x14, 0x13, 0x18);
-const NEON: [Color; 6] = [
-    Color::srgb_u8(0xff, 0x2a, 0x6d),
-    Color::srgb_u8(0x05, 0xd9, 0xe8),
-    Color::srgb_u8(0xb1, 0x4a, 0xed),
-    Color::srgb_u8(0x7d, 0xff, 0x5a),
-    Color::srgb_u8(0xff, 0xb3, 0x2e),
-    Color::srgb_u8(0xff, 0x4f, 0x2e),
-];
 
 pub(super) struct SignsPlugin;
 
@@ -177,11 +170,7 @@ impl Sign {
                 &[1.0]
             };
             for &face in faces {
-                let rotation = if face > 0.0 {
-                    Quat::IDENTITY
-                } else {
-                    Quat::from_rotation_y(std::f32::consts::PI)
-                };
+                let rotation = turned_to(face);
                 for tube in self.tubes() {
                     parent.spawn((
                         Mesh3d(kit.cube.clone()),
@@ -241,7 +230,7 @@ impl Sign {
     /// Tubes for the word, fitted into the panel.
     fn tubes(&self) -> Vec<Tube> {
         let mut tubes = Tube::lettering(&self.word, self.size, self.vertical);
-        let thickness = tubes.first().map_or(0.0, |tube| tube.size.y);
+        let thickness = tubes.first().map_or(0.0, Tube::thickness);
         if self.framed {
             let inset = self.size / 2.0 - thickness * 1.5;
             let corners = [
@@ -260,11 +249,7 @@ impl Sign {
 }
 
 /// One straight piece of neon tube, or a stroke of painted letters.
-pub(super) struct Tube {
-    center: Vec3,
-    size: Vec3,
-    rotation: Quat,
-}
+pub(super) struct Tube(Bar);
 
 impl Tube {
     /// The strokes of `word` fitted into a panel of `size`, centered on the
@@ -281,18 +266,27 @@ impl Tube {
 
     /// Placement of a unit cube for this tube, `z` in front of the panel.
     pub(super) fn transform(&self, z: f32) -> Transform {
-        Transform::from_translation(self.center.with_z(z + self.size.z / 2.0))
-            .with_rotation(self.rotation)
-            .with_scale(self.size)
+        self.0
+            .translated(Vec3::Z * (z + self.thickness() / 2.0))
+            .unit_transform()
     }
 
+    fn thickness(&self) -> f32 {
+        self.0.section.y
+    }
+
+    /// A tube in the plane of the panel, its ends rounded off by reaching
+    /// half its thickness past them.
     fn between(a: Vec2, b: Vec2, thickness: f32) -> Self {
-        let delta = b - a;
-        Self {
-            center: ((a + b) / 2.0).extend(0.0),
-            size: Vec3::new(delta.length() + thickness, thickness, thickness),
-            rotation: Quat::from_rotation_z(delta.y.atan2(delta.x)),
-        }
+        Self(
+            Bar {
+                from: a.extend(0.0),
+                to: b.extend(0.0),
+                section: Vec2::splat(thickness),
+                up: Vec3::Z,
+            }
+            .extended(thickness / 2.0),
+        )
     }
 }
 

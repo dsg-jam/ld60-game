@@ -76,6 +76,12 @@ impl Glyph {
         let point = |(x, y): (u8, u8)| Vec2::new(f32::from(x), -f32::from(y));
         self.0.iter().map(move |&(a, b)| (point(a), point(b)))
     }
+
+    /// Like [`Glyph::strokes`], with the origin in the middle of the glyph.
+    pub(crate) fn centered_strokes(&self) -> impl Iterator<Item = (Vec2, Vec2)> {
+        let middle = GLYPH_SIZE * Vec2::new(0.5, -0.5);
+        self.strokes().map(move |(a, b)| (a - middle, b - middle))
+    }
 }
 
 impl Word {

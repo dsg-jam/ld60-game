@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use bevy::{
     asset::RenderAssetUsages,
     mesh::{Indices, PrimitiveTopology},
@@ -17,7 +19,7 @@ const WOOL: Color = Color::srgb_u8(0x9e, 0x8c, 0x6c);
 const SEED: u64 = 12;
 /// Space between the tassels along each end.
 const SPACING: f32 = 0.008;
-const LENGTH: std::ops::Range<f32> = 0.035..0.07;
+const LENGTH: Range<f32> = 0.035..0.07;
 const WIDTH: f32 = 0.004;
 const SEGMENTS: usize = 8;
 /// How far strands turn away from straight out, in radians.
@@ -68,7 +70,7 @@ impl Rug {
     }
 
     /// Flat strands of wool spilling out of both ends, each bent its own way
-    /// and the neighbours of a tassel bent alike.
+    /// and the neighbors of a tassel bent alike.
     fn fringe(rng: &mut impl Rng) -> Mesh {
         let mut positions = Vec::new();
         let mut indices = Vec::new();
@@ -79,7 +81,7 @@ impl Rug {
                 let x = -SIZE.x / 2.0
                     + SPACING * (index as f32 + 0.5)
                     + rng.random_range(-0.002..0.002);
-                // Slow waves along the end, so neighbours lean together.
+                // Slow waves along the end, so neighbors lean together.
                 let lean = (x * 9.0 + phase).sin() * 0.6 + (x * 23.0 + phase * 2.0).sin() * 0.4;
                 let mut heading = lean * SPREAD + rng.random_range(-0.15..0.15);
                 let mut curl = rng.random_range(-CURL..CURL);

@@ -6,7 +6,6 @@ struct HeightFog {
     color: vec4<f32>,
     density: f32,
     falloff: f32,
-    ground: f32,
 }
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -23,7 +22,7 @@ const MAX_EXPONENT: f32 = 80.0;
 /// How much of the haze a ray collects on its way through air that thins
 /// out with height, after Quilez, "Better Fog".
 fn haze_along(origin: vec3<f32>, ray: vec3<f32>, distance: f32) -> f32 {
-    let thickness = fog.density * exp(-fog.falloff * (origin.y - fog.ground));
+    let thickness = fog.density * exp(-fog.falloff * origin.y);
     let rise = ray.y * fog.falloff;
     if abs(rise * distance) < 1e-4 {
         return thickness * distance;

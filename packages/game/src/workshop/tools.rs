@@ -46,7 +46,7 @@ impl Plugin for ToolsPlugin {
     }
 }
 
-/// A tool on the desk that finishes a job. It is only clickable when it is
+/// A tool on the counter that finishes a job. It is only clickable when it is
 /// the next step.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 #[require(Transform, Visibility)]

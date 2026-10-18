@@ -1,7 +1,5 @@
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
-    camera::visibility::NoFrustumCulling,
-    light::NotShadowCaster,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -10,18 +8,22 @@ use rand::RngExt;
 
 use super::super::rng;
 use super::super::weather::Weather;
-use super::models::WHEELBASE;
+use super::models::{TRACK, WHEELBASE};
+use crate::GRAVITY;
 use crate::geometry::quads::Quads;
 
 const SEED: u64 = 6;
 /// Droplets per rear wheel. The front wheels throw fewer.
 const DROPLETS: usize = 80;
 const FRONT_DROPLETS: usize = 24;
-/// Distance of the wheels from the middle of the car.
-const TRACK: f32 = 0.85;
 const LIFETIME: f32 = 0.6;
 const SIZE: f32 = 0.4;
-const TAIL: f32 = -2.3;
+/// Where the tail lights of most cars sit, on the side of +Z, which light
+/// the spray red.
+const TAIL_LIGHT: Vec3 = Vec3::new(-2.3, 0.65, 0.8);
+/// Droplets leave the tire this far behind the axle and this high above the
+/// road.
+const SPRAY_START: Vec2 = Vec2::new(0.3, 0.05);
 
 pub(super) struct SprayPlugin;
 
@@ -56,7 +58,8 @@ struct SprayParams {
     wetness: f32,
     lifetime: f32,
     size: f32,
-    tail: f32,
+    tail: Vec3,
+    gravity: f32,
 }
 
 impl FromWorld for Spray {
@@ -69,7 +72,8 @@ impl FromWorld for Spray {
                     wetness: 0.0,
                     lifetime: LIFETIME,
                     size: SIZE,
-                    tail: TAIL,
+                    tail: TAIL_LIGHT,
+                    gravity: GRAVITY,
                 },
             });
         Self { mesh, material }
@@ -83,10 +87,7 @@ impl Spray {
             Mesh3d(self.mesh.clone()),
             MeshMaterial3d(self.material.clone()),
             Transform::default(),
-            // The vertex shader moves the droplets, so the mesh bounds mean
-            // nothing.
-            NoFrustumCulling,
-            NotShadowCaster,
+            Quads::unbounded(),
         )
     }
 
@@ -109,7 +110,11 @@ impl Spray {
                     rng.random::<f32>(),
                     side,
                 ];
-                quads.push_with(Vec3::new(x - 0.3, 0.05, side * TRACK), [0.0; 3], random);
+                quads.push_with(
+                    Vec3::new(x - SPRAY_START.x, SPRAY_START.y, side * TRACK),
+                    [0.0; 3],
+                    random,
+                );
             }
         }
         quads.into_mesh()

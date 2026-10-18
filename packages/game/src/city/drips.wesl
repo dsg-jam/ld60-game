@@ -17,10 +17,10 @@ struct Drips {
 struct Vertex {
     /// Where the drop hangs before it falls.
     @location(0) anchor: vec3<f32>,
-    /// Seconds between drops, a random number, and nothing.
+    /// Seconds between drops, a random number, and its phase.
     @location(1) timing: vec3<f32>,
     @location(2) uv: vec2<f32>,
-    /// The light the drop falls through, and its phase.
+    /// The light the drop falls through.
     @location(5) light: vec4<f32>,
 }
 
@@ -34,7 +34,7 @@ struct Drop {
 @vertex
 fn vertex(vertex: Vertex) -> Drop {
     let period = vertex.timing.x;
-    let t = fract(globals.time / period + vertex.light.w) * period;
+    let t = fract(globals.time / period + vertex.timing.z) * period;
     let fall = sqrt(2.0 * vertex.anchor.y / drips.gravity);
     let speed = drips.gravity * t;
     let head = vertex.anchor - vec3<f32>(0.0, 0.5 * drips.gravity * t * t, 0.0);

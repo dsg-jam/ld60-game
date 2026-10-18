@@ -12,10 +12,17 @@ mod traffic;
 mod weather;
 mod wet;
 
-use bevy::{light::cluster::GlobalClusterSettings, prelude::*};
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
+use std::f32::consts::PI;
 
+use bevy::{
+    light::cluster::GlobalClusterSettings,
+    prelude::*,
+    shape::{Aabb3d, RayCast3d},
+};
+use rand::rngs::SmallRng;
+use rand::{Rng, RngExt, SeedableRng};
+
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 
 /// Curb on the shop side of the road.
@@ -30,6 +37,16 @@ const CURB_HEIGHT: f32 = 0.15;
 const Z_SLICES: usize = 4096;
 /// The street ends this far to each side of the shop.
 const HALF_LENGTH: f32 = 90.0;
+/// The colors of the city's neon: signs, crowns on the towers and lights
+/// under the cars.
+const NEON: [Color; 6] = [
+    Color::srgb_u8(0xff, 0x2a, 0x6d),
+    Color::srgb_u8(0x05, 0xd9, 0xe8),
+    Color::srgb_u8(0xb1, 0x4a, 0xed),
+    Color::srgb_u8(0x7d, 0xff, 0x5a),
+    Color::srgb_u8(0xff, 0xb3, 0x2e),
+    Color::srgb_u8(0xff, 0x4f, 0x2e),
+];
 
 pub(crate) struct CityPlugin;
 
@@ -50,6 +67,37 @@ impl Plugin for CityPlugin {
         ))
         .init_resource::<Kit>()
         .add_systems(Startup, make_room_for_lights);
+    }
+}
+
+/// A straight piece of a path, like a cable or a flight route.
+#[derive(Clone, Copy, Debug)]
+struct Segment {
+    from: Vec3,
+    to: Vec3,
+}
+
+impl Segment {
+    /// Whether the segment passes `bounds` by.
+    fn misses(&self, bounds: &Aabb3d) -> bool {
+        let Ok(direction) = Dir3::new(self.to - self.from) else {
+            return true;
+        };
+        RayCast3d::new(self.from, direction, self.from.distance(self.to))
+            .aabb_intersection_at(bounds)
+            .is_none()
+    }
+}
+
+/// Picks one item at random, like `rand`'s `choose`, from a list that is
+/// never empty.
+trait Pick<T> {
+    fn pick(&self, rng: &mut impl Rng) -> &T;
+}
+
+impl<T> Pick<T> for [T] {
+    fn pick(&self, rng: &mut impl Rng) -> &T {
+        &self[rng.random_range(0..self.len())]
     }
 }
 
@@ -80,20 +128,11 @@ impl Kit {
         )
     }
 
-    /// A bar from `a` to `b`, `thickness` wide and deep.
-    fn bar<M: Material>(&self, a: Vec3, b: Vec3, thickness: f32, material: Handle<M>) -> Part<M> {
-        let along = b - a;
-        let up = if along.normalize_or_zero().y.abs() > 0.9 {
-            Vec3::X
-        } else {
-            Vec3::Y
-        };
+    fn bar<M: Material>(&self, bar: &Bar, material: Handle<M>) -> Part<M> {
         (
             Mesh3d(self.cube.clone()),
             MeshMaterial3d(material),
-            Transform::from_translation((a + b) / 2.0)
-                .looking_to(along, up)
-                .with_scale(Vec3::new(thickness, thickness, along.length())),
+            bar.unit_transform(),
         )
     }
 }
@@ -127,4 +166,14 @@ fn glow(color: Color, strength: f32) -> StandardMaterial {
 /// The same city every time.
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
+}
+
+/// No turn for a positive `side`, half a turn about Y for a negative one,
+/// for things that face either way across or along the street.
+fn turned_to(side: f32) -> Quat {
+    if side > 0.0 {
+        Quat::IDENTITY
+    } else {
+        Quat::from_rotation_y(PI)
+    }
 }

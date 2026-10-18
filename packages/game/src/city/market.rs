@@ -1,4 +1,3 @@
-use std::f32::consts::PI;
 use std::ops::Range;
 
 use bevy::prelude::*;
@@ -6,7 +5,8 @@ use rand::{Rng, RngExt};
 
 use super::drips::DripEdge;
 use super::signs::Tube;
-use super::{Kit, glow};
+use super::{Kit, Pick, glow, turned_to};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::parts::script::Word;
@@ -192,11 +192,7 @@ impl Stock {
                 width = last - x;
             }
             let center = Vec3::new(x + width / 2.0, 0.0, front);
-            let rotation = if facing > 0.0 {
-                Quat::IDENTITY
-            } else {
-                Quat::from_rotation_y(PI)
-            };
+            let rotation = turned_to(facing);
             let lit = center.x.abs() < LIT_RADIUS;
             let bay = Bay::random(rng);
             let place = Transform::from_translation(center).with_rotation(rotation);
@@ -231,10 +227,6 @@ impl Stock {
     /// The plain wall at the back of the stalls.
     pub(super) fn wall(&self) -> Handle<SurfaceMaterial> {
         self.concrete.clone()
-    }
-
-    fn pick<M: Material>(materials: &[Handle<M>], rng: &mut impl Rng) -> Handle<M> {
-        materials[rng.random_range(0..materials.len())].clone()
     }
 }
 
@@ -302,7 +294,7 @@ impl Bay {
         let top = Block::new(counter.size.with_y(0.04) + Vec3::new(0.06, 0.0, 0.06))
             .on_top_of(&counter)
             .translated(Vec3::new(0.0, 0.0, counter.center.z));
-        stall.spawn(kit.cuboid(&counter, Stock::pick(&stock.counters, rng)));
+        stall.spawn(kit.cuboid(&counter, stock.counters.pick(rng).clone()));
         stall.spawn(kit.cuboid(&top, stock.metal.clone()));
         Self::spawn_goods(stall, kit, stock, &top, rng);
 
@@ -316,7 +308,7 @@ impl Bay {
         }
 
         // A lamp hanging from the ceiling on its cord.
-        let (color, lamp_material) = &stock.lamps[rng.random_range(0..stock.lamps.len())];
+        let (color, lamp_material) = stock.lamps.pick(rng);
         let at = Vec3::new(rng.random_range(-inner * 0.5..=inner * 0.5), 0.0, -1.3);
         let drop = rng.random_range(0.3..0.6);
         let lamp =
@@ -346,7 +338,7 @@ impl Bay {
                     .translated(Vec3::new(x, 0.0, STOOL_OUT));
                 let seat = Block::new(Vec3::new(0.32, 0.05, 0.32)).on_top_of(&leg);
                 stall.spawn(kit.cuboid(&leg, stock.metal.clone()));
-                stall.spawn(kit.cuboid(&seat, Stock::pick(&stock.awnings, rng)));
+                stall.spawn(kit.cuboid(&seat, stock.awnings.pick(rng).clone()));
             }
         }
 
@@ -358,17 +350,13 @@ impl Bay {
         }
         // Fixed to the facade above the opening, over the sign.
         let top = MARKET_HEIGHT + AWNING_ABOVE;
-        let slope = (AWNING_DROP / AWNING_REACH).atan();
-        let length = AWNING_REACH.hypot(AWNING_DROP);
-        let awning = Block::new(Vec3::new(width - 0.1, 0.04, length));
-        let center = Vec3::new(0.0, top - AWNING_DROP / 2.0, AWNING_REACH / 2.0);
-        stall.spawn((
-            Mesh3d(kit.cube.clone()),
-            MeshMaterial3d(Stock::pick(&stock.awnings, rng)),
-            Transform::from_translation(center)
-                .with_rotation(Quat::from_rotation_x(slope))
-                .with_scale(awning.size),
-        ));
+        let awning = Bar {
+            from: Vec3::new(0.0, top, 0.0),
+            to: Vec3::new(0.0, top - AWNING_DROP, AWNING_REACH),
+            section: Vec2::new(width - 0.1, 0.04),
+            up: Vec3::Y,
+        };
+        stall.spawn(kit.bar(&awning, stock.awnings.pick(rng).clone()));
         let lip = Vec3::new(0.0, top - AWNING_DROP, AWNING_REACH);
         let reach = Vec3::X * (width / 2.0 - 0.1);
         // A light strip under the edge, in the color of the stall's lamp.
@@ -381,7 +369,10 @@ impl Bay {
         for side in [-1.0, 1.0] {
             let on_awning = lip + reach * side * 0.95 - Vec3::Y * 0.03;
             let on_pillar = Vec3::new(side * width / 2.0, MARKET_HEIGHT - STRUT_DROP, 0.0);
-            stall.spawn(kit.bar(on_pillar, on_awning, STRUT, stock.metal.clone()));
+            stall.spawn(kit.bar(
+                &Bar::square(on_pillar, on_awning, STRUT),
+                stock.metal.clone(),
+            ));
         }
         Some(DripEdge {
             from: lip - reach,
@@ -414,7 +405,7 @@ impl Bay {
                     0.0,
                     surface.center.z,
                 ));
-                stall.spawn(kit.cuboid(&item, Stock::pick(&stock.goods, rng)));
+                stall.spawn(kit.cuboid(&item, stock.goods.pick(rng).clone()));
             }
             x += size.x + rng.random_range(0.01..0.08);
         }
@@ -433,7 +424,7 @@ impl Bay {
             center: Vec3::new(0.0, MARKET_HEIGHT - 0.1 - SIGN_HEIGHT / 2.0, 0.05),
             size: size.extend(0.1),
         };
-        stall.spawn(kit.cuboid(&lightbox, Stock::pick(&stock.lightboxes, rng)));
+        stall.spawn(kit.cuboid(&lightbox, stock.lightboxes.pick(rng).clone()));
         let word = Word::random(rng, 2..6);
         for stroke in Tube::lettering(&word, size, false) {
             let local = stroke.transform(lightbox.size.z / 2.0);
@@ -487,7 +478,7 @@ impl Bay {
                 rng.random_range(-STALL_DEPTH + 0.5..-0.5),
             );
             let crate_ = Block::new(size).translated(at);
-            stall.spawn(kit.cuboid(&crate_, Stock::pick(&stock.counters, rng)));
+            stall.spawn(kit.cuboid(&crate_, stock.counters.pick(rng).clone()));
         }
     }
 }

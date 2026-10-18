@@ -1,7 +1,5 @@
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
-    camera::visibility::NoFrustumCulling,
-    light::NotShadowCaster,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -11,6 +9,7 @@ use rand::RngExt;
 use super::buildings::Skyline;
 use super::rng;
 use super::weather::Weather;
+use crate::GRAVITY;
 use crate::geometry::quads::Quads;
 
 const SEED: u64 = 7;
@@ -18,7 +17,6 @@ const DROPS_PER_METER: f32 = 4.0;
 const PERIOD: (f32, f32) = (0.5, 2.0);
 const WIDTH: f32 = 0.008;
 const BRIGHTNESS: f32 = 2.5;
-const GRAVITY: f32 = 9.81;
 
 pub(super) struct DripsPlugin;
 
@@ -82,10 +80,7 @@ impl DripMaterial {
                 },
             })),
             Transform::default(),
-            // The vertex shader moves the drops, so the mesh bounds mean
-            // nothing.
-            NoFrustumCulling,
-            NotShadowCaster,
+            Quads::unbounded(),
         ));
     }
 
@@ -101,9 +96,9 @@ impl DripMaterial {
                 let timing = [
                     rng.random_range(PERIOD.0..PERIOD.1),
                     rng.random::<f32>(),
-                    0.0,
+                    rng.random::<f32>(),
                 ];
-                let light = [light.red, light.green, light.blue, rng.random::<f32>()];
+                let light = [light.red, light.green, light.blue, 1.0];
                 quads.push_with(anchor, timing, light);
             }
         }

@@ -21,7 +21,7 @@ const DUST_DEPTH: f32 = 0.35;
 /// The cloud is this much wider and taller than the glass.
 const DUST_SPREAD: f32 = 1.3;
 const DUST_MOTES: usize = 70;
-const DUST_SEED: u64 = 12;
+const DUST_SEED: u64 = 13;
 
 /// Space between the front of the monitor and the back of the keyboard.
 const KEYBOARD_GAP: f32 = 0.06;

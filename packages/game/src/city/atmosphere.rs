@@ -59,9 +59,12 @@ impl Plugin for AtmospherePlugin {
                 brightness: AMBIENT_BRIGHTNESS,
                 ..default()
             })
-            .add_systems(Startup, (spawn_planet_light, spawn_street_haze))
-            .add_systems(Update, thicken_fog.run_if(resource_changed::<Weather>))
-            .add_observer(dress_camera);
+            .add_systems(Startup, (Self::spawn_planet_light, StreetHaze::spawn))
+            .add_systems(
+                Update,
+                (Self::thicken_fog, StreetHaze::thicken).run_if(resource_changed::<Weather>),
+            )
+            .add_observer(Self::dress_camera);
     }
 }
 
@@ -69,78 +72,81 @@ impl Plugin for AtmospherePlugin {
 #[derive(Component, Debug)]
 struct StreetHaze;
 
-fn spawn_planet_light(mut commands: Commands) {
-    commands.spawn((
-        Name::new("planet light"),
-        DirectionalLight {
-            color: MOON,
-            illuminance: MOON_ILLUMINANCE,
-            shadow_maps_enabled: true,
-            ..default()
-        },
-        Transform::from_translation(PLANET).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-}
-
-/// Haze between the buildings, where the lamps and signs light up the air.
-fn spawn_street_haze(mut commands: Commands) {
-    let street = Block::between(
-        Vec3::new(-HAZE_HALF_LENGTH, -1.0, FACADES),
-        Vec3::new(HAZE_HALF_LENGTH, HAZE_HEIGHT, shop::FRONT),
-    );
-    commands.spawn((
-        Name::new("street haze"),
-        StreetHaze,
-        FogVolume {
-            fog_color: STREET_HAZE,
-            density_factor: HAZE_DENSITY,
-            light_intensity: HAZE_GLOW,
-            ..default()
-        },
-        street.transform().with_scale(street.size),
-    ));
-}
-
-/// Rain makes the air hazier.
-fn thicken_fog(
-    weather: Res<Weather>,
-    mut fogs: Query<&mut HeightFog, With<PlayerCamera>>,
-    mut volumes: Query<&mut FogVolume, With<StreetHaze>>,
-) {
-    for mut fog in &mut fogs {
-        fog.density = FOG_DENSITY + RAIN_FOG_DENSITY * weather.rain;
+impl AtmospherePlugin {
+    fn spawn_planet_light(mut commands: Commands) {
+        commands.spawn((
+            Name::new("planet light"),
+            DirectionalLight {
+                color: MOON,
+                illuminance: MOON_ILLUMINANCE,
+                shadow_maps_enabled: true,
+                ..default()
+            },
+            Transform::from_translation(PLANET).looking_at(Vec3::ZERO, Vec3::Y),
+        ));
     }
-    for mut volume in &mut volumes {
-        volume.density_factor = HAZE_DENSITY + RAIN_HAZE_DENSITY * weather.rain;
+
+    /// Rain makes the air hazier.
+    fn thicken_fog(weather: Res<Weather>, mut fogs: Query<&mut HeightFog, With<PlayerCamera>>) {
+        for mut fog in &mut fogs {
+            fog.density = FOG_DENSITY + RAIN_FOG_DENSITY * weather.rain;
+        }
+    }
+
+    /// Night look for the player's view: glowing lights and hazy distance.
+    fn dress_camera(add: On<Add<PlayerCamera>>, mut commands: Commands) {
+        commands.entity(add.entity).insert((
+            ScreenSpaceReflections {
+                // Only the puddles reflect. Blurry reflections on damp ground
+                // are noisy without temporal anti-aliasing, which would smear
+                // the rain.
+                min_perceptual_roughness: 0.0..0.01,
+                max_perceptual_roughness: 0.1..0.15,
+                ..default()
+            },
+            Bloom {
+                intensity: BLOOM_INTENSITY,
+                ..Bloom::NATURAL
+            },
+            VolumetricFog {
+                ambient_intensity: 0.0,
+                step_count: HAZE_STEPS,
+                ..default()
+            },
+            Exposure::INDOOR,
+            HeightFog {
+                color: FOG.to_linear().to_vec4(),
+                density: FOG_DENSITY,
+                falloff: 1.0 / FOG_HEIGHT,
+            },
+        ));
     }
 }
 
-/// Night look for the player's view: glowing lights and hazy distance.
-fn dress_camera(add: On<Add<PlayerCamera>>, mut commands: Commands) {
-    commands.entity(add.entity).insert((
-        ScreenSpaceReflections {
-            // Only the puddles reflect. Blurry reflections on damp ground
-            // are noisy without temporal anti-aliasing, which would smear
-            // the rain.
-            min_perceptual_roughness: 0.0..0.01,
-            max_perceptual_roughness: 0.1..0.15,
-            ..default()
-        },
-        Bloom {
-            intensity: BLOOM_INTENSITY,
-            ..Bloom::NATURAL
-        },
-        VolumetricFog {
-            ambient_intensity: 0.0,
-            step_count: HAZE_STEPS,
-            ..default()
-        },
-        Exposure::INDOOR,
-        HeightFog {
-            color: FOG.to_linear().to_vec4(),
-            density: FOG_DENSITY,
-            falloff: 1.0 / FOG_HEIGHT,
-            ground: 0.0,
-        },
-    ));
+impl StreetHaze {
+    /// Haze between the buildings, where the lamps and signs light up the air.
+    fn spawn(mut commands: Commands) {
+        let street = Block::between(
+            Vec3::new(-HAZE_HALF_LENGTH, -1.0, FACADES),
+            Vec3::new(HAZE_HALF_LENGTH, HAZE_HEIGHT, shop::FRONT),
+        );
+        commands.spawn((
+            Name::new("street haze"),
+            StreetHaze,
+            FogVolume {
+                fog_color: STREET_HAZE,
+                density_factor: HAZE_DENSITY,
+                light_intensity: HAZE_GLOW,
+                ..default()
+            },
+            street.transform().with_scale(street.size),
+        ));
+    }
+
+    /// Rain makes the air hazier.
+    fn thicken(weather: Res<Weather>, mut volumes: Query<&mut FogVolume, With<StreetHaze>>) {
+        for mut volume in &mut volumes {
+            volume.density_factor = HAZE_DENSITY + RAIN_HAZE_DENSITY * weather.rain;
+        }
+    }
 }

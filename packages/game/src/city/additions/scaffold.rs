@@ -5,9 +5,10 @@ use rand::{Rng, RngExt};
 
 use super::{Additions, Wall};
 use crate::city::Kit;
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 
-pub(super) const SCAFFOLD_CHANCE: f64 = 0.15;
+const SCAFFOLD_CHANCE: f64 = 0.15;
 const BAYS: Range<usize> = 2..6;
 const BAY: f32 = 2.0;
 const LIFTS: Range<usize> = 2..7;
@@ -30,6 +31,9 @@ impl Additions {
         wall: &Wall,
         rng: &mut impl Rng,
     ) {
+        if !rng.random_bool(SCAFFOLD_CHANCE) {
+            return;
+        }
         let building = &wall.building;
         let bays = rng.random_range(BAYS).min((building.size.x / BAY) as usize);
         let lifts = rng
@@ -45,9 +49,8 @@ impl Additions {
         let outer = GAP + DEPTH;
         // Poles reach past their ends, so the joints close.
         let bar = |parent: &mut ChildSpawnerCommands, a: Vec3, b: Vec3| {
-            let (a, b) = (wall.at(a), wall.at(b));
-            let past = (b - a).normalize_or_zero() * POLE / 2.0;
-            parent.spawn(kit.bar(a - past, b + past, POLE, self.scaffold.clone()));
+            let pole = Bar::square(wall.at(a), wall.at(b), POLE).extended(POLE / 2.0);
+            parent.spawn(kit.bar(&pole, self.scaffold.clone()));
         };
 
         for bay in 0..=bays {

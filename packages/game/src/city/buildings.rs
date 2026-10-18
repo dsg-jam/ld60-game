@@ -1,155 +1,24 @@
 mod cladding;
+mod facade;
+mod rows;
 
 use std::ops::Range;
 
-use bevy::{
-    asset::{AssetPath, embedded_asset, embedded_path},
-    pbr::{ExtendedMaterial, MaterialExtension},
-    prelude::*,
-    render::render_resource::{AsBindGroup, ShaderType},
-    shader::{ShaderRef, load_shader_library},
-};
+use bevy::{prelude::*, shader::load_shader_library};
 use rand::{Rng, RngExt};
 
-use self::cladding::Cladding;
+pub(super) use self::facade::{Facade, FacadeMaterial, WindowGrid};
+use self::rows::{Plot, ROWS, Row, VIEW_CONE};
 use super::additions::Additions;
 use super::drips::{DripEdge, DripEdges};
 use super::market::{MARKET_HEIGHT, STALL_DEPTH, Stock};
-use super::weather::Weather;
-use super::{FACADES, HALF_LENGTH, Kit, glow, rng};
+use super::{Kit, NEON, Pick, glow, rng};
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::workshop::shop;
 
-/// Plots are at least this wide, so everything on them fits.
-const MIN_PLOT: f32 = 3.0;
 const SEED: u64 = 2;
 
-const ROWS: [Row; 6] = [
-    // Our side of the street.
-    Row {
-        front: shop::FRONT,
-        facing: -1.0,
-        gap: Some(shop::SIZE.x / 2.0),
-        half_length: HALF_LENGTH,
-        width: 6.0..18.0,
-        depth: 12.0..22.0,
-        height: 10.0..65.0,
-        skew: 3,
-        setback: 0.0,
-        alley_chance: 0.2,
-        alleys: 1.2..3.0,
-        market: true,
-        additions: true,
-        low_across: None,
-        tiers: 0.3,
-        crowns: 0.0,
-    },
-    // Across the street.
-    Row {
-        front: FACADES,
-        facing: 1.0,
-        gap: None,
-        half_length: HALF_LENGTH,
-        width: 6.0..18.0,
-        depth: 12.0..22.0,
-        height: 10.0..65.0,
-        skew: 3,
-        setback: 1.5,
-        alley_chance: 0.35,
-        alleys: 1.2..3.0,
-        market: true,
-        additions: true,
-        low_across: Some(LOW_ACROSS),
-        tiers: 0.3,
-        crowns: 0.0,
-    },
-    // The skyline behind: towers of all heights with gaps between them.
-    Row {
-        front: -48.0,
-        facing: 1.0,
-        gap: None,
-        half_length: 160.0,
-        width: 8.0..22.0,
-        depth: 15.0..30.0,
-        height: 20.0..150.0,
-        skew: 3,
-        setback: 10.0,
-        alley_chance: 0.55,
-        alleys: 3.0..12.0,
-        market: false,
-        additions: true,
-        low_across: None,
-        tiers: 0.6,
-        crowns: 0.15,
-    },
-    Row {
-        front: -120.0,
-        facing: 1.0,
-        gap: None,
-        half_length: 320.0,
-        width: 12.0..35.0,
-        depth: 25.0..45.0,
-        height: 50.0..330.0,
-        skew: 3,
-        setback: 25.0,
-        alley_chance: 0.5,
-        alleys: 8.0..30.0,
-        market: false,
-        additions: false,
-        low_across: None,
-        tiers: 0.7,
-        crowns: 0.25,
-    },
-    // Skyscrapers far apart, standing out against the low rows.
-    Row {
-        front: -200.0,
-        facing: 1.0,
-        gap: None,
-        half_length: 300.0,
-        width: 16.0..30.0,
-        depth: 16.0..30.0,
-        height: 180.0..380.0,
-        skew: 1,
-        setback: 20.0,
-        alley_chance: 1.0,
-        alleys: 25.0..80.0,
-        market: false,
-        additions: false,
-        low_across: None,
-        tiers: 0.8,
-        crowns: 0.5,
-    },
-    // Silhouettes far away in the haze.
-    Row {
-        front: -260.0,
-        facing: 1.0,
-        gap: None,
-        half_length: 600.0,
-        width: 25.0..70.0,
-        depth: 40.0..70.0,
-        height: 120.0..500.0,
-        skew: 3,
-        setback: 40.0,
-        alley_chance: 0.5,
-        alleys: 20.0..60.0,
-        market: false,
-        additions: false,
-        low_across: None,
-        tiers: 0.7,
-        crowns: 0.3,
-    },
-];
-/// The buildings across from the shop within this distance of it stay low.
-const LOW_HALF_WIDTH: f32 = 8.0;
-/// Their height: the market floor and one more above it.
-const LOW_ACROSS: Range<f32> = 6.5..7.5;
-/// Straight across from the shop, the rows behind the street stay below the
-/// buildings across, so the sky above them is open. Half the width of that
-/// view and its top, as angles from the player's eyes in radians.
-const VIEW_CONE: f32 = 0.42;
-const VIEW_TOP: f32 = 0.49;
-const EYE_HEIGHT: f32 = 1.5;
 /// Buildings behind the street this tall may get large signs.
 const BACKDROP_HEIGHT: f32 = 20.0;
 /// Height of the wall around the roof, above the top floor.
@@ -159,16 +28,9 @@ const LEDGE_OUT: f32 = 0.12;
 const LEDGE_HEIGHT: f32 = 0.3;
 const SHOP_FLOOR: f32 = 3.4;
 
-const FLOOR_HEIGHT: Range<f32> = 3.0..3.8;
-const WINDOW_PITCH: Range<f32> = 1.8..3.6;
-const LIT: Range<f32> = 0.2..0.5;
-const WINDOW_GLOW: f32 = 6.0;
-const AGE: Range<f32> = 0.4..1.0;
 /// Floors above the shop, as high as this.
 const SHOP_BUILDING_HEIGHT: f32 = 24.0;
 const SHOP_BUILDING_DEPTH: f32 = 14.0;
-/// Matches `COVERS` in `facade.wesl`.
-const COVERS: usize = 4;
 
 const ROOF_BOXES: Range<usize> = 1..5;
 const ANTENNA_CHANCE: f64 = 0.5;
@@ -177,12 +39,7 @@ const BEACON_SIZE: f32 = 0.35;
 const BEACON_PERIOD: f32 = 1.6;
 
 const LEDGE: Color = Color::srgb_u8(0x4e, 0x4a, 0x4c);
-const CROWNS: [Color; 4] = [
-    Color::srgb_u8(0xff, 0x2a, 0x6d),
-    Color::srgb_u8(0x05, 0xd9, 0xe8),
-    Color::srgb_u8(0xb1, 0x4a, 0xed),
-    Color::srgb_u8(0xff, 0xb3, 0x2e),
-];
+const CROWNS: [Color; 4] = [NEON[0], NEON[1], NEON[2], NEON[4]];
 const CROWN_GLOW: f32 = 12.0;
 const CROWN_HEIGHT: f32 = 0.6;
 const ROOF_GEAR: Color = Color::srgb_u8(0x50, 0x52, 0x56);
@@ -192,21 +49,12 @@ pub(super) struct BuildingsPlugin;
 
 impl Plugin for BuildingsPlugin {
     fn build(&self, app: &mut App) {
-        embedded_asset!(app, "facade.wesl");
         load_shader_library!(app, "walls.wesl");
-        app.add_plugins(MaterialPlugin::<FacadeMaterial>::default())
+        app.add_plugins(facade::FacadePlugin)
             .add_systems(Startup, Skyline::spawn)
-            .add_systems(
-                Update,
-                (
-                    Beacon::blink,
-                    Facade::follow_weather.run_if(resource_changed::<Weather>),
-                ),
-            );
+            .add_systems(Update, Beacon::blink);
     }
 }
-
-pub(super) type FacadeMaterial = ExtendedMaterial<StandardMaterial, Facade>;
 
 /// Front faces of the buildings across the road and behind it, for hanging
 /// signs on.
@@ -235,100 +83,6 @@ pub(super) struct Backdrop {
     pub(super) roof: Option<Block>,
     /// Whether the player sees it from the shop, beside the view of the sky.
     pub(super) in_sight: bool,
-}
-
-/// Where a building stands, and the height of its floors.
-struct Plot {
-    block: Block,
-    floor: f32,
-    /// Kept low for the view from the shop, without anything on top.
-    low: bool,
-}
-
-/// One row of buildings, parallel to the street.
-struct Row {
-    /// Z of the front faces.
-    front: f32,
-    /// Direction along Z that the front faces look.
-    facing: f32,
-    /// Half width of a gap around X = 0 for the shop.
-    gap: Option<f32>,
-    half_length: f32,
-    width: Range<f32>,
-    depth: Range<f32>,
-    height: Range<f32>,
-    /// Higher makes tall buildings rarer.
-    skew: i32,
-    /// How far a building may stand back from the row front.
-    setback: f32,
-    alley_chance: f64,
-    alleys: Range<f32>,
-    /// Whether the ground floor is a market.
-    market: bool,
-    /// Whether people built additions onto the front.
-    additions: bool,
-    /// Chances of a narrower tier on top, and of a glowing crown.
-    tiers: f64,
-    crowns: f64,
-    /// Heights of the buildings across from the shop, kept low so the
-    /// skyline shows behind them.
-    low_across: Option<Range<f32>>,
-}
-
-/// Windows drawn onto the walls of a building.
-#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub(super) struct Facade {
-    #[uniform(100)]
-    params: FacadeParams,
-}
-
-/// Matches `Facade` in `facade.wesl`.
-#[derive(ShaderType, Reflect, Debug, Clone)]
-struct FacadeParams {
-    /// Corner of the building with the smallest coordinates.
-    origin: Vec3,
-    seed: f32,
-    size: Vec3,
-    /// Horizontal window pitch and floor height. Each wall fits a whole
-    /// number of windows, so the pitch varies slightly from wall to wall.
-    cell: Vec2,
-    /// Window size as a share of the cell.
-    window: Vec2,
-    /// Share of lit windows.
-    lit: f32,
-    glow: f32,
-    /// Direction along Z that the street side looks, 0 for none.
-    facing: f32,
-    /// Number of floors with windows, from the bottom.
-    floors: f32,
-    archetype: u32,
-    cladding: u32,
-    /// How wet the walls are, from 0 to 1.
-    wetness: f32,
-    /// How weathered the walls are, from 0 to 1.
-    age: f32,
-    /// Areas of the street side without windows, as min and max corners.
-    covers: [Vec4; COVERS],
-}
-
-/// Where the windows of a facade are.
-#[derive(Clone, Copy, Debug)]
-pub(super) struct WindowGrid {
-    /// Horizontal window pitch and floor height.
-    pub(super) cell: Vec2,
-    /// Window size as a share of the cell, centered in it.
-    pub(super) window: Vec2,
-}
-
-/// What a building is used for, which decides how its windows light up.
-///
-/// Matches the constants in `facade.wesl`.
-#[derive(Clone, Copy, Debug)]
-enum Archetype {
-    Office = 0,
-    Home = 1,
-    /// Mostly empty.
-    Dead = 2,
 }
 
 /// The shared blinking material of the red lights on top of antennas.
@@ -364,7 +118,8 @@ impl Skyline {
         ));
         root.with_children(|parent| {
             for row in &ROWS {
-                for Plot { block, floor, low } in row.lay_out(&mut rng) {
+                for plot in row.lay_out(&mut rng) {
+                    let Plot { block, floor, low } = plot;
                     let facade = if row.market {
                         Self::spawn_market_building(
                             parent,
@@ -400,32 +155,18 @@ impl Skyline {
                             &mut rng,
                         );
                     }
-                    // Up to two narrower tiers, stepping in towards the top.
-                    let mut roof = block;
-                    for _ in 0..2 {
-                        let floors = ((roof.size.y - PARAPET) / floor) as usize;
-                        if low || floors < 3 || !rng.random_bool(row.tiers) {
-                            break;
-                        }
-                        let tier_floors = rng.random_range(1..=floors / 2) as f32;
-                        let tier = Block::new(Vec3::new(
-                            roof.size.x * rng.random_range(0.5..0.85),
-                            tier_floors * floor + PARAPET,
-                            roof.size.z * rng.random_range(0.5..0.85),
-                        ))
-                        .on_top_of(&roof)
-                        .translated(
-                            Vec3::Z * row.facing * -rng.random_range(0.0..roof.size.z * 0.1),
-                        );
-                        let facade = Facade::random(&tier, 0.0, floor, &mut rng);
-                        parent.spawn(kit.cuboid(&tier, facades.add(facade)));
-                        parent.spawn(kit.cuboid(&Self::roof_edge(&tier), ledge.clone()));
-                        skyline.volumes.push(tier);
-                        roof = tier;
-                    }
+                    let roof = skyline.spawn_tiers(
+                        parent,
+                        &kit,
+                        &mut facades,
+                        &ledge,
+                        &plot,
+                        row,
+                        &mut rng,
+                    );
                     let crowned = !low && rng.random_bool(row.crowns);
                     if crowned {
-                        let crown = &crowns[rng.random_range(0..crowns.len())];
+                        let crown = crowns.pick(&mut rng);
                         Self::spawn_crown(parent, &kit, &roof, crown);
                     }
                     Self::spawn_roof_gear(parent, &kit, &roof, &gear, &beacon, &mut rng);
@@ -442,7 +183,59 @@ impl Skyline {
                 }
             }
         });
-        // The building the shop is in: floors above it and rooms behind it.
+        skyline.spawn_shop_building(&mut commands, &kit, &mut facades, &mut rng);
+        commands.insert_resource(skyline);
+        commands.insert_resource(DripEdges(drips));
+    }
+
+    /// Up to two narrower tiers on top of `plot`, stepping in towards the
+    /// top. Returns the roof of the highest.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "all of it goes into one building"
+    )]
+    fn spawn_tiers(
+        &mut self,
+        parent: &mut ChildSpawnerCommands,
+        kit: &Kit,
+        facades: &mut Assets<FacadeMaterial>,
+        ledge: &Handle<SurfaceMaterial>,
+        plot: &Plot,
+        row: &Row,
+        rng: &mut impl Rng,
+    ) -> Block {
+        let floor = plot.floor;
+        let mut roof = plot.block;
+        for _ in 0..2 {
+            let floors = ((roof.size.y - PARAPET) / floor) as usize;
+            if plot.low || floors < 3 || !rng.random_bool(row.tiers) {
+                break;
+            }
+            let tier_floors = rng.random_range(1..=floors / 2) as f32;
+            let tier = Block::new(Vec3::new(
+                roof.size.x * rng.random_range(0.5..0.85),
+                tier_floors * floor + PARAPET,
+                roof.size.z * rng.random_range(0.5..0.85),
+            ))
+            .on_top_of(&roof)
+            .translated(Vec3::Z * row.facing * -rng.random_range(0.0..roof.size.z * 0.1));
+            let facade = Facade::random(&tier, 0.0, floor, rng);
+            parent.spawn(kit.cuboid(&tier, facades.add(facade)));
+            parent.spawn(kit.cuboid(&Self::roof_edge(&tier), ledge.clone()));
+            self.volumes.push(tier);
+            roof = tier;
+        }
+        roof
+    }
+
+    /// The building the shop is in: floors above it and rooms behind it.
+    fn spawn_shop_building(
+        &mut self,
+        commands: &mut Commands,
+        kit: &Kit,
+        facades: &mut Assets<FacadeMaterial>,
+        rng: &mut impl Rng,
+    ) {
         let back = shop::FRONT + SHOP_BUILDING_DEPTH;
         let parts = [
             Block::between(
@@ -454,18 +247,16 @@ impl Skyline {
                 Vec3::new(shop::SIZE.x / 2.0, shop::SIZE.y, back),
             ),
         ];
-        skyline.volumes.extend(parts);
+        self.volumes.extend(parts);
         for part in parts {
             commands.spawn((
                 Name::new("shop building"),
                 kit.cuboid(
                     &part,
-                    facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, &mut rng)),
+                    facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, rng)),
                 ),
             ));
         }
-        commands.insert_resource(skyline);
-        commands.insert_resource(DripEdges(drips));
     }
 
     /// A building with a market in its ground floor and windows above.
@@ -589,163 +380,6 @@ impl Skyline {
             parent.spawn(kit.cuboid(&mast, gear.clone()));
             parent.spawn(kit.cuboid(&light, beacon.clone()));
         }
-    }
-}
-
-impl Row {
-    fn lay_out(&self, rng: &mut impl Rng) -> Vec<Plot> {
-        let mut plots = Vec::new();
-        let mut x = -self.half_length;
-        while x < self.half_length {
-            let mut width = rng.random_range(self.width.clone());
-            if let Some(gap) = self.gap
-                && x < gap
-                && x + width > -gap
-            {
-                // The building ends at the gap, the next one starts after.
-                // A sliver left before the gap stays empty.
-                if x < -gap - MIN_PLOT {
-                    width = -gap - x;
-                } else {
-                    x = gap;
-                    continue;
-                }
-            }
-            let depth = rng.random_range(self.depth.clone());
-            let front = self.front - self.facing * rng.random_range(0.0..=self.setback);
-            let mut height = self.height.start
-                + (self.height.end - self.height.start) * rng.random::<f32>().powi(self.skew);
-            if let Some(low) = &self.low_across
-                && x < LOW_HALF_WIDTH
-                && x + width > -LOW_HALF_WIDTH
-            {
-                height = rng.random_range(low.clone());
-            }
-            let distance = shop::FRONT - front;
-            let view = distance * VIEW_CONE.tan();
-            let low = !self.market && x < view && x + width > -view;
-            if low {
-                height = height.min(EYE_HEIGHT + distance * VIEW_TOP.tan());
-            }
-            // Whole floors, and a parapet on top.
-            let floor = rng.random_range(FLOOR_HEIGHT);
-            let base = if self.market { MARKET_HEIGHT } else { 0.0 };
-            let floors = if low {
-                ((height - base - PARAPET) / floor).floor().max(1.0)
-            } else {
-                ((height - base) / floor).round().max(1.0)
-            };
-            let height = base + floors * floor + PARAPET;
-            plots.push(Plot {
-                block: Block::between(
-                    Vec3::new(x, 0.0, front - self.facing * depth),
-                    Vec3::new(x + width, height, front),
-                ),
-                floor,
-                low,
-            });
-            x += width;
-            if rng.random_bool(self.alley_chance) {
-                x += rng.random_range(self.alleys.clone());
-            }
-        }
-        plots
-    }
-}
-
-impl Facade {
-    fn shader() -> ShaderRef {
-        AssetPath::from_path_buf(embedded_path!("facade.wesl"))
-            .with_source("embedded")
-            .into()
-    }
-
-    pub(super) fn grid(&self) -> WindowGrid {
-        WindowGrid {
-            cell: self.params.cell,
-            window: self.params.window,
-        }
-    }
-
-    fn follow_weather(weather: Res<Weather>, mut facades: ResMut<Assets<FacadeMaterial>>) {
-        for (_, facade) in facades.iter_mut() {
-            facade.extension.params.wetness = weather.wetness;
-        }
-    }
-
-    /// Hides the windows behind `area` of the shop side, in world X and Y.
-    pub(super) fn cover(&mut self, area: Rect) {
-        let origin = self.params.origin.xy();
-        let free = self
-            .params
-            .covers
-            .iter_mut()
-            .find(|cover| cover.z <= cover.x);
-        if let Some(cover) = free {
-            *cover = (area.min - origin)
-                .extend(area.max.x - origin.x)
-                .extend(area.max.y - origin.y);
-        }
-    }
-
-    /// Windows for `block` with floors of height `floor`. The block faces
-    /// the street along `facing`.
-    pub(super) fn random(
-        block: &Block,
-        facing: f32,
-        floor: f32,
-        rng: &mut impl Rng,
-    ) -> FacadeMaterial {
-        let cladding = Cladding::random(rng);
-        let wall = cladding.color(rng);
-        let columns = (block.size.x / rng.random_range(WINDOW_PITCH))
-            .round()
-            .max(1.0);
-        ExtendedMaterial {
-            base: StandardMaterial {
-                base_color: wall,
-                perceptual_roughness: 0.85,
-                ..default()
-            },
-            extension: Self {
-                params: FacadeParams {
-                    origin: block.min(),
-                    seed: rng.random_range(0.0..1000.0),
-                    size: block.size,
-                    cell: Vec2::new(block.size.x / columns, floor),
-                    window: Vec2::new(rng.random_range(0.3..0.6), rng.random_range(0.4..0.6)),
-                    lit: rng.random_range(LIT),
-                    glow: WINDOW_GLOW,
-                    facing,
-                    floors: (block.size.y / floor).floor(),
-                    archetype: Archetype::random(rng) as u32,
-                    cladding: cladding as u32,
-                    wetness: 0.0,
-                    age: rng.random_range(AGE),
-                    covers: [Vec4::ZERO; COVERS],
-                },
-            },
-        }
-    }
-}
-
-impl Archetype {
-    fn random(rng: &mut impl Rng) -> Self {
-        match rng.random_range(0.0..1.0) {
-            x if x < 0.35 => Self::Office,
-            x if x < 0.9 => Self::Home,
-            _ => Self::Dead,
-        }
-    }
-}
-
-impl MaterialExtension for Facade {
-    fn fragment_shader() -> ShaderRef {
-        Self::shader()
-    }
-
-    fn deferred_fragment_shader() -> ShaderRef {
-        Self::shader()
     }
 }
 

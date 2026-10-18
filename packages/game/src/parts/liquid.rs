@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
     pbr::{ExtendedMaterial, MaterialExtension},
@@ -7,7 +9,8 @@ use bevy::{
 };
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-const GRAVITY: f32 = 9.81;
+use crate::GRAVITY;
+
 /// Surface tension over density of water, and so of coffee, in m³/s².
 const TENSION: f32 = 7.2e-5;
 /// Share of critical damping. A shaken mug rings for a few seconds.
@@ -205,7 +208,7 @@ impl Liquid {
         // White noise with unit variance per second, whatever the step.
         let spread = 3.0_f32.sqrt() / step.sqrt();
         for (mut liquid, material) in &mut liquids {
-            liquid.turn = (liquid.turn + SWIRL * dt) % std::f32::consts::TAU;
+            liquid.turn = (liquid.turn + SWIRL * dt) % TAU;
             let damping = DAMPING * (1.0 + FOAM_DAMPING * liquid.foam.cover);
             for (index, &(around, _)) in MODES.iter().enumerate() {
                 let omega = liquid.frequency(index);
