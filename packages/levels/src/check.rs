@@ -49,12 +49,35 @@ impl fmt::Display for Report {
     }
 }
 
-/// Runs every test case once per seed. A case passes only if all seeds pass.
+/// Runs the customer's test cases once per seed. A case passes only if all
+/// seeds pass.
 pub fn run(level: &Level, rom: &Rom, seeds: &[u64]) -> Result<Report, LevelError> {
+    run_cases(level, rom, &level.tests, seeds)
+}
+
+/// Like [`run`], but with the end of line tests of the level's device model.
+pub fn run_line_tests(level: &Level, rom: &Rom, seeds: &[u64]) -> Result<Report, LevelError> {
+    let cases: Vec<_> = level
+        .device
+        .line_tests()
+        .iter()
+        .map(|test| TestCase {
+            keys: test.keys.into(),
+            display: test.display.into(),
+        })
+        .collect();
+    run_cases(level, rom, &cases, seeds)
+}
+
+fn run_cases(
+    level: &Level,
+    rom: &Rom,
+    cases: &[TestCase],
+    seeds: &[u64],
+) -> Result<Report, LevelError> {
     let seeds = if seeds.is_empty() { &[0][..] } else { seeds };
     let mut device = device(level, rom.clone())?;
-    let outcomes = level
-        .tests
+    let outcomes = cases
         .iter()
         .map(|case| {
             let mut last = None;

@@ -1,6 +1,25 @@
 use std::collections::HashSet;
 
-use ld60_levels::{CATALOG, Variant};
+use ld60_levels::{CATALOG, TEST_SEEDS, Variant, initial_rom, run_line_tests};
+
+/// Levels whose bug only the customer's tests find.
+const MISSED_BY_LINE_TESTS: &[&str] = &["summa6-05", "summa6-06"];
+
+#[test]
+fn line_tests_catch_the_bug_unless_listed() {
+    let mut failures = Vec::new();
+    for source in CATALOG {
+        let original = Variant::original(source).unwrap();
+        let level = &original.level;
+        let rom = initial_rom(level, &original.buggy).unwrap();
+        let report = run_line_tests(level, &rom, TEST_SEEDS).unwrap();
+        let listed = MISSED_BY_LINE_TESTS.contains(&level.id.as_str());
+        if report.passed() != listed {
+            failures.push(format!("{}: listed {listed}\n{report}", level.id));
+        }
+    }
+    assert!(failures.is_empty(), "\n{}", failures.join("\n"));
+}
 
 #[test]
 fn every_level_is_solvable_and_starts_broken() {

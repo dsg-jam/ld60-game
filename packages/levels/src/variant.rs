@@ -12,6 +12,7 @@ use self::ram_map::RamMap;
 use self::rng::Rng;
 use crate::{
     Level, LevelError, LevelSource, TEST_SEEDS, VerifyError, assemble, burn, initial_rom, run,
+    run_line_tests,
 };
 
 /// The seed the game uses for its jobs.
@@ -118,7 +119,8 @@ impl Variant {
         })
     }
 
-    /// Checks that the buggy firmware fails a test and the fixed one passes all.
+    /// Checks that the buggy firmware fails a test and the fixed one passes all,
+    /// including the end of line tests of the device.
     pub fn verify(&self) -> Result<(), VerifyError> {
         let level = &self.level;
         let initial = initial_rom(level, &self.buggy).map_err(VerifyError::Buggy)?;
@@ -133,6 +135,10 @@ impl Variant {
         let report = run(level, &rom, TEST_SEEDS).map_err(VerifyError::Run)?;
         if !report.passed() {
             return Err(VerifyError::FixedFails(report));
+        }
+        let report = run_line_tests(level, &rom, TEST_SEEDS).map_err(VerifyError::Run)?;
+        if !report.passed() {
+            return Err(VerifyError::FixedFailsLineTests(report));
         }
         Ok(())
     }
