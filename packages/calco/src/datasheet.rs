@@ -150,7 +150,8 @@ pub const NOTES: &[NoteDoc] = &[
         Op::Adc(DIRECT),
         "There is no plain ADD or SUB. Use CLC first, then ADC or SBC.",
     ),
-    note(Op::Dec, "INC and DEC do not change C."),
+    note(Op::Inc, "INC does not change C."),
+    note(Op::Dec, "DEC does not change C."),
     note(Op::Djnz(0), "DJNZ with B = 0 loops 256 times."),
     note(
         Op::Call(0),

@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_4;
 
 use bevy::prelude::*;
 use ld60_calco::datasheet::{INSTRUCTIONS, NOTES, PORTS};
-use ld60_calco::{Cond, Erratum, Op, Revision};
+use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
 use ld60_devices::ChipSpec;
 
 use super::job::Job;
@@ -175,9 +175,19 @@ impl Datasheet {
             "ROM: 256 bytes, 00 to FF. Code cannot read it as data.",
         ));
         page.spawn(Paper::text("RAM: 16 cells, M0 to MF."));
-        page.spawn(Paper::text(
-            "Reset: PC, A, B, Z and C are 0. RAM and stack are undefined.",
-        ));
+        let registers = if revision.supports(Op::LdiB(0)) {
+            "PC, A, B, Z and C are"
+        } else {
+            "PC, A, Z and C are"
+        };
+        let memory = if revision.supports(Op::Call(0)) {
+            "RAM and stack are"
+        } else {
+            "RAM is"
+        };
+        page.spawn(Paper::text(format!(
+            "Reset: {registers} 0. {memory} undefined."
+        )));
         page.spawn(Paper::heading("PORTS"));
         for port in PORTS.iter().filter(|port| revision.supports(port.op())) {
             let direction = if port.output { "OUT" } else { "IN" };
@@ -236,9 +246,14 @@ impl Datasheet {
                 (format!("jumps if {}", cond.description()), 440.0),
             ]));
         }
-        page.spawn(Paper::faded(
-            "After CMP or CPI, JC jumps if A is lower and JZ if A is equal.",
-        ));
+        let compares = if revision.supports(Op::Cmp(Addr::Direct(0))) {
+            "CMP or CPI"
+        } else {
+            "CPI"
+        };
+        page.spawn(Paper::faded(format!(
+            "After {compares}, JC jumps if A is lower and JZ if A is equal."
+        )));
         let notes: Vec<_> = NOTES
             .iter()
             .filter(|note| revision.supports(note.op))
