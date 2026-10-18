@@ -28,6 +28,7 @@ pub(super) enum Page {
     #[default]
     Source,
     Notes,
+    Versions,
 }
 
 /// The page on the screen.
@@ -43,6 +44,7 @@ impl Page {
         match self {
             Self::Source => "FIRMWARE EDITOR",
             Self::Notes => "NOTES",
+            Self::Versions => "FIRMWARE VERSIONS",
         }
     }
 
@@ -51,12 +53,13 @@ impl Page {
         match self {
             Self::Source => None,
             Self::Notes => Some(Command::Notes),
+            Self::Versions => Some(Command::Versions),
         }
     }
 
     /// The command of the active page goes back to the source.
     fn switch_on_run(run: On<Run>, mut active: ResMut<ActivePage>) {
-        let Some(page) = [Self::Notes]
+        let Some(page) = [Self::Notes, Self::Versions]
             .into_iter()
             .find(|page| page.command() == Some(run.0))
         else {

@@ -8,6 +8,7 @@ mod lexer;
 mod notes;
 mod page;
 pub(super) mod undo;
+mod versions;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
@@ -27,6 +28,7 @@ use self::highlight::Highlight;
 use self::notes::Notes;
 use self::page::{Page, PageTitle};
 use self::undo::Undo;
+use self::versions::VersionsPage;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::parts::screen::UiCanvas;
@@ -78,7 +80,7 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
         .add_observer(Editor::scroll_on_wheel);
-        app.add_plugins(page::PagePlugin);
+        app.add_plugins((page::PagePlugin, versions::VersionsPlugin));
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.editor", Editor::debug_state);
         #[cfg(feature = "debug_port")]
@@ -152,6 +154,7 @@ impl Editor {
                     children![Highlight::bundle(font.clone())],
                 ),
                 Notes::bundle(font.clone()),
+                VersionsPage::bundle(font.clone()),
                 (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
                 (
                     Node {
@@ -198,6 +201,15 @@ impl Editor {
 
     pub(super) fn release_focus(mut focus: ResMut<InputFocus>) {
         focus.clear();
+    }
+
+    /// Replaces all of the source, such as when the player restores a
+    /// saved version.
+    fn replace_text(text: &mut EditableText, source: &str) {
+        text.clear();
+        text.viewport.offset.y = 0.0;
+        text.queue_edit(TextEdit::Insert(source.into()));
+        text.queue_edit(TextEdit::TextStart(false));
     }
 
     /// Inserts spaces instead of moving focus.
