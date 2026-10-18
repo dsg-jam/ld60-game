@@ -56,8 +56,8 @@ pub(crate) struct FocusTarget {
 pub(crate) enum View {
     /// Relative to the target.
     Local(Transform),
-    /// Back at the seat, looking straight ahead.
-    Seated,
+    /// A fixed pose in the world.
+    World(Transform),
 }
 
 impl FocusTarget {

@@ -12,13 +12,14 @@ use bevy::{
 };
 
 use super::{
+    camera::PlayerCamera,
     cursor,
     focus::{self, Clickable, Focus},
 };
 
 const SENSITIVITY: f32 = 0.0025;
-const MAX_YAW: f32 = 1.2;
-const MAX_PITCH: f32 = 0.7;
+/// Just short of looking straight up or down, in radians.
+const MAX_PITCH: f32 = 1.5;
 
 pub(super) struct LookPlugin;
 
@@ -54,22 +55,30 @@ impl LookAngles {
     /// Turns the head of `seat`: yaw around the world up axis, pitch around
     /// the camera's own right axis.
     pub(crate) fn apply(&self, seat: Transform) -> Transform {
-        let yaw = Quat::from_rotation_y(self.yaw);
-        let pitch = Quat::from_axis_angle(*seat.right(), self.pitch);
-        seat.with_rotation(yaw * pitch * seat.rotation)
+        let (yaw, pitch, _) = seat.rotation.to_euler(EulerRot::YXZ);
+        seat.with_rotation(Quat::from_euler(
+            EulerRot::YXZ,
+            yaw + self.yaw,
+            pitch + self.pitch,
+            0.0,
+        ))
     }
 
+    /// Turns freely, but never past looking straight up or down.
     fn update(
         motion: Res<AccumulatedMouseMotion>,
         cursor: Single<&CursorOptions, With<PrimaryWindow>>,
+        camera: Single<&PlayerCamera>,
         mut angles: ResMut<LookAngles>,
     ) {
         if cursor.grab_mode != CursorGrabMode::Locked {
             return;
         }
         let delta = motion.delta * SENSITIVITY;
-        angles.yaw = (angles.yaw - delta.x).clamp(-MAX_YAW, MAX_YAW);
-        angles.pitch = (angles.pitch - delta.y).clamp(-MAX_PITCH, MAX_PITCH);
+        let (_, seat_pitch, _) = camera.seat().rotation.to_euler(EulerRot::YXZ);
+        angles.yaw -= delta.x;
+        angles.pitch =
+            (angles.pitch - delta.y).clamp(-MAX_PITCH - seat_pitch, MAX_PITCH - seat_pitch);
     }
 }
 
