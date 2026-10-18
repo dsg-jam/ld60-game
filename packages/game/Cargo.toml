@@ -13,12 +13,14 @@ publish = { workspace = true }
 debug_port = ["bevy/bevy_remote", "dep:serde_json"]
 
 [dependencies]
+fluent-bundle = { workspace = true }
 ld60-calco = { workspace = true }
 ld60-devices = { workspace = true }
 ld60-levels = { workspace = true }
 ld60-machine = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true, features = ["std"], optional = true }
+unic-langid = { workspace = true, features = ["macros"] }
 
 [dependencies.bevy]
 workspace = true

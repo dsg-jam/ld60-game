@@ -37,3 +37,7 @@ like a small speaker. They are in `packages/game/assets/music`.
 
 `packages/game/src/parts/dot_matrix/font.rs` holds the glyphs of the public
 domain 5x7 font from X11's misc-fixed fonts.
+
+`packages/game/assets/fonts/kenney-input-keyboard-mouse.ttf` is the keyboard and
+mouse font from [Input Prompts](https://kenney.nl/assets/input-prompts) by
+Kenney, under CC0.

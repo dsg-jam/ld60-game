@@ -120,6 +120,7 @@ impl JobTicket {
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, pages),
             FocusTarget {
+                prompt: "click-ticket",
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(sheet_center)),
             },

@@ -92,6 +92,7 @@ impl Holdable {
             holdable.rest = *transform;
         }
         commands.entity(add.entity).insert(FocusTarget {
+            prompt: "click-device",
             focus: Focus::Device,
             // `Holdable::frame` keeps it in front of the seat.
             view: View::World(Transform::IDENTITY),

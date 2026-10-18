@@ -117,6 +117,7 @@ impl Radio {
         commands
             .entity(add.entity)
             .insert(FocusTarget {
+                prompt: "click-radio",
                 focus: Focus::Radio,
                 view: View::Local(
                     Transform::from_translation(VIEW).looking_at(Vec3::Y * CASE.y / 2.0, Vec3::Y),

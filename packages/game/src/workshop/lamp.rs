@@ -65,7 +65,7 @@ impl Plugin for LampPlugin {
 
 /// A desk lamp with its arm reaching towards +X. A click switches it.
 #[derive(Component, Debug)]
-#[require(Transform, Visibility, Clickable)]
+#[require(Transform, Visibility)]
 pub(crate) struct Lamp {
     on: bool,
 }
@@ -81,8 +81,19 @@ impl Default for Lamp {
 struct LampLight;
 
 impl Lamp {
+    const fn clickable(&self) -> Clickable {
+        Clickable {
+            prompt: if self.on {
+                "click-lamp-off"
+            } else {
+                "click-lamp-on"
+            },
+        }
+    }
+
     fn on_add(
         add: On<Add<Lamp>>,
+        lamps: Query<&Lamp>,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
@@ -95,10 +106,19 @@ impl Lamp {
         let top = Vec3::new(arm.max().x - SHADE_BOTTOM, arm.min().y, 0.0);
         let socket = Block::new(SOCKET).standing_at(top - Vec3::Y * SOCKET.y);
         let bulb = top - Vec3::Y * BULB_DROP;
+        let Ok(lamp) = lamps.get(add.entity) else {
+            return;
+        };
+        let (on, clickable) = (lamp.on, lamp.clickable());
+        let light = if on {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
 
         commands
             .entity(add.entity)
-            .insert(DUST)
+            .insert((DUST, clickable))
             .with_children(|lamp| {
                 lamp.spawn(Shape::cylinder(&base, SHADE));
                 lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));
@@ -123,12 +143,13 @@ impl Lamp {
                         radius: BULB_RADIUS,
                         color: LIGHT_COLOR,
                         glow: GLASS_GLOW,
-                        on: true,
+                        on,
                     },
                     Transform::from_translation(bulb),
                 ));
                 lamp.spawn((
                     LampLight,
+                    light,
                     PointLight {
                         color: SHADE.mix(&LIGHT_COLOR, 0.5),
                         intensity: FILL_INTENSITY,
@@ -142,6 +163,7 @@ impl Lamp {
                 let cone = (SHADE_BOTTOM / rim).atan();
                 lamp.spawn((
                     LampLight,
+                    light,
                     SpotLight {
                         color: LIGHT_COLOR,
                         intensity: LIGHT_INTENSITY,
@@ -205,7 +227,7 @@ impl Lamp {
     fn toggle_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        mut lamps: Query<(&mut Lamp, &Children)>,
+        mut lamps: Query<(&mut Lamp, &mut Clickable, &Children)>,
         mut lights: Query<&mut Visibility, With<LampLight>>,
         mut bulbs: Query<&mut Bulb>,
         mut commands: Commands,
@@ -213,11 +235,12 @@ impl Lamp {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let Ok((mut lamp, children)) = lamps.get_mut(press.entity) else {
+        let Ok((mut lamp, mut clickable, children)) = lamps.get_mut(press.entity) else {
             return;
         };
         press.propagate(false);
         lamp.on = !lamp.on;
+        *clickable = lamp.clickable();
         for &child in children {
             if let Ok(mut visibility) = lights.get_mut(child) {
                 visibility.toggle_inherited_hidden();

@@ -20,6 +20,7 @@ impl Plugin for FocusPlugin {
             .init_resource::<Focused>()
             .add_systems(Update, Focused::leave_on_input)
             .add_observer(FocusOn::apply)
+            .add_observer(FocusTarget::make_clickable)
             .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.focus", Focused::debug_focus);
@@ -39,14 +40,19 @@ pub(crate) enum Focus {
 
 /// Something the player can click from the desk view.
 ///
-/// Hovering it shows the shimmer and the large dot.
-#[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct Clickable;
+/// Hovering it shows the shimmer and what a click does.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Clickable {
+    /// The message that says what a click does.
+    pub(crate) prompt: &'static str,
+}
 
-/// Makes an entity focusable from the seated view.
+/// Makes an entity focusable from the seated view, and [`Clickable`] with
+/// `prompt`.
 #[derive(Component, Clone, Copy, Debug)]
-#[require(Clickable)]
 pub(crate) struct FocusTarget {
+    /// The message that says what a click does.
+    pub(crate) prompt: &'static str,
     pub(crate) focus: Focus,
     pub(crate) view: View,
 }
@@ -61,6 +67,18 @@ pub(crate) enum View {
 }
 
 impl FocusTarget {
+    fn make_clickable(
+        add: On<Add<FocusTarget>>,
+        targets: Query<&FocusTarget>,
+        mut commands: Commands,
+    ) {
+        if let Ok(target) = targets.get(add.entity) {
+            commands.entity(add.entity).insert(Clickable {
+                prompt: target.prompt,
+            });
+        }
+    }
+
     fn focus_on_press(
         mut press: On<PointerPress>,
         targets: Query<(), With<FocusTarget>>,

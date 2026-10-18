@@ -12,6 +12,7 @@ mod city;
 mod debug_port;
 mod device;
 mod geometry;
+mod locale;
 mod menu;
 mod parts;
 mod player;
@@ -49,6 +50,7 @@ fn main() -> AppExit {
         audio::AudioPlugin,
         city::CityPlugin,
         geometry::GeometryPlugin,
+        locale::LocalePlugin,
         menu::MenuPlugin,
         parts::PartsPlugin,
         player::PlayerPlugin,

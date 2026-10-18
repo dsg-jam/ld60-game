@@ -92,6 +92,7 @@ impl Computer {
             .entity(add.entity)
             .insert(dust)
             .insert(FocusTarget {
+                prompt: "click-computer",
                 focus: Focus::Computer,
                 view: View::Local(layout.screen_view()),
             })
