@@ -70,7 +70,7 @@ fn check(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Resul
 }
 
 fn generate(out: &mut impl Write, check: bool) -> ld60_cli::Result<bool> {
-    let data_dir = std::path::Path::new(ld60_levels::DATA_DIR);
+    let data_dir = std::path::Path::new(ld60_cli::LEVELS);
     ld60_cli::generate::run(out, data_dir, check)
 }
 

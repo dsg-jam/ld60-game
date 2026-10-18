@@ -1,9 +1,11 @@
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use ld60_levels::{Catalog, TEST_SEEDS, Variant, initial_rom, run_line_tests};
 
-static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
+const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
 
 /// Levels whose bug only the customer's tests find.
 const MISSED_BY_LINE_TESTS: &[&str] = &["summa6-05", "summa6-06"];

@@ -76,7 +76,7 @@ mod tests {
     use crate::variant::firmware::Firmware;
 
     fn moved_to_b(firmware: &str) -> (Variant, Variant) {
-        let catalog = Catalog::on_disk().unwrap();
+        let catalog = Catalog::in_repository();
         let source = catalog
             .levels()
             .iter()

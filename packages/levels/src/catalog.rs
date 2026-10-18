@@ -3,16 +3,6 @@ use std::{fmt, fs, io};
 
 use crate::{Level, LevelError};
 
-/// The level data on disk. Only valid on the machine that built the crate.
-pub const DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../game/assets/levels");
-
-/// The English text of the levels. Only valid on the machine that built the
-/// crate.
-pub const ENGLISH_TEXT: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../game/assets/locales/en/levels.ftl"
-);
-
 /// All levels in the order they are played.
 #[derive(Clone, Debug)]
 pub struct Catalog {
@@ -57,11 +47,6 @@ impl Catalog {
         Ok(Self { levels })
     }
 
-    /// Reads the catalog from [`DATA_DIR`].
-    pub fn on_disk() -> Result<Self, CatalogError> {
-        Self::read(Path::new(DATA_DIR))
-    }
-
     pub fn levels(&self) -> &[LevelSource] {
         &self.levels
     }
@@ -74,6 +59,14 @@ impl Catalog {
     /// Where the level in the folder `path` is in the play order.
     pub fn position(&self, path: &str) -> Option<usize> {
         self.levels.iter().position(|source| source.path == path)
+    }
+}
+
+#[cfg(test)]
+impl Catalog {
+    /// The levels in the repository.
+    pub(crate) fn in_repository() -> Self {
+        Self::read(&Path::new(env!("LD60_ASSETS")).join("levels")).unwrap()
     }
 }
 

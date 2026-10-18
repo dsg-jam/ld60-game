@@ -1,7 +1,6 @@
 # Levels
 
-Levels live in `packages/game/assets/levels`. Each level is a folder with three
-files:
+Levels live in `assets/levels`. Each level is a folder with three files:
 
 - `level.ron`: the job, its tests and its firmware source.
 - `buggy.asm`: the firmware the device comes in with.
@@ -15,8 +14,8 @@ files:
 2. Run `cli gen` to write `buggy.asm` and `fixed.asm`.
 3. Add the folder to `catalog.ron`. The game plays the levels in the order of
    this list.
-4. Add a message named after the level `id` to
-   `packages/game/assets/locales/en/levels.ftl`. It needs these attributes:
+4. Add a message named after the level `id` to `assets/locales/en/levels.ftl`.
+   It needs these attributes:
    - `customer`: who brings the device in.
    - `complaint`: what the customer says is wrong.
    - `remark-<key>`: one for each key in `remarks` of `level.ron`.

@@ -1,12 +1,14 @@
+use std::path::Path;
 use std::sync::LazyLock;
 
 use ld60_dsl::{Flavor, Selection, Target, compile, compile_pair};
-use ld60_levels::{Catalog, DATA_DIR, Variant};
+use ld60_levels::{Catalog, Variant};
 
-static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::on_disk().unwrap());
+const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
 
 fn read(path: &str) -> String {
-    std::fs::read_to_string(format!("{DATA_DIR}/{path}")).unwrap()
+    std::fs::read_to_string(format!("{LEVELS}/{path}")).unwrap()
 }
 
 #[test]

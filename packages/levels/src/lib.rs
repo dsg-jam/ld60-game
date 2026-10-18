@@ -6,7 +6,7 @@ mod level;
 mod variant;
 
 pub use bench::{assemble, burn, device, initial_rom};
-pub use catalog::{Catalog, CatalogError, DATA_DIR, ENGLISH_TEXT, LevelSource};
+pub use catalog::{Catalog, CatalogError, LevelSource};
 pub use check::{Outcome, Report, TEST_SEEDS, run, run_line_tests};
 pub use error::{LevelError, VerifyError};
 pub use level::{FirmwareSource, Level, RomSpec, TestCase};

@@ -1,0 +1,4 @@
+[env]
+# Bevy looks for `assets` here when the game runs through cargo.
+BEVY_ASSET_ROOT = { value = ".", relative = true }
+LD60_ASSETS = { value = "assets", relative = true }

@@ -25,7 +25,7 @@ The shaders and sounds adapt techniques from these papers and articles.
 ## Music
 
 The radio plays these tracks, converted to mono Ogg Vorbis and filtered to sound
-like a small speaker. They are in `packages/game/assets/music`.
+like a small speaker. They are in `assets/music`.
 
 | Files                   | Track                                 | Source                                                                     | License   |
 | ----------------------- | ------------------------------------- | -------------------------------------------------------------------------- | --------- |
@@ -38,6 +38,6 @@ like a small speaker. They are in `packages/game/assets/music`.
 `packages/game/src/parts/dot_matrix/font.rs` holds the glyphs of the public
 domain 5x7 font from X11's misc-fixed fonts.
 
-`packages/game/assets/fonts/kenney-input-keyboard-mouse.ttf` is the keyboard and
-mouse font from [Input Prompts](https://kenney.nl/assets/input-prompts) by
-Kenney, under CC0.
+`assets/fonts/kenney-input-keyboard-mouse.ttf` is the keyboard and mouse font
+from [Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney, under
+CC0.

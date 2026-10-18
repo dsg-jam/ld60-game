@@ -8,7 +8,7 @@ use super::{FILES, LANGUAGE, Locale, Localized, Message};
 impl Locale {
     /// The messages of the default language, read straight from the files.
     pub(crate) fn on_disk() -> Self {
-        let dir = format!("{}/assets/locales/{LANGUAGE}", env!("CARGO_MANIFEST_DIR"));
+        let dir = format!("{}/locales/{LANGUAGE}", env!("LD60_ASSETS"));
         let files = FILES.iter().map(|file| {
             let source = std::fs::read_to_string(format!("{dir}/{file}")).unwrap();
             Arc::new(FluentResource::try_new(source).unwrap())
