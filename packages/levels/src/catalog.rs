@@ -11,6 +11,9 @@ macro_rules! level {
     };
 }
 
+/// The level data on disk. Only valid on the machine that built the crate.
+pub const DATA_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/data");
+
 pub const CATALOG: &[LevelSource] = &[
     level!("tally2/01-clear-key"),
     level!("tally2/02-double-count"),
