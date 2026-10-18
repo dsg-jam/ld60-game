@@ -1,3 +1,5 @@
+mod clouds;
+
 use std::error::Error;
 
 use bevy::{
@@ -29,6 +31,9 @@ const PLANET_LIGHT: f32 = 0.3;
 const ZENITH: f32 = 0.25;
 /// The wind blows this many times stronger at the height of the clouds.
 const ALOFT: f32 = 5.0;
+/// The cloud noise repeats every this many meters. Matches `SHAPE_SIZE` in
+/// `sky.wesl`.
+const CLOUD_TILE: f32 = 2400.0;
 
 pub(super) struct SkyPlugin;
 
@@ -41,6 +46,7 @@ impl Plugin for SkyPlugin {
                 Update,
                 (
                     SkyMaterial::follow_camera,
+                    SkyMaterial::drift,
                     SkyMaterial::follow_weather.run_if(resource_changed::<Weather>),
                 ),
             );
@@ -52,6 +58,9 @@ impl Plugin for SkyPlugin {
 struct SkyMaterial {
     #[uniform(0)]
     params: SkyParams,
+    #[texture(1, dimension = "3d")]
+    #[sampler(2)]
+    clouds: Handle<Image>,
 }
 
 /// Matches `Sky` in `sky.wesl`.
@@ -65,8 +74,8 @@ struct SkyParams {
     planet_light: f32,
     sun: Vec3,
     rain: f32,
-    /// Wind at the height of the clouds, in meters per second.
-    wind: Vec2,
+    /// How far the wind has blown the clouds, in meters.
+    drift: Vec2,
 }
 
 /// The dome the sky is drawn on, centered on the camera.
@@ -84,6 +93,7 @@ impl SkyMaterial {
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<SkyMaterial>>,
+        mut images: ResMut<Assets<Image>>,
     ) {
         // Seen from inside.
         let mesh = match Sphere::new(RADIUS)
@@ -111,8 +121,9 @@ impl SkyMaterial {
                     planet_light: PLANET_LIGHT,
                     sun: SUN.normalize(),
                     rain: 0.0,
-                    wind: WIND * ALOFT,
+                    drift: Vec2::ZERO,
                 },
+                clouds: images.add(clouds::noise()),
             })),
             NoFrustumCulling,
             NotShadowCaster,
@@ -124,6 +135,15 @@ impl SkyMaterial {
         mut dome: Single<&mut Transform, With<Dome>>,
     ) {
         dome.translation = camera.translation();
+    }
+
+    /// Blows the clouds along with the wind. Wraps where the noise repeats,
+    /// so the drift stays small.
+    fn drift(time: Res<Time>, mut materials: ResMut<Assets<SkyMaterial>>) {
+        for (_, material) in materials.iter_mut() {
+            let drift = material.params.drift + WIND * ALOFT * time.delta_secs();
+            material.params.drift = drift.rem_euclid(Vec2::splat(CLOUD_TILE));
+        }
     }
 
     fn follow_weather(weather: Res<Weather>, mut materials: ResMut<Assets<SkyMaterial>>) {

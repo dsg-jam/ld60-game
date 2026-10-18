@@ -17,19 +17,34 @@ struct Sky {
     /// Towards the sun, which is below the horizon.
     sun: vec3<f32>,
     rain: f32,
-    /// Wind at the height of the clouds, in meters per second.
-    wind: vec2<f32>,
+    /// How far the wind has blown the clouds, in meters.
+    drift: vec2<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> sky: Sky;
+/// Red: billowy cloud shapes. Green: finer noise that wears their edges.
+@group(constants::MATERIAL_BIND_GROUP) @binding(1) var cloud_noise: texture_3d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(2) var cloud_sampler: sampler;
 
 /// Light pollution from the streets, warm and low.
 const CITY_GLOW: vec3<f32> = vec3<f32>(0.06, 0.025, 0.02);
-const CLOUD_GLOW: vec3<f32> = vec3<f32>(0.12, 0.075, 0.07);
-/// Height of the cloud layer, in meters.
-const CLOUD_HEIGHT: f32 = 500.0;
-/// Size of a cloud, in meters.
-const CLOUD_SIZE: f32 = 200.0;
+/// The city lights the clouds from below.
+const CITY_LIGHT: vec3<f32> = vec3<f32>(0.13, 0.08, 0.07);
+/// The planet lights them faintly from above.
+const PLANET_GLOW: vec3<f32> = vec3<f32>(0.03, 0.035, 0.05);
+/// Bottom and top of the cloud layer, in meters.
+const CLOUD_BASE: f32 = 450.0;
+const CLOUD_TOP: f32 = 1100.0;
+/// The noise repeats every this many meters for the shapes, and the
+/// detail. Matches `CLOUD_TILE` in `sky.rs`.
+const SHAPE_SIZE: f32 = 2400.0;
+const DETAIL_SIZE: f32 = 400.0;
+/// Light the clouds take out of a ray, per meter at full density.
+const EXTINCTION: f32 = 0.02;
+/// Samples along a ray through the layer.
+const CLOUD_STEPS: u32 = 32u;
+/// Clouds further away than this fade into the haze.
+const CLOUD_REACH: f32 = 15000.0;
 const BAND_LIGHT: vec3<f32> = vec3<f32>(0.62, 0.5, 0.36);
 const BAND_DARK: vec3<f32> = vec3<f32>(0.26, 0.38, 0.42);
 const RING: vec3<f32> = vec3<f32>(0.55, 0.48, 0.4);
@@ -102,6 +117,88 @@ fn planet(d: vec3<f32>, background: vec3<f32>) -> vec3<f32> {
     return color;
 }
 
+fn remap(v: f32, from_min: f32, from_max: f32, to_min: f32, to_max: f32) -> f32 {
+    return to_min + (v - from_min) / (from_max - from_min) * (to_max - to_min);
+}
+
+/// How thick the clouds are at `p`, after Schneider, "The Real-time
+/// Volumetric Cloudscapes of Horizon Zero Dawn".
+fn cloud_density(p: vec3<f32>) -> f32 {
+    let height = (p.y - CLOUD_BASE) / (CLOUD_TOP - CLOUD_BASE);
+    if height < 0.0 || height > 1.0 {
+        return 0.0;
+    }
+    let moved = p - vec3<f32>(sky.drift.x, 0.0, sky.drift.y);
+    let shape = textureSampleLevel(cloud_noise, cloud_sampler, moved / SHAPE_SIZE, 0.0).r;
+    // Flat, rounded bottoms and tops that thin out.
+    let profile = smoothstep(0.0, 0.12, height) * smoothstep(1.0, 0.35, height);
+    // Scattered clouds in clear weather, closing up in the rain.
+    let coverage = mix(0.3, 0.55, sky.rain);
+    let base = remap(shape * profile, 1.0 - coverage, 1.0, 0.0, 1.0);
+    if base <= 0.0 {
+        return 0.0;
+    }
+    // Wisps at the edges, more so towards the top.
+    let detail = textureSampleLevel(cloud_noise, cloud_sampler, moved / DETAIL_SIZE, 0.0).g;
+    return max(remap(base, detail * mix(0.25, 0.45, height), 1.0, 0.0, 1.0), 0.0);
+}
+
+/// How much light reaches `p` from `toward`, through the cloud in between.
+/// Light that scattered several times inside reaches deeper, which a second,
+/// weaker and less absorbed term stands in for, after Wrenninge et al.,
+/// "Oz: The Great and Volumetric".
+fn cloud_light(p: vec3<f32>, toward: vec3<f32>) -> f32 {
+    var depth = 0.0;
+    for (var i = 1.0; i <= 3.0; i += 1.0) {
+        depth += cloud_density(p + toward * 60.0 * i * i) * 60.0 * (2.0 * i - 1.0);
+    }
+    let optical = depth * EXTINCTION;
+    return exp(-optical) + 0.5 * exp(-optical * 0.25);
+}
+
+/// The clouds along the ray from `origin` towards `d`: the light they send
+/// back in rgb, and the share of what lies behind them that shows through
+/// in alpha.
+fn clouds(origin: vec3<f32>, d: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
+    if d.y < 0.01 {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    let start = (CLOUD_BASE - origin.y) / d.y;
+    let end = min((CLOUD_TOP - origin.y) / d.y, CLOUD_REACH);
+    if start >= end {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    let step = (end - start) / f32(CLOUD_STEPS);
+    // Starts each pixel at a different point, so the steps don't show as
+    // bands.
+    let jitter = fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
+    // Light scattered forward towards the planet glows a little brighter.
+    let towards_planet = dot(d, sky.planet);
+    let phase = 0.6 + 0.4 * towards_planet * towards_planet;
+    let fade = 1.0 - smoothstep(CLOUD_REACH * 0.4, CLOUD_REACH, start);
+    var light = vec3<f32>(0.0);
+    var through = 1.0;
+    for (var i = 0u; i < CLOUD_STEPS; i++) {
+        let t = start + (f32(i) + jitter) * step;
+        let p = origin + d * t;
+        let density = cloud_density(p) * fade;
+        if density <= 0.0 {
+            continue;
+        }
+        let absorbed = 1.0 - exp(-density * EXTINCTION * step);
+        // Dark edges where little light has scattered inside yet.
+        let powder = 1.0 - exp(-density * 4.0);
+        let below = CITY_LIGHT * cloud_light(p, vec3<f32>(0.0, -1.0, 0.0));
+        let above = PLANET_GLOW * cloud_light(p, sky.planet) * phase;
+        light += through * absorbed * (below + above + sky.horizon) * mix(0.5, 1.0, powder);
+        through *= 1.0 - absorbed;
+        if through < 0.02 {
+            break;
+        }
+    }
+    return vec4<f32>(light, through);
+}
+
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let d = normalize(in.world_position.xyz - view.world_position);
@@ -113,15 +210,8 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let without_planet = color;
     color = mix(planet(d, color), without_planet, 0.3 + 0.4 * sky.rain);
 
-    // Low clouds, lit from below by the city.
-    // Projected onto a flat layer overhead, so they shrink towards the
-    // horizon.
-    let p = (d.xz / (up + 0.08) * CLOUD_HEIGHT + sky.wind * globals.time) / CLOUD_SIZE;
-    // Scattered clouds in clear weather, closing up in the rain.
-    let edge = mix(0.58, 0.44, sky.rain);
-    let cloud = smoothstep(edge, edge + 0.12, fbm(p, 80.0));
-    let lit = CLOUD_GLOW * (0.6 + 0.6 * exp(-up * 4.0)) * mix(0.5, 1.3, fbm(p * 3.0, 90.0));
-    color = mix(color, lit, cloud * 0.92);
+    let clouds = clouds(view.world_position, d, in.position.xy);
+    color = color * clouds.a + clouds.rgb;
 
     // Meets the fog of the distant buildings at the horizon.
     color = mix(sky.horizon, color, smoothstep(0.0, 0.12, d.y));
