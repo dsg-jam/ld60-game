@@ -11,11 +11,11 @@ use bevy::{
         pointer::{Location, PointerAction, PointerButton, PointerId, PointerInput},
     },
     prelude::*,
-    render::render_resource::TextureFormat,
+    render::render_resource::{TextureFormat, TextureUsages},
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
-pub(crate) use self::crt::{CrtGlass, CrtMaterial};
+pub(crate) use self::crt::{CrtGlass, CrtLight, CrtMaterial};
 
 pub(crate) struct ScreenPlugin;
 
@@ -57,8 +57,10 @@ impl UiCanvas {
         owner: Entity,
     ) -> Self {
         let mut image =
-            Image::new_target_texture(size.x, size.y, TextureFormat::Bgra8UnormSrgb, None);
+            Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
         image.sampler = ImageSampler::nearest();
+        // So lights can follow what it shows.
+        image.texture_descriptor.usage |= TextureUsages::COPY_SRC;
         let image = images.add(image);
         let camera = commands
             .spawn((

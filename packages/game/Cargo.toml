@@ -22,7 +22,15 @@ serde_json = { workspace = true, features = ["std"], optional = true }
 
 [dependencies.bevy]
 workspace = true
-features = ["3d", "audio", "custom_cursor", "system_clipboard", "ui", "wav"]
+features = [
+  "3d",
+  "area_light_luts",
+  "audio",
+  "custom_cursor",
+  "system_clipboard",
+  "ui",
+  "wav",
+]
 
 [lints]
 workspace = true

@@ -9,17 +9,11 @@ use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
-use crate::parts::screen::{CrtGlass, CrtMaterial, ScreenSurface, UiCanvas};
+use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusTarget, View};
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);
-/// Faint phosphor light the screen casts on the desk.
-const GLOW_COLOR: Color = Color::srgb(0.55, 1.0, 0.7);
-const GLOW_INTENSITY: f32 = 200.0;
-const GLOW_RANGE: f32 = 1.5;
-/// In front of the glass.
-const GLOW_OFFSET: Vec3 = Vec3::new(0.0, 0.0, 0.12);
 
 /// Space between the front of the monitor and the back of the keyboard.
 const KEYBOARD_GAP: f32 = 0.06;
@@ -93,15 +87,9 @@ impl Computer {
                         ScreenSurface::new(&canvas),
                         Mesh3d(meshes.add(glass.build())),
                         MeshMaterial3d(crt_materials.add(CrtMaterial::new(&canvas))),
-                        children![(
-                            PointLight {
-                                color: GLOW_COLOR,
-                                intensity: GLOW_INTENSITY,
-                                range: GLOW_RANGE,
-                                ..default()
-                            },
-                            Transform::from_translation(GLOW_OFFSET),
-                        )],
+                        CrtLight {
+                            size: monitor::GLASS_SIZE,
+                        },
                     ),
                 );
                 layout.keyboard.spawn(

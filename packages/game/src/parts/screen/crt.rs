@@ -1,3 +1,5 @@
+mod light;
+
 use bevy::{
     asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
     mesh::{Indices, MeshBuilder, PrimitiveTopology},
@@ -6,6 +8,7 @@ use bevy::{
     shader::ShaderRef,
 };
 
+pub(crate) use self::light::CrtLight;
 use super::UiCanvas;
 
 const CORNER_RADIUS: f32 = 0.06;
@@ -14,13 +17,18 @@ const BRIGHTNESS: f32 = 1.1;
 const SCANLINE_PITCH: f32 = 4.0;
 /// How dark the gaps between scanlines get, from 0 to 1.
 const SCANLINE_DARKNESS: f32 = 0.55;
+/// The phosphor glows faintly even where the picture is black.
+const BLACK_LEVEL: Vec3 = Vec3::new(0.02, 0.045, 0.03);
 
 pub(super) struct CrtPlugin;
 
 impl Plugin for CrtPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "crt.wesl");
-        app.add_plugins(MaterialPlugin::<CrtMaterial>::default());
+        app.add_plugins((
+            MaterialPlugin::<CrtMaterial>::default(),
+            light::CrtLightPlugin,
+        ));
     }
 }
 
@@ -42,6 +50,7 @@ struct CrtParams {
     scanlines: f32,
     brightness: f32,
     scanline_darkness: f32,
+    black_level: Vec3,
 }
 
 impl CrtMaterial {
@@ -53,6 +62,7 @@ impl CrtMaterial {
                 scanlines: canvas.size.y as f32 / SCANLINE_PITCH,
                 brightness: BRIGHTNESS,
                 scanline_darkness: SCANLINE_DARKNESS,
+                black_level: BLACK_LEVEL,
             },
         }
     }
