@@ -63,6 +63,9 @@ reached by falling through, except after the entry block.
 | `match a { 'C' => goto x }` | `CPI` and `JZ` per arm. `0 to 9` gives `CPI 10` and `JC`. |
 | `asm { }` | Raw assembly lines |
 
+Loops run at least once, so `i` must start at 1 or more. A loop counts `i`
+down and stops after the pass with `i = 1`.
+
 Conditions are `a == v`, `a != v`, `a < v`, `a >= v`, `carry`, `!carry`,
 `zero` and `!zero`. Key literals like `'+'` print in hex. Numbers keep the way
 you wrote them. A `;` comment after a statement goes on its first instruction.
@@ -93,8 +96,8 @@ All switches with the same name flip together. An unknown name is an error.
 
 The level's chip picks what the compiler may use. If the chip has no `CALL`, a
 routine is copied into each call site. If it has no `DJNZ` or no `[B+n]`, a
-loop with a known count is unrolled. Anything else is an error that names the
-revision.
+loop with a known count of 1 to 16 is unrolled. Anything else is an error that
+names the revision.
 
 The compiler also checks that loops do not nest, that a call in a loop keeps
 `i`, and that calls fit the stack. These are errors for `fixed.asm` and

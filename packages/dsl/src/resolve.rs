@@ -7,6 +7,8 @@ use crate::labels::{LabelId, LabelName, Labels};
 use crate::literal::Literal;
 use crate::{Diagnostic, Target};
 
+const ZERO_LOOP: &str = "loops run at least once, so i must start at 1 or more";
+
 const RESERVED: &[&str] = &["a", "i", "carry", "zero", "bcd_add", "bcd_sub"];
 
 type Result<T> = std::result::Result<T, Diagnostic>;
@@ -358,6 +360,9 @@ impl Resolver<'_> {
                     return Err(Diagnostic::error(end.pos, "loops count down to 1"));
                 }
                 let start = self.literal(start)?;
+                if start.value == 0 {
+                    return Err(Diagnostic::error(start_pos(stmt), ZERO_LOOP));
+                }
                 vec![
                     Stmt::Prim(Prim::SetIndex(start)),
                     Stmt::Repeat {
@@ -460,11 +465,30 @@ impl Resolver<'_> {
 
     fn stmts(&mut self, stmts: &[ast::Stmt], kind: BlockKind) -> Vec<Node> {
         let mut nodes = Vec::new();
+        let mut index = None;
         for stmt in stmts {
-            match self.stmt(stmt, kind) {
-                Ok(more) => nodes.extend(more),
-                Err(error) => self.errors.push(error),
+            if matches!(stmt.kind, StmtKind::Repeat { .. }) && index == Some(0) {
+                self.errors.push(Diagnostic::error(stmt.pos, ZERO_LOOP));
             }
+            let more = match self.stmt(stmt, kind) {
+                Ok(more) => more,
+                Err(error) => {
+                    self.errors.push(error);
+                    Vec::new()
+                }
+            };
+            index = match (&stmt.kind, more.last()) {
+                (
+                    StmtKind::Assign { .. },
+                    Some(Node {
+                        stmt: Stmt::Prim(Prim::SetIndex(literal)),
+                        ..
+                    }),
+                ) => Some(literal.value),
+                (StmtKind::Assign { .. } | StmtKind::Comment(_), _) => index,
+                _ => None,
+            };
+            nodes.extend(more);
         }
         nodes
     }
@@ -493,6 +517,14 @@ impl Resolver<'_> {
                 "expected a number, a cell or a port",
             )),
         }
+    }
+}
+
+/// Where the start value of a `for` loop is, for errors about it.
+fn start_pos(stmt: &ast::Stmt) -> Pos {
+    match &stmt.kind {
+        StmtKind::For { start, .. } => start.pos,
+        _ => stmt.pos,
     }
 }
 
