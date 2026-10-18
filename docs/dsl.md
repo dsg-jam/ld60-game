@@ -15,6 +15,11 @@ Run `cli gen` after you change a source. It rewrites `buggy.asm` and
 `fixed.asm` of every level with a `firmware` field. `cli gen --check` and the
 levels tests fail if a file is out of date.
 
+The output is for the level's chip and board. The board is `board` in
+`level.ron`, or board A if the field is missing. The game can move a level to
+another board later. See the board revisions in the device docs, for example
+[Tally 2](devices/tally2.md).
+
 ## Declarations
 
 ```
@@ -170,7 +175,7 @@ routine tens {
 }
 ```
 
-The fixed output for a Rev B chip starts like this:
+The fixed output for a Rev B chip on board 2A starts like this:
 
 ```
 ; Tally-2 firmware 1.0
