@@ -257,6 +257,44 @@ block next {
 }
 
 #[test]
+fn loops_cannot_start_at_zero() {
+    let for_loop = "\
+entry main {
+    a = 0
+    for i = 0 downto 1 {
+        a += 1
+    }
+    n = a
+    wait
+}
+";
+    let repeat = "\
+entry main {
+    a = 0
+    i = 0
+    repeat i {
+        a += 1
+    }
+    n = a
+    wait
+}
+";
+    for (body, line, col) in [(for_loop, 5, 13), (repeat, 6, 5)] {
+        for revision in [Revision::A, Revision::B] {
+            let diagnostic = error(tally(revision, body));
+            assert_eq!(
+                (diagnostic.line, diagnostic.col, diagnostic.message.as_str()),
+                (
+                    line,
+                    col,
+                    "loops run at least once, so i must start at 1 or more"
+                )
+            );
+        }
+    }
+}
+
+#[test]
 fn asm_labels_block_copies() {
     let looped = "\
 entry main {
