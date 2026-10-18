@@ -7,6 +7,13 @@ const CELLS: usize = 16;
 pub(crate) struct RamMap([u8; CELLS]);
 
 impl RamMap {
+    /// Moves every cell `by` cells up, wrapping like `[B+n]` does.
+    pub(crate) fn rotate(by: u8) -> Self {
+        Self(std::array::from_fn(|c| {
+            (c as u8).wrapping_add(by) % CELLS as u8
+        }))
+    }
+
     /// Shuffles every cell except the `pinned` ones.
     pub(crate) fn shuffle(pinned: impl IntoIterator<Item = usize>, rng: &mut Rng) -> Self {
         let mut free = [true; CELLS];

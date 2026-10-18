@@ -47,6 +47,12 @@ pub(crate) fn cell(token: &str) -> Option<u8> {
     chars.next().is_none().then_some(n as u8)
 }
 
+/// Replaces `part`, which must be a slice of `text`, with `new`.
+pub(crate) fn splice(text: &str, part: &str, new: &str) -> String {
+    let start = part.as_ptr().addr() - text.as_ptr().addr();
+    format!("{}{new}{}", &text[..start], &text[start + part.len()..])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
