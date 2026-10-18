@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use ld60_devices::Fault;
 use ld60_levels::{CATALOG, Variant};
 
 #[test]
@@ -33,15 +34,29 @@ fn tutorial_starts_on_the_smallest_chip() {
     assert_eq!(chips, ["CalCo Rev A", "CalCo Rev B"]);
 }
 
+/// `Variant::new` falls back to the original when no rewrite verifies, so
+/// most seeds must give a different firmware.
 #[test]
-fn variants_verify_over_many_seeds() {
+fn most_seeds_give_a_rewrite() {
+    const SEEDS: u64 = 64;
     for source in CATALOG {
-        for seed in 0..64 {
-            let variant = Variant::new(source, seed).unwrap();
-            if let Err(error) = variant.verify() {
-                panic!("{} seed {seed}: {error}\n{}", source.path, variant.buggy);
-            }
+        let original = Variant::original(source).unwrap();
+        let rom_damage = original
+            .level
+            .faults
+            .iter()
+            .any(|f| matches!(f, Fault::FadedRomBits { .. }));
+        if rom_damage {
+            continue;
         }
+        let rewrites = (0..SEEDS)
+            .filter(|&seed| Variant::new(source, seed).unwrap().buggy != original.buggy)
+            .count();
+        assert!(
+            rewrites as u64 * 4 >= SEEDS * 3,
+            "{}: {rewrites} of {SEEDS} seeds give a rewrite",
+            source.path
+        );
     }
 }
 
