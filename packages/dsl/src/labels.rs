@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::emit::{Instr, Line};
+use crate::backend::{Backend, Syntax};
+use crate::emit::Line;
 
 const MAX_LEN: usize = 6;
 
@@ -38,7 +39,7 @@ impl Labels {
     }
 
     /// Names every label. Labels at the same place as a better one share its name.
-    pub(crate) fn name(&self, lines: &[Line], role: impl Fn(&Instr) -> Role) -> Names {
+    pub(crate) fn name(&self, lines: &[Line], backend: &dyn Backend) -> Names {
         let mut alias = BTreeMap::new();
         let mut next_instr = BTreeMap::new();
         let mut order = Vec::new();
@@ -69,7 +70,9 @@ impl Labels {
                 _ => None,
             })
             .chain(lines.iter().filter_map(|line| match line {
-                Line::Raw(raw, _) => asm_label(raw).map(|(name, _)| name.to_string()),
+                Line::Raw(raw, _) => {
+                    asm_label(raw, backend.syntax()).map(|(name, _)| name.to_string())
+                }
                 _ => None,
             }))
             .collect();
@@ -87,7 +90,7 @@ impl Labels {
                 LabelName::Fixed(name) | LabelName::Hint(name) => name.clone(),
                 LabelName::Join(prefix) => {
                     let next = next_instr.get(&id).and_then(|&i| match &lines[i] {
-                        Line::Instr(instr) => Some(role(instr)),
+                        Line::Instr(instr) => Some(backend.label_role(instr)),
                         _ => None,
                     });
                     let word = match next {
@@ -159,13 +162,13 @@ fn unique(wanted: &str, taken: &BTreeSet<String>) -> String {
         .unwrap_or(base)
 }
 
-/// The label and the rest of an `asm { }` line, if it starts with `name:`.
-pub(crate) fn asm_label(line: &str) -> Option<(&str, &str)> {
-    let code = line.split(';').next().unwrap_or_default();
-    if !code.contains(':') {
+/// The label and the rest of an `asm { }` line, if it starts with one.
+pub(crate) fn asm_label(line: &str, syntax: Syntax) -> Option<(&str, &str)> {
+    let code = line.split(syntax.comment).next().unwrap_or_default();
+    if !code.contains(syntax.label_end) {
         return None;
     }
-    let (name, rest) = line.split_once(':')?;
+    let (name, rest) = line.split_once(syntax.label_end)?;
     let name = name.trim();
     let valid = name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');

@@ -10,7 +10,7 @@ use crate::{Diagnostic, Target};
 
 const ZERO_LOOP: &str = "loops run at least once, so i must start at 1 or more";
 
-const RESERVED: &[&str] = &["a", "i", "carry", "zero", "bcd_add", "bcd_sub"];
+const RESERVED: &[&str] = &["a", "i", "carry", "bcd_add", "bcd_sub"];
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
@@ -136,12 +136,17 @@ impl Resolver<'_> {
                 )),
             };
         }
-        if is_name(target, "carry") {
+        if let ExprKind::Name(name) = &target.kind
+            && let Some(flag) = self.target.backend.flags().iter().find(|&&f| f == name)
+        {
             return match self.value(value)? {
                 Value::Imm(literal) if literal.value <= 1 => {
-                    Ok(vec![Prim::SetCarry(literal.value == 1)])
+                    Ok(vec![Prim::SetFlag(flag, literal.value == 1)])
                 }
-                _ => Err(Diagnostic::error(value.pos, "carry can only be 0 or 1")),
+                _ => Err(Diagnostic::error(
+                    value.pos,
+                    format!("{name} can only be 0 or 1"),
+                )),
             };
         }
         let dst = self.place(target, true)?;
@@ -172,14 +177,16 @@ impl Resolver<'_> {
 
     fn cond(&self, cond: &ast::Cond) -> Result<Cond> {
         match cond {
-            ast::Cond::Flag { name, set, pos } => match name.as_str() {
-                "carry" => Ok(Cond::Carry(*set)),
-                "zero" => Ok(Cond::Zero(*set)),
-                _ => Err(Diagnostic::error(
-                    *pos,
-                    format!("expected 'carry' or 'zero', found '{name}'"),
-                )),
-            },
+            ast::Cond::Flag { name, set, pos } => {
+                let flags = self.target.backend.flags();
+                match flags.iter().find(|&&f| f == name) {
+                    Some(flag) => Ok(Cond::Flag(flag, *set)),
+                    None => Err(Diagnostic::error(
+                        *pos,
+                        format!("expected one of {}, found '{name}'", flags.join(", ")),
+                    )),
+                }
+            }
             ast::Cond::Compare { lhs, op, rhs } => {
                 if !is_name(lhs, "a") {
                     return Err(Diagnostic::error(lhs.pos, "only 'a' can be compared"));
@@ -235,6 +242,7 @@ impl Resolver<'_> {
         let taken = RESERVED.contains(&name)
             || backend.ports().iter().any(|p| p.name == name)
             || backend.intrinsics().contains(&name)
+            || backend.flags().contains(&name)
             || self.cells.contains_key(name)
             || self.consts.contains_key(name);
         if taken {
@@ -337,8 +345,7 @@ impl Resolver<'_> {
                             format!("the loop runs {count} times, but {name} has {len} elements"),
                         ));
                     }
-                    let cells = self.target.backend.features().ram_cells;
-                    return Ok(Place::Indexed((addr + cells - 1) % cells));
+                    return Ok(Place::Indexed(self.target.backend.index_offset(addr)));
                 }
                 let n = self.literal(index)?.value;
                 if !(1..=len).contains(&n) {
@@ -560,14 +567,6 @@ fn is_one(expr: &ast::Expr) -> bool {
     matches!(&expr.kind, ExprKind::Num(literal) if literal.value == 1)
 }
 
-fn parse_cell(addr: &str) -> Option<u8> {
-    let digits = addr.strip_prefix('M')?;
-    if digits.is_empty() || digits.len() > 2 {
-        return None;
-    }
-    u8::from_str_radix(digits, 16).ok()
-}
-
 /// Turns the switch-free syntax tree into the program for `target`.
 pub(crate) fn resolve(
     file: &File,
@@ -621,8 +620,10 @@ pub(crate) fn resolve(
                     continue;
                 }
                 let len = decl.len.unwrap_or(1);
-                let addr = parse_cell(&decl.addr)
-                    .filter(|&a| len > 0 && u16::from(a) + u16::from(len) <= u16::from(ram_cells));
+                let addr = target
+                    .backend
+                    .cell(&decl.addr)
+                    .filter(|&a| usize::from(a) + usize::from(len) <= ram_cells);
                 let Some(addr) = addr else {
                     resolver.errors.push(Diagnostic::error(
                         decl.pos,
@@ -641,7 +642,11 @@ pub(crate) fn resolve(
                 {
                     resolver.errors.push(Diagnostic::error(
                         decl.pos,
-                        format!("'{}' overlaps the cell at M{:X}", decl.name, other.first),
+                        format!(
+                            "'{}' overlaps the cell at {}",
+                            decl.name,
+                            target.backend.cell_name(other.first)
+                        ),
                     ));
                     continue;
                 }

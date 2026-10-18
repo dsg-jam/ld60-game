@@ -83,11 +83,9 @@ pub fn compile(
     let mut warnings = program.warnings.clone();
     warnings.extend(lint::lint(&program, backend.features(), selection.flavor)?);
     let emitted = emit::emit(&program, backend).map_err(|e| vec![e])?;
-    let names = emitted
-        .labels
-        .name(&emitted.lines, |instr| backend.label_role(instr));
+    let names = emitted.labels.name(&emitted.lines, backend);
     check_size(&emitted.lines, backend.features().rom_len)?;
-    let printed = print::print(&program, &emitted.lines, &names);
+    let printed = print::print(&program, &emitted.lines, &names, backend);
     if let Err(errors) = target.chip.isa().assemble(&printed.text) {
         return Err(errors
             .into_iter()
