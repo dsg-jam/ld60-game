@@ -32,7 +32,7 @@ pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 const PHOSPHOR: Color = Color::srgb(0.45, 1.0, 0.55);
 const PHOSPHOR_DIM: Color = Color::srgb(0.2, 0.55, 0.26);
 /// Dark enough for the dimmest highlight color to stay readable on it.
-const SELECTION: Color = Color::srgb(0.13, 0.38, 0.18);
+const SELECTION: Color = Color::srgb(0.1, 0.3, 0.14);
 const FONT_SIZE: f32 = 13.0;
 /// Keeps text clear of the bezel, which covers the edges of the glass.
 const PADDING: f32 = 32.0;
