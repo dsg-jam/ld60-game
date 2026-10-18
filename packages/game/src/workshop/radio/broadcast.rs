@@ -6,7 +6,7 @@ use bevy::{asset::LoadState, audio::Volume, prelude::*};
 
 use self::pan::{Pan, Panned};
 use super::{Front, Radio};
-use crate::audio::{Sound, Takes};
+use crate::audio::{Mixer, Sound, Takes};
 
 /// Station n starts with track n and plays on through the ones after it.
 pub(super) const TRACKS: [Track; 9] = [
@@ -101,6 +101,7 @@ impl Tuner {
     fn tune(
         mut commands: Commands,
         time: Res<Time>,
+        mixer: Res<Mixer>,
         assets: Res<AssetServer>,
         mut statics: ResMut<StaticTakes>,
         mut panned: ResMut<Assets<Panned>>,
@@ -132,7 +133,8 @@ impl Tuner {
                     commands.entity(entity).with_child((
                         Static,
                         AudioPlayer(panned.add(Panned::new(statics.0.next().clone(), pan.clone()))),
-                        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(Static::gain(radio))),
+                        PlaybackSettings::DESPAWN
+                            .with_volume(Volume::Linear(Static::gain(radio) * mixer.gain())),
                         pan,
                         Radio::speaker(),
                     ));
@@ -179,6 +181,7 @@ impl Broadcast {
     fn start(
         mut commands: Commands,
         assets: Res<AssetServer>,
+        mixer: Res<Mixer>,
         sources: Res<Assets<AudioSource>>,
         mut panned: ResMut<Assets<Panned>>,
         broadcasts: Query<(Entity, &Broadcast, &Pan, &ChildOf), Without<AudioPlayer<Panned>>>,
@@ -197,13 +200,14 @@ impl Broadcast {
             };
             commands.entity(entity).insert((
                 AudioPlayer(panned.add(Panned::new(music.clone(), pan.clone()))),
-                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(radio.gain())),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(radio.gain() * mixer.gain())),
             ));
         }
     }
 
     /// Follows the volume knob and the power switch.
     fn set_volume(
+        mixer: Res<Mixer>,
         radios: Query<(&Radio, &Children)>,
         mut music: Query<&mut AudioSink, (With<Broadcast>, Without<Static>)>,
         mut static_sinks: Query<&mut AudioSink, (With<Static>, Without<Broadcast>)>,
@@ -211,10 +215,10 @@ impl Broadcast {
         for (radio, children) in &radios {
             for &child in children {
                 if let Ok(mut sink) = music.get_mut(child) {
-                    sink.set_volume(Volume::Linear(radio.gain()));
+                    sink.set_volume(Volume::Linear(radio.gain() * mixer.gain()));
                 }
                 if let Ok(mut sink) = static_sinks.get_mut(child) {
-                    sink.set_volume(Volume::Linear(Static::gain(radio)));
+                    sink.set_volume(Volume::Linear(Static::gain(radio) * mixer.gain()));
                 }
             }
         }

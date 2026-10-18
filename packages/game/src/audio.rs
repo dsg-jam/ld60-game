@@ -8,6 +8,8 @@ use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
 
 const CLICK_VOLUME: f32 = 0.35;
+/// How loud the game is while a menu is open.
+const DUCKED: f32 = 0.35;
 /// Keys differ a little in pitch, so typing doesn't sound like a loop.
 const CLICK_PITCHES: [f32; 5] = [0.92, 0.97, 1.0, 1.04, 1.08];
 /// Sounds that would stand out if they always came the same get this many
@@ -99,6 +101,15 @@ impl Sound {
     }
 }
 
+/// How loud the game is overall.
+#[derive(Resource, Debug)]
+pub(crate) struct Mixer {
+    /// From 0 to 1.
+    pub(crate) volume: f32,
+    /// Quieter while a menu is open.
+    ducked: bool,
+}
+
 /// Plays a [`Sound`].
 #[derive(Event, Debug)]
 pub(crate) struct Play(pub(crate) Sound);
@@ -113,9 +124,35 @@ impl Default for KeyClicks {
     }
 }
 
+impl Default for Mixer {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            // The game starts on the title screen.
+            ducked: true,
+        }
+    }
+}
+
+impl Mixer {
+    /// What every sound is multiplied by.
+    pub(crate) fn gain(&self) -> f32 {
+        if self.ducked {
+            self.volume * DUCKED
+        } else {
+            self.volume
+        }
+    }
+
+    pub(crate) fn duck<const ON: bool>(mut mixer: ResMut<Mixer>) {
+        mixer.ducked = ON;
+    }
+}
+
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyClicks>()
+            .init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
             .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>))
             .add_observer(Sounds::play);
@@ -149,13 +186,19 @@ impl Sounds {
         commands.insert_resource(Self(sounds));
     }
 
-    fn play(play: On<Play>, sounds: Option<ResMut<Sounds>>, mut commands: Commands) {
+    fn play(
+        play: On<Play>,
+        sounds: Option<ResMut<Sounds>>,
+        mixer: Res<Mixer>,
+        mut commands: Commands,
+    ) {
         if let Some(mut sounds) = sounds
             && let Some(source) = sounds.0.get_mut(&play.0).map(|takes| takes.next().clone())
         {
             commands.spawn((
                 AudioPlayer(source),
-                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(play.0.volume())),
+                PlaybackSettings::DESPAWN
+                    .with_volume(Volume::Linear(play.0.volume() * mixer.gain())),
             ));
         }
     }
@@ -163,6 +206,7 @@ impl Sounds {
     fn click_keys(
         sounds: Res<Sounds>,
         enabled: Res<KeyClicks>,
+        mixer: Res<Mixer>,
         keys: Query<(Entity, &PressableKey), Changed<PressableKey>>,
         mut down: Local<EntityHashSet>,
         mut commands: Commands,
@@ -178,7 +222,7 @@ impl Sounds {
                 commands.spawn((
                     AudioPlayer(click.clone()),
                     PlaybackSettings::DESPAWN
-                        .with_volume(Volume::Linear(CLICK_VOLUME))
+                        .with_volume(Volume::Linear(CLICK_VOLUME * mixer.gain()))
                         .with_speed(pitch),
                 ));
             }

@@ -9,6 +9,7 @@ use bevy::{
 
 use self::sprite::Sprite;
 use super::focus::{self, Clickable, Focus};
+use crate::menu::AppState;
 use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
 
 /// Diameter of the dot cursor, in logical pixels.
@@ -180,6 +181,7 @@ impl Cursors {
     fn update(
         mut cursors: ResMut<Cursors>,
         time: Res<Time<Real>>,
+        app_state: Res<State<AppState>>,
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
@@ -189,7 +191,9 @@ impl Cursors {
         mut icon: Single<&mut CursorIcon, With<PrimaryWindow>>,
     ) {
         let under: Vec<Entity> = focus::under_mouse(&hovers, &parents).collect();
-        let wanted = if surfaces.iter().any(ScreenSurface::hovered) {
+        let wanted = if *app_state.get() != AppState::Playing
+            || surfaces.iter().any(ScreenSurface::hovered)
+        {
             Kind::Arrow
         } else if under
             .iter()

@@ -2,6 +2,7 @@ use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeig
 
 use super::{cursor, look::Gaze};
 use crate::locale::{Localized, Message};
+use crate::menu::Settings;
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";
 const ICON_SIZE: f32 = 64.0;
@@ -15,10 +16,10 @@ const TEXT_SIZE: f32 = 18.0;
 const GAP: f32 = 6.0;
 /// From the bottom left corner to the hint for going back.
 const CORNER: f32 = 24.0;
-const INK: Color = cursor::DOT_FILL;
+pub(crate) const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
-const ACCENT: Color = Color::srgb_u8(0xff, 0xb0, 0x50);
-const SHADOW: TextShadow = TextShadow {
+pub(crate) const ACCENT: Color = Color::srgb_u8(0xff, 0xb0, 0x50);
+pub(crate) const SHADOW: TextShadow = TextShadow {
     offset: Vec2::new(1.0, 1.0),
     color: Color::srgba(0.0, 0.0, 0.0, 0.8),
 };
@@ -148,8 +149,12 @@ impl BackHint {
             });
     }
 
-    fn update(gaze: Gaze, mut hint: Single<&mut Visibility, With<BackHint>>) {
-        hint.set_if_neq(if gaze.focused() {
+    fn update(
+        gaze: Gaze,
+        settings: Res<Settings>,
+        mut hint: Single<&mut Visibility, With<BackHint>>,
+    ) {
+        hint.set_if_neq(if gaze.focused() && settings.hints() {
             Visibility::Inherited
         } else {
             Visibility::Hidden
