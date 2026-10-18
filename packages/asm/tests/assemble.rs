@@ -58,6 +58,24 @@ fn reports_all_errors_with_line_numbers() {
 }
 
 #[test]
+fn reports_the_span_of_each_error() {
+    let errors = assemble(
+        "  FOO
+JMP nowhere
+x: NOP
+x: NOP
+.db 1, 300",
+        &Toy,
+    )
+    .unwrap_err();
+    let spans: Vec<_> = errors.iter().map(|e| e.span.clone()).collect();
+    assert_eq!(
+        spans,
+        vec![Some(2..5), Some(4..11), Some(0..1), Some(4..10)]
+    );
+}
+
+#[test]
 fn rejects_overlap_and_overflow() {
     assert!(assemble("NOP\n.org 0\nNOP", &Toy).is_err());
     assert!(assemble(".org 15\nJMP 0", &Toy).is_err());

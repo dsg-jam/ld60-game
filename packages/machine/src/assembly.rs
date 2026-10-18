@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::ops::Range;
 
 use crate::Image;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AsmError {
+    /// 1-based source line.
     pub line: usize,
+    /// Byte range within the line that the error is about, if known.
+    pub span: Option<Range<usize>>,
     pub message: String,
 }
 
