@@ -1,4 +1,14 @@
-use bevy::{core_pipeline::tonemapping::DebandDither, post_process::bloom::Bloom, prelude::*};
+use bevy::{
+    anti_alias::smaa::Smaa,
+    camera::Hdr,
+    core_pipeline::{
+        prepass::DeferredPrepass,
+        tonemapping::{DebandDither, Tonemapping},
+    },
+    pbr::{DefaultOpaqueRendererMethod, ScreenSpaceAmbientOcclusion},
+    post_process::bloom::Bloom,
+    prelude::*,
+};
 
 use super::focus::{FocusTarget, Focused, View};
 use super::look::LookAngles;
@@ -16,10 +26,13 @@ pub(super) struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            PlayerCamera::follow.after(Focused::leave_on_right_click),
-        );
+        // Deferred shading, so many lights stay cheap and screen space
+        // effects get the normals and roughness they need.
+        app.insert_resource(DefaultOpaqueRendererMethod::deferred())
+            .add_systems(
+                Update,
+                PlayerCamera::follow.after(Focused::leave_on_right_click),
+            );
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(Update, CameraOverride::apply.after(PlayerCamera::follow))
@@ -29,7 +42,20 @@ impl Plugin for CameraPlugin {
 
 /// The camera of the seated player.
 #[derive(Component, Debug)]
-#[require(Camera3d, IsDefaultUiCamera, DebandDither::Disabled, Bloom = Bloom::NATURAL)]
+#[require(
+    Camera3d,
+    IsDefaultUiCamera,
+    DebandDither::Disabled,
+    Hdr,
+    Bloom = Bloom::NATURAL,
+    Tonemapping::TonyMcMapface,
+    DeferredPrepass,
+    // Deferred shading doesn't work with multisampling.
+    Msaa::Off,
+    Smaa,
+    // Grounds small things on the surfaces they rest on.
+    ScreenSpaceAmbientOcclusion,
+)]
 pub(crate) struct PlayerCamera {
     /// Pose while sitting at the desk and looking straight ahead.
     seat: Transform,
