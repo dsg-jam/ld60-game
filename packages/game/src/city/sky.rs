@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use super::atmosphere::SKY;
-use super::weather::Weather;
+use super::weather::{WIND, Weather};
 use crate::player::camera::PlayerCamera;
 
 /// Far away, but still inside the camera's far plane.
@@ -27,6 +27,8 @@ const SUN: Vec3 = Vec3::new(-1.0, 0.2, 0.6);
 /// Light of the planet's lit side.
 const PLANET_LIGHT: f32 = 0.3;
 const ZENITH: f32 = 0.25;
+/// The wind blows this many times stronger at the height of the clouds.
+const ALOFT: f32 = 5.0;
 
 pub(super) struct SkyPlugin;
 
@@ -63,6 +65,8 @@ struct SkyParams {
     planet_light: f32,
     sun: Vec3,
     rain: f32,
+    /// Wind at the height of the clouds, in meters per second.
+    wind: Vec2,
 }
 
 /// The dome the sky is drawn on, centered on the camera.
@@ -107,6 +111,7 @@ impl SkyMaterial {
                     planet_light: PLANET_LIGHT,
                     sun: SUN.normalize(),
                     rain: 0.0,
+                    wind: WIND * ALOFT,
                 },
             })),
             NoFrustumCulling,
