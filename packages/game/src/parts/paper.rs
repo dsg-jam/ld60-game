@@ -265,7 +265,7 @@ impl Paper {
         }
     }
 
-    fn show_current(papers: Query<&Paper, Changed<Paper>>, mut nodes: Query<&mut Node>) {
+    pub(crate) fn show_current(papers: Query<&Paper, Changed<Paper>>, mut nodes: Query<&mut Node>) {
         for paper in &papers {
             for (index, &page) in paper.pages.iter().enumerate() {
                 if let Ok(mut node) = nodes.get_mut(page) {

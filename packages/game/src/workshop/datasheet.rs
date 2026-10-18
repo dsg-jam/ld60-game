@@ -32,7 +32,9 @@ impl Plugin for DatasheetPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(Datasheet::on_add).add_systems(
             Update,
-            Datasheet::print_for_job.run_if(resource_exists_and_changed::<Job>),
+            Datasheet::print_for_job
+                .run_if(resource_exists_and_changed::<Job>)
+                .before(Paper::show_current),
         );
     }
 }
