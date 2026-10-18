@@ -180,7 +180,7 @@ impl TicketStatus {
     fn text(job: Option<&Job>) -> &'static str {
         match job {
             Some(job) if job.stamped => "Done. Ring the bell for pickup.",
-            Some(job) if job.repaired => "Repaired. Stamp the ticket.",
+            Some(job) if job.flashed => "Flashed. Stamp the ticket when it works.",
             _ => "Open",
         }
     }
