@@ -2,7 +2,9 @@ mod chip_title;
 mod clicks;
 mod footer;
 mod highlight;
+mod history;
 mod lexer;
+mod undo;
 
 use bevy::{
     input::keyboard::{Key, KeyboardInput},
@@ -19,6 +21,7 @@ use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
+use self::undo::Undo;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::parts::screen::UiCanvas;
@@ -48,6 +51,9 @@ impl Plugin for EditorPlugin {
             PostUpdate,
             (
                 Clicks::correct_edits.before(EditableTextSystems),
+                Undo::sync
+                    .after(EditableTextSystems)
+                    .before(UiSystems::PostLayout),
                 Highlight::follow_scroll.before(UiSystems::Layout),
             ),
         )
@@ -60,6 +66,7 @@ impl Plugin for EditorPlugin {
             ChipTitle::update.run_if(resource_changed_or_removed::<Job>),
         )
         .add_observer(Editor::indent_on_tab)
+        .add_observer(Undo::on_key)
         .add_observer(Command::run_on_key)
         .add_observer(Command::run_on_click)
         .add_observer(Command::keep_editor_focus)
@@ -131,6 +138,7 @@ impl Editor {
                         ..default()
                     },
                     TabIndex(0),
+                    Undo::default(),
                     children![Highlight::bundle(font.clone())],
                 ),
                 (Status, Text::default(), font.clone(), TextColor(PHOSPHOR)),
@@ -156,7 +164,7 @@ impl Editor {
     fn load_job(
         job: Option<Res<Job>>,
         mut loaded: Local<Option<usize>>,
-        editor: Single<&mut EditableText, With<Editor>>,
+        editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
         mut status: Single<&mut Text, With<Status>>,
     ) {
         let index = job.as_ref().map(|job| job.index);
@@ -164,17 +172,17 @@ impl Editor {
             return;
         }
         *loaded = index;
-        let mut text = editor.into_inner();
+        let (mut text, mut undo) = editor.into_inner();
         text.clear();
         text.viewport.offset.y = 0.0;
         match job {
             Some(job) => {
-                text.queue_edit(TextEdit::Insert(job.buggy.as_str().into()));
-                text.queue_edit(TextEdit::TextStart(false));
+                undo.replace(&mut text, &job.buggy);
                 status.0.clear();
             }
             None => status.0 = "NO MORE JOBS TONIGHT.".into(),
         }
+        undo.reset();
     }
 
     pub(super) fn take_focus(editor: Single<Entity, With<Editor>>, mut focus: ResMut<InputFocus>) {
@@ -218,16 +226,33 @@ impl Editor {
         text.viewport.offset.y = (text.viewport.offset.y - pixels).max(0.0);
     }
 
-    /// `ld60.editor` returns the text, the caret, the selected byte range and
-    /// the assembler errors.
+    /// `ld60.editor { "history": "undo" }` returns the text, the caret, the
+    /// selected byte range and the assembler errors.
+    ///
+    /// The optional `history` is `undo` or `redo`. It applies in the next
+    /// frame.
     #[cfg(feature = "debug_port")]
     fn debug_state(
-        In(_): In<Option<serde_json::Value>>,
-        text: Single<&EditableText, With<Editor>>,
+        In(params): In<Option<serde_json::Value>>,
+        editor: Single<(&EditableText, &mut Undo), With<Editor>>,
         job: Option<Res<Job>>,
     ) -> bevy::remote::BrpResult {
-        use serde_json::json;
+        use serde_json::{Value, json};
 
+        let (text, mut undo) = editor.into_inner();
+        let step = params.as_ref().and_then(|params| params.get("history"));
+        match step.map(Value::as_str) {
+            None => {}
+            Some(Some("undo")) => undo.request(self::undo::Request::Undo),
+            Some(Some("redo")) => undo.request(self::undo::Request::Redo),
+            Some(_) => {
+                return Err(bevy::remote::BrpError {
+                    code: bevy::remote::error_codes::INVALID_PARAMS,
+                    message: "`history` must be \"undo\" or \"redo\"".into(),
+                    data: None,
+                });
+            }
+        }
         let source = text.value().to_string();
         let errors = job
             .and_then(|job| job.isa().assemble(&source).err())
