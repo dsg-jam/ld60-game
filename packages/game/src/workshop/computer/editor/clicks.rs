@@ -7,7 +7,7 @@ use bevy::{
     ui::{ComputedUiRenderTargetInfo, UiGlobalTransform},
 };
 
-use super::Editor;
+use super::page::Page;
 
 /// Presses farther apart than this, in canvas pixels, start a new click.
 const SAME_SPOT: f32 = 4.0;
@@ -37,7 +37,7 @@ impl Clicks {
                 &UiGlobalTransform,
                 &ComputedUiRenderTargetInfo,
             ),
-            With<Editor>,
+            With<Page>,
         >,
     ) {
         for press in presses.read() {
