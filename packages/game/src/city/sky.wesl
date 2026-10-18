@@ -23,7 +23,11 @@ struct Sky {
 
 /// Light pollution from the streets, warm and low.
 const CITY_GLOW: vec3<f32> = vec3<f32>(0.06, 0.025, 0.02);
-const CLOUD_GLOW: vec3<f32> = vec3<f32>(0.05, 0.025, 0.04);
+const CLOUD_GLOW: vec3<f32> = vec3<f32>(0.12, 0.075, 0.07);
+/// How fast the clouds drift across the sky.
+const WIND: vec2<f32> = vec2<f32>(0.05, 0.02);
+/// Clouds per unit of the layer they drift in.
+const CLOUD_SCALE: f32 = 2.5;
 const BAND_LIGHT: vec3<f32> = vec3<f32>(0.62, 0.5, 0.36);
 const BAND_DARK: vec3<f32> = vec3<f32>(0.26, 0.38, 0.42);
 const RING: vec3<f32> = vec3<f32>(0.55, 0.48, 0.4);
@@ -108,10 +112,13 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     color = mix(planet(d, color), without_planet, 0.3 + 0.4 * sky.rain);
 
     // Low clouds, lit from below by the city.
-    let p = d.xz / (up + 0.08) * 0.6 + vec2<f32>(globals.time * 0.004, globals.time * 0.0015);
-    let coverage = mix(0.45, 0.85, sky.rain);
-    let cloud = smoothstep(1.0 - coverage, 1.25 - coverage, fbm(p, 80.0));
-    let lit = CLOUD_GLOW * (0.6 + 0.6 * exp(-up * 4.0)) * mix(0.7, 1.2, fbm(p * 3.0, 90.0));
+    // Projected onto a flat layer overhead, so they shrink towards the
+    // horizon.
+    let p = d.xz / (up + 0.08) * CLOUD_SCALE + WIND * globals.time;
+    // Scattered clouds in clear weather, closing up in the rain.
+    let edge = mix(0.58, 0.44, sky.rain);
+    let cloud = smoothstep(edge, edge + 0.12, fbm(p, 80.0));
+    let lit = CLOUD_GLOW * (0.6 + 0.6 * exp(-up * 4.0)) * mix(0.5, 1.3, fbm(p * 3.0, 90.0));
     color = mix(color, lit, cloud * 0.92);
 
     // Meets the fog of the distant buildings at the horizon.
