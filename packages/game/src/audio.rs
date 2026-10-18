@@ -14,6 +14,10 @@ const CLICK_PITCHES: [f32; 5] = [0.92, 0.97, 1.0, 1.04, 1.08];
 /// Sounds of interactions, all made in code.
 pub(crate) struct AudioPlugin;
 
+/// Plays a short click, like a switch.
+#[derive(Event, Debug)]
+pub(crate) struct Click;
+
 /// Whether pressing keys makes a sound.
 #[derive(Resource, Debug)]
 pub(crate) struct KeyClicks(pub(crate) bool);
@@ -28,7 +32,8 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyClicks>()
             .add_systems(Startup, Sounds::load)
-            .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>));
+            .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>))
+            .add_observer(Sounds::click);
     }
 }
 
@@ -44,6 +49,15 @@ impl Sounds {
                 bytes: Arc::from(Samples::click().wav()),
             }),
         });
+    }
+
+    fn click(_: On<Click>, sounds: Option<Res<Sounds>>, mut commands: Commands) {
+        if let Some(sounds) = sounds {
+            commands.spawn((
+                AudioPlayer(sounds.click.clone()),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(CLICK_VOLUME)),
+            ));
+        }
     }
 
     fn click_keys(

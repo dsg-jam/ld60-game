@@ -1,4 +1,4 @@
-use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
+use bevy::{core_pipeline::tonemapping::DebandDither, post_process::bloom::Bloom, prelude::*};
 
 use super::focus::{FocusTarget, Focused, View};
 use super::look::LookAngles;
@@ -23,7 +23,7 @@ impl Plugin for CameraPlugin {
 
 /// The camera of the seated player.
 #[derive(Component, Debug)]
-#[require(Camera3d, IsDefaultUiCamera, DebandDither::Disabled)]
+#[require(Camera3d, IsDefaultUiCamera, DebandDither::Disabled, Bloom = Bloom::NATURAL)]
 pub(crate) struct PlayerCamera {
     /// Pose while sitting at the desk and looking straight ahead.
     seat: Transform,

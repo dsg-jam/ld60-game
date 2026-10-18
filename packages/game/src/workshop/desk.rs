@@ -80,6 +80,13 @@ impl DeskLayout {
             .with_rotation(Quat::from_rotation_y(yaw))
     }
 
+    /// Like [`DeskLayout::place`], but on top of the cutting mat, with
+    /// `spot` relative to the mat.
+    pub(crate) fn place_on_mat(&self, spot: Vec2, yaw: f32) -> Transform {
+        Transform::from_translation(self.mat.top_spot(spot))
+            .with_rotation(Quat::from_rotation_y(yaw))
+    }
+
     /// Camera pose of the seated player.
     pub(crate) fn seated_view(&self) -> Transform {
         let eye = Vec3::new(
