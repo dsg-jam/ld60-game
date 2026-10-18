@@ -4,6 +4,8 @@ mod datasheet;
 mod desk;
 pub(crate) mod job;
 mod lamp;
+mod pickup;
+mod receipt;
 mod room;
 mod service;
 mod switch;
@@ -53,6 +55,7 @@ impl Plugin for WorkshopPlugin {
             datasheet::DatasheetPlugin,
             ticket::TicketPlugin,
             job::JobPlugin,
+            receipt::ReceiptPlugin,
             tools::ToolsPlugin,
             computer::ComputerPlugin,
         ))

@@ -4,8 +4,10 @@ use bevy::prelude::*;
 use ld60_levels::{CATALOG, GAME_SEED, Level, LevelError, Variant};
 
 use super::desk::DeskLayout;
+use super::pickup::{Complaint, Earnings, Pickup};
+use super::receipt::Receipt;
 use super::ticket::JobTicket;
-use crate::device::Handheld;
+use crate::device::{Emulator, Handheld};
 
 const DEVICE_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
 const DEVICE_YAW: f32 = 0.15;
@@ -23,7 +25,8 @@ impl Plugin for JobPlugin {
             Some(Err(err)) => error!(error = &err as &dyn Error, "first job does not load"),
             None => {}
         }
-        app.add_systems(Startup, Job::spawn_items)
+        app.init_resource::<Earnings>()
+            .add_systems(Startup, Job::spawn_items)
             .add_observer(HandIn::next_job);
     }
 }
@@ -31,7 +34,7 @@ impl Plugin for JobPlugin {
 /// The repair job on the bench.
 ///
 /// A job is done in three steps: flash new firmware, stamp the ticket, then
-/// ring the bell to hand it in.
+/// ring the bell to hand it in. The customer tests the device at pickup.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {
     /// Position in [`CATALOG`].
@@ -50,7 +53,8 @@ pub(crate) struct Job {
 #[derive(Component, Debug, Default)]
 pub(crate) struct JobItem;
 
-/// Hands in the stamped job and puts the next one on the bench.
+/// Hands in the stamped job, lets the customer test it and puts the next
+/// one on the bench.
 #[derive(Event, Debug)]
 pub(crate) struct HandIn;
 
@@ -93,11 +97,20 @@ impl HandIn {
         _: On<HandIn>,
         job: Option<Res<Job>>,
         items: Query<Entity, With<JobItem>>,
+        emulators: Query<&Emulator, With<JobItem>>,
+        receipts: Query<Entity, With<Receipt>>,
+        mut earnings: ResMut<Earnings>,
         mut commands: Commands,
     ) {
         let Some(job) = job.filter(|job| job.stamped) else {
             return;
         };
+        let pickup = match emulators.single() {
+            Ok(emulator) => Pickup::inspect(&job.level, emulator.rom()),
+            Err(_) => Pickup::Refused(Complaint::Dead),
+        };
+        earnings.add(&pickup);
+        Receipt::new(&job.level, pickup, *earnings).hand_out(receipts, &mut commands);
         for item in &items {
             commands.entity(item).despawn();
         }
