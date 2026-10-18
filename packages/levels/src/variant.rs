@@ -60,7 +60,7 @@ impl Variant {
         let mut fixed = Firmware::new(&self.fixed);
         let pinned = self
             .level
-            .device
+            .board()
             .display_cells()
             .chain(buggy.indexed_cells())
             .chain(fixed.indexed_cells());

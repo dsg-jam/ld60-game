@@ -1,6 +1,6 @@
 use ld60_machine::{Cpu, Step};
 
-use crate::{ChipSpec, DeviceKind, Fault, Readout, Rom, RunError};
+use crate::{Board, ChipSpec, DeviceKind, Fault, Readout, Rom, RunError};
 
 pub const MAX_STEPS: u32 = 100_000;
 
@@ -12,6 +12,7 @@ pub trait Device {
         }
     }
 
+    fn board(&self) -> &'static Board;
     fn chip(&self) -> ChipSpec;
     fn cpu(&self) -> &dyn Cpu;
     fn cpu_mut(&mut self) -> &mut dyn Cpu;

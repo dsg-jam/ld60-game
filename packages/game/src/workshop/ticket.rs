@@ -96,7 +96,7 @@ impl JobTicket {
                 &canvas,
                 (2, 2),
                 service::footer(level.device),
-                |page| service::write(page, level.device),
+                |page| service::write(page, level.board()),
             ),
         ];
         let board = Block::new(BOARD_SIZE);
@@ -154,6 +154,7 @@ impl JobTicket {
             ("CUSTOMER", level.customer.name.clone()),
             ("DEVICE", device.into()),
             ("S/N", level.serial.clone()),
+            ("BOARD", level.board().name()),
             ("CHIP", chip),
             ("ROM", rom.into()),
         ] {

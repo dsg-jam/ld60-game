@@ -63,3 +63,15 @@ impl fmt::Display for RunError {
 }
 
 impl std::error::Error for RunError {}
+
+/// The text that did not name a board revision.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownBoardRev(pub String);
+
+impl fmt::Display for UnknownBoardRev {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown board revision '{}', use A, B or C", self.0)
+    }
+}
+
+impl std::error::Error for UnknownBoardRev {}
