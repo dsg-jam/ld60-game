@@ -43,8 +43,7 @@ impl Earnings {
 }
 
 impl Pickup {
-    /// Runs the customer's tests against `rom`, including the ones the job
-    /// ticket does not mention.
+    /// Runs the customer's tests against `rom`.
     pub(crate) fn inspect(level: &Level, rom: &Rom) -> Self {
         let report = match ld60_levels::run(level, rom, TEST_SEEDS) {
             Ok(report) => report,
@@ -76,10 +75,18 @@ impl Complaint {
                 keys,
                 expected,
                 shown,
-            } => format!(
-                "{} and it showed {shown}. It should say {expected}.",
-                did(keys)
-            ),
+            } => {
+                // The readout prints broken segments as `?`.
+                let shown = if shown.contains('?') {
+                    "strange symbols"
+                } else {
+                    shown
+                };
+                format!(
+                    "{} and it showed {shown}. It should say {expected}.",
+                    did(keys)
+                )
+            }
             Self::Froze { keys } => format!("{} and it froze.", did(keys)),
         }
     }
@@ -167,6 +174,15 @@ mod tests {
         assert_eq!(
             wrong.note(),
             "I typed 12+34= and it showed 000040. It should say 000046."
+        );
+        let garbage = Complaint::Wrong {
+            keys: String::new(),
+            expected: "000000".into(),
+            shown: "0?00?0".into(),
+        };
+        assert_eq!(
+            garbage.note(),
+            "I switched it on and it showed strange symbols. It should say 000000."
         );
         let froze = Complaint::Froze {
             keys: String::new(),
