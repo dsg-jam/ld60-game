@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ld60_devices::{Board, ChipSpec};
+use ld60_devices::{Annunciator, Board, ChipSpec};
 
 use crate::backend::{Backend, CalcoBackend};
 
@@ -26,6 +26,15 @@ impl Target {
     /// The name used after `for` in a firmware declaration.
     pub(crate) fn device_name(&self) -> String {
         format!("{:?}", self.board.kind).to_ascii_lowercase()
+    }
+
+    /// The `ANN` bit of the annunciator named like `minus`, if the board
+    /// has it.
+    pub(crate) fn ann_bit(&self, name: &str) -> Option<u8> {
+        let annunciator = Annunciator::ALL
+            .into_iter()
+            .find(|a| format!("{a:?}").eq_ignore_ascii_case(name))?;
+        self.board.ann_bit(annunciator)
     }
 
     /// The code the firmware reads from the key port for `key`.

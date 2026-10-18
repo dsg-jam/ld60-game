@@ -57,6 +57,7 @@ through into a routine, and `goto` cannot jump into a routine. Call it instead.
 | `a = 5`, `a = x`, `a = arr[2]`, `a = arr[i]` | `LDI A, 5`, `LD Mn`, `LD Mn`, `LD [B+n]` |
 | `x = a`, `arr[i] = a`, `x = y` | `ST`, or `LD` and `ST` |
 | `a = KEY`, `ANN = a` | `IN KEY`, `OUT ANN` |
+| `ANN = ann(minus)` | `LDI A, n` and `OUT ANN` |
 | `a = x + 1`, `a += 1`, `a -= 1` | `LD x` and `INC`, `INC`, `DEC` |
 | `a = x + y + carry`, `a = x - y - carry` | `LD x` and `ADC y` or `SBC y` |
 | `a = bcd_add(x, y)`, `a = bcd_sub(x, y)` | The above, then `DA` or `DS` |
@@ -76,6 +77,10 @@ down and stops after the pass with `i = 1`.
 Conditions are `a == v`, `a != v`, `a < v`, `a >= v`, `carry`, `!carry`,
 `zero` and `!zero`. Key literals like `'+'` print in hex. Numbers keep the way
 you wrote them. A `;` comment after a statement goes on its first instruction.
+
+`ann(minus)` is the `ANN` value that lights the minus annunciator on the board
+of the level. `ann(minus, error)` lights both. Use it instead of raw bits, so the
+firmware stays right on every board.
 
 The compiler does not optimize. It only drops a generated jump to the next
 line.
