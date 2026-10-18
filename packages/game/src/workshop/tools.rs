@@ -1,5 +1,7 @@
 //! The rubber stamp and the service bell, for finishing a job.
 
+use std::f32::consts::PI;
+
 use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
@@ -10,6 +12,7 @@ use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
+use crate::parts::paper::Paper;
 use crate::player::focus::{Clickable, Focus, FocusOn};
 
 const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
@@ -19,6 +22,10 @@ const STAMP_KNOB_SIZE: Vec3 = Vec3::new(0.03, 0.024, 0.03);
 const STAMP_WOOD: Color = Color::srgb_u8(0x9a, 0x6e, 0x48);
 const STAMP_RUBBER: Color = Color::srgb_u8(0x5a, 0x1c, 0x18);
 const STAMP_HANDLE: Color = Color::srgb_u8(0xb0, 0x2e, 0x24);
+
+/// How far the stamp moves down when pressed, and for how long.
+const PRESS_DEPTH: f32 = 0.012;
+const PRESS_TIME: f32 = 0.2;
 
 const BELL_BASE_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.07);
 const BELL_DOME_RADIUS: f32 = 0.032;
@@ -32,7 +39,7 @@ pub(crate) struct ToolsPlugin;
 
 impl Plugin for ToolsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, Tool::arm)
+        app.add_systems(Update, (Tool::arm, Press::animate))
             .add_observer(Tool::on_add)
             .add_observer(Tool::use_on_press);
     }
@@ -78,7 +85,8 @@ impl Tool {
         state: Res<State<Focus>>,
         tools: Query<&Tool, With<Clickable>>,
         job: Option<ResMut<Job>>,
-        tickets: Query<Entity, With<JobTicket>>,
+        mut tickets: Query<(Entity, &mut Paper), With<JobTicket>>,
+        transforms: Query<&Transform>,
         mut commands: Commands,
     ) {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
@@ -91,8 +99,14 @@ impl Tool {
         match tool {
             Self::Stamp => {
                 job.stamped = true;
-                commands.trigger(Play(Sound::Thunk));
-                if let Ok(ticket) = tickets.single() {
+                if let Ok(transform) = transforms.get(press.entity) {
+                    commands.entity(press.entity).insert(Press {
+                        elapsed: 0.0,
+                        rest: *transform,
+                    });
+                }
+                if let Ok((ticket, mut paper)) = tickets.single_mut() {
+                    paper.open_first_page();
                     commands.trigger(FocusOn { entity: ticket });
                 }
             }
@@ -158,6 +172,31 @@ impl Tool {
                         plunger.transform(),
                     ));
                 });
+            }
+        }
+    }
+}
+
+/// A tool moving down and back up once after a click.
+#[derive(Component, Debug)]
+struct Press {
+    elapsed: f32,
+    rest: Transform,
+}
+
+impl Press {
+    fn animate(
+        time: Res<Time>,
+        mut tools: Query<(Entity, &mut Press, &mut Transform)>,
+        mut commands: Commands,
+    ) {
+        for (tool, mut press, mut transform) in &mut tools {
+            press.elapsed += time.delta_secs();
+            let t = (press.elapsed / PRESS_TIME).min(1.0);
+            *transform = press.rest;
+            transform.translation.y -= PRESS_DEPTH * (PI * t).sin();
+            if t >= 1.0 {
+                commands.entity(tool).remove::<Press>();
             }
         }
     }

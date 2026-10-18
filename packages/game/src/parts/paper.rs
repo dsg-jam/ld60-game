@@ -196,6 +196,10 @@ impl Paper {
         Transform::from_translation(at + Vec3::Y * READING_HEIGHT).looking_at(at, Vec3::NEG_Z)
     }
 
+    pub(crate) fn open_first_page(&mut self) {
+        self.current = 0;
+    }
+
     fn turn(&mut self, forward: bool) {
         let last = self.pages.len().saturating_sub(1);
         self.current = if forward {

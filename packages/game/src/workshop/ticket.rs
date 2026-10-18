@@ -6,6 +6,7 @@ use ld60_levels::{Level, LevelSource};
 
 use super::job::Job;
 use super::service;
+use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::parts::paper::Paper;
@@ -26,6 +27,11 @@ const FOOTER: &str = "DSG SERVICE BENCH";
 const STAMP_POSITION: Vec2 = Vec2::new(300.0, 520.0);
 /// In degrees, clockwise.
 const STAMP_TILT: f32 = -12.0;
+/// Seconds until the camera reaches the ticket.
+const STAMP_DELAY: f32 = 0.55;
+const STAMP_DROP_TIME: f32 = 0.12;
+/// How big the stamp looks while it is still above the paper.
+const STAMP_START_SCALE: f32 = 1.7;
 const STAMP_INK: Color = Color::srgba(0.72, 0.12, 0.1, 0.8);
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 440.0;
@@ -36,7 +42,10 @@ impl Plugin for TicketPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(JobTicket::on_add).add_systems(
             Update,
-            TicketStatus::update.run_if(resource_exists_and_changed::<Job>),
+            (
+                TicketStatus::update.run_if(resource_exists_and_changed::<Job>),
+                Landing::animate,
+            ),
         );
     }
 }
@@ -180,17 +189,51 @@ impl TicketStatus {
     fn update(
         job: Res<Job>,
         mut texts: Query<&mut Text, With<TicketStatus>>,
-        mut stamps: Query<&mut Visibility, With<ShopStamp>>,
+        mut stamps: Query<(Entity, &mut Visibility, Has<Landing>), With<ShopStamp>>,
+        mut commands: Commands,
     ) {
         for mut text in &mut texts {
             text.0 = Self::text(Some(&job)).into();
         }
-        for mut visibility in &mut stamps {
-            *visibility = if job.stamped {
-                Visibility::Inherited
-            } else {
-                Visibility::Hidden
-            };
+        for (stamp, mut visibility, landing) in &mut stamps {
+            if !job.stamped {
+                *visibility = Visibility::Hidden;
+            } else if *visibility == Visibility::Hidden && !landing {
+                commands.entity(stamp).insert(Landing::default());
+            }
+        }
+    }
+}
+
+/// The shop stamp coming down onto the ticket.
+///
+/// It waits for the camera to reach the ticket, then drops from above and
+/// thunks when it hits the paper.
+#[derive(Component, Debug, Default)]
+struct Landing {
+    elapsed: f32,
+}
+
+impl Landing {
+    fn animate(
+        time: Res<Time>,
+        mut stamps: Query<(Entity, &mut Landing, &mut Visibility, &mut UiTransform)>,
+        mut commands: Commands,
+    ) {
+        for (stamp, mut landing, mut visibility, mut transform) in &mut stamps {
+            landing.elapsed += time.delta_secs();
+            let t = (landing.elapsed - STAMP_DELAY) / STAMP_DROP_TIME;
+            if t < 0.0 {
+                continue;
+            }
+            *visibility = Visibility::Inherited;
+            // Speeds up as it falls, like a hand pressing down.
+            let fall = t.min(1.0).powi(2);
+            transform.scale = Vec2::splat(STAMP_START_SCALE + (1.0 - STAMP_START_SCALE) * fall);
+            if t >= 1.0 {
+                commands.entity(stamp).remove::<Landing>();
+                commands.trigger(Play(Sound::Thunk));
+            }
         }
     }
 }
