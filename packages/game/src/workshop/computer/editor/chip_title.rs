@@ -7,9 +7,16 @@ use crate::workshop::job::Job;
 pub(super) struct ChipTitle;
 
 impl ChipTitle {
-    pub(super) fn update(job: Res<Job>, mut titles: Query<&mut Text, With<ChipTitle>>) {
+    /// Shown without a job.
+    pub(super) const NONE: &str = "CALCO";
+
+    pub(super) fn update(job: Option<Res<Job>>, mut titles: Query<&mut Text, With<ChipTitle>>) {
+        let name = job.map_or_else(
+            || Self::NONE.into(),
+            |job| job.level.chip.isa().name().to_uppercase(),
+        );
         for mut title in &mut titles {
-            title.0 = job.level.chip.isa().name().to_uppercase();
+            title.0.clone_from(&name);
         }
     }
 }
