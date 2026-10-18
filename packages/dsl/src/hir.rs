@@ -143,7 +143,7 @@ pub(crate) enum Prim {
         src: Value,
     },
     Return,
-    SetCarry(bool),
+    SetFlag(&'static str, bool),
     SetIndex(Literal),
     Store(Place),
     /// `a = a - v - carry`
@@ -175,16 +175,15 @@ pub(crate) enum CmpOp {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Cond {
-    Carry(bool),
     /// `a <op> value`
     Compare(CmpOp, Value),
-    Zero(bool),
+    /// A backend flag, set or clear.
+    Flag(&'static str, bool),
 }
 
 impl Cond {
     pub(crate) fn inverse(&self) -> Self {
         match self {
-            Self::Carry(set) => Self::Carry(!set),
             Self::Compare(op, value) => {
                 let op = match op {
                     CmpOp::Eq => CmpOp::Ne,
@@ -194,7 +193,7 @@ impl Cond {
                 };
                 Self::Compare(op, value.clone())
             }
-            Self::Zero(set) => Self::Zero(!set),
+            Self::Flag(name, set) => Self::Flag(name, !set),
         }
     }
 }

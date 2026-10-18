@@ -2,11 +2,12 @@ use ld60_calco::datasheet::{INSTRUCTIONS, PORTS};
 use ld60_calco::{Addr, Cond as Jcc, Op, RAM_LEN, ROM_LEN, Revision};
 use ld60_machine::Isa;
 
-use crate::backend::{Backend, Features, Port};
+use crate::backend::{Backend, Features, Port, Syntax};
 use crate::emit::{Emitter, Instr, Operand};
 use crate::hir::{CmpOp, Cond, Place, Prim, Value};
 use crate::labels::Role;
 
+const FLAGS: &[&str] = &["carry", "zero"];
 const INTRINSICS: &[&str] = &["da", "ds", "nop"];
 const STACK_DEPTH: u8 = 2;
 
@@ -23,7 +24,7 @@ impl CalcoBackend {
             calls: has(Op::Call(0)) && has(Op::Ret),
             loops: has(Op::Djnz(0)) && has(Op::LdiB(0)),
             indexed: has(Op::Ld(Addr::Indexed(0))) && has(Op::St(Addr::Indexed(0))),
-            ram_cells: RAM_LEN as u8,
+            ram_cells: RAM_LEN,
             rom_len: ROM_LEN,
             stack_depth: Some(STACK_DEPTH),
         };
@@ -43,10 +44,10 @@ impl CalcoBackend {
 
     fn branch(&self, cond: &Cond, target: Operand, out: &mut Emitter) -> Result<(), String> {
         let jcc = match cond {
-            Cond::Carry(true) => Jcc::Carry,
-            Cond::Carry(false) => Jcc::NoCarry,
-            Cond::Zero(true) => Jcc::Zero,
-            Cond::Zero(false) => Jcc::NotZero,
+            Cond::Flag("carry", true) => Jcc::Carry,
+            Cond::Flag("carry", false) => Jcc::NoCarry,
+            Cond::Flag(_, true) => Jcc::Zero,
+            Cond::Flag(_, false) => Jcc::NotZero,
             Cond::Compare(op, value) => {
                 match value {
                     Value::Imm(literal) => self.emit(
@@ -107,8 +108,39 @@ impl CalcoBackend {
 }
 
 impl Backend for CalcoBackend {
+    fn cell(&self, name: &str) -> Option<u8> {
+        let digits = name.strip_prefix('M')?;
+        let mut chars = digits.chars();
+        let digit = chars.next()?.to_digit(16)?;
+        chars.next().is_none().then_some(digit as u8)
+    }
+
+    fn cell_name(&self, addr: u8) -> String {
+        format!("M{addr:X}")
+    }
+
     fn features(&self) -> &Features {
         &self.features
+    }
+
+    fn flags(&self) -> &[&'static str] {
+        FLAGS
+    }
+
+    fn format(&self, instr: &Instr, operands: &[&str]) -> String {
+        if operands.is_empty() {
+            instr.mnemonic.into()
+        } else {
+            format!("{:<4} {}", instr.mnemonic, operands.join(", "))
+        }
+    }
+
+    fn indexed_cell(&self, offset: u8, index: u8) -> u8 {
+        ((usize::from(offset) + usize::from(index)) % RAM_LEN) as u8
+    }
+
+    fn index_offset(&self, first: u8) -> u8 {
+        ((usize::from(first) + RAM_LEN - 1) % RAM_LEN) as u8
     }
 
     fn intrinsics(&self) -> &[&'static str] {
@@ -174,8 +206,9 @@ impl Backend for CalcoBackend {
                 self.lower(&Prim::Store(*dst), out)
             }
             Prim::Return => self.emit(out, Op::Ret, Vec::new()),
-            Prim::SetCarry(true) => self.emit(out, Op::Sec, Vec::new()),
-            Prim::SetCarry(false) => self.emit(out, Op::Clc, Vec::new()),
+            Prim::SetFlag("carry", true) => self.emit(out, Op::Sec, Vec::new()),
+            Prim::SetFlag("carry", false) => self.emit(out, Op::Clc, Vec::new()),
+            Prim::SetFlag(name, _) => Err(format!("{} cannot set {name}", self.name())),
             Prim::SetIndex(literal) => self.emit(
                 out,
                 Op::LdiB(literal.value),
@@ -199,6 +232,13 @@ impl Backend for CalcoBackend {
 
     fn ports(&self) -> &[Port] {
         &self.ports
+    }
+
+    fn syntax(&self) -> Syntax {
+        Syntax {
+            comment: ";",
+            label_end: ':',
+        }
     }
 }
 

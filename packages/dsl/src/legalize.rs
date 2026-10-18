@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::Diagnostic;
 use crate::ast::BlockKind;
-use crate::backend::{Backend, Features};
+use crate::backend::{Backend, Features, Syntax};
 use crate::diagnostic::Pos;
 use crate::hir::{Block, Cond, Node, Place, Prim, Program, Stmt, Value};
 use crate::labels::{LabelId, LabelName, Labels, asm_label};
@@ -12,6 +12,7 @@ const MAX_UNROLL: u8 = 16;
 type Result<T> = std::result::Result<T, Diagnostic>;
 
 struct Inliner<'a> {
+    syntax: Syntax,
     routines: BTreeMap<LabelId, Block>,
     sites: BTreeMap<LabelId, usize>,
     labels: &'a mut Labels,
@@ -36,7 +37,7 @@ impl Inliner<'_> {
                     stack.pop();
                     let once = self.sites.get(&target) == Some(&1);
                     if !once {
-                        if has_asm_label(&body) {
+                        if has_asm_label(&body, self.syntax) {
                             return Err(Diagnostic::error(
                                 pos,
                                 format!(
@@ -103,6 +104,7 @@ impl Inliner<'_> {
 }
 
 struct Unroller<'a> {
+    backend: &'a dyn Backend,
     features: &'a Features,
     name: &'a str,
     /// How often each label is a jump or call target in the whole program.
@@ -123,7 +125,7 @@ impl Unroller<'_> {
                 "loops with loops or calls inside cannot be unrolled",
             ));
         }
-        if has_asm_label(body) {
+        if has_asm_label(body, self.backend.syntax()) {
             return Err(Diagnostic::error(
                 pos,
                 "loops with asm labels inside cannot be unrolled",
@@ -201,12 +203,9 @@ impl Unroller<'_> {
                     }
                     for k in (1..=count).rev() {
                         let mut copy = body.clone();
-                        let cells = self.features.ram_cells;
+                        let backend = self.backend;
                         map_places(&mut copy, &|place| match place {
-                            Place::Indexed(offset) => {
-                                let cell = (u16::from(offset) + u16::from(k)) % u16::from(cells);
-                                Place::Cell(cell as u8)
-                            }
+                            Place::Indexed(offset) => Place::Cell(backend.indexed_cell(offset, k)),
                             place => place,
                         });
                         if k == count {
@@ -292,6 +291,7 @@ pub(crate) fn legalize(
             .into_iter()
             .partition(|b| b.kind == BlockKind::Routine);
         let mut inliner = Inliner {
+            syntax: backend.syntax(),
             routines: routines.into_iter().map(|r| (r.label, r)).collect(),
             sites,
             labels: &mut program.labels,
@@ -317,6 +317,7 @@ pub(crate) fn legalize(
         }
     }
     let mut unroller = Unroller {
+        backend,
         features: &features,
         name: backend.name(),
         refs,
@@ -480,11 +481,11 @@ fn drop_labels(nodes: &mut Vec<Node>, keep: &impl Fn(LabelId) -> bool) {
     }
 }
 
-fn has_asm_label(nodes: &[Node]) -> bool {
+fn has_asm_label(nodes: &[Node], syntax: Syntax) -> bool {
     let mut found = false;
     Node::visit(nodes, &mut |node| {
         if let Stmt::Asm(lines) = &node.stmt {
-            found |= lines.iter().any(|line| asm_label(line).is_some());
+            found |= lines.iter().any(|line| asm_label(line, syntax).is_some());
         }
     });
     found
