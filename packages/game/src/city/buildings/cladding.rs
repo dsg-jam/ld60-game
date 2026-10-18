@@ -1,5 +1,9 @@
+use std::ops::Range;
+
 use bevy::prelude::*;
 use rand::{Rng, RngExt};
+
+use super::super::Pick;
 
 const CONCRETE: [Color; 4] = [
     Color::srgb_u8(0x4a, 0x48, 0x46),
@@ -29,7 +33,7 @@ const BRICK: [Color; 3] = [
     Color::srgb_u8(0x4c, 0x2e, 0x24),
 ];
 /// Some buildings are lighter or darker than their color.
-const SHADE: std::ops::Range<f32> = 0.8..1.15;
+const SHADE: Range<f32> = 0.8..1.15;
 
 /// What the outer walls of a building are clad in.
 ///
@@ -62,7 +66,7 @@ impl Cladding {
             Self::Brick => &BRICK,
             Self::Plaster => &PAINT,
         };
-        let color = colors[rng.random_range(0..colors.len())];
+        let color = *colors.pick(rng);
         let shade = rng.random_range(SHADE);
         let linear = color.to_linear();
         Color::linear_rgb(

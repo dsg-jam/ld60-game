@@ -1,7 +1,5 @@
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
-    camera::visibility::NoFrustumCulling,
-    light::NotShadowCaster,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
@@ -94,9 +92,7 @@ impl RainMaterial {
                 },
             })),
             Transform::default(),
-            // The vertex shader moves the streaks, so the mesh bounds mean nothing.
-            NoFrustumCulling,
-            NotShadowCaster,
+            Quads::unbounded(),
         ));
     }
 

@@ -2,12 +2,13 @@ use std::ops::Range;
 
 use bevy::{
     prelude::*,
-    shape::{Aabb3d, RayCast3d},
+    shape::{Aabb3d, BoundingVolume},
 };
 use rand::{Rng, RngExt};
 
 use super::signs::{Sign, SignBounds};
-use super::{FACADES, Kit, rng};
+use super::{FACADES, Kit, Pick, Segment, rng};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::parts::bulb::Bulb;
@@ -85,15 +86,13 @@ impl Cable {
                 else {
                     continue;
                 };
-                for segment in 0..SEGMENTS {
-                    let a = cable.point(segment as f32 / SEGMENTS as f32);
-                    let b = cable.point((segment + 1) as f32 / SEGMENTS as f32);
-                    parent.spawn(kit.bar(a, b, THICKNESS, wire.clone()));
+                for Segment { from, to } in cable.segments() {
+                    parent.spawn(kit.bar(&Bar::square(from, to, THICKNESS), wire.clone()));
                 }
                 let apart = last_string.is_none_or(|last| index - last >= STRING_SPACING);
                 if apart && rng.random_bool(STRING_LIGHT_CHANCE) {
                     last_string = Some(index);
-                    let color = BULBS[rng.random_range(0..BULBS.len())];
+                    let color = *BULBS.pick(&mut rng);
                     let count = (cable.near.distance(cable.far) / BULB_SPACING) as usize;
                     for index in 1..count {
                         let at = cable.point(index as f32 / count as f32);
@@ -134,20 +133,18 @@ impl Cable {
     }
 
     fn clear_of(&self, signs: &[Aabb3d]) -> bool {
-        (0..SEGMENTS).all(|segment| {
-            let a = self.point(segment as f32 / SEGMENTS as f32);
-            let b = self.point((segment + 1) as f32 / SEGMENTS as f32);
-            let Ok(direction) = Dir3::new(b - a) else {
-                return true;
-            };
-            let ray = RayCast3d::new(a, direction, a.distance(b));
-            signs.iter().all(|sign| {
-                let bounds = Aabb3d {
-                    min: sign.min - CLEARANCE,
-                    max: sign.max + CLEARANCE,
-                };
-                ray.aabb_intersection_at(&bounds).is_none()
-            })
+        self.segments().all(|segment| {
+            signs
+                .iter()
+                .all(|sign| segment.misses(&sign.grow(Vec3::splat(CLEARANCE))))
+        })
+    }
+
+    /// The straight pieces the sagging cable is made of.
+    fn segments(&self) -> impl Iterator<Item = Segment> {
+        (0..SEGMENTS).map(|segment| Segment {
+            from: self.point(segment as f32 / SEGMENTS as f32),
+            to: self.point((segment + 1) as f32 / SEGMENTS as f32),
         })
     }
 }

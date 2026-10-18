@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::{
     asset::RenderAssetUsages,
     light::VolumetricLight,
@@ -167,7 +169,7 @@ impl Lamp {
         // Outwards and slightly up, along the slanted side.
         let slope = (SHADE_BOTTOM - SHADE_TOP) / SHADE_HEIGHT;
         for index in 0..=SHADE_SEGMENTS {
-            let angle = index as f32 / SHADE_SEGMENTS as f32 * std::f32::consts::TAU;
+            let angle = index as f32 / SHADE_SEGMENTS as f32 * TAU;
             let around = Vec3::new(angle.cos(), 0.0, angle.sin());
             let normal = (around + Vec3::Y * slope).normalize();
             positions.push(around * SHADE_BOTTOM);
@@ -182,7 +184,7 @@ impl Lamp {
         positions.push(Vec3::Y * SHADE_HEIGHT);
         normals.push(Vec3::Y);
         for index in 0..=SHADE_SEGMENTS {
-            let angle = index as f32 / SHADE_SEGMENTS as f32 * std::f32::consts::TAU;
+            let angle = index as f32 / SHADE_SEGMENTS as f32 * TAU;
             positions.push(
                 Vec3::new(angle.cos(), 0.0, angle.sin()) * SHADE_TOP + Vec3::Y * SHADE_HEIGHT,
             );

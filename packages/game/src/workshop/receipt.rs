@@ -26,7 +26,7 @@ impl Plugin for ReceiptPlugin {
     }
 }
 
-/// The slip left on the desk after a pickup. It says whether the customer
+/// The slip left on the counter after a pickup. It says whether the customer
 /// paid and quotes their note if they did not.
 #[derive(Component, Clone, Debug)]
 #[require(Transform, Visibility)]

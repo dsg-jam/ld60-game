@@ -1,3 +1,4 @@
+use std::f32::consts::TAU;
 use std::ops::Range;
 
 use bevy::prelude::*;
@@ -81,7 +82,7 @@ impl Candle {
 
     /// Lets the flame burn on for `seconds`.
     fn advance(&mut self, seconds: f32) {
-        let omega = std::f32::consts::TAU * SPRING_HZ;
+        let omega = TAU * SPRING_HZ;
         // Counts down, so it ends even once the clock is too large to tell
         // a step apart.
         let mut left = seconds;
@@ -94,7 +95,7 @@ impl Candle {
             let drafts = CALM_DRAFTS + (BREEZY_DRAFTS - CALM_DRAFTS) * breeze;
             if self.rng.random::<f32>() < drafts * dt {
                 self.speed -= self.rng.random_range(KNOCK) * (0.5 + breeze);
-                let angle = self.rng.random_range(0.0..std::f32::consts::TAU);
+                let angle = self.rng.random_range(0.0..TAU);
                 self.blown = Vec3::new(angle.cos(), 0.0, angle.sin());
             }
             let rest = 1.0

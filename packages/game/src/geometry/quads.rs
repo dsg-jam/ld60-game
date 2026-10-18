@@ -1,5 +1,7 @@
 use bevy::{
     asset::RenderAssetUsages,
+    camera::visibility::NoFrustumCulling,
+    light::NotShadowCaster,
     mesh::{Indices, PrimitiveTopology},
     prelude::*,
 };
@@ -34,6 +36,13 @@ impl Quads {
             .extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         self.indices
             .extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+    }
+
+    /// Goes with the mesh. The shader moves the quads away from where the
+    /// mesh puts them, so its bounds mean nothing for culling, and they cast
+    /// no shadows.
+    pub(crate) fn unbounded() -> impl Bundle {
+        (NoFrustumCulling, NotShadowCaster)
     }
 
     pub(crate) fn into_mesh(self) -> Mesh {

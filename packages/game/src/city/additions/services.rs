@@ -7,6 +7,8 @@ use super::{Additions, Wall};
 use crate::city::Kit;
 use crate::geometry::block::Block;
 
+/// Thickness of the pipes running along a wall.
+const PIPE: f32 = 0.12;
 const DRAIN: f32 = 0.1;
 const DRAIN_CHANCE: f64 = 0.7;
 const BRACKET_SPACING: f32 = 1.8;
@@ -99,7 +101,7 @@ impl Additions {
         let y = wall.corner(0, row).y + 0.15;
         let from = wall.corner(first, row).x;
         let to = wall.corner(last, row).x;
-        let size = super::PIPE;
+        let size = PIPE;
         let run = Block::between(
             wall.at(Vec3::new(from, y, OFF_WALL)),
             wall.at(Vec3::new(to, y + size, OFF_WALL + size)),

@@ -1,18 +1,17 @@
+use std::f32::consts::TAU;
 use std::ops::Range;
 
-use bevy::{
-    prelude::*,
-    shape::{Aabb3d, RayCast3d},
-};
+use bevy::{prelude::*, shape::Aabb3d};
 use rand::{Rng, RngExt, rngs::SmallRng};
 
 use super::super::buildings::Skyline;
-use super::super::{FACADES, Kit, rng};
-use super::HOVER_BOB;
+use super::super::{FACADES, Kit, Segment, rng};
 use super::models::Fleet;
 use crate::geometry::block::Block;
 
-const SEED: u64 = 5;
+const SEED: u64 = 9;
+/// How far a flying car bobs up and down, in meters.
+const HOVER_BOB: f32 = 0.25;
 const CARS: usize = 22;
 /// Routes pass over a random point in this area, beyond the street.
 const AREA_X: Range<f32> = -160.0..160.0;
@@ -135,16 +134,19 @@ impl Route {
                 rng.random_range(ALTITUDE),
                 rng.random_range(AREA_Z),
             );
-            let heading = rng.random_range(0.0..std::f32::consts::TAU);
+            let heading = rng.random_range(0.0..TAU);
             let across = Vec3::new(heading.cos(), 0.0, heading.sin()) * REACH;
             let climb = Vec3::Y * rng.random_range(CLIMB) / 2.0;
             let start = over - across - climb;
             let end = over + across + climb;
             let street = Self::over_street();
-            let clear = Self::misses(start, end, &street)
+            let route = Segment {
+                from: start,
+                to: end,
+            };
+            let clear = route.misses(&street)
                 && volumes.iter().all(|block| {
-                    let bounds = Aabb3d::new(block.center, block.size / 2.0 + CLEARANCE);
-                    Self::misses(start, end, &bounds)
+                    route.misses(&Aabb3d::new(block.center, block.size / 2.0 + CLEARANCE))
                 });
             clear.then(|| {
                 let speed = rng.random_range(SPEED);
@@ -164,13 +166,5 @@ impl Route {
         let lo = Vec3::new(-STREET_HALF_LENGTH, 0.0, FACADES - STREET_MARGIN);
         let hi = Vec3::new(STREET_HALF_LENGTH, 2.0 * ALTITUDE.end, STREET_MARGIN);
         Aabb3d::new((lo + hi) / 2.0, (hi - lo) / 2.0)
-    }
-
-    fn misses(start: Vec3, end: Vec3, bounds: &Aabb3d) -> bool {
-        let Ok(direction) = Dir3::new(end - start) else {
-            return true;
-        };
-        let ray = RayCast3d::new(start, direction, start.distance(end));
-        ray.aabb_intersection_at(bounds).is_none()
     }
 }

@@ -4,10 +4,11 @@ use bevy::prelude::*;
 
 use self::candle::{Candle, Paper};
 use super::shop::{FRONT, PILLAR, SIZE};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
-use crate::parts::script::{ALPHABET, GLYPH_SIZE};
+use crate::parts::script::ALPHABET;
 
 /// Box of the rolled up shutter above the opening.
 const SHUTTER_HEIGHT: f32 = 0.3;
@@ -17,6 +18,8 @@ const ROOF_REACH: f32 = 0.8;
 const ROOF_DROP: f32 = 0.2;
 const ROOF_THICKNESS: f32 = 0.03;
 const ROOF_RIBS: usize = 9;
+/// Width and height of the ribs on the roof.
+const RIB: Vec2 = Vec2::new(0.03, 0.02);
 
 /// Bottom of the beam the noren hang from.
 const BEAM_HEIGHT: f32 = 2.95;
@@ -29,6 +32,8 @@ const NAME: [usize; 3] = [4, 11, 17];
 /// Size of one grid step of the letters on the noren.
 const LETTER_STEP: f32 = 0.075;
 const STROKE: f32 = 0.03;
+/// How far the letters stand out of the fabric.
+const LETTER_DEPTH: f32 = 0.004;
 
 const LANTERN: Vec3 = Vec3::new(0.24, 0.32, 0.24);
 /// How far out the lanterns hang, as a share of the roof's reach.
@@ -135,28 +140,22 @@ impl Front {
 
     /// Corrugated metal sloping down towards the street.
     fn spawn_roof(front: &mut ChildSpawnerCommands, top: f32) {
-        let slope = (ROOF_DROP / ROOF_REACH).atan();
-        let length = ROOF_REACH.hypot(ROOF_DROP);
         let width = SIZE.x - 0.1;
-        let center = Vec3::new(0.0, top - ROOF_DROP / 2.0, FRONT - ROOF_REACH / 2.0);
-        let tilt = Quat::from_rotation_x(-slope);
-        let sheet = Block {
-            center: Vec3::ZERO,
-            size: Vec3::new(width, ROOF_THICKNESS, length),
+        let sheet = Bar {
+            from: Vec3::new(0.0, top, FRONT),
+            to: Vec3::new(0.0, top - ROOF_DROP, FRONT - ROOF_REACH),
+            section: Vec2::new(width, ROOF_THICKNESS),
+            up: Vec3::Y,
         };
-        front
-            .spawn((Shape::cuboid(&sheet, ROOF_METAL), Finish::Rust))
-            .insert(Transform::from_translation(center).with_rotation(tilt));
+        front.spawn((Shape::bar(&sheet, ROOF_METAL), Finish::Rust));
+        let tilt = sheet.placement().rotation;
         for index in 0..ROOF_RIBS {
             let x = -width / 2.0 + (index as f32 + 0.5) * width / ROOF_RIBS as f32;
-            let rib = Block {
-                center: Vec3::ZERO,
-                size: Vec3::new(0.03, 0.02, length),
+            let rib = Bar {
+                section: RIB,
+                ..sheet.translated(tilt * Vec3::new(x, (ROOF_THICKNESS + RIB.y) / 2.0, 0.0))
             };
-            let offset = tilt * Vec3::new(x, ROOF_THICKNESS / 2.0 + 0.01, 0.0);
-            front
-                .spawn((Shape::cuboid(&rib, ROOF_METAL), Finish::Rust))
-                .insert(Transform::from_translation(center + offset).with_rotation(tilt));
+            front.spawn((Shape::bar(&rib, ROOF_METAL), Finish::Rust));
         }
     }
 
@@ -187,28 +186,17 @@ impl Front {
                 (panel.max().z + 0.003, LETTERS_INSIDE),
             ] {
                 let middle = Vec3::new(panel.center.x, panel.center.y, z);
-                for (a, b) in ALPHABET[letter].strokes() {
-                    let (a, b) = (
-                        a - GLYPH_SIZE * Vec2::new(0.5, -0.5),
-                        b - GLYPH_SIZE * Vec2::new(0.5, -0.5),
-                    );
-                    // The street looks along +Z, so its right is -X.
-                    let (a, b) = (
-                        a * LETTER_STEP * Vec2::new(-1.0, 1.0),
-                        b * LETTER_STEP * Vec2::new(-1.0, 1.0),
-                    );
-                    let delta = b - a;
-                    let stroke = Block {
-                        center: Vec3::ZERO,
-                        size: Vec3::new(delta.length() + STROKE, STROKE, 0.004),
-                    };
-                    let at = middle + ((a + b) / 2.0).extend(0.0);
-                    front
-                        .spawn((Shape::cuboid(&stroke, color), Finish::Fabric))
-                        .insert(
-                            Transform::from_translation(at)
-                                .with_rotation(Quat::from_rotation_z(delta.y.atan2(delta.x))),
-                        );
+                // The street looks along +Z, so its right is -X.
+                let scale = LETTER_STEP * Vec2::new(-1.0, 1.0);
+                for (a, b) in ALPHABET[letter].centered_strokes() {
+                    let stroke = Bar {
+                        from: middle + (a * scale).extend(0.0),
+                        to: middle + (b * scale).extend(0.0),
+                        section: Vec2::new(STROKE, LETTER_DEPTH),
+                        up: Vec3::Z,
+                    }
+                    .extended(STROKE / 2.0);
+                    front.spawn((Shape::bar(&stroke, color), Finish::Fabric));
                 }
             }
         }

@@ -123,7 +123,7 @@ impl SkyMaterial {
                     rain: 0.0,
                     drift: Vec2::ZERO,
                 },
-                clouds: images.add(clouds::noise()),
+                clouds: images.add(Self::cloud_noise()),
             })),
             NoFrustumCulling,
             NotShadowCaster,

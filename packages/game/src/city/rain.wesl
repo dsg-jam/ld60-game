@@ -30,7 +30,7 @@ struct Vertex {
     @location(2) uv: vec2<f32>,
 }
 
-struct Streak {
+struct Falling {
     @builtin(position) clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) world: vec3<f32>,
@@ -39,11 +39,11 @@ struct Streak {
 }
 
 @vertex
-fn vertex(vertex: Vertex) -> Streak {
+fn vertex(vertex: Vertex) -> Falling {
     let drop = rain.origin + fract(vertex.seed + rain.fall * globals.time / rain.size) * rain.size;
     let along = normalize(rain.fall) * rain.length;
     let shape = streak(drop - along * 0.5, along, rain.width, vertex.uv, view.world_position);
-    var out: Streak;
+    var out: Falling;
     out.clip = position_world_to_clip(shape.world);
     // Light rain drops some of the streaks.
     if fract(vertex.seed.x * 13.7 + vertex.seed.z * 7.1) >= rain.amount {
@@ -56,7 +56,7 @@ fn vertex(vertex: Vertex) -> Streak {
 }
 
 @fragment
-fn fragment(in: Streak) -> @location(0) vec4<f32> {
+fn fragment(in: Falling) -> @location(0) vec4<f32> {
     let along = smoothstep(0.0, 0.3, in.uv.y) * (1.0 - in.uv.y * 0.6);
     // Rain only shows where light falls on it.
     var light = vec3<f32>(0.6, 0.7, 1.0) * rain.ambient;

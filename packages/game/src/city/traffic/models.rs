@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::{light::VolumetricLight, prelude::*, shape::ConvexPolygonError};
 use rand::{Rng, RngExt};
 
-use super::super::{Kit, glow, matte};
+use super::super::{Kit, NEON, Pick, glow, matte};
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 
@@ -59,6 +59,8 @@ const WHEEL_WIDTH: f32 = 0.26;
 /// How far the wheels stick out of the body.
 const WHEEL_OUT: f32 = 0.04;
 pub(super) const WHEELBASE: f32 = 1.45;
+/// Distance of a sedan's wheels from its middle.
+pub(super) const TRACK: f32 = CAR_WIDTH / 2.0 - WHEEL_WIDTH / 2.0 + WHEEL_OUT;
 const POD_RADIUS: f32 = 0.22;
 const POD_LENGTH: f32 = 1.6;
 const STRIP: f32 = 0.06;
@@ -74,11 +76,7 @@ const PAINTS: [Color; 6] = [
     Color::srgb_u8(0x3a, 0x3a, 0x3e),
     Color::srgb_u8(0xc8, 0x8a, 0x2a),
 ];
-const UNDERGLOW: [Color; 3] = [
-    Color::srgb_u8(0x05, 0xd9, 0xe8),
-    Color::srgb_u8(0xff, 0x2a, 0x6d),
-    Color::srgb_u8(0xb1, 0x4a, 0xed),
-];
+const UNDERGLOW: [Color; 3] = [NEON[1], NEON[0], NEON[2]];
 const GLASS: Color = Color::srgb_u8(0x0c, 0x10, 0x16);
 const HEADLIGHT: Color = Color::srgb_u8(0xff, 0xf4, 0xe0);
 const TAILLIGHT: Color = Color::srgb_u8(0xff, 0x18, 0x10);
@@ -148,7 +146,7 @@ impl Fleet {
     }
 
     pub(super) fn car(&self, parts: &mut ChildSpawnerCommands, kit: &Kit, rng: &mut impl Rng) {
-        let paint = Self::pick(&self.paints, rng);
+        let paint = self.paints.pick(rng).clone();
         let (width, front, rear) = if rng.random_bool(VAN_CHANCE) {
             self.van_details(parts, kit, &paint, rng);
             (VAN_WIDTH, 2.5, -2.45)
@@ -174,7 +172,7 @@ impl Fleet {
                 Vec3::new(rear * 0.8, 0.22, -width * 0.42),
                 Vec3::new(front * 0.8, 0.22 + STRIP, width * 0.42),
             );
-            parts.spawn(kit.cuboid(&strip, Self::pick(&self.glows, rng)));
+            parts.spawn(kit.cuboid(&strip, self.glows.pick(rng).clone()));
         }
     }
 
@@ -199,7 +197,7 @@ impl Fleet {
         let windows = side(Vec2::new(1.15, 1.3), Vec2::new(1.85, 1.85), 0.01);
         let stripe = side(Vec2::new(-2.4, 0.95), Vec2::new(2.45, 1.05), 0.012);
         parts.spawn(kit.cuboid(&windows, self.glass.clone()));
-        parts.spawn(kit.cuboid(&stripe, Self::pick(&self.paints, rng)));
+        parts.spawn(kit.cuboid(&stripe, self.paints.pick(rng).clone()));
         for x in [0.95, -0.3] {
             let seam = side(Vec2::new(x, 0.5), Vec2::new(x + 0.03, 2.0), 0.014);
             parts.spawn(kit.cuboid(&seam, self.tire.clone()));
@@ -219,8 +217,8 @@ impl Fleet {
     }
 
     pub(super) fn hover(&self, parts: &mut ChildSpawnerCommands, kit: &Kit, rng: &mut impl Rng) {
-        let paint = Self::pick(&self.paints, rng);
-        let glow = Self::pick(&self.glows, rng);
+        let paint = self.paints.pick(rng).clone();
+        let glow = self.glows.pick(rng).clone();
         parts.spawn(Self::part(&self.hover_hull, &paint));
         parts.spawn(Self::part(&self.hover_canopy, &self.glass));
         for side in [-1.0, 1.0] {
@@ -289,9 +287,5 @@ impl Fleet {
 
     fn part<M: Material>(mesh: &Handle<Mesh>, material: &Handle<M>) -> impl Bundle {
         (Mesh3d(mesh.clone()), MeshMaterial3d(material.clone()))
-    }
-
-    fn pick<M: Material>(materials: &[Handle<M>], rng: &mut impl Rng) -> Handle<M> {
-        materials[rng.random_range(0..materials.len())].clone()
     }
 }

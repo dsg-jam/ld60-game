@@ -10,8 +10,10 @@ struct Spray {
     /// Seconds a droplet flies.
     lifetime: f32,
     size: f32,
-    /// Local X of the tail lights, which light the spray red.
-    tail: f32,
+    /// Where the tail lights sit, on the side of +Z, which light the spray
+    /// red.
+    tail: vec3<f32>,
+    gravity: f32,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> spray: Spray;
@@ -39,7 +41,7 @@ fn vertex(vertex: Vertex) -> Droplet {
     let t = age * spray.lifetime;
     // Thrown back and up by the tire, then falling.
     let velocity = vec3<f32>(-mix(1.5, 4.5, r.y), mix(0.6, 2.0, r.z), r.w * mix(0.2, 1.0, r.y));
-    var local = vertex.anchor + velocity * t - vec3<f32>(0.0, 4.9 * t * t, 0.0);
+    var local = vertex.anchor + velocity * t - vec3<f32>(0.0, 0.5 * spray.gravity * t * t, 0.0);
     local.y = max(local.y, 0.02);
     let world = (get_world_from_local(vertex.instance_index) * vec4<f32>(local, 1.0)).xyz;
 
@@ -59,7 +61,7 @@ fn vertex(vertex: Vertex) -> Droplet {
 fn fragment(in: Droplet) -> @location(0) vec4<f32> {
     let soft = 1.0 - smoothstep(0.0, 1.0, length(in.uv - 0.5) * 2.0);
     let fade = (1.0 - in.age) * (1.0 - in.age) * spray.wetness * 0.4;
-    let tail = vec3<f32>(spray.tail, 0.65, sign(in.local.z) * 0.8);
+    let tail = spray.tail * vec3<f32>(1.0, 1.0, sign(in.local.z));
     let d = in.local - tail;
     let red = 1.0 / (1.0 + dot(d, d) * 4.0);
     let light = vec3<f32>(0.04, 0.045, 0.05) + vec3<f32>(1.0, 0.08, 0.05) * red * 1.5;

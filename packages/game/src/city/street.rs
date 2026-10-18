@@ -1,8 +1,9 @@
 use bevy::{light::VolumetricLight, prelude::*};
 
 use super::wet::{Wet, WetMaterial};
-use super::{CURB_HEIGHT, FACADES, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB};
+use super::{CURB_HEIGHT, FACADES, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, turned_to};
 use super::{glow, matte};
+use crate::geometry::bar::Bar;
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::workshop::shop;
@@ -53,163 +54,165 @@ pub(super) struct StreetPlugin;
 
 impl Plugin for StreetPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_street);
+        app.add_systems(Startup, Self::spawn);
     }
 }
 
-fn spawn_street(
-    mut commands: Commands,
-    kit: Res<Kit>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut wet: ResMut<Assets<WetMaterial>>,
-    mut surfaces: ResMut<Assets<SurfaceMaterial>>,
-) {
-    let asphalt = wet.add(Wet::material(matte(ASPHALT, 0.9), ROAD_PUDDLES, 1.0));
-    let concrete = wet.add(Wet::material(matte(CONCRETE, 0.92), WALK_PUDDLES, 2.0));
-    let curb = wet.add(Wet::material(matte(CURB, 0.8), 0.0, 3.0));
-    let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, 1.0));
-    let slab = |block: &Block, material: &Handle<WetMaterial>| kit.cuboid(block, material.clone());
+impl StreetPlugin {
+    fn spawn(
+        mut commands: Commands,
+        kit: Res<Kit>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+        mut wet: ResMut<Assets<WetMaterial>>,
+        mut surfaces: ResMut<Assets<SurfaceMaterial>>,
+    ) {
+        let asphalt = wet.add(Wet::material(matte(ASPHALT, 0.9), ROAD_PUDDLES, 1.0));
+        let concrete = wet.add(Wet::material(matte(CONCRETE, 0.92), WALK_PUDDLES, 2.0));
+        let curb = wet.add(Wet::material(matte(CURB, 0.8), 0.0, 3.0));
+        let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, 1.0));
+        let slab =
+            |block: &Block, material: &Handle<WetMaterial>| kit.cuboid(block, material.clone());
 
-    let ground = |top: f32, near: f32, far: f32| {
-        Block::between(
-            Vec3::new(-HALF_LENGTH, top - SLAB_DEPTH, near),
-            Vec3::new(HALF_LENGTH, top, far),
-        )
-    };
-    // Edge to edge, so no faces overlap.
-    let road = ground(-CURB_HEIGHT, NEAR_CURB, FAR_CURB);
-    let near_curb = ground(0.0, NEAR_CURB + CURB_WIDTH, NEAR_CURB);
-    let near_walk = ground(0.0, shop::FRONT + BACKYARD, NEAR_CURB + CURB_WIDTH);
-    let far_curb = ground(0.0, FAR_CURB, FAR_CURB - CURB_WIDTH);
-    let far_walk = ground(0.0, FAR_CURB - CURB_WIDTH, FACADES - BACKYARD);
+        let ground = |top: f32, near: f32, far: f32| {
+            Block::between(
+                Vec3::new(-HALF_LENGTH, top - SLAB_DEPTH, near),
+                Vec3::new(HALF_LENGTH, top, far),
+            )
+        };
+        // Edge to edge, so no faces overlap.
+        let road = ground(-CURB_HEIGHT, NEAR_CURB, FAR_CURB);
+        let near_curb = ground(0.0, NEAR_CURB + CURB_WIDTH, NEAR_CURB);
+        let near_walk = ground(0.0, shop::FRONT + BACKYARD, NEAR_CURB + CURB_WIDTH);
+        let far_curb = ground(0.0, FAR_CURB, FAR_CURB - CURB_WIDTH);
+        let far_walk = ground(0.0, FAR_CURB - CURB_WIDTH, FACADES - BACKYARD);
 
-    commands
-        .spawn((
-            Name::new("street"),
-            Transform::default(),
-            Visibility::default(),
-        ))
-        .with_children(|street| {
-            street.spawn(slab(&road, &asphalt));
-            street.spawn(slab(&near_walk, &concrete));
-            street.spawn(slab(&far_walk, &concrete));
-            street.spawn(slab(&near_curb, &curb));
-            street.spawn(slab(&far_curb, &curb));
+        commands
+            .spawn((
+                Name::new("street"),
+                Transform::default(),
+                Visibility::default(),
+            ))
+            .with_children(|street| {
+                street.spawn(slab(&road, &asphalt));
+                street.spawn(slab(&near_walk, &concrete));
+                street.spawn(slab(&far_walk, &concrete));
+                street.spawn(slab(&near_curb, &curb));
+                street.spawn(slab(&far_curb, &curb));
 
-            let middle = (NEAR_CURB + FAR_CURB) / 2.0;
-            let mut x = -HALF_LENGTH;
+                let middle = (NEAR_CURB + FAR_CURB) / 2.0;
+                let mut x = -HALF_LENGTH;
+                while x < HALF_LENGTH {
+                    let dash = Block::between(
+                        Vec3::new(x, -CURB_HEIGHT, middle - LINE_WIDTH / 2.0),
+                        Vec3::new(
+                            x + DASH_LENGTH,
+                            -CURB_HEIGHT + PAINT_HEIGHT,
+                            middle + LINE_WIDTH / 2.0,
+                        ),
+                    );
+                    street.spawn(slab(&dash, &paint));
+                    x += DASH_LENGTH + DASH_GAP;
+                }
+            });
+
+        Self::spawn_lamps(&mut commands, &kit, &mut materials, &mut surfaces);
+    }
+
+    /// Street lamps on both sides, reaching over the road.
+    fn spawn_lamps(
+        commands: &mut Commands,
+        kit: &Kit,
+        materials: &mut Assets<StandardMaterial>,
+        surfaces: &mut Assets<SurfaceMaterial>,
+    ) {
+        let post = surfaces.add(Finish::Paint.scaled(POST));
+        let housing = surfaces.add(Finish::Metal.scaled(HOUSING));
+        let lens = materials.add(glow(SODIUM, 60.0));
+        let sides = [
+            // Leaves the view from the shop free.
+            (NEAR_CURB + CURB_WIDTH * 2.0, -1.0, LAMP_SPACING / 2.0),
+            (FAR_CURB - CURB_WIDTH * 2.0, 1.0, LAMP_SPACING / 4.0),
+        ];
+        for (z, towards_road, offset) in sides {
+            let mut x = -HALF_LENGTH + offset;
             while x < HALF_LENGTH {
-                let dash = Block::between(
-                    Vec3::new(x, -CURB_HEIGHT, middle - LINE_WIDTH / 2.0),
+                let plinth = Block::new(LAMP_PLINTH).translated(Vec3::new(x, 0.0, z));
+                let pole = Block::new(Vec3::new(LAMP_POST, LAMP_HEIGHT, LAMP_POST))
+                    .translated(Vec3::new(x, 0.0, z));
+                let arm = Block::between(
+                    Vec3::new(x - LAMP_POST / 4.0, LAMP_HEIGHT - LAMP_POST / 2.0, z),
                     Vec3::new(
-                        x + DASH_LENGTH,
-                        -CURB_HEIGHT + PAINT_HEIGHT,
-                        middle + LINE_WIDTH / 2.0,
+                        x + LAMP_POST / 4.0,
+                        LAMP_HEIGHT,
+                        z + towards_road * LAMP_REACH,
                     ),
                 );
-                street.spawn(slab(&dash, &paint));
-                x += DASH_LENGTH + DASH_GAP;
+                // The housing hangs from the end of the arm, tipped towards the
+                // road. Its parts are placed in its own space, long along Z.
+                let head = Vec3::new(
+                    x,
+                    LAMP_HEIGHT - LAMP_HOUSING.y / 2.0,
+                    z + towards_road * (LAMP_REACH - LAMP_HOUSING.z / 4.0),
+                );
+                let facing = turned_to(towards_road);
+                let tilt = facing * Quat::from_rotation_x(-LAMP_TILT);
+                let shell = Block {
+                    center: Vec3::ZERO,
+                    size: LAMP_HOUSING,
+                };
+                let glass = Block {
+                    center: Vec3::new(0.0, -LAMP_HOUSING.y / 2.0, LAMP_HOUSING.z * 0.05),
+                    size: Vec3::new(LAMP_LENS.x, 0.02, LAMP_LENS.y),
+                };
+                let cell = Block::new(PHOTOCELL).translated(Vec3::new(
+                    0.0,
+                    LAMP_HOUSING.y / 2.0,
+                    -LAMP_HOUSING.z * 0.3,
+                ));
+                // A strut from the pole up to the arm, holding it.
+                let strut_low = Vec3::new(x, LAMP_HEIGHT - 1.0, z + towards_road * LAMP_POST);
+                let strut_high = Vec3::new(
+                    x,
+                    LAMP_HEIGHT - LAMP_POST / 2.0,
+                    z + towards_road * LAMP_REACH * 0.5,
+                );
+                let light_at = head + tilt * glass.center;
+                commands
+                    .spawn((Transform::default(), Visibility::default()))
+                    .with_children(|parts| {
+                        parts.spawn(kit.cuboid(&plinth, post.clone()));
+                        parts.spawn(kit.cuboid(&pole, post.clone()));
+                        parts.spawn(kit.cuboid(&arm, post.clone()));
+                        parts.spawn(kit.bar(
+                            &Bar::square(strut_low, strut_high, LAMP_STRUT),
+                            post.clone(),
+                        ));
+                        parts
+                            .spawn((
+                                Transform::from_translation(head).with_rotation(tilt),
+                                Visibility::default(),
+                            ))
+                            .with_children(|head| {
+                                head.spawn(kit.cuboid(&shell, housing.clone()));
+                                head.spawn(kit.cuboid(&glass, lens.clone()));
+                                head.spawn(kit.cuboid(&cell, post.clone()));
+                            });
+                        parts.spawn((
+                            VolumetricLight,
+                            SpotLight {
+                                color: SODIUM,
+                                intensity: LAMP_INTENSITY,
+                                range: LAMP_RANGE,
+                                outer_angle: LAMP_ANGLE,
+                                inner_angle: LAMP_ANGLE * 0.6,
+                                ..default()
+                            },
+                            Transform::from_translation(light_at - Vec3::Y * 0.02)
+                                .looking_at(light_at.with_y(0.0), Vec3::X),
+                        ));
+                    });
+                x += LAMP_SPACING;
             }
-        });
-
-    spawn_lamps(&mut commands, &kit, &mut materials, &mut surfaces);
-}
-
-/// Street lamps on both sides, reaching over the road.
-fn spawn_lamps(
-    commands: &mut Commands,
-    kit: &Kit,
-    materials: &mut Assets<StandardMaterial>,
-    surfaces: &mut Assets<SurfaceMaterial>,
-) {
-    let post = surfaces.add(Finish::Paint.scaled(POST));
-    let housing = surfaces.add(Finish::Metal.scaled(HOUSING));
-    let lens = materials.add(glow(SODIUM, 60.0));
-    let sides = [
-        // Leaves the view from the shop free.
-        (NEAR_CURB + CURB_WIDTH * 2.0, -1.0, LAMP_SPACING / 2.0),
-        (FAR_CURB - CURB_WIDTH * 2.0, 1.0, LAMP_SPACING / 4.0),
-    ];
-    for (z, towards_road, offset) in sides {
-        let mut x = -HALF_LENGTH + offset;
-        while x < HALF_LENGTH {
-            let plinth = Block::new(LAMP_PLINTH).translated(Vec3::new(x, 0.0, z));
-            let pole = Block::new(Vec3::new(LAMP_POST, LAMP_HEIGHT, LAMP_POST))
-                .translated(Vec3::new(x, 0.0, z));
-            let arm = Block::between(
-                Vec3::new(x - LAMP_POST / 4.0, LAMP_HEIGHT - LAMP_POST / 2.0, z),
-                Vec3::new(
-                    x + LAMP_POST / 4.0,
-                    LAMP_HEIGHT,
-                    z + towards_road * LAMP_REACH,
-                ),
-            );
-            // The housing hangs from the end of the arm, tipped towards the
-            // road. Its parts are placed in its own space, long along Z.
-            let head = Vec3::new(
-                x,
-                LAMP_HEIGHT - LAMP_HOUSING.y / 2.0,
-                z + towards_road * (LAMP_REACH - LAMP_HOUSING.z / 4.0),
-            );
-            let facing = if towards_road > 0.0 {
-                Quat::IDENTITY
-            } else {
-                Quat::from_rotation_y(std::f32::consts::PI)
-            };
-            let tilt = facing * Quat::from_rotation_x(-LAMP_TILT);
-            let shell = Block {
-                center: Vec3::ZERO,
-                size: LAMP_HOUSING,
-            };
-            let glass = Block {
-                center: Vec3::new(0.0, -LAMP_HOUSING.y / 2.0, LAMP_HOUSING.z * 0.05),
-                size: Vec3::new(LAMP_LENS.x, 0.02, LAMP_LENS.y),
-            };
-            let cell = Block::new(PHOTOCELL).translated(Vec3::new(
-                0.0,
-                LAMP_HOUSING.y / 2.0,
-                -LAMP_HOUSING.z * 0.3,
-            ));
-            // A strut from the pole up to the arm, holding it.
-            let strut_low = Vec3::new(x, LAMP_HEIGHT - 1.0, z + towards_road * LAMP_POST);
-            let strut_high = Vec3::new(
-                x,
-                LAMP_HEIGHT - LAMP_POST / 2.0,
-                z + towards_road * LAMP_REACH * 0.5,
-            );
-            let light_at = head + tilt * glass.center;
-            commands
-                .spawn((Transform::default(), Visibility::default()))
-                .with_children(|parts| {
-                    parts.spawn(kit.cuboid(&plinth, post.clone()));
-                    parts.spawn(kit.cuboid(&pole, post.clone()));
-                    parts.spawn(kit.cuboid(&arm, post.clone()));
-                    parts.spawn(kit.bar(strut_low, strut_high, LAMP_STRUT, post.clone()));
-                    parts
-                        .spawn((
-                            Transform::from_translation(head).with_rotation(tilt),
-                            Visibility::default(),
-                        ))
-                        .with_children(|head| {
-                            head.spawn(kit.cuboid(&shell, housing.clone()));
-                            head.spawn(kit.cuboid(&glass, lens.clone()));
-                            head.spawn(kit.cuboid(&cell, post.clone()));
-                        });
-                    parts.spawn((
-                        VolumetricLight,
-                        SpotLight {
-                            color: SODIUM,
-                            intensity: LAMP_INTENSITY,
-                            range: LAMP_RANGE,
-                            outer_angle: LAMP_ANGLE,
-                            inner_angle: LAMP_ANGLE * 0.6,
-                            ..default()
-                        },
-                        Transform::from_translation(light_at - Vec3::Y * 0.02)
-                            .looking_at(light_at.with_y(0.0), Vec3::X),
-                    ));
-                });
-            x += LAMP_SPACING;
         }
     }
 }

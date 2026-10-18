@@ -76,10 +76,8 @@ pub(super) struct HeightFog {
     pub(super) color: Vec4,
     /// How much a meter of air at the ground hides.
     pub(super) density: f32,
-    /// How quickly the haze thins out, per meter of height.
+    /// How quickly the haze thins out, per meter of height above 0.
     pub(super) falloff: f32,
-    /// Height of the ground the density is measured at.
-    pub(super) ground: f32,
 }
 
 /// The render pipeline for [`HeightFog`].

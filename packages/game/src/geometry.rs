@@ -1,3 +1,4 @@
+pub(crate) mod bar;
 pub(crate) mod block;
 pub(crate) mod frame;
 pub(crate) mod quads;

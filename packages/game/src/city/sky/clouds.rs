@@ -6,6 +6,7 @@ use bevy::{
 };
 use rand::{RngExt, rngs::SmallRng};
 
+use super::SkyMaterial;
 use crate::city::rng;
 
 /// Voxels along each side of the noise, which repeats seamlessly.
@@ -90,78 +91,80 @@ impl Lattice {
     }
 }
 
-/// Noise the clouds are made of, after Schneider, "The Real-time Volumetric
-/// Cloudscapes of Horizon Zero Dawn".
-///
-/// Red holds billowy shapes: smooth noise pushed up where cellular noise is
-/// high, so it bulges in round lumps. Green holds finer cellular noise that
-/// wears away their edges into wisps.
-pub(super) fn noise() -> Image {
-    let mut rng = rng(SEED);
-    let shape_points: Vec<Points> = SHAPE_CELLS
-        .iter()
-        .map(|&cells| Points::new(cells, &mut rng))
-        .collect();
-    let detail_points: Vec<Points> = DETAIL_CELLS
-        .iter()
-        .map(|&cells| Points::new(cells, &mut rng))
-        .collect();
-    let lattices: Vec<Lattice> = SHAPE_CELLS
-        .iter()
-        .map(|&cells| Lattice::new(cells, &mut rng))
-        .collect();
-    let mut shapes = Vec::with_capacity(SIZE * SIZE * SIZE);
-    let mut details = Vec::with_capacity(SIZE * SIZE * SIZE);
-    for z in 0..SIZE {
-        for y in 0..SIZE {
-            for x in 0..SIZE {
-                let p = (Vec3::new(x as f32, y as f32, z as f32) + 0.5) / SIZE as f32;
-                let fbm = |values: &mut dyn Iterator<Item = f32>| {
-                    values.zip(OCTAVE_WEIGHTS).map(|(v, w)| v * w).sum::<f32>()
-                };
-                let cells = fbm(&mut shape_points.iter().map(|points| points.cellular(p)));
-                let smooth = fbm(&mut lattices.iter().map(|lattice| lattice.smooth(p)));
-                let detail = fbm(&mut detail_points.iter().map(|points| points.cellular(p)));
-                shapes.push(cells + smooth * (1.0 - cells));
-                details.push(detail);
+impl SkyMaterial {
+    /// Noise the clouds are made of, after Schneider, "The Real-time Volumetric
+    /// Cloudscapes of Horizon Zero Dawn".
+    ///
+    /// Red holds billowy shapes: smooth noise pushed up where cellular noise is
+    /// high, so it bulges in round lumps. Green holds finer cellular noise that
+    /// wears away their edges into wisps.
+    pub(super) fn cloud_noise() -> Image {
+        let mut rng = rng(SEED);
+        let shape_points: Vec<Points> = SHAPE_CELLS
+            .iter()
+            .map(|&cells| Points::new(cells, &mut rng))
+            .collect();
+        let detail_points: Vec<Points> = DETAIL_CELLS
+            .iter()
+            .map(|&cells| Points::new(cells, &mut rng))
+            .collect();
+        let lattices: Vec<Lattice> = SHAPE_CELLS
+            .iter()
+            .map(|&cells| Lattice::new(cells, &mut rng))
+            .collect();
+        let mut shapes = Vec::with_capacity(SIZE * SIZE * SIZE);
+        let mut details = Vec::with_capacity(SIZE * SIZE * SIZE);
+        for z in 0..SIZE {
+            for y in 0..SIZE {
+                for x in 0..SIZE {
+                    let p = (Vec3::new(x as f32, y as f32, z as f32) + 0.5) / SIZE as f32;
+                    let fbm = |values: &mut dyn Iterator<Item = f32>| {
+                        values.zip(OCTAVE_WEIGHTS).map(|(v, w)| v * w).sum::<f32>()
+                    };
+                    let cells = fbm(&mut shape_points.iter().map(|points| points.cellular(p)));
+                    let smooth = fbm(&mut lattices.iter().map(|lattice| lattice.smooth(p)));
+                    let detail = fbm(&mut detail_points.iter().map(|points| points.cellular(p)));
+                    shapes.push(cells + smooth * (1.0 - cells));
+                    details.push(detail);
+                }
             }
         }
+        // Both spread over the whole range, so coverage means the same for
+        // any seed.
+        let stretch = |values: &[f32]| {
+            let (low, high) = values
+                .iter()
+                .fold((f32::MAX, f32::MIN), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+            let span = (high - low).max(f32::EPSILON);
+            values
+                .iter()
+                .map(|&v| ((v - low) / span * 255.0) as u8)
+                .collect::<Vec<_>>()
+        };
+        let data = stretch(&shapes)
+            .into_iter()
+            .zip(stretch(&details))
+            .flat_map(|(shape, detail)| [shape, detail])
+            .collect();
+        let mut image = Image::new(
+            Extent3d {
+                width: SIZE as u32,
+                height: SIZE as u32,
+                depth_or_array_layers: SIZE as u32,
+            },
+            TextureDimension::D3,
+            data,
+            TextureFormat::Rg8Unorm,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
+            address_mode_u: ImageAddressMode::Repeat,
+            address_mode_v: ImageAddressMode::Repeat,
+            address_mode_w: ImageAddressMode::Repeat,
+            mag_filter: ImageFilterMode::Linear,
+            min_filter: ImageFilterMode::Linear,
+            ..default()
+        });
+        image
     }
-    // Both spread over the whole range, so coverage means the same for
-    // any seed.
-    let stretch = |values: &[f32]| {
-        let (low, high) = values
-            .iter()
-            .fold((f32::MAX, f32::MIN), |(lo, hi), &v| (lo.min(v), hi.max(v)));
-        let span = (high - low).max(f32::EPSILON);
-        values
-            .iter()
-            .map(|&v| ((v - low) / span * 255.0) as u8)
-            .collect::<Vec<_>>()
-    };
-    let data = stretch(&shapes)
-        .into_iter()
-        .zip(stretch(&details))
-        .flat_map(|(shape, detail)| [shape, detail])
-        .collect();
-    let mut image = Image::new(
-        Extent3d {
-            width: SIZE as u32,
-            height: SIZE as u32,
-            depth_or_array_layers: SIZE as u32,
-        },
-        TextureDimension::D3,
-        data,
-        TextureFormat::Rg8Unorm,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
-        address_mode_u: ImageAddressMode::Repeat,
-        address_mode_v: ImageAddressMode::Repeat,
-        address_mode_w: ImageAddressMode::Repeat,
-        mag_filter: ImageFilterMode::Linear,
-        min_filter: ImageFilterMode::Linear,
-        ..default()
-    });
-    image
 }
