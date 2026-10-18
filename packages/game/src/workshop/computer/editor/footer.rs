@@ -148,7 +148,7 @@ impl Run {
     /// Burns `source` into the device and powers it on. Testing it is up to
     /// the player.
     fn flash(
-        job: &mut Job,
+        job: &mut ResMut<Job>,
         emulator: &mut Emulator,
         source: &str,
         commands: &mut Commands,
@@ -167,7 +167,9 @@ impl Run {
         };
         emulator.restart(device);
         commands.trigger(Flashed(source.into()));
-        job.flashed = true;
+        if !job.flashed {
+            job.flashed = true;
+        }
         "FLASHED. DEVICE RESTARTED.".into()
     }
 
