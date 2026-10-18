@@ -104,13 +104,28 @@ pub fn compile(
 
 /// Compiles the buggy and the fixed firmware.
 ///
-/// Fails if a switch name does not exist in the source.
+/// Fails if a switch name does not exist in the source. Error messages start
+/// with the firmware that failed.
 pub fn compile_pair(
     source: &str,
     target: &Target,
     switches: &[String],
 ) -> Result<Pair, Vec<Diagnostic>> {
-    let build = |flavor| compile(source, target, &Selection { flavor, switches });
+    let build = |flavor| {
+        compile(source, target, &Selection { flavor, switches }).map_err(|errors| {
+            let name = match flavor {
+                Flavor::Buggy => "buggy",
+                Flavor::Fixed => "fixed",
+            };
+            errors
+                .into_iter()
+                .map(|mut e| {
+                    e.message = format!("{name} firmware: {}", e.message);
+                    e
+                })
+                .collect::<Vec<_>>()
+        })
+    };
     Ok(Pair {
         buggy: build(Flavor::Buggy)?,
         fixed: build(Flavor::Fixed)?,

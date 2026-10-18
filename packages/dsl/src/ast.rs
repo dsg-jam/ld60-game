@@ -182,6 +182,14 @@ impl SwitchKind {
         }
     }
 
+    pub(crate) fn keyword(self) -> &'static str {
+        match self {
+            Self::Bug => "bug",
+            Self::Change => "change",
+            Self::Fix => "fix",
+        }
+    }
+
     pub(crate) fn from_keyword(word: &str) -> Option<Self> {
         match word {
             "bug" => Some(Self::Bug),

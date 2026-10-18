@@ -1,9 +1,9 @@
 mod common;
 
-use common::{build, code, error};
+use common::{build, code, error, target};
 use ld60_calco::Revision;
 use ld60_devices::DeviceKind;
-use ld60_dsl::{Diagnostic, Flavor, Output};
+use ld60_dsl::{Diagnostic, Flavor, Output, compile_pair};
 
 fn tally(revision: Revision, body: &str) -> Result<Output, Vec<Diagnostic>> {
     let source = format!("firmware \"T\" for tally2\ncell n at M1\n{body}");
@@ -318,6 +318,48 @@ fn assembler_errors_point_at_the_source() {
         .map(|d| (d.line, d.message.as_str()))
         .collect();
     assert_eq!(found, [(5, "generated code: unknown mnemonic 'FOO'")]);
+}
+
+#[test]
+fn a_switch_name_has_one_kind() {
+    let source = "\
+firmware \"T\" for tally2
+fix \"x\" {
+    after {
+        cell foo at M4
+    }
+}
+entry main {
+    bug \"x\" {
+        buggy {
+            a = 1
+        }
+    }
+    change \"x\" {
+        after {
+            a = 2
+            fix \"y\" {
+                after {
+                    a = 3
+                }
+            }
+        }
+    }
+    a = foo
+    wait
+}
+";
+    let switches = ["x".to_string()];
+    let errors =
+        compile_pair(source, &target(Revision::B, DeviceKind::Tally2), &switches).unwrap_err();
+    let found: Vec<_> = errors
+        .iter()
+        .map(|d| (d.line, d.message.as_str()))
+        .collect();
+    assert_eq!(
+        found,
+        [(8, "buggy firmware: switch 'x' is a fix switch elsewhere")]
+    );
 }
 
 #[test]

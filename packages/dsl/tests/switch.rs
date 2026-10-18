@@ -109,7 +109,7 @@ fn unknown_switches_are_errors() {
     let switches = ["typo".to_string()];
     let errors =
         compile_pair(SOURCE, &target(Revision::B, DeviceKind::Tally2), &switches).unwrap_err();
-    assert_eq!(errors[0].message, "unknown switch 'typo'");
+    assert_eq!(errors[0].message, "buggy firmware: unknown switch 'typo'");
 }
 
 #[test]
