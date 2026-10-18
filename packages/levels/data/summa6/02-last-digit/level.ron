@@ -18,4 +18,5 @@
         (keys: "5+5=", display: "000010"),
     ],
     reward: 15,
+    firmware: Some((source: "summa6/firmware.fw", switches: ["short-add"])),
 )

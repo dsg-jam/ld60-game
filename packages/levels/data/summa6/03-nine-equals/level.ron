@@ -19,4 +19,5 @@
         (keys: "99-9=", display: "000090"),
     ],
     reward: 10,
+    firmware: Some((source: "summa6/firmware.fw", switches: ["nine-key"])),
 )

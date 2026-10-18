@@ -19,4 +19,5 @@
         (keys: "50-8=", display: "000042"),
     ],
     reward: 25,
+    firmware: Some((source: "summa6/firmware.fw", switches: ["ds-errata"])),
 )
