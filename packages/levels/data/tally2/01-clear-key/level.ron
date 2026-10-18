@@ -2,6 +2,8 @@
     id: "tally2-01",
     title: "Clear key",
     device: Tally2,
+    boards: [A],
+    keep_layout: true,
     chip: Calco((revision: A, date_code: 7541)),
     serial: "2A-00107",
     remarks: [

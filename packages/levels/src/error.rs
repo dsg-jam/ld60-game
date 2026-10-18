@@ -9,6 +9,7 @@ use crate::Report;
 pub enum LevelError {
     Parse(String),
     BoardNotAllowed(BoardRev),
+    NoRewrite(BoardRev),
     Assemble(Vec<AsmError>),
     Device(DeviceError),
 }
@@ -17,6 +18,9 @@ impl fmt::Display for LevelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse(message) => write!(f, "invalid level file: {message}"),
+            Self::NoRewrite(rev) => {
+                write!(f, "no rewrite for board revision {rev:?} passes the checks")
+            }
             Self::BoardNotAllowed(rev) => {
                 write!(f, "the job does not allow board revision {rev:?}")
             }

@@ -1,10 +1,11 @@
+mod differential;
 mod effects;
 mod firmware;
 mod line;
 mod ram_map;
 mod rng;
 
-use ld60_devices::{BoardRev, Fault};
+use ld60_devices::{Board, BoardRev, Fault};
 
 use self::firmware::Firmware;
 use self::ram_map::RamMap;
@@ -12,6 +13,9 @@ use self::rng::Rng;
 use crate::{
     Level, LevelError, LevelSource, TEST_SEEDS, VerifyError, assemble, burn, initial_rom, run,
 };
+
+/// The seed the game uses for its jobs.
+pub const GAME_SEED: u64 = 0x1D60;
 
 const TRIES: u64 = 8;
 
@@ -36,10 +40,13 @@ impl Variant {
         let original = Self::original(source)?;
         let boards = original.level.allowed_boards();
         let pick = Rng::new(seed, &original.level.id).next_u64() % boards.len() as u64;
-        original.on_board(boards[pick as usize], seed)
+        match original.clone().on_board(boards[pick as usize], seed) {
+            Err(LevelError::NoRewrite(_)) => Ok(original),
+            result => result,
+        }
     }
 
-    /// Like [`Variant::new`], but on the given board.
+    /// Like [`Variant::new`], but on the given board and without a fallback.
     pub fn with_board(
         source: &LevelSource,
         seed: u64,
@@ -60,14 +67,13 @@ impl Variant {
         if !self.level.allowed_boards().contains(&board) {
             return Err(LevelError::BoardNotAllowed(board));
         }
-        // ponytail: faded ROM bits sit at fixed addresses, so these levels keep their layout.
-        if self.level.has_rom_damage() {
+        if board == self.level.board && self.level.keeps_layout() {
             return Ok(self);
         }
-        let variant = (0..TRIES)
+        (0..TRIES)
             .filter_map(|n| self.rewrite(board, seed.wrapping_add(n)))
-            .find(|v| v.verify().is_ok());
-        Ok(variant.unwrap_or(self))
+            .find(|v| v.verify().is_ok() && v.behaves_like(&self))
+            .ok_or(LevelError::NoRewrite(board))
     }
 
     /// Returns `None` if the firmware cannot move to `board`.
@@ -77,22 +83,29 @@ impl Variant {
         let mut fixed = Firmware::new(&self.fixed);
         let rotation = buggy.rewire(from, to)?;
         fixed.rewire(from, to)?;
-        let pinned = to
-            .display_cells()
-            .chain(buggy.indexed_cells())
-            .chain(fixed.indexed_cells());
-        let map = RamMap::shuffle(pinned, &mut Rng::new(seed, "ram"));
-        for firmware in [&mut buggy, &mut fixed] {
-            firmware.remap_ram(&map);
-            firmware.swap_independent(seed);
-            firmware.shuffle_key_checks(seed);
-            firmware.reorder_routines(seed);
-        }
+        let map = if self.level.keeps_layout() {
+            RamMap::rotate(0)
+        } else {
+            let pinned = to
+                .display_cells()
+                .chain(buggy.indexed_cells())
+                .chain(fixed.indexed_cells());
+            let map = RamMap::shuffle(pinned, &mut Rng::new(seed, "ram"));
+            for firmware in [&mut buggy, &mut fixed] {
+                firmware.remap_ram(&map);
+                firmware.swap_independent(seed);
+                firmware.shuffle_key_checks(seed);
+                firmware.reorder_routines(seed);
+            }
+            map
+        };
         let mut level = self.level.clone();
         level.board = board;
-        if let Some(number) = level.serial.strip_prefix(&from.name()) {
-            level.serial = format!("{}{number}", to.name());
+        level.serial = rename_units(&level.serial, from, to);
+        for remark in &mut level.remarks {
+            *remark = rename_units(remark, from, to);
         }
+        level.customer.complaint = rename_units(&level.customer.complaint, from, to);
         for fault in &mut level.faults {
             if let Fault::StuckRamBit(bit) = fault {
                 bit.cell = map.get(rotation.get(bit.cell));
@@ -123,4 +136,9 @@ impl Variant {
         }
         Ok(())
     }
+}
+
+/// Moves serial numbers like `6A-05530` in `text` to the `to` board.
+fn rename_units(text: &str, from: &Board, to: &Board) -> String {
+    text.replace(&format!("{}-", from.name()), &format!("{}-", to.name()))
 }
