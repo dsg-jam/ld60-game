@@ -1,4 +1,5 @@
 mod backdrop;
+mod frontage;
 
 use std::ops::Range;
 
@@ -6,7 +7,6 @@ use bevy::{light::VolumetricLight, prelude::*, shape::Aabb3d};
 use rand::{Rng, RngExt};
 
 use super::buildings::{FacadeMaterial, Skyline};
-use super::market::{AWNING_ABOVE, MARKET_HEIGHT};
 use super::{Kit, glow, rng};
 use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
@@ -19,19 +19,6 @@ const GLYPHS: Range<usize> = 2..7;
 const TUBE: f32 = 0.22;
 const TUBE_GLOW: f32 = 30.0;
 
-const SHOP_SIGN_CHANCE: f64 = 0.8;
-const SHOP_SIGN_HEIGHT: Range<f32> = 0.9..1.6;
-/// Shop signs hang above the stall awnings.
-const SHOP_SIGN_BOTTOM: f32 = MARKET_HEIGHT + AWNING_ABOVE + 0.25;
-const BLADE_CHANCE: f64 = 0.45;
-const BLADE_REACH: f32 = 1.6;
-const BLADE_BOTTOM: Range<f32> = 5.0..9.0;
-/// Signs on a wall end this far below the roof.
-const ROOF_MARGIN: f32 = 0.3;
-/// Width of the wall strip behind the bracket of a blade sign.
-const BLADE_BRACKET: f32 = 0.6;
-const BILLBOARD_CHANCE: f64 = 0.25;
-const BILLBOARD_HEIGHT: Range<f32> = 3.0..6.0;
 /// Share of the panel height taken by the text.
 const TEXT_SHARE: f32 = 0.6;
 const PANEL_DEPTH: f32 = 0.12;
@@ -72,7 +59,8 @@ pub(super) struct Sign {
     /// Center of the panel.
     transform: Transform,
     size: Vec2,
-    color: Color,
+    /// Which of the [`NEON`] colors it glows in.
+    neon: usize,
     /// Text on both faces, for signs that stick out from a wall.
     double_sided: bool,
     vertical: bool,
@@ -110,97 +98,10 @@ impl Sign {
 
         let mut signs = Vec::new();
         for frontage in &skyline.front {
-            let building = &frontage.block;
-            let front = building.max().z;
             let Some(mut facade) = facades.get_mut(&frontage.facade) else {
                 continue;
             };
-            let pick = |rng: &mut dyn Rng| NEON[rng.random_range(0..NEON.len())];
-            if rng.random_bool(SHOP_SIGN_CHANCE) {
-                let word = Word::random(&mut rng, GLYPHS);
-                let size = Sign::fit(
-                    &word,
-                    rng.random_range(SHOP_SIGN_HEIGHT),
-                    building.size.x * 0.9,
-                );
-                let center = Vec3::new(
-                    building.center.x,
-                    SHOP_SIGN_BOTTOM + size.y / 2.0,
-                    front + PANEL_DEPTH / 2.0,
-                );
-                facade
-                    .extension
-                    .cover(Rect::from_center_size(center.xy(), size));
-                signs.push(Sign {
-                    transform: Transform::from_translation(center),
-                    size,
-                    color: pick(&mut rng),
-                    double_sided: false,
-                    vertical: false,
-                    spill: true,
-                    framed: rng.random_bool(0.5),
-                    legs: 0.0,
-                    word,
-                });
-            }
-            if rng.random_bool(BLADE_CHANCE) {
-                let word = Word::random(&mut rng, GLYPHS);
-                let size = Vec2::new(BLADE_REACH, BLADE_REACH * word.len() as f32 * 0.8);
-                let side = if rng.random_bool(0.5) { -1.0 } else { 1.0 };
-                // Low enough to stay under the roof.
-                let bottom = rng
-                    .random_range(BLADE_BOTTOM)
-                    .min(building.max().y - ROOF_MARGIN - size.y);
-                let center = Vec3::new(
-                    building.center.x + side * (building.size.x / 2.0 - 0.6),
-                    bottom + size.y / 2.0,
-                    front + size.x / 2.0,
-                );
-                // The bracket on the wall takes a strip of the facade.
-                facade.extension.cover(Rect::from_center_size(
-                    center.xy(),
-                    Vec2::new(BLADE_BRACKET, size.y),
-                ));
-                signs.push(Sign {
-                    transform: Transform::from_translation(center)
-                        .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)),
-                    size,
-                    color: pick(&mut rng),
-                    double_sided: true,
-                    vertical: true,
-                    spill: false,
-                    framed: true,
-                    legs: 0.0,
-                    word,
-                });
-            }
-            if building.size.y > 20.0 && rng.random_bool(BILLBOARD_CHANCE) {
-                let word = Word::random(&mut rng, GLYPHS);
-                let size = Sign::fit(
-                    &word,
-                    rng.random_range(BILLBOARD_HEIGHT),
-                    building.size.x * 0.9,
-                );
-                let center = Vec3::new(
-                    building.center.x,
-                    building.max().y - size.y / 2.0 - rng.random_range(1.0..6.0),
-                    front + PANEL_DEPTH / 2.0,
-                );
-                facade
-                    .extension
-                    .cover(Rect::from_center_size(center.xy(), size));
-                signs.push(Sign {
-                    transform: Transform::from_translation(center),
-                    size,
-                    color: pick(&mut rng),
-                    double_sided: false,
-                    vertical: false,
-                    spill: false,
-                    framed: true,
-                    legs: 0.0,
-                    word,
-                });
-            }
+            signs.extend(Sign::on_frontage(&frontage.block, &mut facade, &mut rng));
         }
 
         for backdrop in &skyline.back {
@@ -212,76 +113,96 @@ impl Sign {
 
         commands.insert_resource(SignBounds(signs.iter().map(Sign::bounds).collect()));
         for sign in signs {
-            let color_index = NEON.iter().position(|&c| c == sign.color).unwrap_or(0);
-            let flicker = if rng.random_bool(FLICKER_CHANCE) {
-                let handle = materials.add(glow(sign.color, TUBE_GLOW));
-                Some(Flicker {
-                    material: handle,
-                    color: sign.color.to_linear() * TUBE_GLOW,
-                    phase: rng.random_range(0.0..100.0),
-                })
-            } else {
-                None
+            sign.spawn(
+                &mut commands,
+                &kit,
+                &panel,
+                &tubes,
+                &mut materials,
+                &mut rng,
+            );
+        }
+    }
+
+    /// Spawns the panel, its tubes, and its light, if it spills any.
+    fn spawn(
+        &self,
+        commands: &mut Commands,
+        kit: &Kit,
+        panel: &Handle<SurfaceMaterial>,
+        tubes: &[Handle<StandardMaterial>],
+        materials: &mut Assets<StandardMaterial>,
+        rng: &mut impl Rng,
+    ) {
+        let color = NEON[self.neon];
+        let flicker = if rng.random_bool(FLICKER_CHANCE) {
+            let handle = materials.add(glow(color, TUBE_GLOW));
+            Some(Flicker {
+                material: handle,
+                color: color.to_linear() * TUBE_GLOW,
+                phase: rng.random_range(0.0..100.0),
+            })
+        } else {
+            None
+        };
+        let tube_material = flicker
+            .as_ref()
+            .map_or_else(|| tubes[self.neon].clone(), |f| f.material.clone());
+        let mut entity = commands.spawn((self.transform, Visibility::default()));
+        if let Some(flicker) = flicker {
+            entity.insert(flicker);
+        }
+        entity.with_children(|parent| {
+            let board = Block {
+                center: Vec3::ZERO,
+                size: self.size.extend(PANEL_DEPTH),
             };
-            let tube_material = flicker
-                .as_ref()
-                .map_or_else(|| tubes[color_index].clone(), |f| f.material.clone());
-            let mut entity = commands.spawn((sign.transform, Visibility::default()));
-            if let Some(flicker) = flicker {
-                entity.insert(flicker);
-            }
-            entity.with_children(|parent| {
-                let board = Block {
-                    center: Vec3::ZERO,
-                    size: sign.size.extend(PANEL_DEPTH),
-                };
-                parent.spawn(kit.cuboid(&board, panel.clone()));
-                if sign.legs > 0.0 {
-                    for side in [-0.4, 0.4] {
-                        let leg = Block {
-                            center: Vec3::new(
-                                side * sign.size.x,
-                                -(sign.size.y + sign.legs) / 2.0,
-                                0.0,
-                            ),
-                            size: Vec3::new(LEG, sign.legs, LEG),
-                        };
-                        parent.spawn(kit.cuboid(&leg, panel.clone()));
-                    }
-                }
-                let faces: &[f32] = if sign.double_sided {
-                    &[1.0, -1.0]
-                } else {
-                    &[1.0]
-                };
-                for &face in faces {
-                    let rotation = if face > 0.0 {
-                        Quat::IDENTITY
-                    } else {
-                        Quat::from_rotation_y(std::f32::consts::PI)
+            parent.spawn(kit.cuboid(&board, panel.clone()));
+            if self.legs > 0.0 {
+                for side in [-0.4, 0.4] {
+                    let leg = Block {
+                        center: Vec3::new(
+                            side * self.size.x,
+                            -(self.size.y + self.legs) / 2.0,
+                            0.0,
+                        ),
+                        size: Vec3::new(LEG, self.legs, LEG),
                     };
-                    for tube in sign.tubes() {
-                        parent.spawn((
-                            Mesh3d(kit.cube.clone()),
-                            MeshMaterial3d(tube_material.clone()),
-                            Transform::from_rotation(rotation) * tube.transform(PANEL_DEPTH / 2.0),
-                        ));
-                    }
+                    parent.spawn(kit.cuboid(&leg, panel.clone()));
                 }
-                if sign.spill {
+            }
+            let faces: &[f32] = if self.double_sided {
+                &[1.0, -1.0]
+            } else {
+                &[1.0]
+            };
+            for &face in faces {
+                let rotation = if face > 0.0 {
+                    Quat::IDENTITY
+                } else {
+                    Quat::from_rotation_y(std::f32::consts::PI)
+                };
+                for tube in self.tubes() {
                     parent.spawn((
-                        VolumetricLight,
-                        PointLight {
-                            color: sign.color,
-                            intensity: SPILL_INTENSITY,
-                            range: SPILL_RANGE,
-                            ..default()
-                        },
-                        Transform::from_xyz(0.0, -sign.size.y / 2.0, SPILL_DISTANCE),
+                        Mesh3d(kit.cube.clone()),
+                        MeshMaterial3d(tube_material.clone()),
+                        Transform::from_rotation(rotation) * tube.transform(PANEL_DEPTH / 2.0),
                     ));
                 }
-            });
-        }
+            }
+            if self.spill {
+                parent.spawn((
+                    VolumetricLight,
+                    PointLight {
+                        color,
+                        intensity: SPILL_INTENSITY,
+                        range: SPILL_RANGE,
+                        ..default()
+                    },
+                    Transform::from_xyz(0.0, -self.size.y / 2.0, SPILL_DISTANCE),
+                ));
+            }
+        });
     }
 
     /// The space the sign takes up.

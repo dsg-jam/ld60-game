@@ -41,7 +41,7 @@ impl Sign {
             return None;
         }
         let building = &backdrop.front.block;
-        let color = NEON[rng.random_range(0..NEON.len())];
+        let neon = rng.random_range(0..NEON.len());
         if let Some(roof) = backdrop.roof
             && rng.random_bool(ROOFTOP_CHANCE)
         {
@@ -59,7 +59,7 @@ impl Sign {
             return Some(Sign {
                 transform: Transform::from_translation(center),
                 size,
-                color,
+                neon,
                 double_sided: false,
                 vertical: false,
                 spill: false,
@@ -97,7 +97,7 @@ impl Sign {
         Some(Sign {
             transform: Transform::from_translation(center),
             size: Vec2::new(width, height),
-            color,
+            neon,
             double_sided: false,
             vertical: true,
             spill: false,
