@@ -3573,6 +3573,7 @@ version = "0.1.0"
 dependencies = [
  "ld60-calco",
  "ld60-devices",
+ "ld60-dsl",
  "ld60-levels",
  "ld60-machine",
 ]

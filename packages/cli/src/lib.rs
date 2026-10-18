@@ -1,6 +1,7 @@
 //! Terminal tools to try levels and firmware before the game exists.
 
 pub mod check;
+pub mod generate;
 pub mod list;
 pub mod listing;
 pub mod play;

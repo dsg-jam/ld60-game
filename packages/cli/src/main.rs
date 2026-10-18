@@ -9,7 +9,8 @@ Usage:
   cli check <level> [file.asm]           Run level tests on the buggy ROM or a file
   cli play <level> [--fixed] [--seed N] [--variant N]
                                          Open a level on the bench
-  cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)";
+  cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)
+  cli gen [--check]                      Regenerate level firmware from its source";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -24,6 +25,8 @@ fn main() -> ExitCode {
         ["asm", file, "--rev", revision] | ["asm", "--rev", revision, file] => {
             listing(&mut out, file, revision).map(|()| true)
         }
+        ["gen"] => generate(&mut out, false),
+        ["gen", "--check"] => generate(&mut out, true),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -45,6 +48,11 @@ fn is_broken_pipe(error: &(dyn std::error::Error + 'static)) -> bool {
     error
         .downcast_ref::<io::Error>()
         .is_some_and(|e| e.kind() == io::ErrorKind::BrokenPipe)
+}
+
+fn generate(out: &mut impl Write, check: bool) -> ld60_cli::Result<bool> {
+    let data_dir = std::path::Path::new(ld60_levels::DATA_DIR);
+    ld60_cli::generate::run(out, data_dir, check)
 }
 
 fn listing(out: &mut impl Write, file: &str, revision: &str) -> ld60_cli::Result<()> {
