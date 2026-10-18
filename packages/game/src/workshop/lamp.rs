@@ -1,5 +1,3 @@
-mod dust;
-
 use bevy::{
     asset::RenderAssetUsages,
     light::{NotShadowCaster, VolumetricLight},
@@ -9,6 +7,7 @@ use bevy::{
     prelude::*,
 };
 
+use super::dust::Dust;
 use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -37,6 +36,15 @@ const GLASS_GLOW: f32 = 6.0;
 const LIGHT_COLOR: Color = Color::srgb(1.0, 0.85, 0.65);
 const LIGHT_INTENSITY: f32 = 6_000.0;
 const LIGHT_RANGE: f32 = 4.0;
+/// Dust floats in the light under the shade.
+const DUST: Dust = Dust {
+    cloud: Block {
+        center: Vec3::new(0.2, 0.3, 0.0),
+        size: Vec3::new(0.8, 0.6, 0.8),
+    },
+    motes: 80,
+    seed: 11,
+};
 /// Share of the light cone at full strength, before it fades out at the
 /// rim of the shade.
 const SOFT_EDGE: f32 = 0.75;
@@ -52,8 +60,7 @@ pub(crate) struct LampPlugin;
 
 impl Plugin for LampPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(dust::DustPlugin)
-            .add_observer(Lamp::on_add)
+        app.add_observer(Lamp::on_add)
             .add_observer(Lamp::toggle_on_press);
     }
 }
@@ -116,7 +123,7 @@ impl Lamp {
         parts.light(true, &mut materials);
         commands
             .entity(add.entity)
-            .insert(parts)
+            .insert((parts, DUST))
             .with_children(|lamp| {
                 lamp.spawn(Shape::cylinder(&base, SHADE));
                 lamp.spawn((Shape::cylinder(&pole, METAL), Finish::Metal));

@@ -2,6 +2,7 @@ mod clutter;
 mod computer;
 mod counter;
 mod datasheet;
+mod dust;
 mod front;
 pub(crate) mod job;
 mod lamp;
@@ -46,6 +47,7 @@ impl Plugin for WorkshopPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             counter::CounterPlugin,
+            dust::DustPlugin,
             clutter::ClutterPlugin,
             front::FrontPlugin,
             lamp::LampPlugin,

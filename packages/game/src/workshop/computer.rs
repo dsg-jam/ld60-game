@@ -7,6 +7,7 @@ use bevy::{mesh::MeshBuilder, prelude::*};
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
+use super::dust::Dust;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
 use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
@@ -14,6 +15,13 @@ use crate::player::focus::{Focus, FocusTarget, View};
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);
+
+/// Dust in front of the glass, which its light shows up in.
+const DUST_DEPTH: f32 = 0.35;
+/// The cloud is this much wider and taller than the glass.
+const DUST_SPREAD: f32 = 1.3;
+const DUST_MOTES: usize = 70;
+const DUST_SEED: u64 = 12;
 
 /// Space between the front of the monitor and the back of the keyboard.
 const KEYBOARD_GAP: f32 = 0.06;
@@ -72,8 +80,17 @@ impl Computer {
             size: monitor::GLASS_SIZE,
             bulge: monitor::GLASS_BULGE,
         };
+        let screen = layout.monitor.glass;
+        let dust = Dust {
+            cloud: Block::new((screen.size.truncate() * DUST_SPREAD).extend(DUST_DEPTH))
+                .centered_on(&screen)
+                .translated(Vec3::Z * DUST_DEPTH / 2.0),
+            motes: DUST_MOTES,
+            seed: DUST_SEED,
+        };
         commands
             .entity(add.entity)
+            .insert(dust)
             .insert(FocusTarget {
                 focus: Focus::Computer,
                 view: View::Local(layout.screen_view()),
