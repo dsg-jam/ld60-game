@@ -1,5 +1,5 @@
 (
-    id: "tally2-01",
+    id: "tally2-02",
     title: "Double count",
     device: Tally2,
     chip: Calco((revision: B, date_code: 7630)),
