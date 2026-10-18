@@ -209,15 +209,17 @@ impl<K: Copy> Keypad<K> {
         }
     }
 
-    /// Spawns the label canvas and returns its texture.
+    /// Spawns the label canvas for the keypad on `owner` and returns its
+    /// texture.
     pub(crate) fn spawn_labels(
         &self,
         commands: &mut Commands,
         images: &mut Assets<Image>,
+        owner: Entity,
     ) -> Handle<Image> {
         let cell = self.style.label_cell;
         let size = (Self::area(self.rows, self.style) / self.style.pitch * cell).as_uvec2();
-        let canvas = UiCanvas::spawn(commands, images, size);
+        let canvas = UiCanvas::spawn(commands, images, size, owner);
         commands
             .spawn((
                 Node {
@@ -228,7 +230,7 @@ impl<K: Copy> Keypad<K> {
                     ..default()
                 },
                 BackgroundColor(self.style.cap),
-                UiTargetCamera(canvas.camera),
+                canvas.target(),
             ))
             .with_children(|root| {
                 for defs in self.rows {

@@ -31,15 +31,31 @@ impl Plugin for ScreenPlugin {
     }
 }
 
-/// An offscreen UI that renders into an image.
+/// Ties a canvas camera or UI root to the entity that shows the canvas, so
+/// they despawn with it.
+#[derive(Component, Debug)]
+#[relationship(relationship_target = Canvases)]
+pub(crate) struct CanvasOf(Entity);
+
+#[derive(Component, Debug, Default)]
+#[relationship_target(relationship = CanvasOf, linked_spawn)]
+pub(crate) struct Canvases(Vec<Entity>);
+
+/// An offscreen UI that renders into an image, shown by `owner`.
 pub(crate) struct UiCanvas {
     pub(crate) image: Handle<Image>,
     pub(crate) camera: Entity,
     pub(crate) size: UVec2,
+    owner: Entity,
 }
 
 impl UiCanvas {
-    pub(crate) fn spawn(commands: &mut Commands, images: &mut Assets<Image>, size: UVec2) -> Self {
+    pub(crate) fn spawn(
+        commands: &mut Commands,
+        images: &mut Assets<Image>,
+        size: UVec2,
+        owner: Entity,
+    ) -> Self {
         let mut image =
             Image::new_target_texture(size.x, size.y, TextureFormat::Bgra8UnormSrgb, None);
         image.sampler = ImageSampler::nearest();
@@ -53,13 +69,20 @@ impl UiCanvas {
                     ..default()
                 },
                 RenderTarget::Image(image.clone().into()),
+                CanvasOf(owner),
             ))
             .id();
         Self {
             image,
             camera,
             size,
+            owner,
         }
+    }
+
+    /// Makes a UI root draw into this canvas.
+    pub(crate) fn target(&self) -> impl Bundle {
+        (UiTargetCamera(self.camera), CanvasOf(self.owner))
     }
 }
 

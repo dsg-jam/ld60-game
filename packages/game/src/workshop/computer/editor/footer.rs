@@ -8,7 +8,7 @@ use bevy::{
 use ld60_levels::{LevelError, TEST_SEEDS};
 
 use super::Editor;
-use crate::audio::KeyClicks;
+use crate::audio::{KeyClicks, Play, Sound};
 use crate::device::Emulator;
 use crate::workshop::job::Job;
 
@@ -94,6 +94,7 @@ impl Command {
 pub(super) struct Run(Command);
 
 impl Run {
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
@@ -102,6 +103,7 @@ impl Run {
         mut emulators: Query<&mut Emulator>,
         mut status: Single<&mut Text, (With<Status>, Without<Command>)>,
         mut labels: Query<(&Command, &mut Text), Without<Status>>,
+        mut commands: Commands,
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
@@ -121,7 +123,14 @@ impl Run {
                 Err(err) => Self::describe(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
-                Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source),
+                Ok(mut emulator) => {
+                    let was_repaired = job.repaired;
+                    let message = Self::flash(&mut job, &mut emulator, &source);
+                    if job.repaired && !was_repaired {
+                        commands.trigger(Play(Sound::Chime));
+                    }
+                    message
+                }
                 Err(_) => "NO DEVICE CONNECTED".into(),
             },
         };
@@ -152,7 +161,7 @@ impl Run {
         let total = report.outcomes.len();
         if report.passed() {
             job.repaired = true;
-            format!("FLASHED. ALL {total} TESTS PASS")
+            format!("FLASHED. ALL {total} TESTS PASS. STAMP THE TICKET.")
         } else {
             format!("FLASHED. {passed} OF {total} TESTS PASS")
         }

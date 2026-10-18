@@ -15,6 +15,8 @@ use self::clicks::Clicks;
 use self::footer::{Command, Run, Status};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+use crate::parts::screen::UiCanvas;
+use crate::workshop::job::Job;
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 
@@ -38,6 +40,7 @@ impl Plugin for EditorPlugin {
             PostUpdate,
             Clicks::correct_edits.before(EditableTextSystems),
         )
+        .add_systems(Update, Editor::load_job)
         .add_observer(Editor::indent_on_tab)
         .add_observer(Command::run_on_key)
         .add_observer(Command::run_on_click)
@@ -54,20 +57,19 @@ impl Plugin for EditorPlugin {
 pub(super) struct Editor;
 
 impl Editor {
-    /// Spawns the editor UI with `source` into the canvas rendered by
-    /// `camera`.
-    pub(super) fn spawn(commands: &mut Commands, camera: Entity, source: &str) {
+    /// Spawns the editor UI into `canvas`. The firmware of the job comes
+    /// with [`Editor::load_job`].
+    pub(super) fn spawn(commands: &mut Commands, canvas: &UiCanvas) {
         let font = TextFont {
             font_size: FontSize::Px(FONT_SIZE),
             ..default()
         };
         let title = |text| (Text::new(text), font.clone(), TextColor(Color::BLACK));
-        let mut source = EditableText {
+        let source = EditableText {
             visible_lines: None,
             allow_newlines: true,
-            ..EditableText::new(source)
+            ..default()
         };
-        source.queue_edit(TextEdit::TextStart(false));
         commands.spawn((
             Node {
                 width: percent(100),
@@ -77,7 +79,7 @@ impl Editor {
                 row_gap: px(ROW_GAP),
                 ..default()
             },
-            UiTargetCamera(camera),
+            canvas.target(),
             children![
                 (
                     Node {
@@ -124,6 +126,31 @@ impl Editor {
                 ),
             ],
         ));
+    }
+
+    /// Puts the firmware of a new job into the editor.
+    fn load_job(
+        job: Option<Res<Job>>,
+        mut loaded: Local<Option<usize>>,
+        editor: Single<&mut EditableText, With<Editor>>,
+        mut status: Single<&mut Text, With<Status>>,
+    ) {
+        let index = job.as_ref().map(|job| job.index);
+        if index == *loaded {
+            return;
+        }
+        *loaded = index;
+        let mut text = editor.into_inner();
+        text.clear();
+        text.viewport.offset.y = 0.0;
+        match job {
+            Some(job) => {
+                text.queue_edit(TextEdit::Insert(job.source.buggy.into()));
+                text.queue_edit(TextEdit::TextStart(false));
+                status.0.clear();
+            }
+            None => status.0 = "NO MORE JOBS TONIGHT.".into(),
+        }
     }
 
     pub(super) fn take_focus(editor: Single<Entity, With<Editor>>, mut focus: ResMut<InputFocus>) {

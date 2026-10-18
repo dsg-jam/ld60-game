@@ -32,6 +32,50 @@ impl Samples {
         .normalized(0.8)
     }
 
+    /// Two soft bell notes going up, for a finished job.
+    pub(super) fn chime() -> Self {
+        const NOTES: [(f32, f32); 2] = [(0.0, 1_046.5), (0.14, 1_318.5)];
+        Self::generate(1.4, |t| {
+            NOTES
+                .iter()
+                .filter(|(start, _)| t >= *start)
+                .map(|&(start, pitch)| {
+                    let t = t - start;
+                    let attack = (t * 400.0).min(1.0);
+                    let bell = (TAU * pitch * t).sin() + 0.3 * (TAU * pitch * 2.76 * t).sin();
+                    bell * attack * (-t * 3.5).exp()
+                })
+                .sum()
+        })
+        .normalized(0.7)
+    }
+
+    /// A rubber stamp hitting paper on a wooden desk.
+    pub(super) fn thunk() -> Self {
+        let mut noise = Noise::new(4);
+        let mut thud = Lowpass::new(0.05);
+        Self::generate(0.25, |t| {
+            let attack = (t * 2_000.0).min(1.0);
+            let body = (TAU * 95.0 * t).sin() * (-t * 28.0).exp();
+            let slap = thud.next(noise.next()) * 6.0 * (-t * 90.0).exp();
+            (body + slap) * attack
+        })
+        .normalized(0.8)
+    }
+
+    /// A small brass service bell.
+    pub(super) fn ding() -> Self {
+        const PITCH: f32 = 2_093.0;
+        Self::generate(2.0, |t| {
+            let attack = (t * 800.0).min(1.0);
+            let ring = (TAU * PITCH * t).sin()
+                + 0.4 * (TAU * PITCH * 2.76 * t).sin() * (-t * 2.0).exp()
+                + 0.2 * (TAU * PITCH * 5.4 * t).sin() * (-t * 5.0).exp();
+            ring * attack * (-t * 1.8).exp()
+        })
+        .normalized(0.6)
+    }
+
     fn normalized(mut self, peak: f32) -> Self {
         let max = self
             .0

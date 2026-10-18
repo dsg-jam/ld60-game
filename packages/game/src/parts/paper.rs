@@ -78,7 +78,7 @@ impl Paper {
                     ..default()
                 },
                 BackgroundColor(PAPER),
-                UiTargetCamera(canvas.camera),
+                canvas.target(),
             ))
             .with_children(|page| {
                 content(page);

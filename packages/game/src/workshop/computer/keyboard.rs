@@ -108,13 +108,14 @@ impl Keyboard {
         Self { base, keypad }
     }
 
-    /// Spawns the label canvas and returns its texture.
+    /// Spawns the label canvas on `owner` and returns its texture.
     pub(super) fn spawn_labels(
         &self,
         commands: &mut Commands,
         images: &mut Assets<Image>,
+        owner: Entity,
     ) -> Handle<Image> {
-        self.keypad.spawn_labels(commands, images)
+        self.keypad.spawn_labels(commands, images, owner)
     }
 
     pub(super) fn spawn(

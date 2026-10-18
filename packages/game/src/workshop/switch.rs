@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
 };
 
-use crate::audio::Click;
+use crate::audio::{Play, Sound};
 use crate::player::focus::{Clickable, Focus};
 
 pub(crate) struct SwitchPlugin;
@@ -68,6 +68,6 @@ impl LightSwitch {
                 LinearRgba::BLACK
             };
         }
-        commands.trigger(Click);
+        commands.trigger(Play(Sound::Click));
     }
 }

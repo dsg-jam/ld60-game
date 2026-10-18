@@ -45,7 +45,7 @@ impl Datasheet {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
-        let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE);
+        let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let contents: [fn(&mut ChildSpawnerCommands); _] = [
             Self::overview,
             Self::instructions,

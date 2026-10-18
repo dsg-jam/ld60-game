@@ -174,9 +174,9 @@ impl Handheld {
         let window = Block::new((lcd_size + 2.0 * LCD_BORDER).extend(WINDOW_HEIGHT).xzy())
             .resting_on(&body, model.window_spot);
         let keypad = Keypad::new(model.rows, &STYLE, &body, model.keypad_spot);
-        let labels = keypad.spawn_labels(&mut commands, &mut images);
+        let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
         let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
-        let sticker = Self::spawn_sticker(&mut commands, &mut images, model, &level);
+        let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, model, &level);
         let sticker_spot = body
             .top_spot(model.sticker_spot)
             .with_y(body.min().y - STICKER_GAP);
@@ -236,10 +236,11 @@ impl Handheld {
     fn spawn_sticker(
         commands: &mut Commands,
         images: &mut Assets<Image>,
+        owner: Entity,
         model: &Model,
         level: &Level,
     ) -> Handle<Image> {
-        let canvas = UiCanvas::spawn(commands, images, STICKER_CANVAS);
+        let canvas = UiCanvas::spawn(commands, images, STICKER_CANVAS, owner);
         commands.spawn((
             Node {
                 width: percent(100),
@@ -250,7 +251,7 @@ impl Handheld {
                 ..default()
             },
             BackgroundColor(STICKER_PAPER),
-            UiTargetCamera(canvas.camera),
+            canvas.target(),
             children![(
                 Text::new(Self::sticker_text(model, level)),
                 TextFont {

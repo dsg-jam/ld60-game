@@ -82,7 +82,7 @@ pub(crate) fn spawn(
     source: Entity,
     digits: usize,
 ) -> Handle<Image> {
-    let canvas = UiCanvas::spawn(commands, images, canvas_size(digits));
+    let canvas = UiCanvas::spawn(commands, images, canvas_size(digits), source);
     let digit_segments = segment_rects(DIGIT_SIZE, SEGMENT_THICKNESS);
     let lamp_segments = segment_rects(LAMP_SIZE, LAMP_THICKNESS);
     let lamp_origin = Vec2::splat(MARGIN);
@@ -96,7 +96,7 @@ pub(crate) fn spawn(
                 ..default()
             },
             BackgroundColor(BACKGROUND),
-            UiTargetCamera(canvas.camera),
+            canvas.target(),
         ))
         .with_children(|root| {
             root.spawn((
