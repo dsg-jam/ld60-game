@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use crate::variant::effects::Effects;
-use crate::variant::line::{Line, cell, immediate, number, splice};
+use crate::variant::line::{Line, cell, fit, immediate, number};
 
 /// A kind of bug that changes one line of working firmware.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -54,7 +54,8 @@ impl Operator {
         let replace_operand = |operand: &str, values: Vec<String>| {
             values
                 .into_iter()
-                .map(|value| replace(vec![splice(text, operand, &value)]))
+                .filter_map(|value| fit(text, operand, &value))
+                .map(|new| replace(vec![new]))
                 .collect()
         };
         match (self, mnemonic.as_str(), operands.as_slice()) {
@@ -74,7 +75,10 @@ impl Operator {
                     _ => "JC",
                 };
                 let old = &line.rest[..mnemonic.len()];
-                vec![replace(vec![splice(text, old, flipped)])]
+                fit(text, old, flipped)
+                    .map(|new| replace(vec![new]))
+                    .into_iter()
+                    .collect()
             }
             (Self::WrongCell, "LD" | "ST" | "ADC" | "SBC" | "CMP", [operand]) => {
                 replace_operand(operand, neighbour_cells(operand))
@@ -199,10 +203,29 @@ mod tests {
     #[test]
     fn flips_conditional_jumps_only() {
         assert_eq!(
-            mutate("x: JZ a\n   JMP a\n   JNC a\n", Operator::FlippedJump),
+            mutate(
+                "x: JZ   a ; z\n   JMP  a\n   JNC  a\n   JC a\n",
+                Operator::FlippedJump
+            ),
             [
-                "x: JNZ a\n   JMP a\n   JNC a\n",
-                "x: JZ a\n   JMP a\n   JC a\n"
+                "x: JNZ  a ; z\n   JMP  a\n   JNC  a\n   JC a\n",
+                "x: JZ   a ; z\n   JMP  a\n   JC   a\n   JC a\n"
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_the_comment_column() {
+        assert_eq!(
+            mutate("LD [B]   ; a\nLD [B] ; b\n", Operator::WrongCell),
+            ["LD [B+1] ; a\nLD [B] ; b\n"]
+        );
+        assert_eq!(
+            mutate("CPI 10 ; a\nCPI 9 ; b\n", Operator::OffByOne),
+            [
+                "CPI 11 ; a\nCPI 9 ; b\n",
+                "CPI 9  ; a\nCPI 9 ; b\n",
+                "CPI 10 ; a\nCPI 8 ; b\n"
             ]
         );
     }

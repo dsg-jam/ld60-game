@@ -67,6 +67,25 @@ pub(crate) fn splice(text: &str, part: &str, new: &str) -> String {
     format!("{}{new}{}", &text[..start], &text[start + part.len()..])
 }
 
+/// Like [`splice`], but takes the change in length out of the spaces after
+/// `part`, so that the operands and the comment keep their columns.
+///
+/// Returns `None` if fewer than one space would be left.
+pub(crate) fn fit(text: &str, part: &str, new: &str) -> Option<String> {
+    let end = part.as_ptr().addr() - text.as_ptr().addr() + part.len();
+    let tail = &text[end..];
+    let next = tail.trim_start_matches(' ');
+    if next.is_empty() {
+        return Some(splice(text, part, new));
+    }
+    let spaces = tail.len() - next.len();
+    let gap = (spaces + part.len())
+        .checked_sub(new.len())
+        .filter(|&gap| gap > 0)?;
+    let start = end - part.len();
+    Some(format!("{}{new}{}{next}", &text[..start], " ".repeat(gap)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -94,6 +94,53 @@ fn diff(fixed: &str, buggy: &str) -> (usize, usize) {
     (a.len() - common, b.len() - common)
 }
 
+/// The columns of the first operand and of the comment in `line`.
+fn columns(line: &str) -> (Option<usize>, Option<usize>) {
+    let comment = line.find(';');
+    let code = &line[..comment.unwrap_or(line.len())];
+    let start = code.find(':').map_or(0, |colon| colon + 1);
+    let body = code[start..].trim_start();
+    let operand = body
+        .find(' ')
+        .map(|space| body[space..].trim_start())
+        .filter(|operands| !operands.is_empty())
+        .map(|operands| code.len() - operands.len());
+    (operand, comment)
+}
+
+/// The changed lines of `job` that do not keep the columns of the fixed line.
+fn misaligned(job: &Generated) -> Vec<String> {
+    let fixed: Vec<&str> = job.variant.fixed.lines().collect();
+    let buggy: Vec<&str> = job.variant.buggy.lines().collect();
+    let mut bugs = job.bugs.clone();
+    bugs.sort_by_key(|bug| bug.line);
+    let mut pairs = Vec::new();
+    let mut shift = 0;
+    for bug in bugs {
+        let at = bug.line - shift;
+        match bug.operator {
+            Operator::OffByOne | Operator::FlippedJump | Operator::WrongCell => {
+                pairs.push((fixed[bug.line], buggy[at]));
+            }
+            Operator::SwappedInstructions => {
+                pairs.push((fixed[bug.line + 1], buggy[at]));
+                pairs.push((fixed[bug.line], buggy[at + 1]));
+            }
+            Operator::DroppedInstruction => {
+                let code = fixed[bug.line].split(';').next().unwrap_or_default();
+                if !code.contains(':') {
+                    shift += 1;
+                }
+            }
+        }
+    }
+    pairs
+        .into_iter()
+        .filter(|(fixed, buggy)| columns(fixed) != columns(buggy))
+        .map(|(fixed, buggy)| format!("'{fixed}' became '{buggy}'"))
+        .collect()
+}
+
 /// Checks every seed and returns the operators, symptoms, chips and faults used.
 fn check(device: DeviceKind, references: &[Reference]) -> HashSet<String> {
     let name = format!("{device:?}");
@@ -154,6 +201,9 @@ fn check(device: DeviceKind, references: &[Reference]) -> HashSet<String> {
                 "{name} seed {seed}: {removed} lines removed, {added} added for {bugs} bugs\n{}",
                 variant.buggy
             ));
+        }
+        for line in misaligned(&job) {
+            failures.push(format!("{name} seed {seed}: {line}"));
         }
         let keys: HashSet<String> = variant
             .level
