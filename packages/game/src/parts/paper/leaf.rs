@@ -211,23 +211,24 @@ impl Leaf {
             commands.entity(rider).insert((at, ChildOf(root)));
         }
         let sides = [(&shape.front, Some(spec.front)), (&shape.back, spec.back)];
-        for (mesh, material) in sides {
+        for (index, (mesh, material)) in sides.into_iter().enumerate() {
             let Some(material) = material else {
                 continue;
             };
             let mesh = meshes.add(mesh.clone());
-            // Front and back lie on each other, so their shadows would fall
-            // on each other in stripes. It moves away from its bounds as it
-            // bends.
-            commands.spawn((
+            // It moves away from its bounds as it bends.
+            let mut side = commands.spawn((
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material),
                 Transform::default(),
                 Pickable::IGNORE,
-                NotShadowCaster,
                 NoFrustumCulling,
                 ChildOf(root),
             ));
+            // Front and back lie on each other, so only one casts a shadow.
+            if index > 0 {
+                side.insert(NotShadowCaster);
+            }
             leaf.sides.push(mesh);
         }
         leaf.bend(meshes);
