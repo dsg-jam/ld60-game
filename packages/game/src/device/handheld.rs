@@ -217,6 +217,13 @@ pub(crate) struct Handheld {
     buggy: String,
 }
 
+#[cfg(test)]
+impl Handheld {
+    pub(crate) fn body_size(kind: DeviceKind) -> Vec3 {
+        Model::of(kind).body_size
+    }
+}
+
 impl Handheld {
     /// A unit as it comes in for `level`, running `buggy`.
     pub(crate) fn for_job(level: &Level, buggy: &str) -> Self {

@@ -27,6 +27,11 @@ const PIN_KEY: KeyCode = KeyCode::KeyP;
 
 pub(crate) struct ManualsPlugin;
 
+#[cfg(test)]
+impl ShopManuals {
+    pub(super) const CLOSED: Vec3 = model::CLOSED;
+}
+
 impl Plugin for ManualsPlugin {
     fn build(&self, app: &mut App) {
         app.add_observer(ShopManuals::on_add)

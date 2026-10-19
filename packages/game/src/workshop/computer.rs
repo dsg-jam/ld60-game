@@ -137,15 +137,15 @@ impl Computer {
 struct ComputerScreen;
 
 /// Geometry of a [`Computer`] in its own space.
-struct ComputerLayout {
+pub(super) struct ComputerLayout {
     monitor: Monitor,
     keyboard: Keyboard,
     /// Where the keyboard sits.
-    keyboard_placement: Block,
+    pub(super) keyboard_placement: Block,
 }
 
 impl ComputerLayout {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let monitor = Monitor::new();
         let keyboard = Keyboard::new();
         let keyboard_placement = Block::new(keyboard.base.size)
@@ -156,6 +156,11 @@ impl ComputerLayout {
             keyboard,
             keyboard_placement,
         }
+    }
+
+    #[cfg(test)]
+    pub(super) fn monitor_body(&self) -> Block {
+        self.monitor.body
     }
 
     /// Camera pose straight in front of the glass.

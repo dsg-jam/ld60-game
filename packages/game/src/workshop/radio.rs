@@ -14,7 +14,7 @@ use crate::parts::knob::Knob;
 use crate::parts::latch_button::LatchButton;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
 
-const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
+pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
 /// Twelve characters of five dots.
 const DISPLAY_COLUMNS: u32 = 60;
 const DISPLAY_DOT: f32 = 0.0017;

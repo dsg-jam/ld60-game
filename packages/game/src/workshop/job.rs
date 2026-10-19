@@ -20,10 +20,10 @@ use super::ticket::JobTicket;
 use super::tutorial::{self, TutorialNote};
 use crate::device::{Emulator, Handheld};
 
-const DEVICE_SPOT: Vec2 = Vec2::new(-0.05, 0.3);
-const DEVICE_YAW: f32 = 0.15;
-const TICKET_SPOT: Vec2 = Vec2::new(-0.85, 0.5);
-const TICKET_YAW: f32 = 0.12;
+pub(super) const DEVICE_SPOT: Vec2 = Vec2::new(0.03, 0.3);
+pub(super) const DEVICE_YAW: f32 = 0.15;
+pub(super) const TICKET_SPOT: Vec2 = Vec2::new(-0.85, 0.5);
+pub(super) const TICKET_YAW: f32 = 0.12;
 
 pub(crate) struct JobPlugin;
 

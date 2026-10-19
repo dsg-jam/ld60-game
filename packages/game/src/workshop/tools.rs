@@ -16,7 +16,7 @@ use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::player::focus::{Clickable, Focus, FocusOn};
 
-const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
+pub(super) const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
 const STAMP_PAD_SIZE: Vec3 = Vec3::new(0.058, 0.005, 0.038);
 const STAMP_NECK_SIZE: Vec3 = Vec3::new(0.012, 0.03, 0.012);
 const STAMP_KNOB_SIZE: Vec3 = Vec3::new(0.03, 0.024, 0.03);
@@ -28,7 +28,7 @@ const STAMP_HANDLE: Color = Color::srgb_u8(0xb0, 0x2e, 0x24);
 const PRESS_DEPTH: f32 = 0.012;
 const PRESS_TIME: f32 = 0.2;
 
-const BELL_BASE_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.07);
+pub(super) const BELL_BASE_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.07);
 const BELL_DOME_RADIUS: f32 = 0.032;
 /// The dome is a flattened sphere.
 const BELL_DOME_FLATTEN: f32 = 0.75;

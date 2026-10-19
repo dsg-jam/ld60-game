@@ -16,7 +16,7 @@ const SLAT: f32 = 0.12;
 const SLAT_GAP: f32 = 0.008;
 /// The part of the top where the player works and puts things.
 const WORK_AREA: Vec2 = Vec2::new(1.6, 0.8);
-const MAT_SIZE: Vec3 = Vec3::new(0.7, 0.004, 0.42);
+const MAT_SIZE: Vec3 = Vec3::new(0.48, 0.004, 0.42);
 /// Where the mat lies, see [`Block::top_spot`].
 const MAT_SPOT: Vec2 = Vec2::new(0.0, 0.1);
 /// A shelf under the top, on the player's side.
@@ -91,7 +91,7 @@ pub(crate) struct CounterLayout {
     top: Block,
     wall: Block,
     work: Block,
-    mat: Block,
+    pub(super) mat: Block,
     shelf: Block,
 }
 

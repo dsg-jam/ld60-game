@@ -15,7 +15,7 @@ use crate::parts::screen::UiCanvas;
 pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 /// Thickness, height and depth of the closed file standing on its bottom
 /// edge, with the spine towards +Z.
-const CLOSED: Vec3 = Vec3::new(0.07, 0.25, 0.2);
+pub(super) const CLOSED: Vec3 = Vec3::new(0.07, 0.25, 0.2);
 const BOARD: f32 = 0.004;
 const COVER: Vec2 = Vec2::new(0.185, 0.24);
 /// Pages under the open one.

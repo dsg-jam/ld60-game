@@ -5,6 +5,8 @@ use bevy::prelude::*;
 
 use self::props::{Finishes, Props};
 use super::counter::CounterLayout;
+#[cfg(test)]
+use super::footprint::Footprint;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
@@ -14,9 +16,9 @@ const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);
 const SCREWDRIVER_YAW: f32 = 0.4;
 /// Spots on the mat, see [`CounterLayout::place_on_mat`], and yaws.
 const SCREWS: [(Vec2, f32); 3] = [
-    (Vec2::new(0.32, 0.62), 0.4),
-    (Vec2::new(0.4, 0.74), 2.1),
-    (Vec2::new(0.27, 0.82), -0.9),
+    (Vec2::new(0.47, 0.62), 0.4),
+    (Vec2::new(0.58, 0.74), 2.1),
+    (Vec2::new(0.39, 0.82), -0.9),
 ];
 
 const NOTES: [(Vec2, f32, Color); 2] = [
@@ -26,7 +28,7 @@ const NOTES: [(Vec2, f32, Color); 2] = [
         Color::srgb_u8(0xe8, 0xd4, 0x6a),
     ),
     (
-        Vec2::new(0.0, -0.75),
+        Vec2::new(-0.03, -0.8),
         -0.3,
         Color::srgb_u8(0xe6, 0x9a, 0xa0),
     ),
@@ -45,6 +47,29 @@ impl Plugin for ClutterPlugin {
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Clutter;
+
+#[cfg(test)]
+impl Clutter {
+    pub(super) fn footprints(counter: &CounterLayout) -> Vec<Footprint> {
+        let mut footprints = vec![
+            Footprint::new("mug", counter.place(MUG_SPOT, 0.0), Props::mug_area()),
+            Footprint::new(
+                "screwdriver",
+                counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW),
+                Props::screwdriver_area(),
+            ),
+        ];
+        for (spot, yaw, _) in NOTES {
+            footprints.push(Footprint::new(
+                "note",
+                counter.place(spot, yaw),
+                Block::new(NOTE_SIZE),
+            ));
+        }
+        footprints.extend(sides::footprints(counter));
+        footprints
+    }
+}
 
 impl Clutter {
     fn on_add(

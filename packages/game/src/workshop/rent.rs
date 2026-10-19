@@ -11,9 +11,9 @@ use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 
 /// Next to the receipt, a little closer to the player.
-const SPOT: Vec2 = Vec2::new(-0.36, -0.86);
-const YAW: f32 = -0.12;
-const SHEET_SIZE: Vec2 = Vec2::new(0.12, 0.12);
+pub(super) const SPOT: Vec2 = Vec2::new(-0.6, -0.06);
+pub(super) const YAW: f32 = -0.12;
+pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.12, 0.12);
 const CANVAS_SIZE: UVec2 = UVec2::new(560, 560);
 /// Lifts the note onto the receipt if they overlap.
 const SHEET_GAP: f32 = 0.004;

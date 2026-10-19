@@ -17,7 +17,7 @@ use crate::geometry::surface::Finish;
 use crate::parts::bulb::Bulb;
 use crate::player::focus::{Clickable, Focus};
 
-const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
+pub(super) const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
 const POLE_SIZE: Vec3 = Vec3::new(0.016, 0.46, 0.016);
 const ARM_SIZE: Vec3 = Vec3::new(0.3, 0.016, 0.016);
 const SHADE_TOP: f32 = 0.04;

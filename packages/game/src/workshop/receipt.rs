@@ -11,9 +11,9 @@ use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, View};
 
-const SPOT: Vec2 = Vec2::new(-0.12, -0.8);
-const YAW: f32 = 0.1;
-const SHEET_SIZE: Vec2 = Vec2::new(0.12, 0.163);
+pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
+pub(super) const YAW: f32 = 0.1;
+pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.12, 0.163);
 const CANVAS_SIZE: UVec2 = UVec2::new(560, 760);
 /// Lifts the slip onto the sticky notes there.
 const SHEET_GAP: f32 = 0.0025;

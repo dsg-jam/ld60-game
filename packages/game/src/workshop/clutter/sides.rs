@@ -4,6 +4,8 @@ use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 use crate::workshop::counter::CounterLayout;
+#[cfg(test)]
+use crate::workshop::footprint::Footprint;
 
 /// Where things lie on the counter, see [`Block::top_spot`] of the work
 /// area, and their yaw in radians. All of it outside the work area, so it
@@ -58,6 +60,20 @@ pub(super) fn spawn(
         .with_children(|station| spawn_soldering_station(station, display));
     clutter.spawn(place(TRAY)).with_children(spawn_tray);
     clutter.spawn(place(BINDER)).with_children(spawn_binder);
+}
+
+#[cfg(test)]
+pub(super) fn footprints(counter: &CounterLayout) -> Vec<Footprint> {
+    let place = |(spot, yaw): (Vec2, f32)| counter.place(spot, yaw);
+    let holder = Block::new(HOLDER_BASE)
+        .behind(&Block::new(STATION))
+        .translated(Vec3::Z * -0.02);
+    vec![
+        Footprint::new("soldering station", place(SOLDERING), Block::new(STATION)),
+        Footprint::new("iron holder", place(SOLDERING), holder),
+        Footprint::new("screw tray", place(TRAY), Block::new(TRAY_SIZE)),
+        Footprint::new("binder", place(BINDER), Block::new(BINDER_SIZE)),
+    ]
 }
 
 /// A station with a temperature display and the iron in its holder.

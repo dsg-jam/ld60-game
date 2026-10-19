@@ -4,6 +4,8 @@ mod computer;
 mod counter;
 mod dial;
 mod dust;
+#[cfg(test)]
+mod footprint;
 mod front;
 pub(crate) mod job;
 mod lamp;
@@ -39,11 +41,11 @@ use self::shop::Shop;
 use self::tools::Tool;
 use crate::player::camera::PlayerCamera;
 
-const COMPUTER_SPOT: Vec2 = Vec2::new(0.55, -0.3);
-const COMPUTER_YAW: f32 = -0.5;
+const COMPUTER_SPOT: Vec2 = Vec2::new(0.7, -0.3);
+const COMPUTER_YAW: f32 = -0.4;
 const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
 const LAMP_YAW: f32 = -0.7;
-const RADIO_SPOT: Vec2 = Vec2::new(-0.5, -0.62);
+const RADIO_SPOT: Vec2 = Vec2::new(-0.47, -0.62);
 const RADIO_YAW: f32 = 0.25;
 const STAMP_SPOT: Vec2 = Vec2::new(0.1, -0.75);
 const STAMP_YAW: f32 = 0.3;
@@ -53,7 +55,7 @@ const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
 /// Lying open on the left part of the mat, see
 /// [`CounterLayout::place_on_mat`].
-const MANUALS_OPEN_SPOT: Vec2 = Vec2::new(-0.93, -0.4);
+const MANUALS_OPEN_SPOT: Vec2 = Vec2::new(-0.62, -0.4);
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
 

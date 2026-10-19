@@ -12,9 +12,9 @@ use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 /// On the back left part of the mat, far enough from the device to keep it
 /// out of sight while reading. Relative to the mat, with the whole note on
 /// it.
-pub(super) const SPOT: Vec2 = Vec2::new(-0.7, -0.48);
+pub(super) const SPOT: Vec2 = Vec2::new(-0.62, -0.45);
 pub(super) const YAW: f32 = 0.08;
-const SHEET_SIZE: Vec2 = Vec2::new(0.15, 0.215);
+pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.15, 0.215);
 const CANVAS_SIZE: UVec2 = UVec2::new(450, 645);
 const SHEET_GAP: f32 = 0.0005;
 /// The paragraphs of each note, as attributes of its message.

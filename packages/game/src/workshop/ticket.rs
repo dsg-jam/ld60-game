@@ -16,7 +16,7 @@ use crate::player::focus::{Focus, FocusTarget, View};
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
-const BOARD_SIZE: Vec3 = Vec3::new(0.18, 0.005, 0.26);
+pub(super) const BOARD_SIZE: Vec3 = Vec3::new(0.18, 0.005, 0.26);
 /// The sheet sits a little towards the player, below the clip.
 const SHEET_OFFSET: f32 = 0.012;
 const SHEET_GAP: f32 = 0.0003;

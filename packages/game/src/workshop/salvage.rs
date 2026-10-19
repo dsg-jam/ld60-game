@@ -22,11 +22,10 @@ use crate::parts::paper::{INK_FADED, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 
-/// At the front right of the counter, where the tutorial notes lie. The
-/// trader only comes after the tutorial.
-const SPOT: Vec2 = Vec2::new(0.78, 0.6);
-const YAW: f32 = -0.25;
-const CRATE_SIZE: Vec3 = Vec3::new(0.24, 0.07, 0.17);
+/// At the front right of the counter, beside the keyboard.
+pub(super) const SPOT: Vec2 = Vec2::new(1.0, 0.72);
+pub(super) const YAW: f32 = -0.25;
+pub(super) const CRATE_SIZE: Vec3 = Vec3::new(0.24, 0.07, 0.17);
 const WALL: f32 = 0.008;
 /// The packing straw fills the crate up to this height.
 const STRAW_HEIGHT: f32 = 0.045;

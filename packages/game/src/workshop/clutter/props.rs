@@ -2,6 +2,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
+#[cfg(test)]
+use crate::geometry::block::Block;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::parts::liquid::{Foam, Liquid};
 use crate::parts::steam::Steam;
@@ -73,6 +75,28 @@ impl Finishes {
 pub(super) struct Props<'a> {
     pub(super) meshes: &'a mut Assets<Mesh>,
     pub(super) finishes: &'a Finishes,
+}
+
+#[cfg(test)]
+impl Props<'_> {
+    /// The ground under the mug and its handle.
+    pub(super) fn mug_area() -> Block {
+        let handle = MUG_RADIUS + HANDLE_OUT + HANDLE_RADIUS + HANDLE_THICKNESS / 2.0;
+        Block::between(
+            Vec3::new(-MUG_RADIUS, 0.0, -MUG_RADIUS),
+            Vec3::new(handle, MUG_HEIGHT, MUG_RADIUS),
+        )
+    }
+
+    /// The ground under the screwdriver, from the grip to the tip.
+    pub(super) fn screwdriver_area() -> Block {
+        let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
+        let tip = grip_end + FERRULE_LENGTH + SHAFT_LENGTH - 0.002 + BLADE_SIZE.x;
+        Block::between(
+            Vec3::new(-grip_end, 0.0, -GRIP_RADIUS),
+            Vec3::new(tip, 2.0 * GRIP_RADIUS, GRIP_RADIUS),
+        )
+    }
 }
 
 impl Props<'_> {
