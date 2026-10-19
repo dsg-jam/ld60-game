@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: windows-latest
+            name: windows-x86_64
+          - os: macos-latest
+            name: macos-aarch64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p ld60-game
+      - name: Package
+        run: |
+          dir=bugs-from-home-${{ matrix.name }}
+          mkdir "$dir"
+          cp -r assets "$dir/"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp target/release/ld60-game.exe "$dir/"
+            7z a "$dir.zip" "$dir"
+          else
+            cp target/release/ld60-game "$dir/"
+            tar czf "$dir.tar.gz" "$dir"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: bugs-from-home-*.*
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/trunk-action@v0.5.1
+      - run: trunk build --release --public-url "/${{ github.event.repository.name }}/"
+        working-directory: packages/game
+      - run: cd dist && zip -r ../bugs-from-home-web.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: bugs-from-home-web.zip
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  pages:
+    needs: web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: [desktop, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes bugs-from-home-*
+        env:
+          GH_TOKEN: ${{ github.token }}
