@@ -1,4 +1,5 @@
 mod input;
+mod profile;
 
 #[cfg(not(target_arch = "wasm32"))]
 use bevy::remote::http::{DEFAULT_ADDR, RemoteHttpPlugin};
@@ -31,9 +32,12 @@ impl Plugin for DebugPortPlugin {
         app.add_plugins((
             RemotePlugin::default(),
             RemoteHttpPlugin::default().with_port(port),
+            profile::ProfilePlugin,
         ))
         .add_debug_method("ld60.screenshot", screenshot)
-        .add_debug_method("ld60.input", input::input);
+        .add_debug_method("ld60.input", input::input)
+        .add_debug_method("ld60.diagnostics", profile::diagnostics)
+        .add_debug_method("ld60.vsync", profile::vsync);
         info!("Debug port listening on {DEFAULT_ADDR}:{port}");
     }
 }
