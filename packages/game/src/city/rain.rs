@@ -9,6 +9,7 @@ use rand::RngExt;
 use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
 use crate::geometry::quads::Quads;
+use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
 
@@ -113,6 +114,7 @@ impl RainMaterial {
         spots: Query<(&SpotLight, &GlobalTransform, &InheritedVisibility)>,
         points: Query<(&PointLight, &GlobalTransform, &InheritedVisibility)>,
         weather: Res<Weather>,
+        settings: Res<Settings>,
         rains: Query<&MeshMaterial3d<RainMaterial>>,
         mut materials: ResMut<Assets<RainMaterial>>,
     ) {
@@ -135,7 +137,7 @@ impl RainMaterial {
                 continue;
             };
             let params = &mut material.params;
-            params.amount = weather.rain;
+            params.amount = weather.rain * settings.quality().rain();
             params.lights = [Vec4::ZERO; LIGHTS];
             params.colors = [Vec4::ZERO; LIGHTS];
             for (index, (at, strength, color)) in lights.iter().take(LIGHTS).enumerate() {

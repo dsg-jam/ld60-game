@@ -2,6 +2,7 @@ mod height_fog;
 
 use bevy::{
     camera::Exposure,
+    ecs::schedule::common_conditions::any_match_filter,
     light::{FogVolume, VolumetricFog},
     pbr::ScreenSpaceReflections,
     post_process::bloom::Bloom,
@@ -13,6 +14,7 @@ use super::FACADES;
 use super::sky::PLANET;
 use super::weather::Weather;
 use crate::geometry::block::Block;
+use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;
 
@@ -43,8 +45,6 @@ const RAIN_HAZE_DENSITY: f32 = 0.03;
 const HAZE_HALF_LENGTH: f32 = 25.0;
 /// Makes up for the thin haze.
 const HAZE_GLOW: f32 = 8.0;
-/// Samples along each view ray through the haze.
-const HAZE_STEPS: u32 = 64;
 /// The street haze reaches this high, in meters.
 const HAZE_HEIGHT: f32 = 12.0;
 
@@ -62,7 +62,13 @@ impl Plugin for AtmospherePlugin {
             .add_systems(Startup, (Self::spawn_planet_light, StreetHaze::spawn))
             .add_systems(
                 Update,
-                (Self::thicken_fog, StreetHaze::thicken).run_if(resource_changed::<Weather>),
+                (
+                    (Self::thicken_fog, StreetHaze::thicken).run_if(resource_changed::<Weather>),
+                    Self::match_quality.run_if(
+                        resource_changed::<Settings>
+                            .or_else(any_match_filter::<Added<PlayerCamera>>),
+                    ),
+                ),
             )
             .add_observer(Self::dress_camera);
     }
@@ -72,14 +78,18 @@ impl Plugin for AtmospherePlugin {
 #[derive(Component, Debug)]
 struct StreetHaze;
 
+/// Marks the [`DirectionalLight`] of the planet.
+#[derive(Component, Debug)]
+struct PlanetLight;
+
 impl AtmospherePlugin {
     fn spawn_planet_light(mut commands: Commands) {
         commands.spawn((
             Name::new("planet light"),
+            PlanetLight,
             DirectionalLight {
                 color: MOON,
                 illuminance: MOON_ILLUMINANCE,
-                shadow_maps_enabled: true,
                 ..default()
             },
             Transform::from_translation(PLANET).looking_at(Vec3::ZERO, Vec3::Y),
@@ -93,25 +103,48 @@ impl AtmospherePlugin {
         }
     }
 
+    /// Drops the costly effects on lower [`Quality`](crate::menu::Settings::quality).
+    fn match_quality(
+        settings: Res<Settings>,
+        cameras: Query<Entity, With<PlayerCamera>>,
+        mut planet: Query<&mut DirectionalLight, With<PlanetLight>>,
+        mut commands: Commands,
+    ) {
+        let quality = settings.quality();
+        for mut light in &mut planet {
+            light.shadow_maps_enabled = quality.shadows();
+        }
+        for camera in &cameras {
+            let mut camera = commands.entity(camera);
+            if quality.reflections() {
+                camera.insert(ScreenSpaceReflections {
+                    // Only the puddles reflect. Blurry reflections on damp
+                    // ground are noisy without temporal anti-aliasing, which
+                    // would smear the rain.
+                    min_perceptual_roughness: 0.0..0.01,
+                    max_perceptual_roughness: 0.1..0.15,
+                    ..default()
+                });
+            } else {
+                camera.remove::<ScreenSpaceReflections>();
+            }
+            match quality.haze_steps() {
+                Some(step_count) => camera.insert(VolumetricFog {
+                    ambient_intensity: 0.0,
+                    step_count,
+                    ..default()
+                }),
+                None => camera.remove::<VolumetricFog>(),
+            };
+        }
+    }
+
     /// Night look for the player's view: glowing lights and hazy distance.
     fn dress_camera(add: On<Add<PlayerCamera>>, mut commands: Commands) {
         commands.entity(add.entity).insert((
-            ScreenSpaceReflections {
-                // Only the puddles reflect. Blurry reflections on damp ground
-                // are noisy without temporal anti-aliasing, which would smear
-                // the rain.
-                min_perceptual_roughness: 0.0..0.01,
-                max_perceptual_roughness: 0.1..0.15,
-                ..default()
-            },
             Bloom {
                 intensity: BLOOM_INTENSITY,
                 ..Bloom::NATURAL
-            },
-            VolumetricFog {
-                ambient_intensity: 0.0,
-                step_count: HAZE_STEPS,
-                ..default()
             },
             Exposure::INDOOR,
             HeightFog {
