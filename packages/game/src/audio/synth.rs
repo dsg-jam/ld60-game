@@ -1,4 +1,5 @@
 mod keys;
+mod paper;
 
 use std::f32::consts::{PI, TAU};
 

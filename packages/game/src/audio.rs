@@ -2,10 +2,16 @@ mod synth;
 
 use std::sync::Arc;
 
-use bevy::{audio::Volume, ecs::entity::EntityHashSet, platform::collections::HashMap, prelude::*};
+use bevy::{
+    audio::Volume,
+    ecs::entity::{EntityHashMap, EntityHashSet},
+    platform::collections::HashMap,
+    prelude::*,
+};
 
 use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
+use crate::parts::paper::Paper;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
@@ -44,12 +50,14 @@ pub(crate) enum Sound {
     KeyDown,
     /// A key switch springing back up.
     KeyUp,
+    /// A page of paper turning over.
+    PageTurn,
 }
 
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 10] = [
+    const ALL: [Self; 11] = [
         Self::Click,
         Self::Chime,
         Self::Thunk,
@@ -60,6 +68,7 @@ impl Sound {
         Self::Unlatch,
         Self::KeyDown,
         Self::KeyUp,
+        Self::PageTurn,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -74,7 +83,12 @@ impl Sound {
 
     fn takes(self) -> u32 {
         match self {
-            Self::Detent | Self::Ratchet | Self::Latch | Self::Unlatch | Self::Static => TAKES,
+            Self::Detent
+            | Self::Ratchet
+            | Self::Latch
+            | Self::Unlatch
+            | Self::Static
+            | Self::PageTurn => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
             Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
         }
@@ -93,6 +107,7 @@ impl Sound {
             Self::Static => Samples::radio_static(take),
             Self::KeyDown => Samples::key_down(take),
             Self::KeyUp => Samples::key_up(take),
+            Self::PageTurn => Samples::page_turn(take),
         }
     }
 
@@ -107,6 +122,7 @@ impl Sound {
             Self::Latch | Self::Unlatch => 0.5,
             Self::Static => 0.4,
             Self::KeyDown | Self::KeyUp => 0.4,
+            Self::PageTurn => 0.35,
         }
     }
 }
@@ -164,7 +180,10 @@ impl Plugin for AudioPlugin {
         app.init_resource::<KeyClicks>()
             .init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
-            .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>))
+            .add_systems(
+                Update,
+                (Sounds::click_keys, Sounds::turn_pages).run_if(resource_exists::<Sounds>),
+            )
             .add_observer(Sounds::play);
     }
 }
@@ -250,6 +269,20 @@ impl Sounds {
                     .with_volume(Volume::Linear(sound.volume() * mixer.gain()))
                     .with_speed(pitch),
             ));
+        }
+    }
+
+    /// Paper rustles whenever it shows another page.
+    fn turn_pages(
+        papers: Query<(Entity, &Paper), Changed<Paper>>,
+        mut open: Local<EntityHashMap<usize>>,
+        mut commands: Commands,
+    ) {
+        for (entity, paper) in &papers {
+            let page = paper.current_page();
+            if open.insert(entity, page).is_some_and(|old| old != page) {
+                commands.trigger(Play(Sound::PageTurn));
+            }
         }
     }
 }
