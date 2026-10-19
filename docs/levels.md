@@ -31,3 +31,20 @@ summa6-08 =
 
 Run `cargo test -p ld60-levels -p ld60-game` to check that the level can be
 solved and that all its text exists. Use `cli play <folder>` to try it.
+
+## Generated jobs
+
+`Generated::new` makes jobs from the working firmware of each device.
+`Difficulty::for_job` sets how hard job number `n` is: the number of bugs,
+the kinds of bugs, the chip, harmless RAM faults and how many keys show a bug.
+
+Generated jobs share their text in `levels.ftl`:
+
+- `job-customer`: one attribute for each name in `JobText::CUSTOMERS`.
+- `job-complaint-<symptom>` and `job-complaint-wake-<symptom>`: the
+  attributes `take-1` to `take-3` describe the first bug. They can use
+  `$keys`, `$key` and `$expected`.
+- `job-remarks`: the remarks for further bugs and faults.
+
+To try one, run `cli gen --procedural <device> <seed> <n>`. It writes a level
+folder and prints its path. Then run `cli play <folder>`.

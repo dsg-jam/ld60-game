@@ -1,7 +1,10 @@
+use std::str::FromStr;
+
 use ld60_machine::{Cpu, Step};
 
 use crate::{
-    Annunciator, Board, BoardRev, CalcoDevice, ChipSpec, Device, DeviceError, IsaKind, Readout, Rom,
+    Annunciator, Board, BoardRev, CalcoDevice, ChipSpec, Device, DeviceError, IsaKind, Readout,
+    Rom, UnknownDeviceKind,
 };
 
 macro_rules! each {
@@ -70,6 +73,8 @@ pub enum DeviceKind {
 }
 
 impl DeviceKind {
+    pub const ALL: [Self; 2] = [Self::Tally2, Self::Summa6];
+
     pub fn board(self, rev: BoardRev) -> &'static Board {
         &self.boards()[rev as usize]
     }
@@ -101,6 +106,18 @@ impl DeviceKind {
         match self {
             Self::Tally2 | Self::Summa6 => IsaKind::Calco,
         }
+    }
+}
+
+impl FromStr for DeviceKind {
+    type Err = UnknownDeviceKind;
+
+    /// Parses the model name, like `summa6` or `Summa6`.
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| format!("{kind:?}").eq_ignore_ascii_case(text))
+            .ok_or_else(|| UnknownDeviceKind(text.into()))
     }
 }
 

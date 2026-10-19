@@ -44,14 +44,16 @@ impl LevelText {
     }
 
     /// The `attribute` of the message of `level`, or its ID if there is none.
+    /// See [`Level::message`].
     pub fn get(&self, level: &Level, attribute: &str) -> Result<String, TextError> {
+        let (id, attribute) = level.message(attribute);
         let Some(pattern) = self
             .bundle
-            .get_message(&level.id)
-            .and_then(|message| message.get_attribute(attribute))
+            .get_message(&id)
+            .and_then(|message| message.get_attribute(&attribute))
             .map(|attribute| attribute.value())
         else {
-            return Ok(format!("{}.{attribute}", level.id));
+            return Ok(format!("{id}.{attribute}"));
         };
         let mut args = FluentArgs::new();
         for (name, value) in level.text_args() {
@@ -66,8 +68,8 @@ impl LevelText {
             Ok(text)
         } else {
             Err(TextError::Format {
-                id: level.id.clone(),
-                attribute: attribute.to_owned(),
+                id,
+                attribute,
                 errors,
             })
         }
