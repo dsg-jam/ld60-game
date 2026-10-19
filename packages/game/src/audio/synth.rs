@@ -458,9 +458,41 @@ impl Lowpass {
         Self { amount, value: 0.0 }
     }
 
+    /// Opens up to `hertz`.
+    fn at(hertz: f32) -> Self {
+        Self::new(1.0 - (-TAU * hertz / SAMPLE_RATE as f32).exp())
+    }
+
     fn next(&mut self, input: f32) -> f32 {
         self.value += (input - self.value) * self.amount;
         self.value
+    }
+}
+
+/// Lets through what lies between two frequencies, falling off by 12 dB
+/// per octave on both sides.
+struct Band {
+    low: [Lowpass; 2],
+    high: [Lowpass; 2],
+}
+
+impl Band {
+    fn new(low: f32, high: f32) -> Self {
+        Self {
+            low: [Lowpass::at(low), Lowpass::at(low)],
+            high: [Lowpass::at(high), Lowpass::at(high)],
+        }
+    }
+
+    fn next(&mut self, input: f32) -> f32 {
+        let mut output = input;
+        for filter in &mut self.low {
+            output -= filter.next(output);
+        }
+        for filter in &mut self.high {
+            output = filter.next(output);
+        }
+        output
     }
 }
 

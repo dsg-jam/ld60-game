@@ -63,6 +63,8 @@ pub(crate) enum Sound {
     KeyUp,
     /// A page of paper turning over.
     PageTurn,
+    /// A divider of card turning over, stiffer and slower than a page.
+    DividerTurn,
     /// Rain on the street, a loop.
     Rain,
     /// Rain on the shop's roof, a loop.
@@ -78,7 +80,7 @@ pub(crate) enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 11] = [
+    const ALL: [Self; 12] = [
         Self::Click,
         Self::Chime,
         Self::Thunk,
@@ -90,6 +92,7 @@ impl Sound {
         Self::KeyDown,
         Self::KeyUp,
         Self::PageTurn,
+        Self::DividerTurn,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -110,6 +113,7 @@ impl Sound {
             | Self::Unlatch
             | Self::Static
             | Self::PageTurn
+            | Self::DividerTurn
             | Self::Splash => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
             Self::Rain | Self::Tires | Self::Hover => 3,
@@ -132,6 +136,7 @@ impl Sound {
             Self::KeyDown => Samples::key_down(take),
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
+            Self::DividerTurn => Samples::divider_turn(take),
             Self::Rain => Samples::rain(take),
             Self::RoofRain => Samples::roof_rain(take),
             Self::Tires => Samples::tires(take),
@@ -152,7 +157,8 @@ impl Sound {
             Self::Static => 0.4,
             Self::KeyDown => 0.43,
             Self::KeyUp => 0.26,
-            Self::PageTurn => 0.25,
+            Self::PageTurn => 0.29,
+            Self::DividerTurn => 0.35,
             Self::Rain => 0.1,
             Self::RoofRain => 0.15,
             Self::Tires => 0.25,
