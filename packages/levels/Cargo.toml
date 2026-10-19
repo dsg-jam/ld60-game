@@ -13,12 +13,10 @@ publish = { workspace = true }
 ld60-asm = { workspace = true }
 ld60-calco = { workspace = true }
 ld60-devices = { workspace = true, features = ["serde"] }
+ld60-dsl = { workspace = true }
 ld60-machine = { workspace = true }
 ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
-
-[dev-dependencies]
-ld60-dsl = { workspace = true }
 
 [lints]
 workspace = true

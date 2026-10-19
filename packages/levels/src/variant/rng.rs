@@ -17,6 +17,11 @@ impl Rng {
         z ^ (z >> 31)
     }
 
+    /// A number from 0 up to but not including `len`.
+    pub(crate) fn below(&mut self, len: usize) -> usize {
+        (self.next_u64() % len as u64) as usize
+    }
+
     pub(crate) fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
             let j = (self.next_u64() % (i as u64 + 1)) as usize;
