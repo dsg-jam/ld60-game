@@ -178,7 +178,10 @@ impl Column {
 }
 
 impl Action {
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        expect(clippy::too_many_arguments, reason = "Bevy system")
+    )]
     fn apply(
         action: On<Action>,
         app_state: Res<State<AppState>>,
