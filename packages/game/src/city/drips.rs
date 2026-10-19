@@ -15,6 +15,8 @@ use crate::geometry::quads::Quads;
 const SEED: u64 = 7;
 const DROPS_PER_METER: f32 = 4.0;
 const PERIOD: (f32, f32) = (0.5, 2.0);
+/// Seconds a drop takes at least to form after the last one fell.
+const FORMING: f32 = 0.2;
 const WIDTH: f32 = 0.008;
 const BRIGHTNESS: f32 = 2.5;
 
@@ -45,6 +47,24 @@ pub(super) struct DripEdge {
     pub(super) light: Color,
 }
 
+/// Spots along the [`DripEdges`] where drops form and fall.
+#[derive(Resource, Debug)]
+pub(super) struct Drips(Vec<Drip>);
+
+/// A spot where a drop forms, falls at a random time in each round of
+/// `period` seconds, or now and then skips a round.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Drip {
+    pub(super) anchor: Vec3,
+    period: f32,
+    /// A whole number that picks the random numbers of each round.
+    seed: f32,
+    /// Where in its round the drip is at time 0, from 0 to 1.
+    phase: f32,
+    /// The light the drop falls through.
+    light: LinearRgba,
+}
+
 /// Drops falling from the edges of awnings.
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct DripMaterial {
@@ -68,9 +88,10 @@ impl DripMaterial {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<DripMaterial>>,
     ) {
+        let drips = Drips::along(&edges.0);
         commands.spawn((
             Name::new("drips"),
-            Mesh3d(meshes.add(Self::drops(&edges.0))),
+            Mesh3d(meshes.add(drips.mesh())),
             MeshMaterial3d(materials.add(DripMaterial {
                 params: DripParams {
                     amount: 0.0,
@@ -82,27 +103,7 @@ impl DripMaterial {
             Transform::default(),
             Quads::unbounded(),
         ));
-    }
-
-    /// One quad per drop along each edge. The vertex shader lets them fall.
-    fn drops(edges: &[DripEdge]) -> Mesh {
-        let mut rng = rng(SEED);
-        let mut quads = Quads::default();
-        for edge in edges {
-            let count = (edge.from.distance(edge.to) * DROPS_PER_METER).ceil() as usize;
-            let light = edge.light.to_linear();
-            for _ in 0..count {
-                let anchor = edge.from.lerp(edge.to, rng.random::<f32>());
-                let timing = [
-                    rng.random_range(PERIOD.0..PERIOD.1),
-                    rng.random::<f32>(),
-                    rng.random::<f32>(),
-                ];
-                let light = [light.red, light.green, light.blue, 1.0];
-                quads.push_with(anchor, timing, light);
-            }
-        }
-        quads.into_mesh()
+        commands.insert_resource(drips);
     }
 
     fn follow_weather(
@@ -121,6 +122,50 @@ impl DripMaterial {
         AssetPath::from_path_buf(embedded_path!("drips.wesl"))
             .with_source("embedded")
             .into()
+    }
+}
+
+impl Drips {
+    fn along(edges: &[DripEdge]) -> Self {
+        let mut rng = rng(SEED);
+        let mut drips = Vec::new();
+        for edge in edges {
+            let count = (edge.from.distance(edge.to) * DROPS_PER_METER).ceil() as usize;
+            for _ in 0..count {
+                let anchor = edge.from.lerp(edge.to, rng.random::<f32>());
+                let mut drip = Drip {
+                    anchor,
+                    period: rng.random_range(PERIOD.0..PERIOD.1),
+                    seed: rng.random_range(0..1 << 16) as f32,
+                    phase: rng.random::<f32>(),
+                    light: edge.light.to_linear(),
+                };
+                drip.period = drip.period.max(drip.fall() + FORMING);
+                drips.push(drip);
+            }
+        }
+        Self(drips)
+    }
+
+    /// One quad per drop. The vertex shader lets them fall.
+    fn mesh(&self) -> Mesh {
+        let mut quads = Quads::default();
+        for drip in &self.0 {
+            let light = drip.light;
+            quads.push_with(
+                drip.anchor,
+                [drip.period, drip.seed, drip.phase],
+                [light.red, light.green, light.blue, 1.0],
+            );
+        }
+        quads.into_mesh()
+    }
+}
+
+impl Drip {
+    /// Seconds a drop takes to fall to the ground.
+    fn fall(&self) -> f32 {
+        (2.0 * self.anchor.y / GRAVITY).sqrt()
     }
 }
 
