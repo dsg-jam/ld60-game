@@ -3,8 +3,11 @@ use std::f32::consts::TAU;
 use super::{Lowpass, Mode, Noise, Resonator, SAMPLE_RATE, Samples, Vary};
 
 /// Loops fade from their end into their start over this many seconds.
-const SEAM: f32 = 0.5;
-/// Rain drops hitting hard surfaces ring at these.
+pub(super) const SEAM: f32 = 0.5;
+/// How much of their highs the sounds of the street keep on their way to
+/// the player.
+const MUFFLE: f32 = 0.3;
+/// Drops of the spray hitting hard surfaces ring at these.
 const PATTER: [Mode; 4] = [
     Mode::new(1_300.0, 900.0, 1.0),
     Mode::new(2_200.0, 1_200.0, 1.0),
@@ -13,64 +16,6 @@ const PATTER: [Mode; 4] = [
 ];
 
 impl Samples {
-    /// Steady rain on the street: a soft wash of many far drops, close
-    /// drops ticking on hard surfaces and now and then one plinking into a
-    /// puddle. Loops.
-    pub(in crate::audio) fn rain(seed: u32) -> Self {
-        const SECONDS: f32 = 7.0;
-        let mut noise = Noise::new(seed.wrapping_add(70));
-        let mut dice = Noise::new(seed.wrapping_add(71));
-        let mut wash = Lowpass::new(0.3);
-        let mut wash_low = Lowpass::new(0.015);
-        let mut hiss = Lowpass::new(0.6);
-        let mut patter = Resonator::even(&PATTER, 1.0);
-        let mut plinks = Self::plinks(seed, SECONDS + SEAM);
-        let mut plink = Plink::default();
-        Self::generate(SECONDS + SEAM, |t| {
-            let white = noise.next();
-            let band = wash.next(white);
-            let far = band - wash_low.next(band);
-            let near = hiss.next(white) - band;
-            let mut drops = 0.0;
-            for mode in &mut patter {
-                // Most drops are small and a few are big.
-                let hit = if (dice.next() + 1.0) / 2.0 < 0.0015 {
-                    dice.next().powi(3) * 4.0
-                } else {
-                    0.0
-                };
-                drops += mode.next(hit);
-            }
-            if plinks.last().is_some_and(|next| next.at <= t) {
-                plink = plinks.pop().unwrap_or_default();
-            }
-            // Gusts come and go twice over the loop.
-            let gust = 0.85 + 0.15 * (TAU * 2.0 * t / SECONDS).sin();
-            (far * 0.6 + near * 0.08) * gust + drops * 0.4 + plink.sample(t) * 0.6
-        })
-        .looped(SEAM)
-        .normalized(0.7)
-    }
-
-    /// Drops falling into a puddle, as Minnaert bubbles: short tones that
-    /// rise as the bubble closes. Sorted to pop the earliest first.
-    fn plinks(seed: u32, seconds: f32) -> Vec<Plink> {
-        let mut dice = Noise::new(seed.wrapping_add(72));
-        let mut roll = |low: f32, high: f32| low + (high - low) * (dice.next() + 1.0) / 2.0;
-        let mut plinks = Vec::new();
-        let mut at = roll(0.0, 0.6);
-        while at < seconds - 0.1 {
-            plinks.push(Plink {
-                at,
-                pitch: roll(700.0, 2_400.0),
-                level: roll(0.2, 1.0),
-            });
-            at += roll(0.08, 0.7);
-        }
-        plinks.reverse();
-        plinks
-    }
-
     /// Tires rolling on a wet road: the hiss of water squeezed out of the
     /// tread over the low roar of the road, and the faint whine of an
     /// electric motor. Loops.
@@ -93,6 +38,7 @@ impl Samples {
             let motor = (TAU * whine * t).sin() + 0.4 * (TAU * 2.0 * whine * t).sin();
             hiss + roar + motor * 0.02
         })
+        .muffled(MUFFLE)
         .looped(SEAM)
         .normalized(0.7)
     }
@@ -127,6 +73,7 @@ impl Samples {
             }
             burst + body + drops * 0.4
         })
+        .muffled(MUFFLE)
         .normalized(0.8)
     }
 
@@ -154,13 +101,25 @@ impl Samples {
             let air = (band - rush_low.next(band)) * 3.0;
             (fan(hum) + fan(beat)) * 0.25 + air + (TAU * turbine * t).sin() * 0.03
         })
+        .muffled(MUFFLE)
         .looped(SEAM)
         .normalized(0.7)
     }
 
+    /// Dulls the samples with a two pole low-pass, `amount` from 0 (closed)
+    /// to 1 (open).
+    pub(super) fn muffled(mut self, amount: f32) -> Self {
+        let mut first = Lowpass::new(amount);
+        let mut second = Lowpass::new(amount);
+        for sample in &mut self.0 {
+            *sample = second.next(first.next(*sample));
+        }
+        self
+    }
+
     /// Plays the end of the samples over their start, `seam` seconds long,
     /// so they loop without a click.
-    fn looped(mut self, seam: f32) -> Self {
+    pub(super) fn looped(mut self, seam: f32) -> Self {
         let fade = (seam * SAMPLE_RATE as f32) as usize;
         let length = self.0.len() - fade;
         for i in 0..fade {
@@ -169,25 +128,5 @@ impl Samples {
         }
         self.0.truncate(length);
         self
-    }
-}
-
-/// One drop falling into a puddle.
-#[derive(Clone, Copy, Debug, Default)]
-struct Plink {
-    at: f32,
-    pitch: f32,
-    level: f32,
-}
-
-impl Plink {
-    fn sample(&self, t: f32) -> f32 {
-        let t = t - self.at;
-        if !(0.0..0.06).contains(&t) {
-            return 0.0;
-        }
-        // Rises by about a third over its short life.
-        let phase = TAU * self.pitch * (t + 6.0 * t * t);
-        phase.sin() * self.level * (-t * 70.0).exp() * (t * 3_000.0).min(1.0)
     }
 }

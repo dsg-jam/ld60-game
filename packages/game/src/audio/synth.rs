@@ -1,6 +1,7 @@
 mod city;
 mod keys;
 mod paper;
+mod rain;
 
 use std::f32::consts::{PI, TAU};
 

@@ -15,21 +15,20 @@ use super::models::{TRACK, WHEELBASE};
 use crate::audio::{Mixer, Sound};
 
 const SEED: u64 = 11;
-/// Cars on the street are half as loud this many meters away, and only
-/// heard within the range.
-const TIRE_REACH: f32 = 8.0;
-const TIRE_RANGE: f32 = 70.0;
+/// See [`Emitter`] for the reach. Cars are only heard within the range.
+const TIRE_REACH: f32 = 6.0;
+const TIRE_RANGE: f32 = 50.0;
 /// How loud tires are on a dry road, compared to a soaked one.
 const DRY: f32 = 0.4;
 /// How much louder tires get while they roll through a puddle.
 const PUDDLE: f32 = 0.6;
 /// How far above the puddle level water has to be for a splash. The thin
 /// edges of puddles stay quiet.
-const SPLASH_DEPTH: f32 = 0.01;
+const SPLASH_DEPTH: f32 = 0.06;
 /// Seconds between two splashes of one car, at least.
-const SPLASH_GAP: f32 = 0.25;
-const HOVER_REACH: f32 = 30.0;
-const HOVER_RANGE: f32 = 160.0;
+const SPLASH_GAP: f32 = 1.0;
+const HOVER_REACH: f32 = 15.0;
+const HOVER_RANGE: f32 = 120.0;
 /// Only the closest flying cars are heard.
 const HOVERS: usize = 4;
 /// Engines differ a little, so cars don't all sound the same.
@@ -102,7 +101,7 @@ impl Rolling {
                 let in_puddle = water > SPLASH_DEPTH;
                 if in_puddle && !rolling.in_puddle[index] && rolling.since_splash > SPLASH_GAP {
                     rolling.since_splash = 0.0;
-                    let level = (0.4 + water * 8.0).min(1.0);
+                    let level = (0.3 + (water - SPLASH_DEPTH) * 10.0).min(1.0);
                     let splash =
                         Emitter::new(Sound::Splash, Some(TIRE_REACH), rng.0.random_range(PITCH))
                             .with_level(level);

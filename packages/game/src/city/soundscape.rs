@@ -24,6 +24,8 @@ const RAIN_AT: [Vec3; 3] = [
     Vec3::new(0.0, 4.0, -11.0),
     Vec3::new(8.0, 1.0, -6.0),
 ];
+/// The left and right half of the shop's roof, above the player.
+const ROOF_AT: [Vec3; 2] = [Vec3::new(-0.8, 3.5, -1.0), Vec3::new(0.8, 3.5, -1.0)];
 
 pub(super) struct SoundscapePlugin;
 
@@ -51,8 +53,9 @@ pub(super) struct CitySounds {
 #[derive(Component, Debug)]
 pub(super) struct Emitter {
     sound: Sound,
-    /// Meters at which it is half as loud as up close. Without one, it is
-    /// as loud everywhere.
+    /// Meters at which it is a quarter as loud as up close. It fades with
+    /// the squared distance, faster than in open air, as the stalls and the
+    /// crowd shield the street. Without one, it is as loud everywhere.
     reach: Option<f32>,
     pitch: f32,
     /// How loud it is right now, as a factor of its usual volume.
@@ -65,8 +68,11 @@ pub(super) struct Emitter {
 }
 
 /// One of the sources of the rain sound.
-#[derive(Component, Debug)]
-struct Rain;
+#[derive(Component, Clone, Copy, Debug)]
+enum Rain {
+    Street,
+    Roof,
+}
 
 impl CitySounds {
     fn load(mixer: Res<Mixer>, mut sources: ResMut<Assets<AudioSource>>, mut commands: Commands) {
@@ -77,18 +83,27 @@ impl CitySounds {
                 .map(|source| sources.add(source))
                 .collect()
         };
-        let rain = add(Sound::Rain);
+        let street = add(Sound::Rain);
+        let roof = add(Sound::RoofRain);
         let sounds = Self {
             tires: add(Sound::Tires),
             hover: add(Sound::Hover),
             splash: Takes::new(add(Sound::Splash), 0),
         };
-        for (index, at) in RAIN_AT.into_iter().enumerate() {
+        let rain = RAIN_AT
+            .into_iter()
+            .map(|at| (Rain::Street, at))
+            .chain(ROOF_AT.into_iter().map(|at| (Rain::Roof, at)));
+        for (index, (rain, at)) in rain.enumerate() {
+            let (sound, takes) = match rain {
+                Rain::Street => (Sound::Rain, &street),
+                Rain::Roof => (Sound::RoofRain, &roof),
+            };
             commands.spawn((
                 Name::new("rain sound"),
-                Rain,
-                Emitter::new(Sound::Rain, None, 1.0).bundle(
-                    rain[index % rain.len()].clone(),
+                rain,
+                Emitter::new(sound, None, 1.0).bundle(
+                    takes[index % takes.len()].clone(),
                     PlaybackSettings::LOOP,
                     &mixer,
                     0.0,
@@ -140,7 +155,9 @@ impl Emitter {
     }
 
     fn gain(&self, mixer: &Mixer, distance: f32) -> f32 {
-        let fade = self.reach.map_or(1.0, |reach| reach / (reach + distance));
+        let fade = self
+            .reach
+            .map_or(1.0, |reach| (reach / (reach + distance)).powi(2));
         self.sound.volume() * self.heard * fade * mixer.gain()
     }
 
@@ -175,11 +192,21 @@ impl Rain {
     fn follow_weather(
         time: Res<Time>,
         weather: Res<Weather>,
-        mut rain: Query<&mut Emitter, With<Rain>>,
+        mut rain: Query<(&Rain, &mut Emitter)>,
     ) {
         let step = time.delta_secs() / RAIN_GLIDE;
-        for mut emitter in &mut rain {
-            emitter.level += (weather.rain - emitter.level).clamp(-step, step);
+        for (rain, mut emitter) in &mut rain {
+            let level = rain.level(weather.rain);
+            emitter.level += (level - emitter.level).clamp(-step, step);
+        }
+    }
+
+    /// The roof drums along with any rain. The street fills in as the rain
+    /// gets heavy, so light rain sounds like single drops.
+    fn level(self, rain: f32) -> f32 {
+        match self {
+            Self::Street => rain.powf(1.5),
+            Self::Roof => rain,
         }
     }
 }

@@ -57,6 +57,8 @@ pub(crate) enum Sound {
     PageTurn,
     /// Rain on the street, a loop.
     Rain,
+    /// Rain on the shop's roof, a loop.
+    RoofRain,
     /// A car's tires on the road, a loop.
     Tires,
     /// A car's tire hitting a puddle.
@@ -103,6 +105,7 @@ impl Sound {
             | Self::Splash => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
             Self::Rain | Self::Tires | Self::Hover => 3,
+            Self::RoofRain => 2,
             Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
         }
     }
@@ -122,6 +125,7 @@ impl Sound {
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
             Self::Rain => Samples::rain(take),
+            Self::RoofRain => Samples::roof_rain(take),
             Self::Tires => Samples::tires(take),
             Self::Splash => Samples::splash(take),
             Self::Hover => Samples::hover(take),
@@ -138,12 +142,13 @@ impl Sound {
             Self::Ratchet => 0.12,
             Self::Latch | Self::Unlatch => 0.5,
             Self::Static => 0.4,
-            Self::KeyDown | Self::KeyUp => 0.4,
-            Self::PageTurn => 0.35,
-            Self::Rain => 0.22,
-            Self::Tires => 0.3,
+            Self::KeyDown | Self::KeyUp => 0.32,
+            Self::PageTurn => 0.25,
+            Self::Rain => 0.1,
+            Self::RoofRain => 0.15,
+            Self::Tires => 0.25,
             Self::Splash => 0.35,
-            Self::Hover => 0.25,
+            Self::Hover => 0.35,
         }
     }
 }
