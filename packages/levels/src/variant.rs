@@ -1,9 +1,9 @@
 mod differential;
-mod effects;
+pub(crate) mod effects;
 mod firmware;
-mod line;
+pub(crate) mod line;
 mod ram_map;
-mod rng;
+pub(crate) mod rng;
 
 use ld60_devices::{BoardRev, Fault};
 
@@ -78,7 +78,7 @@ impl Variant {
     }
 
     /// Returns `None` if the firmware cannot move to `board`.
-    fn rewrite(&self, board: BoardRev, seed: u64) -> Option<Self> {
+    pub(crate) fn rewrite(&self, board: BoardRev, seed: u64) -> Option<Self> {
         let (from, to) = (self.level.board(), self.level.device.board(board));
         let mut buggy = Firmware::new(&self.buggy);
         let mut fixed = Firmware::new(&self.fixed);

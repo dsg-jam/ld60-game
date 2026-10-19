@@ -69,7 +69,7 @@ pub fn run_line_tests(level: &Level, rom: &Rom, seeds: &[u64]) -> Result<Report,
     run_cases(level, rom, &cases, seeds)
 }
 
-fn run_cases(
+pub(crate) fn run_cases(
     level: &Level,
     rom: &Rom,
     cases: &[TestCase],
