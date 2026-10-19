@@ -9,7 +9,7 @@ use bevy::{
 use super::contents::{Contents, Page, Section};
 use super::pins::Sheet;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{INK, PAPER, Paper};
+use crate::parts::paper::{INK, PAPER, Paper, PaperButton};
 use crate::workshop::run::Run;
 
 /// Under the pointer, buttons and index lines take this color.
@@ -79,6 +79,7 @@ impl Hover {
             BorderColor::all(INK),
             BackgroundColor(PAPER),
             Self { idle: PAPER },
+            PaperButton::default(),
         )
     }
 
@@ -88,6 +89,7 @@ impl Hover {
             node,
             BackgroundColor(Color::NONE),
             Self { idle: Color::NONE },
+            PaperButton::default(),
         )
     }
 }

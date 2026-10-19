@@ -5,8 +5,8 @@ use bevy::{
     mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    render::render_resource::{AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat},
-    shader::ShaderRef,
+    render::render_resource::{AsBindGroup, ShaderType},
+    shader::{ShaderRef, load_shader_library},
 };
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
@@ -24,13 +24,12 @@ const FOLD_WIDTH: f32 = 0.02;
 const HELD_FLAT: f32 = 0.012;
 /// Distance from a held edge where the wrinkles are back in full.
 const HELD_REACH: f32 = 0.04;
-/// About the size of a strip of a turning page, for the grain.
-const BLANK_SIZE: Vec2 = Vec2::new(0.04, 0.22);
 
 pub(super) struct SheetPlugin;
 
 impl Plugin for SheetPlugin {
     fn build(&self, app: &mut App) {
+        load_shader_library!(app, "punch.wesl");
         embedded_asset!(app, "sheet.wesl");
         app.add_plugins(MaterialPlugin::<PaperMaterial>::default())
             .add_observer(Sheet::add_material)
@@ -85,6 +84,8 @@ struct SheetParams {
     /// Two folds as a point on the line, its angle and its depth, in the
     /// sheet's space: meters from the top left corner, with y down.
     folds: [Vec4; 2],
+    /// Center and radius of each punched hole, in the same space.
+    holes: [Vec4; 2],
 }
 
 /// Gives a sheet its paper material once spawned.
@@ -97,7 +98,7 @@ pub(super) struct SheetGlow(pub(super) LinearRgba);
 
 /// The shape of a crumpled sheet that was flattened again.
 #[derive(Component, Debug, Clone, Copy)]
-pub(super) struct Wrinkles {
+pub(crate) struct Wrinkles {
     size: Vec2,
     seed: u64,
     /// Points from the middle of the sheet to the edge that is held flat, in
@@ -168,6 +169,10 @@ impl Wrinkles {
         }
     }
 
+    pub(super) fn size(&self) -> Vec2 {
+        self.size
+    }
+
     /// Height above the flat sheet at `p` in the sheet's space, before it is
     /// lifted to rest on its lowest point.
     fn height(&self, p: Vec2) -> f32 {
@@ -201,7 +206,7 @@ impl Wrinkles {
     /// under a clip or around the rings.
     pub(super) fn hold(&mut self, binding: &Binding) {
         // The sheet's y runs down the page, the mesh's y up.
-        self.held = Some(binding.held().truncate() * Vec2::new(1.0, -1.0));
+        self.held = Some(binding.held() * Vec2::new(1.0, -1.0));
     }
 
     /// A grid facing +Z like a [`Rectangle`], displaced by the wrinkles.
@@ -278,6 +283,7 @@ impl Sheet {
                     page: 0.0,
                     stains: 1.0,
                     folds: wrinkles.folds,
+                    holes: [Vec4::ZERO; 2],
                 },
                 print: print.clone(),
             },
@@ -288,39 +294,22 @@ impl Sheet {
             .insert(MeshMaterial3d(material));
     }
 
-    /// Clean paper on both sides, for a page that only shows while it turns.
-    pub(super) fn blank(images: &mut Assets<Image>, color: Color) -> PaperMaterial {
-        let white = images.add(Image::new_fill(
-            Extent3d::default(),
-            TextureDimension::D2,
-            &[255; 4],
-            TextureFormat::Rgba8UnormSrgb,
-            RenderAssetUsages::RENDER_WORLD,
-        ));
-        ExtendedMaterial {
-            base: StandardMaterial {
-                base_color: color,
-                perceptual_roughness: ROUGHNESS,
-                reflectance: PAPER_REFLECTANCE,
-                double_sided: true,
-                cull_mode: None,
-                ..default()
-            },
-            extension: Self {
-                params: SheetParams {
-                    size: BLANK_SIZE,
-                    seed: 0.0,
-                    page: 0.0,
-                    stains: 0.0,
-                    folds: [Vec4::ZERO; 2],
-                },
-                print: white,
-            },
+    /// The same sheet with `print` on it, like its blank back.
+    pub(super) fn reprinted(&self, print: Handle<Image>) -> Self {
+        Self {
+            params: self.params,
+            print,
         }
     }
 
+    /// Punches `holes` through the sheet, each a center in the sheet's space
+    /// and a radius.
+    pub(crate) fn punch(&mut self, holes: [Vec3; 2]) {
+        self.params.holes = holes.map(|hole| hole.extend(0.0));
+    }
+
     /// Stains each page of a sheet in its own way.
-    pub(super) fn set_page(&mut self, page: usize) {
+    pub(crate) fn set_page(&mut self, page: usize) {
         self.params.page = page as f32;
     }
 

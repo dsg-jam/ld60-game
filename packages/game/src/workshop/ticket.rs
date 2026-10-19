@@ -120,7 +120,7 @@ impl JobTicket {
         });
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, vec![page]),
-            Binding::clip(SHEET_SIZE),
+            Binding::clip(),
             FocusTarget {
                 prompt: "click-ticket",
                 focus: Focus::Paper,

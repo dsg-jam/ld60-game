@@ -1,6 +1,9 @@
 hint-back = Back
 hint-pin = Pin to monitor
 hint-unpin = Unpin
+hint-next-page = Next page
+hint-previous-page = Previous page
+hint-tab = Turn to { $tab }
 
 click-bell = Ring bell
 click-manuals = Open shop manuals

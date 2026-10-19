@@ -4,14 +4,13 @@ use std::sync::Arc;
 
 use bevy::{
     audio::{SpatialScale, Volume},
-    ecs::entity::{EntityHashMap, EntityHashSet},
+    ecs::entity::EntityHashSet,
     platform::collections::HashMap,
     prelude::*,
 };
 
 use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
-use crate::parts::paper::Paper;
 use crate::player::camera::PlayerCamera;
 
 /// How loud the game is while a menu is open.
@@ -236,10 +235,7 @@ impl Plugin for AudioPlugin {
         app.init_resource::<KeyClicks>()
             .init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
-            .add_systems(
-                Update,
-                (Sounds::click_keys, Sounds::turn_pages).run_if(resource_exists::<Sounds>),
-            )
+            .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>))
             .add_observer(Sounds::play)
             .add_observer(Sounds::play_at)
             .add_observer(listen);
@@ -363,20 +359,6 @@ impl Sounds {
                     .with_volume(Volume::Linear(volume))
                     .with_speed(pitch),
             ));
-        }
-    }
-
-    /// Paper rustles whenever it shows another page.
-    fn turn_pages(
-        papers: Query<(Entity, &Paper), Changed<Paper>>,
-        mut open: Local<EntityHashMap<usize>>,
-        mut commands: Commands,
-    ) {
-        for (entity, paper) in &papers {
-            let page = paper.current_page();
-            if open.insert(entity, page).is_some_and(|old| old != page) {
-                commands.trigger(Play(Sound::PageTurn));
-            }
         }
     }
 }

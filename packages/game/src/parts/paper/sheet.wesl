@@ -13,6 +13,7 @@ import package::geometry::{
     bump::bumped,
     noise::{TAU, hash, noise, visible},
 };
+import package::parts::paper::punch::punched;
 
 struct Sheet {
     size: vec2<f32>,
@@ -22,6 +23,8 @@ struct Sheet {
     stains: f32,
     /// Point on the fold, its angle and depth, in meters from the top left.
     folds: array<vec4<f32>, 2>,
+    /// Center and radius of each punched hole, in meters from the top left.
+    holes: array<vec4<f32>, 2>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> sheet: Sheet;
@@ -92,6 +95,14 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     }
     let fiber = noise(p * vec2<f32>(2500.0, 900.0), sheet.seed);
     relief += 0.000015 * fiber * visible(0.0004, pixel);
+    var left = 1.0;
+    var crease = 0.0;
+    for (var i = 0; i < 2; i++) {
+        let punch = punched(p, size, sheet.holes[i].xyz, s, pixel);
+        left = min(left, punch.x);
+        crease = max(crease, punch.y);
+    }
+    relief += 0.0002 * crease * (fiber - 0.5);
     pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, relief);
 
     let ink = print(in.uv, dpdx(in.uv), dpdy(in.uv)).rgb;
@@ -110,7 +121,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let edge = min(min(p.x, size.x - p.x), min(p.y, size.y - p.y));
     let reach = 0.002 + 0.005 * noise(vec2<f32>(p.x + p.y, 0.5) * 120.0, s + 5.0);
     grime += 0.6 * (1.0 - smoothstep(0.0, reach, edge));
-    grime += 0.25 * fold_line;
+    grime += 0.25 * fold_line + 0.4 * crease;
 
     // Thumbs along the bottom and the sides.
     for (var i = 0; i < 3; i++) {
@@ -148,6 +159,9 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     pbr_input.material.base_color = vec4<f32>(pbr_input.material.base_color.rgb * paper, 1.0);
     pbr_input.material.emissive = vec4<f32>(pbr_input.material.emissive.rgb * paper, pbr_input.material.emissive.a);
 
+    if left < 0.5 {
+        discard;
+    }
     var out: FragmentOutput;
 @if(PREPASS_PIPELINE) {
     out = deferred_output(in, pbr_input);
