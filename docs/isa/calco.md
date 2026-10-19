@@ -121,15 +121,18 @@ next digit.
 All revisions use the same encoding and assembly syntax. They differ in the
 instructions they support.
 
-| Revision | `IN REV` | Supported instructions                                                                  |
-| -------- | -------- | --------------------------------------------------------------------------------------- |
-| A        | 0x10     | `NOP`, `HLT`, `INC`, `LD Mn`, `ST Mn`, `LDI A, ii`, `CPI ii`, `IN p`, `JMP`, `JZ`, `JC` |
-| B        | 0x20     | All                                                                                     |
-| C        | 0x30     | All                                                                                     |
+| Revision | `IN REV` | Supported instructions                                                                                                                |
+| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| A        | 0x10     | `NOP`, `HLT`, `INC`, `LD Mn`, `ST Mn`, `LDI A, ii`, `CPI ii`, `IN p`, `JMP`, `JZ`, `JC`                                               |
+| B        | 0x20     | Rev A, `LDI B, ii`, `LD [B+n]`, `ST [B+n]`, `ADC`, `SBC`, `CLC`, `SEC`, `DEC`, `DA`, `DS`, `OUT`, `JNZ`, `JNC`, `CALL`, `RET`, `DJNZ` |
+| C        | 0x30     | Rev B, `CMP Mn`, `CMP [B+n]`, `SWP`                                                                                                   |
 
 Rev A has just enough to count key presses. It waits for a key, reads it,
 compares it and counts digits with `INC`. It has no B register instructions, no
 stack, no arithmetic and no output port.
+
+Rev B adds the B register, the stack, decimal arithmetic and the output port. It
+compares only with `CPI`. Rev C adds `CMP` and `SWP`.
 
 The assembler rejects instructions that the revision does not support. The chip
 runs them like reserved encodings.

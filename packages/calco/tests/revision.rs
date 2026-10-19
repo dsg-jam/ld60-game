@@ -45,6 +45,10 @@ fn unsupported_on_a(form: &str) -> AsmErrorKind {
     }
 }
 
+fn every_op() -> impl Iterator<Item = Op> {
+    (0..=u8::MAX).map(|first| Op::decode(first, 0))
+}
+
 #[test]
 fn rev_a_rejects_ops_it_lacks() {
     for (source, form) in [
@@ -83,6 +87,36 @@ fn unsupported_reads_like_the_datasheet() {
 }
 
 #[test]
+fn rev_b_rejects_what_only_rev_c_has() {
+    for (source, form) in [("CMP M1", "CMP"), ("cmp [b+2]", "CMP"), ("SWP", "SWP")] {
+        assert_eq!(
+            first_error(Revision::B, source),
+            AsmErrorKind::Unsupported {
+                form: form.into(),
+                isa: "CalCo Rev B",
+            },
+            "{source}"
+        );
+        assert!(Revision::C.isa().assemble(source).is_ok(), "{source}");
+    }
+}
+
+#[test]
+fn each_revision_keeps_the_ops_of_the_one_before() {
+    for pair in Revision::ALL.windows(2) {
+        let [old, new] = [pair[0], pair[1]];
+        for op in every_op().filter(|&op| old.supports(op)) {
+            assert!(new.supports(op), "Rev {new} lacks {op} from Rev {old}");
+        }
+    }
+}
+
+#[test]
+fn rev_c_runs_every_documented_op() {
+    assert!(every_op().all(|op| matches!(op, Op::Reserved(_)) || Revision::C.supports(op)));
+}
+
+#[test]
 fn later_revisions_take_every_op() {
     let source = "CALL f\nf: LDI B, 2\nLD [B+1]\nOUT ANN\nDJNZ f\nRET";
     for revision in [Revision::B, Revision::C] {
@@ -99,8 +133,7 @@ fn labels_named_like_unsupported_ops_still_work() {
 #[test]
 fn mnemonics_match_the_supported_ops() {
     for revision in Revision::ALL {
-        let supported: BTreeSet<String> = (0..=u8::MAX)
-            .map(|first| Op::decode(first, 0))
+        let supported: BTreeSet<String> = every_op()
             .filter(|&op| revision.supports(op))
             .filter_map(|op| op.to_string().split_whitespace().next().map(String::from))
             .collect();
@@ -122,7 +155,14 @@ fn rev_a_has_the_minimal_set() {
             "NOP", "HLT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC"
         ]
     );
-    assert_eq!(Revision::B.isa().mnemonics(), Revision::C.isa().mnemonics());
+}
+
+#[test]
+fn rev_c_adds_cmp_and_swp() {
+    let rev_b: BTreeSet<_> = Revision::B.isa().mnemonics().iter().collect();
+    let rev_c: BTreeSet<_> = Revision::C.isa().mnemonics().iter().collect();
+    let added: Vec<_> = rev_c.difference(&rev_b).copied().copied().collect();
+    assert_eq!(added, ["CMP", "SWP"]);
 }
 
 #[test]
@@ -148,6 +188,11 @@ fn forms_tell_addressing_modes_apart() {
         assert!(rev_b.contains(&form), "{form}");
     }
     assert!(!rev_b.contains(&"Jcc aa"));
+    assert!(!rev_b.contains(&"CMP Mn"));
+    let rev_c = forms(Revision::C);
+    for form in ["CMP Mn", "CMP [B+n]", "SWP"] {
+        assert!(rev_c.contains(&form), "{form}");
+    }
 }
 
 #[test]

@@ -5,7 +5,7 @@ The Tally 2 is a 2-digit tally counter by DSG Electronics. It runs a
 is the first job on the bench.
 
 Early units have a CalCo Rev A, which only supports a few instructions. Later
-units have a Rev B. Check the chip sticker before you change the firmware.
+units have a Rev B or Rev C. Check the chip sticker before you change the firmware.
 
 ## Board revisions
 

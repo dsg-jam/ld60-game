@@ -81,11 +81,13 @@ impl Reference {
 
     /// The chip revisions that [`Reference::compile`] supports for `device`.
     ///
-    /// The Summa6 and the Lock4 need instructions that Rev A does not have.
+    /// The Summa6 needs instructions that Rev A does not have. The Lock4
+    /// also needs `CMP` from Rev C.
     pub fn revisions(device: DeviceKind) -> &'static [Revision] {
         match device {
             DeviceKind::Tally2 => &Revision::ALL,
-            DeviceKind::Summa6 | DeviceKind::Lock4 => &[Revision::B, Revision::C],
+            DeviceKind::Summa6 => &[Revision::B, Revision::C],
+            DeviceKind::Lock4 => &[Revision::C],
         }
     }
 
