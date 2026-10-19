@@ -5,12 +5,15 @@ pub mod generate;
 pub mod list;
 pub mod listing;
 pub mod play;
+pub mod procedural;
 mod render;
 pub mod seed;
 mod session;
 pub mod text;
 
 pub use session::{Session, Stop};
+
+use std::path::Path;
 
 use ld60_devices::BoardRev;
 use ld60_levels::{Catalog, LevelSource, Variant};
@@ -21,14 +24,20 @@ pub const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub fn catalog() -> Result<Catalog> {
-    Ok(Catalog::read(std::path::Path::new(LEVELS))?)
+    Ok(Catalog::read(Path::new(LEVELS))?)
 }
 
+/// The level in the catalog folder `path`, or in the folder at `path`, like
+/// one that `cli gen --procedural` wrote.
 pub fn find_level(path: &str) -> Result<LevelSource> {
-    catalog()?
-        .find(path)
-        .cloned()
-        .ok_or_else(|| format!("unknown level '{path}'. Run 'cli list' to see all levels.").into())
+    if let Some(source) = catalog()?.find(path) {
+        return Ok(source.clone());
+    }
+    let folder = Path::new(path);
+    if folder.join(LevelSource::LEVEL_FILE).is_file() {
+        return Ok(LevelSource::read_folder(folder)?);
+    }
+    Err(format!("unknown level '{path}'. Run 'cli list' to see all levels.").into())
 }
 
 /// The level as written, or the variant for `seed`. A `board` other than the

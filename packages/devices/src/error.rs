@@ -75,3 +75,19 @@ impl fmt::Display for UnknownBoardRev {
 }
 
 impl std::error::Error for UnknownBoardRev {}
+
+/// The text that did not name a device model.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownDeviceKind(pub String);
+
+impl fmt::Display for UnknownDeviceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let names: Vec<String> = DeviceKind::ALL
+            .iter()
+            .map(|kind| format!("{kind:?}").to_lowercase())
+            .collect();
+        write!(f, "unknown device '{}', use {}", self.0, names.join(" or "))
+    }
+}
+
+impl std::error::Error for UnknownDeviceKind {}

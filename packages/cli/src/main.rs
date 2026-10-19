@@ -10,10 +10,15 @@ Usage:
                                          Run level tests on the buggy ROM or a file
   cli play <level> [--fixed] [--seed N] [--variant N] [--board R]
                                          Open a level on the bench
+  cli gen --procedural <device> <seed> <job> [--out DIR]
+                                         Generate job number <job> for tally2
+                                         or summa6 and write its level folder
   cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)
   cli gen [--check]                      Regenerate level firmware from its source
 
---board R moves the level to board revision R (A, B or C).";
+--board R moves the level to board revision R (A, B or C).
+<level> is a level from 'cli list' or a level folder, like one from
+'cli gen --procedural'.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,6 +34,9 @@ fn main() -> ExitCode {
         }
         ["gen"] => generate(&mut out, false),
         ["gen", "--check"] => generate(&mut out, true),
+        ["gen", "--procedural", device, seed, job, options @ ..] => {
+            procedural(&mut out, device, seed, job, options).map(|()| true)
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::from(2);
@@ -72,6 +80,24 @@ fn check(out: &mut impl Write, level: &str, options: &[&str]) -> ld60_cli::Resul
 fn generate(out: &mut impl Write, check: bool) -> ld60_cli::Result<bool> {
     let data_dir = std::path::Path::new(ld60_cli::LEVELS);
     ld60_cli::generate::run(out, data_dir, check)
+}
+
+fn procedural(
+    out: &mut impl Write,
+    device: &str,
+    seed: &str,
+    job: &str,
+    options: &[&str],
+) -> ld60_cli::Result<()> {
+    let (device, seed, job) = (device.parse()?, seed.parse()?, job.parse()?);
+    let folder = match options {
+        [] => ld60_cli::procedural::default_folder(device, seed, job),
+        ["--out", folder] => folder.into(),
+        _ => return Err(format!("unknown options {options:?}").into()),
+    };
+    ld60_cli::procedural::run(out, device, seed, job, &folder)?;
+    writeln!(out, "Play it with: cli play {}", folder.display())?;
+    Ok(())
 }
 
 fn listing(out: &mut impl Write, file: &str, revision: &str) -> ld60_cli::Result<()> {
