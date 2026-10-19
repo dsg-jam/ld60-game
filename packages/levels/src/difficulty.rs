@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use ld60_calco::{ChipInfo, DateCode, Revision};
+use ld60_calco::{ChipInfo, DateCode, Errata, Revision};
 use ld60_devices::{ChipSpec, DeviceKind};
 
 use crate::variant::rng::Rng;
@@ -42,6 +42,25 @@ pub struct Difficulty {
 impl Difficulty {
     /// The difficulty of job `job` on `device`.
     pub fn for_job(job: u32, device: DeviceKind) -> Self {
+        Self::for_shop(job, device, &Revision::ALL)
+    }
+
+    /// The difficulty of job `job` on `device` in a shop with the errata
+    /// pages of the `errata` revisions. A chip with a known bug only comes
+    /// once the shop has the errata pages that explain it.
+    ///
+    /// ```
+    /// use ld60_calco::Errata;
+    /// use ld60_devices::{ChipSpec, DeviceKind};
+    /// use ld60_levels::Difficulty;
+    ///
+    /// for job in 0..40 {
+    ///     let difficulty = Difficulty::for_shop(job, DeviceKind::Summa6, &[]);
+    ///     let ChipSpec::Calco(chip) = difficulty.chip();
+    ///     assert_eq!(Errata::for_chip(chip), Errata::default());
+    /// }
+    /// ```
+    pub fn for_shop(job: u32, device: DeviceKind, errata: &[Revision]) -> Self {
         let n = job as usize;
         Self {
             device,
@@ -54,7 +73,7 @@ impl Difficulty {
                 (job / 2).min(4),
                 (job.saturating_sub(4) / 2).min(4),
             ],
-            chip: Self::pick_chip(job, device),
+            chip: Self::pick_chip(job, device, errata),
             fault_chance: (job.saturating_sub(4) * 5).min(30),
             symptom_keys: (n / 8).min(2)..=(2 + n / 2).min(MAX_SYMPTOM_KEYS),
         }
@@ -112,8 +131,9 @@ impl Difficulty {
     }
 
     /// The first jobs get the newest chip. Then every revision shows up, and
-    /// later the Rev B chips with the `DS` errata.
-    fn pick_chip(job: u32, device: DeviceKind) -> ChipSpec {
+    /// later the Rev B chips with the `DS` errata, if the shop has its
+    /// errata pages.
+    fn pick_chip(job: u32, device: DeviceKind, errata: &[Revision]) -> ChipSpec {
         let revisions = Reference::revisions(device);
         let mut chips: Vec<ChipInfo> = match job {
             0..3 => revisions.last().into_iter().copied().collect(),
@@ -125,11 +145,15 @@ impl Difficulty {
             date_code: LATE,
         })
         .collect();
-        if job >= 8 && revisions.contains(&Revision::B) {
-            chips.push(ChipInfo {
-                revision: Revision::B,
-                date_code: EARLY,
-            });
+        let early = ChipInfo {
+            revision: Revision::B,
+            date_code: EARLY,
+        };
+        let explained = Errata::for_chip(early)
+            .iter()
+            .all(|erratum| errata.contains(&erratum.revision()));
+        if job >= 8 && revisions.contains(&Revision::B) && explained {
+            chips.push(early);
         }
         let pick = Rng::new(u64::from(job), "chip").below(chips.len());
         ChipSpec::Calco(chips[pick])
