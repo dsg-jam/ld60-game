@@ -29,6 +29,7 @@ impl DeviceName for DeviceKind {
         Message::new(match self {
             Self::Tally2 => "device-tally2",
             Self::Summa6 => "device-summa6",
+            Self::Lock4 => "device-lock4",
         })
     }
 }

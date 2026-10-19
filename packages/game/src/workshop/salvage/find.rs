@@ -35,6 +35,7 @@ impl Find {
         match self {
             Self::Device(DeviceKind::Tally2) => 12,
             Self::Device(DeviceKind::Summa6) => 30,
+            Self::Device(DeviceKind::Lock4) => 45,
             Self::Tool(ComputerTool::TestBench) => 14,
             Self::Tool(ComputerTool::Debugger) => 22,
             Self::Tool(ComputerTool::Trace) => 16,
@@ -48,6 +49,7 @@ impl Find {
         Message::new(match self {
             Self::Device(DeviceKind::Tally2) => "salvage-guess-tally2",
             Self::Device(DeviceKind::Summa6) => "salvage-guess-summa6",
+            Self::Device(DeviceKind::Lock4) => "salvage-guess-lock4",
             Self::Tool(ComputerTool::TestBench) => "salvage-guess-test-bench",
             Self::Tool(ComputerTool::Debugger) => "salvage-guess-debugger",
             Self::Tool(ComputerTool::Trace) => "salvage-guess-trace",

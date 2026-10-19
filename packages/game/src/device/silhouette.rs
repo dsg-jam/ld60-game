@@ -55,9 +55,10 @@ mod tests {
 
     #[test]
     fn devices_look_different() {
-        assert_ne!(
-            Silhouette::of(DeviceKind::Tally2),
-            Silhouette::of(DeviceKind::Summa6)
-        );
+        for (index, &device) in DeviceKind::ALL.iter().enumerate() {
+            for &other in &DeviceKind::ALL[index + 1..] {
+                assert_ne!(Silhouette::of(device), Silhouette::of(other), "{device:?}");
+            }
+        }
     }
 }

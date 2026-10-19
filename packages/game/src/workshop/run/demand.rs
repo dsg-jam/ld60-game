@@ -105,7 +105,7 @@ mod tests {
             demand.fixed(DeviceKind::Tally2);
         }
         let mut rng = SmallRng::seed_from_u64(1);
-        let signs = DeviceKind::ALL;
+        let signs = [DeviceKind::Tally2, DeviceKind::Summa6];
         let tallies = (0..1000)
             .filter(|_| demand.pick(&signs, &mut rng) == Some(DeviceKind::Tally2))
             .count();

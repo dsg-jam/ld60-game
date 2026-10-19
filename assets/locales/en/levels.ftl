@@ -80,7 +80,7 @@ job-customer =
 job-complaint-wrong-digit =
     .take-1 = I pressed { $keys } and the little window lied to me. It should say { $expected }.
     .take-2 = My cousin says { $keys } makes { $expected }. This box makes something else. One of them is wrong and it is not my cousin.
-    .take-3 = It was a good box until it learned to count wrong. Press { $keys } and see. It should say { $expected }.
+    .take-3 = It was a good box until it started to make mistakes. Press { $keys } and see. It should say { $expected }.
 
 job-complaint-wake-wrong-digit =
     .take-1 = When I wake it up, it should say { $expected }. It says something else.
@@ -90,7 +90,7 @@ job-complaint-wake-wrong-digit =
 job-complaint-wrong-annunciator =
     .take-1 = I pressed { $keys } and the little marks next to the numbers lit up wrong. It should say { $expected }.
     .take-2 = The tiny lights at the side of the window do what they want. Press { $keys } and look. It should say { $expected }.
-    .take-3 = After { $keys } it shows the wrong little mark. My buyers think I owe them money. It should say { $expected }.
+    .take-3 = After { $keys } it shows the wrong little mark. Now I cannot trust it. It should say { $expected }.
 
 job-complaint-wake-wrong-annunciator =
     .take-1 = When I wake it up, a little mark next to the numbers lights up wrong. It should say { $expected }.

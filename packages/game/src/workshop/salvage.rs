@@ -351,7 +351,11 @@ mod tests {
             let salvage = SalvageCrate::pack(&run).unwrap();
             assert!((FEWEST..=MOST).contains(&salvage.finds.len()));
             assert!(salvage.finds.iter().all(|&find| run.wants(find)));
-            assert_eq!(salvage.finds[0], Find::Device(DeviceKind::Summa6));
+            assert!(
+                matches!(salvage.finds[0], Find::Device(device) if !run.signs().contains(&device)),
+                "{:?}",
+                salvage.finds
+            );
             let unique: HashSet<_> = salvage.finds.iter().collect();
             assert_eq!(unique.len(), salvage.finds.len());
         }

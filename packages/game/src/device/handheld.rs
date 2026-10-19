@@ -82,7 +82,49 @@ const SUMMA6: Model = Model {
     keypad_spot: Vec2::new(0.0, 0.3),
     sticker_size: Vec2::new(0.06, 0.035),
     sticker_spot: Vec2::new(0.0, 0.2),
+    words: false,
 };
+
+const LOCK4: Model = Model {
+    body_size: Vec3::new(0.075, 0.022, 0.16),
+    body: Color::srgb_u8(0x6b, 0x6e, 0x5a),
+    lcd_width: 0.06,
+    window_spot: Vec2::new(0.0, -0.7),
+    rows: LOCK4_ROWS,
+    keypad_spot: Vec2::new(0.0, 0.25),
+    sticker_size: Vec2::new(0.055, 0.032),
+    sticker_spot: Vec2::new(0.0, 0.2),
+    words: true,
+};
+
+const LOCK4_ROWS: &[&[KeyDef<char>]] = &[
+    &[
+        KeyDef::unit("1", '1', &[Typed("1")]),
+        KeyDef::unit("2", '2', &[Typed("2")]),
+        KeyDef::unit("3", '3', &[Typed("3")]),
+    ],
+    &[
+        KeyDef::unit("4", '4', &[Typed("4")]),
+        KeyDef::unit("5", '5', &[Typed("5")]),
+        KeyDef::unit("6", '6', &[Typed("6")]),
+    ],
+    &[
+        KeyDef::unit("7", '7', &[Typed("7")]),
+        KeyDef::unit("8", '8', &[Typed("8")]),
+        KeyDef::unit("9", '9', &[Typed("9")]),
+    ],
+    &[
+        KeyDef::unit("*", '*', &[Typed("*")]),
+        KeyDef::unit("0", '0', &[Typed("0")]),
+        KeyDef::unit("#", '#', &[Typed("#"), Named(Key::Enter)]),
+    ],
+    &[KeyDef::wide(
+        "C",
+        'C',
+        &[Typed("c"), Typed("C"), Named(Key::Delete)],
+        3.0,
+    )],
+];
 
 const TALLY2: Model = Model {
     body_size: Vec3::new(0.065, 0.02, 0.085),
@@ -93,6 +135,7 @@ const TALLY2: Model = Model {
     keypad_spot: Vec2::new(0.0, 0.45),
     sticker_size: Vec2::new(0.05, 0.029),
     sticker_spot: Vec2::ZERO,
+    words: false,
 };
 
 /// Shape and keys of one device kind.
@@ -109,6 +152,8 @@ pub(super) struct Model {
     sticker_size: Vec2,
     /// Where the sticker sits on the underside, see [`Block::top_spot`].
     sticker_spot: Vec2,
+    /// Whether the LCD prints the OPEN and SHUT lamps.
+    words: bool,
 }
 
 impl Model {
@@ -116,12 +161,13 @@ impl Model {
         match kind {
             DeviceKind::Tally2 => &TALLY2,
             DeviceKind::Summa6 => &SUMMA6,
+            DeviceKind::Lock4 => &LOCK4,
         }
     }
 
     /// The LCD for `digits` digits.
     fn lcd_size(&self, digits: usize) -> Vec2 {
-        let canvas = lcd::canvas_size(digits).as_vec2();
+        let canvas = lcd::canvas_size(digits, self.words).as_vec2();
         Vec2::new(self.lcd_width, self.lcd_width * canvas.y / canvas.x)
     }
 
@@ -200,7 +246,14 @@ impl Handheld {
         let window = model.window(&body, lcd_size);
         let keypad = Keypad::new(model.rows, &STYLE, &body, model.keypad_spot);
         let labels = keypad.spawn_labels(&mut commands, &mut images, add.entity);
-        let lcd = lcd::spawn(&mut commands, &mut images, add.entity, digits);
+        let lcd = lcd::spawn(
+            &mut commands,
+            &mut images,
+            add.entity,
+            digits,
+            model.words,
+            level.board(),
+        );
         let sticker = Self::spawn_sticker(&mut commands, &mut images, add.entity, level);
         let sticker_seed = Sticker::seed(&level.serial());
         let sticker_spot = body

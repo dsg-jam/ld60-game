@@ -32,6 +32,7 @@ impl ServiceSheet {
         let summary = match board.kind {
             DeviceKind::Tally2 => "service-summary-tally2",
             DeviceKind::Summa6 => "service-summary-summa6",
+            DeviceKind::Lock4 => "service-summary-lock4",
         };
         page.spawn(Paper::title(board.kind.model()));
         page.spawn(Paper::faded(
@@ -57,6 +58,8 @@ impl ServiceSheet {
                 let id = match annunciator {
                     Annunciator::Minus => "service-annunciator-minus",
                     Annunciator::Error => "service-annunciator-error",
+                    Annunciator::Open => "service-annunciator-open",
+                    Annunciator::Shut => "service-annunciator-shut",
                 };
                 page.spawn(Paper::text(Message::new(id).with("bit", bit)));
             }
@@ -101,6 +104,28 @@ impl ServiceSheet {
             ]));
         }
         page.spawn(Paper::faded(Message::new("service-line-tests-flash")));
+
+        let usage = self.usage();
+        if !usage.is_empty() {
+            page.spawn(Paper::heading(Message::new("service-use")));
+            for &id in usage {
+                page.spawn(Paper::text(Message::new(id)));
+            }
+        }
+    }
+
+    /// How to use a model whose keys do not explain themselves.
+    fn usage(self) -> &'static [&'static str] {
+        match self.board.kind {
+            DeviceKind::Tally2 | DeviceKind::Summa6 => &[],
+            DeviceKind::Lock4 => &[
+                "service-use-lock4-open",
+                "service-use-lock4-entry",
+                "service-use-lock4-wrong",
+                "service-use-lock4-clear",
+                "service-use-lock4-change",
+            ],
+        }
     }
 
     /// Digit keys share one row, the other keys get a row each.
@@ -143,7 +168,7 @@ mod tests {
     #[test]
     fn every_sheet_formats() {
         let locale = Locale::on_disk();
-        for kind in [DeviceKind::Tally2, DeviceKind::Summa6] {
+        for kind in DeviceKind::ALL {
             for board in kind.boards() {
                 let sheet = ServiceSheet::new(board);
                 locale.assert_formats([sheet.footer()]);

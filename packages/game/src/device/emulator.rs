@@ -194,6 +194,8 @@ impl Emulator {
                 digits: emulator.readout.digits.clone(),
                 minus: emulator.readout.minus,
                 error: emulator.readout.error,
+                open: emulator.readout.open,
+                shut: emulator.readout.shut,
             });
         }
     }

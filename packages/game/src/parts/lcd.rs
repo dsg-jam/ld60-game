@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use ld60_devices::{Annunciator, Board};
 
 use super::screen::UiCanvas;
 
@@ -14,6 +15,10 @@ const LAMP_SIZE: Vec2 = Vec2::new(24.0, 40.0);
 const LAMP_THICKNESS: f32 = 5.0;
 /// Segments a, d, e, f and g.
 const LETTER_E: u8 = 0x79;
+/// Width of the column right of the digits that prints the lamp words.
+const WORD_COLUMN: f32 = 150.0;
+const WORD_FONT_SIZE: f32 = 40.0;
+const WORDS: [Annunciator; 2] = [Annunciator::Open, Annunciator::Shut];
 
 const BACKGROUND: Color = Color::srgb_u8(0x9c, 0xab, 0x8a);
 const INK: Color = Color::srgb_u8(0x23, 0x2b, 0x22);
@@ -37,6 +42,8 @@ pub(crate) struct LcdDisplay {
     pub(crate) digits: Vec<u8>,
     pub(crate) minus: bool,
     pub(crate) error: bool,
+    pub(crate) open: bool,
+    pub(crate) shut: bool,
 }
 
 #[derive(Component, Debug)]
@@ -46,47 +53,58 @@ struct Segment {
     bit: u8,
 }
 
+/// A lamp drawn with segments.
 #[derive(Component, Debug)]
 struct Lamp {
     source: Entity,
-    kind: LampKind,
+    kind: Annunciator,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum LampKind {
-    Minus,
-    Error,
+/// A lamp printed as a word.
+#[derive(Component, Debug)]
+struct Word {
+    source: Entity,
+    kind: Annunciator,
 }
 
-impl LampKind {
-    fn is_lit(self, display: &LcdDisplay) -> bool {
-        match self {
-            Self::Minus => display.minus,
-            Self::Error => display.error,
+impl LcdDisplay {
+    fn is_lit(&self, annunciator: Annunciator) -> bool {
+        match annunciator {
+            Annunciator::Minus => self.minus,
+            Annunciator::Error => self.error,
+            Annunciator::Open => self.open,
+            Annunciator::Shut => self.shut,
         }
     }
 }
 
-/// Pixel size of the canvas for `digits` digits.
-pub(crate) fn canvas_size(digits: usize) -> UVec2 {
-    let width = 2.0 * MARGIN + LAMP_COLUMN + digits as f32 * (DIGIT_SIZE.x + DIGIT_GAP) - DIGIT_GAP;
+/// Pixel size of the canvas for `digits` digits, with the lamp words if
+/// `words` is set.
+pub(crate) fn canvas_size(digits: usize, words: bool) -> UVec2 {
+    let words = if words { DIGIT_GAP + WORD_COLUMN } else { 0.0 };
+    let width =
+        2.0 * MARGIN + LAMP_COLUMN + digits as f32 * (DIGIT_SIZE.x + DIGIT_GAP) - DIGIT_GAP + words;
     let height = 2.0 * MARGIN + DIGIT_SIZE.y;
     Vec2::new(width, height).as_uvec2()
 }
 
 /// Spawns an LCD showing the [`LcdDisplay`] of `source` and returns its
-/// texture.
+/// texture. It draws only the lamps that `board` wires. With `words`, the
+/// OPEN and SHUT lamps follow the digits.
 pub(crate) fn spawn(
     commands: &mut Commands,
     images: &mut Assets<Image>,
     source: Entity,
     digits: usize,
+    words: bool,
+    board: &Board,
 ) -> Handle<Image> {
-    let canvas = UiCanvas::spawn(commands, images, canvas_size(digits), source);
+    let canvas = UiCanvas::spawn(commands, images, canvas_size(digits, words), source);
     let digit_segments = segment_rects(DIGIT_SIZE, SEGMENT_THICKNESS);
     let lamp_segments = segment_rects(LAMP_SIZE, LAMP_THICKNESS);
     let lamp_origin = Vec2::splat(MARGIN);
     let minus = digit_segments[6];
+    let wired = |kind: Annunciator| board.ann_bit(kind).is_some();
 
     commands
         .spawn((
@@ -99,25 +117,27 @@ pub(crate) fn spawn(
             canvas.target(),
         ))
         .with_children(|root| {
-            root.spawn((
-                rect(
-                    lamp_origin + minus.0.with_x(0.0),
-                    minus.1.with_x(LAMP_SIZE.x),
-                ),
-                BackgroundColor(GHOST),
-                Lamp {
-                    source,
-                    kind: LampKind::Minus,
-                },
-            ));
+            if wired(Annunciator::Minus) {
+                root.spawn((
+                    rect(
+                        lamp_origin + minus.0.with_x(0.0),
+                        minus.1.with_x(LAMP_SIZE.x),
+                    ),
+                    BackgroundColor(GHOST),
+                    Lamp {
+                        source,
+                        kind: Annunciator::Minus,
+                    },
+                ));
+            }
             for (bit, (position, size)) in lamp_segments.iter().enumerate() {
-                if LETTER_E & (1 << bit) != 0 {
+                if wired(Annunciator::Error) && LETTER_E & (1 << bit) != 0 {
                     root.spawn((
                         rect(lamp_origin + *position, *size),
                         BackgroundColor(GHOST),
                         Lamp {
                             source,
-                            kind: LampKind::Error,
+                            kind: Annunciator::Error,
                         },
                     ));
                 }
@@ -136,6 +156,26 @@ pub(crate) fn spawn(
                             digit,
                             bit: bit as u8,
                         },
+                    ));
+                }
+            }
+            if words {
+                let left = MARGIN + LAMP_COLUMN + digits as f32 * (DIGIT_SIZE.x + DIGIT_GAP);
+                let size = Vec2::new(WORD_COLUMN, DIGIT_SIZE.y / WORDS.len() as f32);
+                for (row, kind) in WORDS
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, kind)| wired(*kind))
+                {
+                    root.spawn((
+                        rect(Vec2::new(left, MARGIN + row as f32 * size.y), size),
+                        Text::new(kind.mark()),
+                        TextFont {
+                            font_size: FontSize::Px(WORD_FONT_SIZE),
+                            ..default()
+                        },
+                        TextColor(GHOST),
+                        Word { source, kind },
                     ));
                 }
             }
@@ -185,6 +225,7 @@ fn show(
     displays: Query<&LcdDisplay, Changed<LcdDisplay>>,
     mut segments: Query<(&Segment, &mut BackgroundColor)>,
     mut lamps: Query<(&Lamp, &mut BackgroundColor), Without<Segment>>,
+    mut words: Query<(&Word, &mut TextColor)>,
 ) {
     let ink = |lit: bool| if lit { INK } else { GHOST };
     for (segment, mut color) in &mut segments {
@@ -195,7 +236,12 @@ fn show(
     }
     for (lamp, mut color) in &mut lamps {
         if let Ok(display) = displays.get(lamp.source) {
-            color.0 = ink(lamp.kind.is_lit(display));
+            color.0 = ink(display.is_lit(lamp.kind));
+        }
+    }
+    for (word, mut color) in &mut words {
+        if let Ok(display) = displays.get(word.source) {
+            color.0 = ink(display.is_lit(word.kind));
         }
     }
 }
