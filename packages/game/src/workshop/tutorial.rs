@@ -6,6 +6,7 @@ use crate::locale::Message;
 use crate::menu::AppState;
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
+use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 
 /// On the back left part of the mat, far enough from the device to keep it
@@ -147,7 +148,17 @@ impl TutorialNote {
         page.spawn(Paper::faded(Message::new("tutorial-signed")));
     }
 
-    fn open_unread(notes: Query<Entity, With<Unread>>, mut commands: Commands) {
+    /// Waits until the player sits at the bench, so the camera does not
+    /// swing to the note on its way in from the street.
+    fn open_unread(
+        notes: Query<Entity, With<Unread>>,
+        camera: Single<(&PlayerCamera, &Transform)>,
+        mut commands: Commands,
+    ) {
+        let (camera, at) = *camera;
+        if !camera.seated(at) {
+            return;
+        }
         for note in &notes {
             commands.entity(note).remove::<Unread>();
             commands.trigger(FocusOn { entity: note });

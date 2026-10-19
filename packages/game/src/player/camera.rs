@@ -95,6 +95,11 @@ impl PlayerCamera {
         self.seat
     }
 
+    /// Whether the camera at `at` has come to rest on the seat.
+    pub(crate) fn seated(&self, at: &Transform) -> bool {
+        !self.traveling && at.translation.distance(self.seat.translation) < SEATED_DISTANCE
+    }
+
     /// Ambient occlusion grounds small things on the surfaces they rest on.
     fn match_quality(
         settings: Res<Settings>,
