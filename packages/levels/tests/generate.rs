@@ -429,6 +429,34 @@ fn later_jobs_are_harder_and_pay_more() {
 }
 
 #[test]
+fn jobs_only_run_on_chips_with_a_datasheet() {
+    let revisions = |device, datasheets: &[Revision]| {
+        (0..40)
+            .map(|job| {
+                let ChipSpec::Calco(chip) =
+                    Difficulty::for_shop(job, device, datasheets, &Revision::ALL).chip();
+                chip.revision
+            })
+            .collect::<HashSet<_>>()
+    };
+    assert_eq!(
+        revisions(DeviceKind::Tally2, &[Revision::A]),
+        HashSet::from([Revision::A])
+    );
+    assert_eq!(
+        revisions(DeviceKind::Tally2, &[Revision::A, Revision::C]),
+        HashSet::from([Revision::A, Revision::C])
+    );
+    assert_eq!(
+        revisions(DeviceKind::Summa6, &[Revision::A, Revision::B]),
+        HashSet::from([Revision::B])
+    );
+    let first = Difficulty::for_shop(0, DeviceKind::Tally2, &[Revision::A, Revision::B], &[]);
+    let ChipSpec::Calco(chip) = first.chip();
+    assert_eq!(chip.revision, Revision::B);
+}
+
+#[test]
 fn late_jobs_pick_old_chips_and_errata() {
     let chips: HashSet<ChipSpec> = (8..40)
         .map(|job| Difficulty::for_job(job, DeviceKind::Summa6).chip())

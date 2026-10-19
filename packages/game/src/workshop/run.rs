@@ -62,6 +62,9 @@ pub(crate) struct Run {
     /// The devices with a sign in the shop window. Locals only bring these.
     /// Their manuals are in the manuals file.
     signs: Vec<DeviceKind>,
+    /// The chip revisions with a datasheet in the manuals file.
+    #[serde(default)]
+    datasheets: Vec<Revision>,
     /// The chip revisions with errata pages in the manuals file.
     errata: Vec<Revision>,
     /// The tutorial steps whose notes are filed in the manuals file.
@@ -134,6 +137,7 @@ impl Default for Run {
             tutorial: true,
             till: 0,
             signs: vec![DeviceKind::Tally2],
+            datasheets: vec![Self::shipped_chip(DeviceKind::Tally2)],
             errata: Vec::new(),
             notes: Vec::new(),
             pins: Pins::default(),
@@ -224,6 +228,39 @@ impl Run {
         }
     }
 
+    /// Files the datasheets that come with the signs and the errata pages.
+    /// Saves from before datasheets were sold kept none.
+    pub(crate) fn file_owned_datasheets(&mut self) {
+        let owned = self
+            .signs
+            .iter()
+            .map(|&device| Self::shipped_chip(device))
+            .chain(self.errata.iter().copied());
+        for revision in owned.collect::<Vec<_>>() {
+            self.file_datasheet(revision);
+        }
+    }
+
+    /// Unpins the sheets that are not in the manuals file. Saves from before
+    /// datasheets were sold can pin datasheets the shop no longer owns.
+    pub(crate) fn unpin_unfiled(&mut self) {
+        let mut pins = std::mem::take(&mut self.pins);
+        pins.keep_filed(self);
+        self.pins = pins;
+    }
+
+    fn file_datasheet(&mut self, revision: Revision) {
+        if !self.datasheets.contains(&revision) {
+            self.datasheets.push(revision);
+        }
+    }
+
+    /// The chip revision whose datasheet comes with the manual of `device`.
+    /// It is the oldest one the firmware of `device` runs on.
+    pub(crate) fn shipped_chip(device: DeviceKind) -> Revision {
+        Reference::revisions(device)[0]
+    }
+
     pub(crate) fn pins(&self) -> &Pins {
         &self.pins
     }
@@ -241,16 +278,12 @@ impl Run {
             .all(|erratum| self.errata.contains(&erratum.revision()))
     }
 
-    /// The chip revisions in the manuals file, in the order of
-    /// [`Revision::ALL`].
+    /// The chip revisions with a datasheet in the manuals file, in the order
+    /// of [`Revision::ALL`].
     pub(crate) fn chips(&self) -> Vec<Revision> {
         Revision::ALL
             .into_iter()
-            .filter(|revision| {
-                self.signs
-                    .iter()
-                    .any(|&device| Reference::revisions(device).contains(revision))
-            })
+            .filter(|revision| self.datasheets.contains(revision))
             .collect()
     }
 
@@ -264,6 +297,7 @@ impl Run {
             Find::Device(device) => self.signs.contains(&device),
             Find::Tool(tool) => self.has(tool),
             Find::Errata(revision) => self.errata.contains(&revision),
+            Find::Datasheet(revision) => self.datasheets.contains(&revision),
         }
     }
 
@@ -271,11 +305,11 @@ impl Run {
     /// yet and must be able to use it.
     pub(crate) fn wants(&self, find: Find) -> bool {
         let usable = match find {
-            Find::Device(_) => true,
+            Find::Device(_) | Find::Datasheet(_) => true,
             Find::Tool(tool) => tool
                 .needs()
                 .is_none_or(|needed| self.tools.contains(&needed)),
-            Find::Errata(revision) => self.chips().contains(&revision),
+            Find::Errata(revision) => self.datasheets.contains(&revision),
         };
         usable && !self.owns(find)
     }
@@ -290,9 +324,13 @@ impl Run {
         self.till -= price;
         self.stats.spent += price;
         match find {
-            Find::Device(device) => self.signs.push(device),
+            Find::Device(device) => {
+                self.signs.push(device);
+                self.file_datasheet(Self::shipped_chip(device));
+            }
             Find::Tool(tool) => self.tools.push(tool),
             Find::Errata(revision) => self.errata.push(revision),
+            Find::Datasheet(revision) => self.datasheets.push(revision),
         }
         true
     }
@@ -448,6 +486,7 @@ mod tests {
     use crate::workshop::levels::Levels;
     use crate::workshop::manuals::Sheet;
     use crate::workshop::pickup::Complaint;
+    use crate::workshop::salvage::Find;
 
     fn job(run: &Run) -> Job {
         Job::new(run.pick(&Levels::on_disk()), run, &Levels::on_disk()).unwrap()
@@ -638,9 +677,79 @@ mod tests {
                 .any(|chip| !run.explains(chip))
         );
         assert!(
-            chips(|job| Difficulty::for_shop(job, DeviceKind::Summa6, &[]))
+            chips(|job| Difficulty::for_shop(job, DeviceKind::Summa6, &Revision::ALL, &[]))
                 .all(|chip| run.explains(chip))
         );
+    }
+
+    #[test]
+    fn devices_bring_the_datasheet_of_their_chip() {
+        let mut run = Run::default().next();
+        assert_eq!(run.chips(), [Revision::A]);
+        run.add_till(100);
+        assert!(run.buy(Find::Device(DeviceKind::Lock4)));
+        assert_eq!(run.chips(), [Revision::A, Revision::C]);
+        assert!(run.buy(Find::Device(DeviceKind::Summa6)));
+        assert_eq!(run.chips(), [Revision::A, Revision::B, Revision::C]);
+        assert!(!run.wants(Find::Datasheet(Revision::B)));
+    }
+
+    #[test]
+    fn a_loose_datasheet_is_sold_once() {
+        let mut run = Run::default().next();
+        let datasheet = Find::Datasheet(Revision::C);
+        assert!(run.wants(datasheet));
+        run.add_till(100);
+        assert!(run.buy(datasheet));
+        assert_eq!(run.chips(), [Revision::A, Revision::C]);
+        assert!(!run.wants(datasheet));
+        assert!(!run.buy(datasheet));
+    }
+
+    #[test]
+    fn errata_pages_need_their_datasheet() {
+        let mut run = Run::default().next();
+        let errata = Find::Errata(Revision::B);
+        assert!(!run.wants(errata));
+        run.add_till(100);
+        assert!(run.buy(Find::Datasheet(Revision::B)));
+        assert!(run.wants(errata));
+    }
+
+    #[test]
+    fn generated_jobs_run_on_chips_with_a_datasheet() {
+        let levels = Levels::on_disk();
+        let mut run = Run::default().next();
+        for number in 0..20 {
+            run.job = number;
+            let job = Job::new(
+                Origin::Generated {
+                    device: DeviceKind::Tally2,
+                    number,
+                },
+                &run,
+                &levels,
+            )
+            .unwrap();
+            let ChipSpec::Calco(chip) = job.level.chip;
+            assert_eq!(chip.revision, Revision::A);
+        }
+    }
+
+    #[test]
+    fn old_saves_file_the_datasheets_they_own() {
+        let text = ron::to_string(&Run {
+            signs: vec![DeviceKind::Tally2, DeviceKind::Summa6],
+            errata: vec![Revision::B],
+            ..Run::default().next()
+        })
+        .unwrap();
+        let old = text.replace("datasheets:[A],", "");
+        assert_ne!(old, text);
+        let mut run: Run = ron::from_str(&old).unwrap();
+        assert!(run.chips().is_empty());
+        run.file_owned_datasheets();
+        assert_eq!(run.chips(), [Revision::A, Revision::B]);
     }
 
     #[test]

@@ -78,7 +78,8 @@ struct Buy {
 
 impl SalvageCrate {
     /// A random few of the finds the shop wants. If there is a device the
-    /// shop does not repair yet, one of them is in the crate.
+    /// shop does not repair yet, the cheapest one is in the crate. No two
+    /// finds file the same datasheet.
     fn pack(run: &Run) -> Option<Self> {
         let seed = run.seed() ^ u64::from(run.stats().cycles).rotate_left(40);
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -86,12 +87,25 @@ impl SalvageCrate {
         finds.shuffle(&mut rng);
         if let Some(device) = finds
             .iter()
-            .position(|find| matches!(find, Find::Device(_)))
+            .enumerate()
+            .filter(|(_, find)| matches!(find, Find::Device(_)))
+            .min_by_key(|(_, find)| find.price())
+            .map(|(index, _)| index)
         {
             finds.swap(0, device);
         }
-        finds.truncate(rng.random_range(FEWEST..=MOST));
-        (!finds.is_empty()).then_some(Self { finds })
+        let size = rng.random_range(FEWEST..=MOST);
+        let mut packed: Vec<Find> = Vec::new();
+        for find in finds {
+            if packed.len() == size {
+                break;
+            }
+            let datasheet = find.datasheet();
+            if datasheet.is_none() || packed.iter().all(|other| other.datasheet() != datasheet) {
+                packed.push(find);
+            }
+        }
+        (!packed.is_empty()).then_some(Self { finds: packed })
     }
 
     /// The trader comes once the landlord got the rent, and takes back the
@@ -369,6 +383,32 @@ mod tests {
             );
             let unique: HashSet<_> = salvage.finds.iter().collect();
             assert_eq!(unique.len(), salvage.finds.len());
+        }
+    }
+
+    #[test]
+    fn the_cheapest_new_device_comes_first() {
+        let mut run = Run::default().next();
+        for _ in 0..10 {
+            paid_rent(&mut run);
+            let salvage = SalvageCrate::pack(&run).unwrap();
+            assert_eq!(salvage.finds[0], Find::Device(DeviceKind::Summa6));
+        }
+    }
+
+    #[test]
+    fn no_two_finds_bring_the_same_datasheet() {
+        let mut run = Run::default().next();
+        for _ in 0..30 {
+            paid_rent(&mut run);
+            let salvage = SalvageCrate::pack(&run).unwrap();
+            let datasheets: Vec<_> = salvage
+                .finds
+                .iter()
+                .filter_map(|find| find.datasheet())
+                .collect();
+            let unique: HashSet<_> = datasheets.iter().collect();
+            assert_eq!(unique.len(), datasheets.len(), "{:?}", salvage.finds);
         }
     }
 
