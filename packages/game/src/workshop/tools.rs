@@ -40,18 +40,17 @@ pub(crate) struct ToolsPlugin;
 
 impl Plugin for ToolsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (Tool::arm, Press::animate))
+        app.add_systems(Update, Press::animate)
             .add_observer(Tool::on_add)
             .add_observer(Tool::use_on_press);
     }
 }
 
-/// A tool on the counter that finishes a job. It is only clickable when it is
-/// the next step.
+/// A tool on the counter that finishes a job. It can be used at any time.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 #[require(Transform, Visibility)]
 pub(crate) enum Tool {
-    /// Stamps the ticket of a flashed job.
+    /// Stamps the ticket of the job.
     Stamp,
     /// Calls the customer for a stamped job.
     Bell,
@@ -65,35 +64,10 @@ impl Tool {
         }
     }
 
-    fn usable(self, job: Option<&Job>) -> bool {
-        match (self, job) {
-            (Self::Stamp, Some(job)) => job.flashed && !job.stamped,
-            (Self::Bell, Some(job)) => job.stamped,
-            (_, None) => false,
-        }
-    }
-
-    fn arm(
-        job: Option<Res<Job>>,
-        tools: Query<(Entity, &Tool, Has<Clickable>)>,
-        mut commands: Commands,
-    ) {
-        for (entity, tool, clickable) in &tools {
-            let usable = tool.usable(job.as_deref());
-            if usable && !clickable {
-                commands.entity(entity).insert(Clickable {
-                    prompt: tool.prompt(),
-                });
-            } else if !usable && clickable {
-                commands.entity(entity).remove::<Clickable>();
-            }
-        }
-    }
-
     fn use_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        tools: Query<(&Tool, &Transform), With<Clickable>>,
+        tools: Query<(&Tool, &Transform, Has<Press>)>,
         landings: Query<(), With<Landing>>,
         job: Option<ResMut<Job>>,
         mut tickets: Query<(Entity, &mut Paper), With<JobTicket>>,
@@ -102,25 +76,33 @@ impl Tool {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let (Ok((&tool, &rest)), Some(mut job)) = (tools.get(press.entity), job) else {
+        let Ok((&tool, &rest, pressed)) = tools.get(press.entity) else {
             return;
         };
         press.propagate(false);
         match tool {
             Self::Stamp => {
-                job.stamped = true;
-                commands
-                    .entity(press.entity)
-                    .insert(Press { elapsed: 0.0, rest });
-                if let Ok((ticket, mut paper)) = tickets.single_mut() {
-                    paper.open_first_page();
-                    commands.trigger(FocusOn { entity: ticket });
+                if !pressed {
+                    commands
+                        .entity(press.entity)
+                        .insert(Press { elapsed: 0.0, rest });
+                }
+                match job {
+                    Some(mut job) if !job.stamped => {
+                        job.stamped = true;
+                        if let Ok((ticket, mut paper)) = tickets.single_mut() {
+                            paper.open_first_page();
+                            commands.trigger(FocusOn { entity: ticket });
+                        }
+                    }
+                    _ => commands.trigger(Play(Sound::Thunk)),
                 }
             }
-            Self::Bell if !landings.is_empty() => {}
             Self::Bell => {
                 commands.trigger(Play(Sound::Ding));
-                commands.trigger(HandIn);
+                if job.is_some_and(|job| job.stamped) && landings.is_empty() {
+                    commands.trigger(HandIn);
+                }
             }
         }
     }
@@ -136,6 +118,9 @@ impl Tool {
             return;
         };
         let mut entity = commands.entity(add.entity);
+        entity.insert(Clickable {
+            prompt: tool.prompt(),
+        });
         match tool {
             Self::Stamp => {
                 let pad = Block::new(STAMP_PAD_SIZE);
