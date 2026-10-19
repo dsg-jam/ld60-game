@@ -6,6 +6,10 @@ use crate::{Addr, Calco, Cond, Op};
 const REV_A_MNEMONICS: &[&str] = &[
     "NOP", "HLT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC",
 ];
+const REV_B_MNEMONICS: &[&str] = &[
+    "NOP", "HLT", "RET", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI", "ADC",
+    "SBC", "IN", "OUT", "JMP", "JZ", "JNZ", "JC", "JNC", "CALL", "DJNZ",
+];
 
 /// Chip revision. Later revisions support more instructions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -13,9 +17,10 @@ const REV_A_MNEMONICS: &[&str] = &[
 pub enum Revision {
     /// Only what a simple counter needs. No B register, stack or arithmetic.
     A,
-    /// The full instruction set.
+    /// Adds the B register, the stack, arithmetic and the output port.
+    /// No `CMP` or `SWP`.
     B,
-    /// Same instructions as Rev B.
+    /// The full instruction set.
     C,
 }
 
@@ -52,7 +57,8 @@ impl Revision {
     pub fn mnemonics(self) -> &'static [&'static str] {
         match self {
             Self::A => REV_A_MNEMONICS,
-            Self::B | Self::C => MNEMONICS,
+            Self::B => REV_B_MNEMONICS,
+            Self::C => MNEMONICS,
         }
     }
 
@@ -71,7 +77,8 @@ impl Revision {
                     | Op::In(_)
                     | Op::Jump(Cond::Always | Cond::Zero | Cond::Carry, _)
             ),
-            Self::B | Self::C => !matches!(op, Op::Reserved(_)),
+            Self::B => !matches!(op, Op::Reserved(_) | Op::Cmp(_) | Op::Swp),
+            Self::C => !matches!(op, Op::Reserved(_)),
         }
     }
 }

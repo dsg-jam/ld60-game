@@ -22,16 +22,13 @@ count:  LD   M2
         JC   ones
         LDI  A, 0
         ST   M2
-        CALL tens
-        JMP  main
-
-ones:   ST   M2
-        JMP  main
-
 tens:   LD   M1
         INC
         CPI  10
         JC   tstore
         LDI  A, 0
 tstore: ST   M1
-        RET
+        JMP  main
+
+ones:   ST   M2
+        JMP  main

@@ -5,7 +5,8 @@ use std::sync::LazyLock;
 use ld60_calco::{ChipInfo, DateCode, Revision};
 use ld60_devices::{ChipSpec, DeviceKind, Fault, Rom, RunError};
 use ld60_levels::{
-    Difficulty, Generated, JobText, Level, Operator, Reference, Symptom, TestCase, initial_rom, run,
+    Difficulty, GenerateError, Generated, JobText, Level, Operator, Reference, Symptom, TestCase,
+    initial_rom, run,
 };
 
 const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
@@ -39,13 +40,21 @@ fn for_chip<'a>(references: &'a [Reference], difficulty: &Difficulty) -> &'a Ref
 }
 
 fn compile(device: DeviceKind, revision: Revision, date_code: DateCode) -> Reference {
+    try_compile(device, revision, date_code).unwrap()
+}
+
+fn try_compile(
+    device: DeviceKind,
+    revision: Revision,
+    date_code: DateCode,
+) -> Result<Reference, GenerateError> {
     let path = format!("{LEVELS}/{}", Reference::source(device));
     let source = std::fs::read_to_string(path).unwrap();
     let chip = ChipSpec::Calco(ChipInfo {
         revision,
         date_code,
     });
-    Reference::compile(device, chip, &source).unwrap()
+    Reference::compile(device, chip, &source)
 }
 
 /// What `rom` shows after `keys` on seed 1.
@@ -344,6 +353,18 @@ fn compiles_for_every_supported_chip() {
                     .variant
                     .verify()
                     .unwrap();
+            }
+        }
+    }
+}
+
+#[test]
+fn fails_to_compile_for_other_chips() {
+    for device in DeviceKind::ALL {
+        for revision in Revision::ALL {
+            if !Reference::revisions(device).contains(&revision) {
+                let result = try_compile(device, revision, DateCode::new(76, 30));
+                assert!(result.is_err(), "{device:?} on Rev {revision}");
             }
         }
     }

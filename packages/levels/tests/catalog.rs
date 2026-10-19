@@ -2,6 +2,9 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::LazyLock;
 
+use ld60_calco::{ChipInfo, Revision};
+use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_dsl::{Target, compile_pair};
 use ld60_levels::{Catalog, TEST_SEEDS, Variant, initial_rom, run_line_tests};
 
 const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
@@ -55,7 +58,26 @@ fn tutorial_starts_on_the_smallest_chip() {
         .iter()
         .map(|source| source.load().unwrap().chip.isa().name())
         .collect();
-    assert_eq!(chips, ["CalCo Rev A", "CalCo Rev B"]);
+    assert_eq!(chips, ["CalCo Rev A", "CalCo Rev A"]);
+}
+
+#[test]
+fn summa6_levels_compile_the_same_on_rev_b_and_rev_c() {
+    for source in CATALOG.levels() {
+        let level = source.load().unwrap();
+        let (DeviceKind::Summa6, Some(firmware)) = (level.device, &level.firmware) else {
+            continue;
+        };
+        let text = std::fs::read_to_string(Path::new(LEVELS).join(&firmware.source)).unwrap();
+        let ChipSpec::Calco(chip) = level.chip;
+        let [rev_b, rev_c] = [Revision::B, Revision::C].map(|revision| {
+            let chip = ChipSpec::Calco(ChipInfo { revision, ..chip });
+            let target = Target::new(chip, level.board());
+            compile_pair(&text, &target, &firmware.switches).unwrap()
+        });
+        assert_eq!(rev_b.buggy.asm, rev_c.buggy.asm, "{}", level.id);
+        assert_eq!(rev_b.fixed.asm, rev_c.fixed.asm, "{}", level.id);
+    }
 }
 
 /// `Variant::new` falls back to the original when no rewrite verifies, so

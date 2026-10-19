@@ -2,7 +2,7 @@
     id: "tally2-02",
     title: "Double count",
     device: Tally2,
-    chip: Calco((revision: B, date_code: 7630)),
+    chip: Calco((revision: A, date_code: 7630)),
     unit: "00412",
     remarks: ["works-fine", "first-thinking"],
     rom: (kind: Eprom, blank_available: true),

@@ -2,6 +2,7 @@
 
 The Lock 4 is a door lock with a 4-digit code by DSG Electronics. It runs a
 [CalCo](../isa/calco.md) chip with the firmware in a 256 byte EPROM socket.
+The chip is always a CalCo Rev C.
 
 ## Use
 

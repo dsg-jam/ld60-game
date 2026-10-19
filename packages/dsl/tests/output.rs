@@ -29,7 +29,7 @@ fn output_is_deterministic() {
 }
 
 #[test]
-fn every_switch_assembles_on_every_full_revision() {
+fn every_switch_assembles_on_every_supported_revision() {
     for revision in [Revision::B, Revision::C] {
         for &switch in SUMMA_SWITCHES {
             for flavor in [Flavor::Buggy, Flavor::Fixed] {
@@ -37,13 +37,18 @@ fn every_switch_assembles_on_every_full_revision() {
                 assert!(revision.isa().assemble(&output.asm).is_ok(), "{switch}");
             }
         }
-        for (source, device) in [
-            (TALLY_0_9, DeviceKind::Tally2),
-            (TALLY_1_0, DeviceKind::Tally2),
-            (LOCK, DeviceKind::Lock4),
-        ] {
+    }
+    for (source, device, revisions) in [
+        (TALLY_0_9, DeviceKind::Tally2, &Revision::ALL[..]),
+        (TALLY_1_0, DeviceKind::Tally2, &Revision::ALL[..]),
+        (LOCK, DeviceKind::Lock4, &[Revision::C][..]),
+    ] {
+        for &revision in revisions {
             let output = build(source, revision, device, Flavor::Fixed, &[]).unwrap();
-            assert!(revision.isa().assemble(&output.asm).is_ok());
+            assert!(
+                revision.isa().assemble(&output.asm).is_ok(),
+                "Rev {revision}"
+            );
         }
     }
 }

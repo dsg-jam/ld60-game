@@ -2,6 +2,7 @@
 
 The Summa 6 is a 6-digit adding machine by DSG Electronics. It runs a
 [CalCo](../isa/calco.md) chip with the firmware in a 256 byte EPROM socket.
+The chip is a CalCo Rev B or Rev C.
 
 ## Board revisions
 
