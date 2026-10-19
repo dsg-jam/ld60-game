@@ -2,7 +2,7 @@ mod crt;
 
 use bevy::{
     asset::uuid::Uuid,
-    camera::{NormalizedRenderTarget, RenderTarget},
+    camera::{NormalizedRenderTarget, RenderTarget, visibility::RenderLayers},
     image::ImageSampler,
     input::ButtonState,
     input_focus::AcquireFocus,
@@ -18,6 +18,10 @@ use bevy::{
 use crate::menu::AppState;
 
 pub(crate) use self::crt::{CrtGlass, CrtLight, CrtMaterial};
+
+/// Screens only show UI, which ignores render layers. Off the scene's layer,
+/// their cameras skip culling every mesh in the city.
+const CANVAS_LAYER: usize = 1;
 
 pub(crate) struct ScreenPlugin;
 
@@ -93,6 +97,7 @@ impl UiCanvas {
                     ..default()
                 },
                 RenderTarget::Image(image.clone().into()),
+                RenderLayers::layer(CANVAS_LAYER),
                 CanvasOf(owner),
             ))
             .id();
