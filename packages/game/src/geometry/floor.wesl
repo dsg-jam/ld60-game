@@ -1,4 +1,4 @@
-import package::geometry::noise::{TAU, hash1, noise, visible};
+import package::geometry::noise::{TAU, hash1, noise, specks, visible};
 
 const PLANK_WIDTH: f32 = 0.14;
 const PLANK_LENGTH: f32 = 1.1;
@@ -161,8 +161,8 @@ fn rug(p: vec2<f32>, h: vec2<f32>, field: vec3<f32>, s: f32, pixel: f32) -> Rug 
     color = mix(color, color * 0.45, grease * 0.6);
 
     // Lint and fluff caught in the pile.
-    let lint = step(0.998, hash1(floor(p / 0.004), s + 20.0)) * visible(0.004, pixel);
-    color = mix(color, RUG_LINT, lint * 0.4);
+    let lint = specks(p, 0.012, 0.02, 0.0005, 0.003, s + 20.0, pixel);
+    color = mix(color, RUG_LINT, lint * 0.6);
 
     var out: Rug;
     out.color = color;
