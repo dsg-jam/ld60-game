@@ -194,9 +194,13 @@ impl Action {
                 started.0 = true;
                 next_state.set(AppState::Playing);
             }
-            Self::NewRun => {
+            Self::NewRun | Self::StartOver => {
                 started.0 = true;
-                commands.trigger(NewRun);
+                commands.trigger(if *action == Self::NewRun {
+                    NewRun::Reopen
+                } else {
+                    NewRun::StartOver
+                });
                 next_state.set(AppState::Playing);
             }
             Self::Settings => next_page.set(Page::Settings),
@@ -270,7 +274,12 @@ mod tests {
             .init_resource::<Run>()
             .add_message::<AppExit>()
             .add_observer(Action::apply)
-            .add_observer(|_: On<NewRun>, mut run: ResMut<Run>| *run = run.next());
+            .add_observer(|new_run: On<NewRun>, mut run: ResMut<Run>| {
+                *run = match *new_run {
+                    NewRun::Reopen => run.next(),
+                    NewRun::StartOver => run.start_over(),
+                };
+            });
         let mut pick = |action| {
             app.world_mut().trigger(action);
             app.update();
@@ -286,8 +295,8 @@ mod tests {
         );
         assert_eq!(pick(Action::Back), (AppState::Title, Some(Page::Entries)));
         pick(Action::Restart);
-        assert_eq!(pick(Action::NewRun), (AppState::Playing, None));
+        assert_eq!(pick(Action::StartOver), (AppState::Playing, None));
         assert!(app.world().resource::<Started>().0);
-        assert_eq!(*app.world().resource::<Run>(), Run::default().next());
+        assert_eq!(*app.world().resource::<Run>(), Run::default().start_over());
     }
 }

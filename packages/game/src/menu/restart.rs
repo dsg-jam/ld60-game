@@ -8,7 +8,7 @@ const WARNING_SIZE: f32 = 22.0;
 
 /// The entries below the warning.
 const ENTRIES: &[(Action, &str)] = &[
-    (Action::NewRun, "menu-start-over"),
+    (Action::StartOver, "menu-start-over"),
     (Action::Back, "menu-back"),
 ];
 

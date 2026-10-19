@@ -117,9 +117,14 @@ pub(crate) enum Rent {
     Short { amount: u32, till: u32 },
 }
 
-/// Starts a new run after the shop closed.
+/// Starts a new run.
 #[derive(Event, Debug)]
-pub(crate) struct NewRun;
+pub(crate) enum NewRun {
+    /// After the shop closed. The player knows the shop by then.
+    Reopen,
+    /// Asked for in the menu. Starts over with the tutorial.
+    StartOver,
+}
 
 impl Default for Run {
     fn default() -> Self {
@@ -150,6 +155,14 @@ impl Run {
             number: self.number + 1,
             tutorial: false,
             notes: self.notes.clone(),
+            ..Self::default()
+        }
+    }
+
+    /// A run from the start, with the tutorial and an empty manuals file.
+    pub(crate) fn start_over(&self) -> Self {
+        Self {
+            number: self.number + 1,
             ..Self::default()
         }
     }
@@ -389,7 +402,7 @@ impl Run {
 
     /// Clears the counter and opens the shop again with an empty till.
     pub(super) fn restart(
-        _: On<NewRun>,
+        new_run: On<NewRun>,
         mut run: ResMut<Run>,
         mut clock: ResMut<Clock>,
         mut focused: ResMut<Focused>,
@@ -397,7 +410,10 @@ impl Run {
         leftovers: Query<Entity, Leftovers>,
         mut commands: Commands,
     ) {
-        *run = run.next();
+        *run = match *new_run {
+            NewRun::Reopen => run.next(),
+            NewRun::StartOver => run.start_over(),
+        };
         *clock = Clock::default();
         focused.leave(&mut focus);
         for entity in &leftovers {
@@ -696,12 +712,26 @@ mod tests {
             .id();
         world.trigger(FocusOn { entity: note });
         assert_eq!(world.resource::<Focused>().get(), Some(note));
-        world.trigger(NewRun);
+        world.trigger(NewRun::Reopen);
         world.flush();
         assert_eq!(world.resource::<Focused>().get(), None);
         assert!(matches!(
             *world.resource::<NextState<Focus>>(),
             NextState::Pending(Focus::Desk)
+        ));
+    }
+
+    #[test]
+    fn starting_over_brings_back_the_tutorial() {
+        let mut run = Run::default().next();
+        run.notes.push(0);
+        let over = run.start_over();
+        assert!(over.tutorial);
+        assert!(over.notes.is_empty());
+        assert_eq!(over.number, run.number + 1);
+        assert!(matches!(
+            over.pick(&Levels::on_disk()),
+            Origin::Lesson { step: 0, .. }
         ));
     }
 

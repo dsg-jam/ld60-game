@@ -201,7 +201,7 @@ mod tests {
         world.insert_resource(run.clone());
         world.insert_resource(Clock::from(23));
         written(&mut world);
-        world.trigger(NewRun);
+        world.trigger(NewRun::Reopen);
         world.flush();
         let saved = written(&mut world);
         assert_eq!(saved.run, run.next());

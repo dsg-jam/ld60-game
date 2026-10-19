@@ -72,6 +72,8 @@ pub(super) enum Action {
     Restart,
     /// Starts a new run.
     NewRun,
+    /// Gives up the current run for one from the start.
+    StartOver,
     /// Browsers have no way to close the game, so only native builds quit.
     #[cfg(not(target_arch = "wasm32"))]
     Quit,
