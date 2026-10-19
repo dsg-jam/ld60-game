@@ -92,6 +92,17 @@ impl LevelSource {
         })
     }
 
+    /// Reads the level in `folder`, which need not be in a catalog.
+    pub fn read_folder(folder: &Path) -> Result<Self, CatalogError> {
+        let file = |name| read(folder.join(name));
+        Ok(Self {
+            level: file(Self::LEVEL_FILE)?,
+            buggy: file(Self::BUGGY_FILE)?,
+            fixed: file(Self::FIXED_FILE)?,
+            path: folder.display().to_string(),
+        })
+    }
+
     pub fn load(&self) -> Result<Level, LevelError> {
         Level::from_ron(&self.level)
     }

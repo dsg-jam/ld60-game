@@ -1,13 +1,14 @@
 use ld60_devices::{Board, BoardRev, ChipSpec, DeviceKind, Fault, RomKind};
 use serde::{Deserialize, Serialize};
 
-use crate::LevelError;
+use crate::{JobText, LevelError};
 
 /// A repair job.
 ///
 /// Its text is in a Fluent message named after [`Level::id`]. The attributes
 /// of that message are [`Level::CUSTOMER`], [`Level::COMPLAINT`] and one
-/// [`Level::remark`] per remark. They get the arguments of
+/// [`Level::remark`] per remark. Generated jobs use shared messages instead,
+/// see [`Level::message`]. The text gets the arguments of
 /// [`Level::text_args`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Level {
@@ -39,6 +40,9 @@ pub struct Level {
     /// Where `buggy.asm` and `fixed.asm` are generated from, if they are.
     #[serde(default)]
     pub firmware: Option<FirmwareSource>,
+    /// The text of a generated job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<JobText>,
 }
 
 /// A firmware source file and the switches a level turns on.
@@ -75,10 +79,33 @@ impl Level {
         format!("remark-{key}")
     }
 
-    /// The arguments of the level's attributes: the board, like `6A`, as
-    /// `$board`.
-    pub fn text_args(&self) -> [(&'static str, String); 1] {
-        [("board", self.board().name())]
+    /// The message and attribute that hold `attribute` of this job.
+    pub fn message(&self, attribute: &str) -> (String, String) {
+        match &self.text {
+            Some(text) => {
+                let woke = self.tests.first().is_some_and(|t| t.keys.trim().is_empty());
+                text.message(attribute, woke)
+            }
+            None => (self.id.clone(), attribute.into()),
+        }
+    }
+
+    /// The arguments of the level's text: the board, like `6A`, as `$board`.
+    ///
+    /// Generated jobs also get the first test: its keys as `$keys`, the last
+    /// of them as `$key` and the display it expects as `$expected`.
+    pub fn text_args(&self) -> Vec<(&'static str, String)> {
+        let mut args = vec![("board", self.board().name())];
+        if let (Some(_), Some(test)) = (&self.text, self.tests.first()) {
+            let keys: String = test.keys.split_whitespace().collect();
+            let key = keys.chars().last().map(String::from).unwrap_or_default();
+            args.extend([
+                ("keys", keys),
+                ("key", key),
+                ("expected", test.display.clone()),
+            ]);
+        }
+        args
     }
 
     /// Printed on the sticker under the device and on the job ticket.
@@ -88,6 +115,12 @@ impl Level {
 
     pub fn from_ron(source: &str) -> Result<Self, LevelError> {
         ron::from_str(source).map_err(|e| LevelError::Parse(e.to_string()))
+    }
+
+    /// The level as a level file.
+    pub fn to_ron(&self) -> Result<String, LevelError> {
+        ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
+            .map_err(LevelError::Write)
     }
 
     pub fn board(&self) -> &'static Board {

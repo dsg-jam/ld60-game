@@ -1,4 +1,5 @@
 use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, Rom, RunError};
+use serde::{Deserialize, Serialize};
 
 use crate::{Level, TEST_SEEDS, device};
 
@@ -6,7 +7,7 @@ use crate::{Level, TEST_SEEDS, device};
 type Replay = (Option<Result<Readout, RunError>>, Result<Readout, RunError>);
 
 /// What the customer sees when a bug shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Symptom {
     /// The display shows other digits.
     WrongDigit,
@@ -30,6 +31,22 @@ impl Symptom {
         Self::WrongAfterClear,
     ];
     const CLEAR: char = 'C';
+
+    /// The name of the symptom in message IDs, like `wrong-digit`.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::WrongDigit => "wrong-digit",
+            Self::WrongAnnunciator => "wrong-annunciator",
+            Self::NoResponse => "no-response",
+            Self::Freeze => "freeze",
+            Self::WrongAfterClear => "wrong-after-clear",
+        }
+    }
+
+    /// Whether the symptom can show right after power on, before any key.
+    pub fn shows_on_wake(self) -> bool {
+        !matches!(self, Self::NoResponse | Self::WrongAfterClear)
+    }
 
     /// What the test for `keys` shows when `buggy` runs instead of `working`.
     ///
