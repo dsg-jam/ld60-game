@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::contents::{Entry, Page};
+use super::contents::{Contents, Entry, Page};
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
+use crate::workshop::run::Run;
 use crate::workshop::tutorial::TutorialNote;
 
 /// One page of the manuals file, named by its entry so it stays the same
@@ -77,6 +78,13 @@ impl Pins {
         self.0.contains(&sheet)
     }
 
+    /// Unpins the sheets whose entry is not in the manuals file of `run`.
+    pub(crate) fn keep_filed(&mut self, run: &Run) {
+        let contents = Contents::of(run);
+        self.0
+            .retain(|sheet| contents.entries().contains(&sheet.entry));
+    }
+
     /// Unpins `sheet` if it is pinned, and pins it otherwise. With
     /// [`Pins::MAX`] sheets pinned already, the oldest one comes off.
     pub(crate) fn toggle(&mut self, sheet: Sheet) {
@@ -119,6 +127,16 @@ mod tests {
 
     fn chip(page: usize) -> Sheet {
         Sheet::new(Entry::Chip(Revision::A), page)
+    }
+
+    #[test]
+    fn sheets_that_are_not_filed_come_off() {
+        let mut pins = Pins::default();
+        let other = Sheet::new(Entry::Chip(Revision::B), 0);
+        pins.toggle(chip(0));
+        pins.toggle(other);
+        pins.keep_filed(&Run::default());
+        assert_eq!(pins.sheets(), [chip(0)]);
     }
 
     #[test]

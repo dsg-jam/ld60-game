@@ -3,17 +3,20 @@ use ld60_devices::DeviceKind;
 use serde::{Deserialize, Serialize};
 
 use crate::locale::Message;
-use crate::workshop::run::ComputerTool;
+use crate::workshop::run::{ComputerTool, Run};
 
 /// Something the scrap trader found, for sale in the salvage crate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) enum Find {
-    /// A dead unit with its human manual. Buying it hangs its sign in the
-    /// window and files the manual in the manuals file.
+    /// A dead unit with its human manual and the datasheet of the chip it
+    /// shipped with. Buying it hangs its sign in the window and files both
+    /// in the manuals file.
     Device(DeviceKind),
     Tool(ComputerTool),
     /// Loose errata pages for one chip revision.
     Errata(Revision),
+    /// A loose datasheet for one chip revision.
+    Datasheet(Revision),
 }
 
 impl Find {
@@ -29,7 +32,17 @@ impl Find {
                     .any(|erratum| erratum.revision() == revision)
             })
             .map(Self::Errata);
-        devices.chain(tools).chain(errata)
+        let datasheets = Revision::ALL.into_iter().map(Self::Datasheet);
+        devices.chain(tools).chain(errata).chain(datasheets)
+    }
+
+    /// The chip revision whose datasheet buying this files.
+    pub(crate) fn datasheet(self) -> Option<Revision> {
+        match self {
+            Self::Device(device) => Some(Run::shipped_chip(device)),
+            Self::Datasheet(revision) => Some(revision),
+            Self::Tool(_) | Self::Errata(_) => None,
+        }
     }
 
     pub(crate) const fn price(self) -> u32 {
@@ -42,6 +55,7 @@ impl Find {
             Self::Tool(ComputerTool::Trace) => 16,
             Self::Tool(ComputerTool::Breakpoints) => 10,
             Self::Errata(_) => 6,
+            Self::Datasheet(_) => 8,
         }
     }
 
@@ -56,6 +70,7 @@ impl Find {
             Self::Tool(ComputerTool::Trace) => "salvage-guess-trace",
             Self::Tool(ComputerTool::Breakpoints) => "salvage-guess-breakpoints",
             Self::Errata(_) => "salvage-guess-errata",
+            Self::Datasheet(_) => "salvage-guess-datasheet",
         })
     }
 
@@ -66,6 +81,9 @@ impl Find {
             Self::Tool(_) => Message::new("salvage-note-tool"),
             Self::Errata(revision) => {
                 Message::new("salvage-note-errata").with("revision", revision.to_string())
+            }
+            Self::Datasheet(revision) => {
+                Message::new("salvage-note-datasheet").with("revision", revision.to_string())
             }
         }
     }

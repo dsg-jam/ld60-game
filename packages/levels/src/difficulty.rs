@@ -42,25 +42,33 @@ pub struct Difficulty {
 impl Difficulty {
     /// The difficulty of job `job` on `device`.
     pub fn for_job(job: u32, device: DeviceKind) -> Self {
-        Self::for_shop(job, device, &Revision::ALL)
+        Self::for_shop(job, device, &Revision::ALL, &Revision::ALL)
     }
 
-    /// The difficulty of job `job` on `device` in a shop with the errata
-    /// pages of the `errata` revisions. A chip with a known bug only comes
-    /// once the shop has the errata pages that explain it.
+    /// The difficulty of job `job` on `device` in a shop with the datasheets
+    /// of the `datasheets` revisions and the errata pages of the `errata`
+    /// revisions. A job only runs on a chip whose datasheet the shop has. A
+    /// chip with a known bug only comes once the shop also has the errata
+    /// pages that explain it.
     ///
     /// ```
-    /// use ld60_calco::Errata;
+    /// use ld60_calco::{Errata, Revision};
     /// use ld60_devices::{ChipSpec, DeviceKind};
     /// use ld60_levels::Difficulty;
     ///
     /// for job in 0..40 {
-    ///     let difficulty = Difficulty::for_shop(job, DeviceKind::Summa6, &[]);
+    ///     let difficulty = Difficulty::for_shop(job, DeviceKind::Summa6, &[Revision::B], &[]);
     ///     let ChipSpec::Calco(chip) = difficulty.chip();
+    ///     assert_eq!(chip.revision, Revision::B);
     ///     assert_eq!(Errata::for_chip(chip), Errata::default());
     /// }
     /// ```
-    pub fn for_shop(job: u32, device: DeviceKind, errata: &[Revision]) -> Self {
+    pub fn for_shop(
+        job: u32,
+        device: DeviceKind,
+        datasheets: &[Revision],
+        errata: &[Revision],
+    ) -> Self {
         let n = job as usize;
         Self {
             device,
@@ -73,7 +81,7 @@ impl Difficulty {
                 (job / 2).min(4),
                 (job.saturating_sub(4) / 2).min(4),
             ],
-            chip: Self::pick_chip(job, device, errata),
+            chip: Self::pick_chip(job, device, datasheets, errata),
             fault_chance: (job.saturating_sub(4) * 5).min(30),
             symptom_keys: (n / 8).min(2)..=(2 + n / 2).min(MAX_SYMPTOM_KEYS),
         }
@@ -131,14 +139,27 @@ impl Difficulty {
         unreachable!("the pick is below the total weight")
     }
 
-    /// The first jobs get the newest chip. Then every revision shows up, and
-    /// later the Rev B chips with the `DS` errata, if the shop has its
-    /// errata pages.
-    fn pick_chip(job: u32, device: DeviceKind, errata: &[Revision]) -> ChipSpec {
-        let revisions = Reference::revisions(device);
+    /// Only revisions with a datasheet in the shop come. The first jobs get
+    /// the newest of them. Then every one shows up, and later the Rev B
+    /// chips with the `DS` errata, if the shop has its errata pages.
+    fn pick_chip(
+        job: u32,
+        device: DeviceKind,
+        datasheets: &[Revision],
+        errata: &[Revision],
+    ) -> ChipSpec {
+        let supported = Reference::revisions(device);
+        let mut revisions: Vec<Revision> = supported
+            .iter()
+            .copied()
+            .filter(|revision| datasheets.contains(revision))
+            .collect();
+        if revisions.is_empty() {
+            revisions = supported[..1].to_vec();
+        }
         let mut chips: Vec<ChipInfo> = match job {
             0..3 => revisions.last().into_iter().copied().collect(),
-            _ => revisions.to_vec(),
+            _ => revisions.clone(),
         }
         .into_iter()
         .map(|revision| ChipInfo {

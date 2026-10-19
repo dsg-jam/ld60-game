@@ -24,6 +24,8 @@ impl Plugin for SavePlugin {
                 salvage,
             } = saved.reopened();
             run.file_past_notes();
+            run.file_owned_datasheets();
+            run.unpin_unfiled();
             app.insert_resource(run).insert_resource(clock);
             if let Some(bench) = bench {
                 app.insert_resource(bench);

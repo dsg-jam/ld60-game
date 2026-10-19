@@ -438,16 +438,11 @@ mod tests {
     }
 
     #[test]
-    fn the_first_run_files_the_tally2_and_its_chips() {
+    fn the_first_run_files_the_tally2_and_the_rev_a_datasheet() {
         let contents = Contents::of(&Run::default());
         assert_eq!(
             contents.entries(),
-            [
-                Entry::Manual(DeviceKind::Tally2),
-                Entry::Chip(Revision::A),
-                Entry::Chip(Revision::B),
-                Entry::Chip(Revision::C),
-            ]
+            [Entry::Manual(DeviceKind::Tally2), Entry::Chip(Revision::A)]
         );
     }
 
