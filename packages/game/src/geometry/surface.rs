@@ -50,6 +50,9 @@ pub(crate) enum Finish {
     Rust = 12,
     /// A knotted rug lying flat, long along Z.
     Rug = 13,
+    /// Plated steel, like a clip. It wears like [`Finish::Metal`] but does
+    /// not rust.
+    Plated = 14,
 }
 
 /// The shape a [`Finish`] covers, which decides where its edges wear.
@@ -141,7 +144,7 @@ impl Finish {
     fn roughness(self) -> f32 {
         match self {
             Self::Ceramic => 0.25,
-            Self::Metal | Self::Perforated => 0.35,
+            Self::Metal | Self::Plated | Self::Perforated => 0.35,
             Self::Plastic => 0.5,
             Self::Paint | Self::Grip => 0.6,
             Self::Wood | Self::Planks => 0.65,
@@ -153,7 +156,7 @@ impl Finish {
 
     fn metallic(self) -> f32 {
         match self {
-            Self::Metal | Self::Perforated | Self::Rust => 1.0,
+            Self::Metal | Self::Plated | Self::Perforated | Self::Rust => 1.0,
             _ => 0.0,
         }
     }

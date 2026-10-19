@@ -48,6 +48,7 @@ const PERFORATED: u32 = 10u;
 const CONCRETE: u32 = 11u;
 const RUST: u32 = 12u;
 const RUG: u32 = 13u;
+const PLATED: u32 = 14u;
 /// Matches `Form::code` in `surface.rs`.
 const BOX: u32 = 0u;
 const CYLINDER: u32 = 1u;
@@ -172,12 +173,12 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             bumps = 0.00002 * noise(uv * 120.0, s + 4.0) * visible(0.008, pixel);
             scratchable = true;
         }
-        case METAL: {
+        case METAL, PLATED: {
             let brushed = noise(vec2<f32>(uv.x * 3.0, uv.y * 400.0), s) * visible(0.0025, pixel);
             rough = mix(rough * 0.7, rough * 1.2, brushed);
             // Fingerprints dull the shine in patches.
             rough = mix(rough, rough + 0.2, smoothstep(0.6, 0.8, noise(uv * 30.0, s + 2.0)));
-            let rusty = rust(uv, s, w, pixel);
+            let rusty = rust(uv, s, w, pixel) * f32(surface.finish == METAL);
             color = mix(color, RUST_COLOR * mix(0.7, 1.2, noise(uv * 300.0, s + 3.0)), rusty);
             rough = mix(rough, 0.9, rusty);
             metallic = mix(metallic, 0.0, rusty);

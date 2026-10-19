@@ -115,7 +115,7 @@ impl JobTicket {
                 ))
                 .id();
             for clip in [spring, jaw] {
-                clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));
+                clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Plated));
             }
         });
         commands.entity(add.entity).insert((
