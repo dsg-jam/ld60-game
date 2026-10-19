@@ -47,6 +47,20 @@ pub(crate) fn cell(token: &str) -> Option<u8> {
     chars.next().is_none().then_some(n as u8)
 }
 
+/// Parses an immediate like `10` or `0x0A`.
+pub(crate) fn number(text: &str) -> Option<u8> {
+    u8::try_from(ld60_asm::parse_number(text).ok()?).ok()
+}
+
+/// Writes `value` in the style of `original`, hex or decimal.
+pub(crate) fn immediate(original: &str, value: u8) -> String {
+    if original.starts_with("0x") || original.starts_with("0X") {
+        format!("0x{value:02X}")
+    } else {
+        value.to_string()
+    }
+}
+
 /// Replaces `part`, which must be a slice of `text`, with `new`.
 pub(crate) fn splice(text: &str, part: &str, new: &str) -> String {
     let start = part.as_ptr().addr() - text.as_ptr().addr();
