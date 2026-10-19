@@ -14,6 +14,7 @@ mod manuals;
 mod pickup;
 mod radio;
 mod receipt;
+mod reflections;
 mod rent;
 mod rug;
 pub(crate) mod run;
@@ -106,6 +107,7 @@ impl Plugin for WorkshopPlugin {
         .add_plugins((
             clock::ClockPlugin,
             dial::DialPlugin,
+            reflections::ReflectionsPlugin,
             rent::RentPlugin,
             run::RunPlugin,
             salvage::SalvagePlugin,

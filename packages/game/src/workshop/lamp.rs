@@ -85,6 +85,10 @@ impl Default for Lamp {
 struct LampLight;
 
 impl Lamp {
+    pub(super) fn is_on(&self) -> bool {
+        self.on
+    }
+
     const fn clickable(&self) -> Clickable {
         Clickable {
             prompt: if self.on {
