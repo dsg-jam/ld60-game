@@ -38,8 +38,21 @@ impl Variant {
     /// The seed also picks one of the allowed boards. Falls back to the
     /// original level if no rewrite passes.
     pub fn new(source: &LevelSource, seed: u64) -> Result<Self, LevelError> {
+        Self::avoiding(source, seed, None)
+    }
+
+    /// Like [`Variant::new`], but not on board `avoid` if the level allows
+    /// another one.
+    pub fn avoiding(
+        source: &LevelSource,
+        seed: u64,
+        avoid: Option<BoardRev>,
+    ) -> Result<Self, LevelError> {
         let original = Self::original(source)?;
-        let boards = original.level.allowed_boards();
+        let mut boards = original.level.allowed_boards();
+        if boards.len() > 1 {
+            boards.retain(|&board| Some(board) != avoid);
+        }
         let pick = Rng::new(seed, &original.level.id).next_u64() % boards.len() as u64;
         match original.clone().on_board(boards[pick as usize], seed) {
             Err(LevelError::NoRewrite(_)) => Ok(original),
