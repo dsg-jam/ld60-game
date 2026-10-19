@@ -2,7 +2,7 @@ mod crt;
 
 use bevy::{
     asset::uuid::Uuid,
-    camera::{NormalizedRenderTarget, RenderTarget, visibility::RenderLayers},
+    camera::{ImageRenderTarget, NormalizedRenderTarget, RenderTarget, visibility::RenderLayers},
     image::ImageSampler,
     input::ButtonState,
     input_focus::AcquireFocus,
@@ -22,6 +22,9 @@ pub(crate) use self::crt::{CrtGlass, CrtLight, CrtMaterial};
 /// Screens only show UI, which ignores render layers. Off the scene's layer,
 /// their cameras skip culling every mesh in the city.
 const CANVAS_LAYER: usize = 1;
+/// Texels per UI pixel of a [`UiCanvas::spawn_print`] canvas. Read up close,
+/// a sheet covers more screen pixels than its canvas has UI pixels.
+const PRINT_SCALE: f32 = 2.0;
 
 pub(crate) struct ScreenPlugin;
 
@@ -76,14 +79,40 @@ impl UiCanvas {
         Self::spawn_sampled(commands, images, (size, ImageSampler::linear()), owner)
     }
 
+    /// Like [`UiCanvas::spawn_smooth`], but drawn at [`PRINT_SCALE`] times
+    /// the resolution, so small type on paper stays sharp up close.
+    pub(crate) fn spawn_print(
+        commands: &mut Commands,
+        images: &mut Assets<Image>,
+        size: UVec2,
+        owner: Entity,
+    ) -> Self {
+        Self::spawn_scaled(
+            commands,
+            images,
+            (size, ImageSampler::linear(), PRINT_SCALE),
+            owner,
+        )
+    }
+
     fn spawn_sampled(
         commands: &mut Commands,
         images: &mut Assets<Image>,
         (size, sampler): (UVec2, ImageSampler),
         owner: Entity,
     ) -> Self {
+        Self::spawn_scaled(commands, images, (size, sampler, 1.0), owner)
+    }
+
+    fn spawn_scaled(
+        commands: &mut Commands,
+        images: &mut Assets<Image>,
+        (size, sampler, scale): (UVec2, ImageSampler, f32),
+        owner: Entity,
+    ) -> Self {
+        let texels = (size.as_vec2() * scale).as_uvec2();
         let mut image =
-            Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
+            Image::new_target_texture(texels.x, texels.y, TextureFormat::Rgba8UnormSrgb, None);
         image.sampler = sampler;
         // So lights can follow what it shows.
         image.texture_descriptor.usage |= TextureUsages::COPY_SRC;
@@ -96,7 +125,10 @@ impl UiCanvas {
                     clear_color: ClearColorConfig::Custom(Color::BLACK),
                     ..default()
                 },
-                RenderTarget::Image(image.clone().into()),
+                RenderTarget::Image(ImageRenderTarget {
+                    handle: image.clone(),
+                    scale_factor: scale,
+                }),
                 RenderLayers::layer(CANVAS_LAYER),
                 CanvasOf(owner),
             ))

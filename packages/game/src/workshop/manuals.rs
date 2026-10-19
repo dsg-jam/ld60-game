@@ -101,7 +101,7 @@ impl ShopManuals {
         };
         let open =
             GlobalTransform::from(file.open_at).reparented_to(&GlobalTransform::from(*stand));
-        let pages = UiCanvas::spawn_smooth(&mut commands, &mut images, CANVAS_SIZE, add.entity);
+        let pages = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let spine = UiCanvas::spawn_smooth(&mut commands, &mut images, SPINE_CANVAS, add.entity);
         let labels = UiCanvas::spawn_smooth(
             &mut commands,

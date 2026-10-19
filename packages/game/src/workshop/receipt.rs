@@ -88,7 +88,7 @@ impl Receipt {
         let Ok(receipt) = receipts.get(add.entity) else {
             return;
         };
-        let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
+        let canvas = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let page = Paper::spawn_page(
             &mut commands,
             &canvas,

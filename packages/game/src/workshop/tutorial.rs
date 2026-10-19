@@ -117,7 +117,7 @@ impl TutorialNote {
         if note.0 == 0 {
             commands.entity(add.entity).insert(Unread);
         }
-        let canvas = UiCanvas::spawn_smooth(&mut commands, &mut images, CANVAS_SIZE, add.entity);
+        let canvas = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let page = Paper::spawn_single(&mut commands, &canvas, note.footer(), |page| {
             note.write(page);
         });
