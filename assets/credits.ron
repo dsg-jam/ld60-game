@@ -46,6 +46,14 @@
             modified: true,
         ),
         (
+            title: "Popi and Bobi Bob (unreleased)",
+            author: "Zentazy",
+            url: Some("https://open.spotify.com/artist/61Ey3451p1g9CHdqFh22z0"),
+            license: "Used with permission",
+            files: ["music/popi.ogg", "music/bobi-bob.ogg"],
+            modified: true,
+        ),
+        (
             title: "Fira Mono",
             author: "The Mozilla Corporation and Telefonica S.A.",
             url: Some("https://github.com/mozilla/Fira"),

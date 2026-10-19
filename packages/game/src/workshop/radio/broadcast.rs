@@ -9,18 +9,21 @@ use super::{Front, Radio};
 use crate::audio::{Mixer, Sound, Takes};
 
 /// Station n starts with track n and plays on through the ones after it.
-pub(super) const TRACKS: [Track; 9] = [
+pub(super) const TRACKS: [Track; 11] = [
     Track::new("stargazer-01-synthetic", ESCP, "Synthetic"),
     Track::new("nostalgia", "GLORYTOTHEMACHINE", "NOSTALGIA"),
     Track::new("stargazer-02-open-space", ESCP, "Open Space"),
     Track::new("stargazer-03-flying-home", ESCP, "Flying Home"),
     Track::new("exploration-theme", "Cleyton Kauffman", "Exploration Theme"),
     Track::new("stargazer-04-sunset", ESCP, "Sunset"),
+    Track::new("popi", ZENTAZY, "Popi"),
     Track::new("stargazer-05-stargazer", ESCP, "Stargazer"),
     Track::new("stargazer-06-above-the-clouds", ESCP, "Above The Clouds"),
+    Track::new("bobi-bob", ZENTAZY, "Bobi Bob"),
     Track::new("stargazer-07-in-love", ESCP, "In Love"),
 ];
 const ESCP: &str = "e s c p";
+const ZENTAZY: &str = "Zentazy";
 /// Seconds between the end of one track and the start of the next.
 const PAUSE: f32 = 2.5;
 
