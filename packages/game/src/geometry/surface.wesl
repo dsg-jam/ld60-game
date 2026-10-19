@@ -203,7 +203,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         case PLASTER: {
             color *= mix(0.8, 1.1, noise(uv * 2.0, s)) * mix(0.9, 1.05, noise(uv * 25.0, s + 1.0));
             pbr_input.material.reflectance = vec3<f32>(0.25);
-            let pores = step(0.96, hash1(floor(uv * 300.0), s)) * visible(0.0033, pixel);
+            let pores = specks(uv, 0.0033, 0.3, 0.0003, 0.0007, s, pixel);
             // Chips knocked out of the plaster, and shoe marks low down.
             let ding = dings(uv, s, w, pixel);
             color = mix(color, BARE_PLASTER, ding.hole * 0.7) * (1.0 - 0.4 * ding.rim);
@@ -241,7 +241,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         case CONCRETE: {
             color *= mix(0.8, 1.1, noise(uv * 2.0, s)) * mix(0.9, 1.05, noise(uv * 25.0, s + 1.0));
             pbr_input.material.reflectance = vec3<f32>(0.25);
-            let pores = step(0.93, hash1(floor(uv * 300.0), s)) * visible(0.0033, pixel);
+            let pores = specks(uv, 0.0033, 0.5, 0.0003, 0.0008, s, pixel);
             bumps = -0.0006 * pores + 0.0006 * noise(uv * 40.0, s + 1.0);
         }
         case RUST: {
