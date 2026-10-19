@@ -1,3 +1,5 @@
+mod leaf;
+
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
@@ -6,6 +8,8 @@ use bevy::{
     prelude::*,
 };
 
+pub(crate) use self::leaf::Binding;
+use self::leaf::{Leaf, LeafLook};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{Focus, Focused};
@@ -47,9 +51,12 @@ impl Plugin for PaperPlugin {
                 Paper::flip_on_keys,
                 Paper::flip_on_scroll,
                 Paper::show_current,
+                Binding::turn_pages,
+                Leaf::animate,
             )
                 .chain(),
         )
+        .init_resource::<LeafLook>()
         .add_observer(Paper::flip_on_click);
     }
 }
@@ -259,6 +266,10 @@ impl Paper {
 
     pub(crate) fn current_page(&self) -> usize {
         self.current
+    }
+
+    pub(crate) fn page_count(&self) -> usize {
+        self.pages.len()
     }
 
     /// Opens page `index`, counted from 0, or the last page if there are
