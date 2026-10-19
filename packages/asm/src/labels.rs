@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use ld60_machine::AsmErrorKind;
+
 use crate::Operand;
 
 pub struct Labels<'a> {
@@ -16,14 +18,14 @@ impl<'a> Labels<'a> {
     }
 
     /// Resolves a number or a label name.
-    pub fn value(&self, operand: &Operand) -> Result<i64, String> {
+    pub fn value(&self, operand: &Operand) -> Result<i64, AsmErrorKind> {
         match operand {
             Operand::Number(n) => Ok(*n),
             Operand::Name(name) => self
                 .get(name)
                 .map(i64::from)
-                .ok_or_else(|| format!("unknown label '{name}'")),
-            Operand::Indirect { .. } => Err("expected a number or label".into()),
+                .ok_or_else(|| AsmErrorKind::UnknownLabel { name: name.clone() }),
+            Operand::Indirect { .. } => Err(AsmErrorKind::ExpectsValue),
         }
     }
 }

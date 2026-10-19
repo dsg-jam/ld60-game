@@ -114,7 +114,7 @@ impl Level {
     }
 
     pub fn from_ron(source: &str) -> Result<Self, LevelError> {
-        ron::from_str(source).map_err(|e| LevelError::Parse(e.to_string()))
+        ron::from_str(source).map_err(LevelError::Parse)
     }
 
     /// The level as a level file.

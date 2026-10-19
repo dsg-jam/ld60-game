@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use ld60_machine::AsmErrorKind;
+
 use crate::parse_number;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,7 +65,7 @@ impl Spans {
 /// A parse error and the byte range of the line it is about.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Fault {
-    pub message: String,
+    pub kind: AsmErrorKind,
     pub span: Range<usize>,
 }
 
@@ -72,8 +74,8 @@ pub(crate) fn parse_line(text: &str) -> Result<Line, Fault> {
         let start = part.as_ptr().addr() - text.as_ptr().addr();
         start..start + part.len()
     };
-    let fault = |message: String, part: &str| Fault {
-        message,
+    let fault = |kind: AsmErrorKind, part: &str| Fault {
+        kind,
         span: span(part),
     };
     let code = text.split(';').next().unwrap_or_default().trim();
@@ -82,7 +84,12 @@ pub(crate) fn parse_line(text: &str) -> Result<Line, Fault> {
         Some((name, rest)) => {
             let name = name.trim();
             if !is_identifier(name) {
-                return Err(fault(format!("invalid label '{name}'"), name));
+                return Err(fault(
+                    AsmErrorKind::InvalidLabel {
+                        name: name.to_string(),
+                    },
+                    name,
+                ));
             }
             spans.label = span(name);
             (Some(name.to_string()), rest.trim())
@@ -107,15 +114,15 @@ pub(crate) fn parse_line(text: &str) -> Result<Line, Fault> {
         .filter(|_| !tail.is_empty())
         .map(|part| {
             let part = part.trim();
-            parse_operand(part).map_err(|message| {
+            parse_operand(part).map_err(|kind| {
                 // An empty operand has no text to point at.
-                fault(message, if part.is_empty() { tail } else { part })
+                fault(kind, if part.is_empty() { tail } else { part })
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
     let body = if let Some(directive) = head.strip_prefix('.') {
-        let directive = parse_directive(directive, operands).map_err(|message| Fault {
-            message,
+        let directive = parse_directive(directive, operands).map_err(|kind| Fault {
+            kind,
             span: spans.operands_or_head(),
         })?;
         Body::Directive(directive)
@@ -132,33 +139,39 @@ pub(crate) fn parse_line(text: &str) -> Result<Line, Fault> {
     })
 }
 
-fn parse_directive(name: &str, operands: Vec<Operand>) -> Result<Directive, String> {
+fn parse_directive(name: &str, operands: Vec<Operand>) -> Result<Directive, AsmErrorKind> {
     let numbers = operands
         .into_iter()
         .map(|op| match op {
             Operand::Number(n) => Ok(n),
-            _ => Err(format!(".{name} expects numbers")),
+            _ => Err(AsmErrorKind::DirectiveExpectsNumbers {
+                directive: name.to_string(),
+            }),
         })
         .collect::<Result<Vec<_>, _>>()?;
     match name.to_ascii_lowercase().as_str() {
         "org" => match numbers.as_slice() {
             [addr] => Ok(Directive::Org(*addr)),
-            _ => Err(".org expects one address".into()),
+            _ => Err(AsmErrorKind::OrgExpectsAddress),
         },
         "db" if !numbers.is_empty() => Ok(Directive::Db(numbers)),
-        "db" => Err(".db expects at least one value".into()),
-        _ => Err(format!("unknown directive '.{name}'")),
+        "db" => Err(AsmErrorKind::DbExpectsValue),
+        _ => Err(AsmErrorKind::UnknownDirective {
+            directive: name.to_string(),
+        }),
     }
 }
 
-fn parse_operand(text: &str) -> Result<Operand, String> {
+fn parse_operand(text: &str) -> Result<Operand, AsmErrorKind> {
     if let Some(inner) = text.strip_prefix('[').and_then(|t| t.strip_suffix(']')) {
         let (base, offset) = match inner.split_once('+') {
             Some((base, offset)) => (base.trim(), parse_number(offset.trim())?),
             None => (inner.trim(), 0),
         };
         if !is_identifier(base) {
-            return Err(format!("invalid operand '{text}'"));
+            return Err(AsmErrorKind::InvalidOperand {
+                text: text.to_string(),
+            });
         }
         return Ok(Operand::Indirect {
             base: base.to_string(),
@@ -171,7 +184,9 @@ fn parse_operand(text: &str) -> Result<Operand, String> {
     if is_identifier(text) {
         return Ok(Operand::Name(text.to_string()));
     }
-    Err(format!("invalid operand '{text}'"))
+    Err(AsmErrorKind::InvalidOperand {
+        text: text.to_string(),
+    })
 }
 
 fn is_identifier(text: &str) -> bool {

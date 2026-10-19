@@ -5,6 +5,7 @@
 //!
 //! - `serde`: implements `Serialize` and `Deserialize` for [`StuckBit`].
 
+mod asm_error;
 mod assembly;
 mod bus;
 mod cpu;
@@ -12,7 +13,8 @@ mod image;
 mod isa;
 mod ram;
 
-pub use assembly::{AsmError, Assembly, DisasmLine, SourceLine};
+pub use asm_error::{AsmError, AsmErrorKind};
+pub use assembly::{Assembly, DisasmLine, SourceLine};
 pub use bus::Bus;
 pub use cpu::{Cpu, Register, Step};
 pub use image::Image;

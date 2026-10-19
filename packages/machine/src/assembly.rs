@@ -1,25 +1,6 @@
 use std::collections::BTreeMap;
-use std::fmt;
-use std::ops::Range;
 
 use crate::Image;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AsmError {
-    /// 1-based source line.
-    pub line: usize,
-    /// Byte range within the line that the error is about.
-    pub span: Range<usize>,
-    pub message: String,
-}
-
-impl fmt::Display for AsmError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "line {}: {}", self.line, self.message)
-    }
-}
-
-impl std::error::Error for AsmError {}
 
 /// Maps emitted words back to a 1-based source line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

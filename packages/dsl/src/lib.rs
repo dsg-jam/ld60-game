@@ -93,7 +93,7 @@ pub fn compile(
                 let pos = printed.positions.get(e.line.wrapping_sub(1));
                 Diagnostic::error(
                     pos.copied().unwrap_or_default(),
-                    format!("generated code: {}", e.message),
+                    format!("generated code: {}", e.kind),
                 )
             })
             .collect());

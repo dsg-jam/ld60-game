@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use common::run;
 use ld60_calco::datasheet::INSTRUCTIONS;
 use ld60_calco::{ChipInfo, Cond, DateCode, Op, Revision};
-use ld60_machine::Isa;
+use ld60_machine::{AsmErrorKind, Isa};
 
 /// Supported instruction forms in datasheet syntax, like `LD Mn` or `JZ aa`.
 fn forms(revision: Revision) -> Vec<&'static str> {
@@ -31,35 +31,54 @@ fn chip(revision: Revision) -> ChipInfo {
     }
 }
 
-fn first_error(revision: Revision, source: &str) -> String {
+fn first_error(revision: Revision, source: &str) -> AsmErrorKind {
     match revision.isa().assemble(source) {
         Ok(_) => panic!("Rev {revision} assembles {source:?}"),
-        Err(errors) => errors[0].message.clone(),
+        Err(errors) => errors[0].kind.clone(),
+    }
+}
+
+fn unsupported_on_a(form: &str) -> AsmErrorKind {
+    AsmErrorKind::Unsupported {
+        form: form.into(),
+        isa: "CalCo Rev A",
     }
 }
 
 #[test]
 fn rev_a_rejects_ops_it_lacks() {
-    for (source, message) in [
-        ("CALL 0", "'CALL' is not supported by CalCo Rev A"),
-        ("call 0", "'CALL' is not supported by CalCo Rev A"),
-        ("JNZ 0", "'JNZ' is not supported by CalCo Rev A"),
-        ("OUT ANN", "'OUT' is not supported by CalCo Rev A"),
-        ("LDI B, 5", "'LDI B, 0x05' is not supported by CalCo Rev A"),
-        ("LD [B+2]", "'LD [B+2]' is not supported by CalCo Rev A"),
-        ("st [b]", "'ST [B]' is not supported by CalCo Rev A"),
+    for (source, form) in [
+        ("CALL 0", "CALL"),
+        ("call 0", "CALL"),
+        ("JNZ 0", "JNZ"),
+        ("OUT ANN", "OUT"),
+        ("LDI B, 5", "LDI B, 0x05"),
+        ("LD [B+2]", "LD [B+2]"),
+        ("st [b]", "ST [B]"),
     ] {
-        assert_eq!(first_error(Revision::A, source), message, "{source}");
+        assert_eq!(
+            first_error(Revision::A, source),
+            unsupported_on_a(form),
+            "{source}"
+        );
     }
 }
 
 #[test]
 fn unknown_and_unsupported_differ() {
-    assert_eq!(first_error(Revision::A, "FOO"), "unknown mnemonic 'FOO'");
-    assert_eq!(first_error(Revision::B, "FOO"), "unknown mnemonic 'FOO'");
+    let unknown = AsmErrorKind::UnknownMnemonic {
+        mnemonic: "FOO".into(),
+    };
+    assert_eq!(first_error(Revision::A, "FOO"), unknown);
+    assert_eq!(first_error(Revision::B, "FOO"), unknown);
+    assert_eq!(first_error(Revision::A, "DJNZ 0"), unsupported_on_a("DJNZ"));
+}
+
+#[test]
+fn unsupported_reads_like_the_datasheet() {
     assert_eq!(
-        first_error(Revision::A, "DJNZ 0"),
-        "'DJNZ' is not supported by CalCo Rev A"
+        unsupported_on_a("LD [B+2]").to_string(),
+        "'LD [B+2]' is not supported by CalCo Rev A"
     );
 }
 

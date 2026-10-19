@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::ops::Range;
 
-use ld60_machine::{AsmError, Assembly, Image, SourceLine};
+use ld60_machine::{AsmError, AsmErrorKind, Assembly, Image, SourceLine};
 
 use crate::Encoder;
 use crate::Labels;
@@ -41,17 +41,13 @@ fn place(
     let mut addr = 0usize;
     for (index, text) in source.lines().enumerate() {
         let line = index + 1;
-        let mut fail = |span: Range<usize>, message: String| {
-            errors.push(AsmError {
-                line,
-                span,
-                message,
-            });
+        let mut fail = |span: Range<usize>, kind: AsmErrorKind| {
+            errors.push(AsmError { line, span, kind });
         };
         let parsed = match parse_line(text) {
             Ok(parsed) => parsed,
             Err(fault) => {
-                fail(fault.span, fault.message);
+                fail(fault.span, fault.kind);
                 continue;
             }
         };
@@ -62,10 +58,8 @@ fn place(
                     e.insert(u16::try_from(addr).unwrap_or(u16::MAX));
                 }
                 Entry::Occupied(e) => {
-                    fail(
-                        spans.label.clone(),
-                        format!("duplicate label '{}'", e.key()),
-                    );
+                    let name = e.key().clone();
+                    fail(spans.label.clone(), AsmErrorKind::DuplicateLabel { name });
                 }
             }
         }
@@ -74,18 +68,15 @@ fn place(
             Body::Directive(Directive::Org(target)) => {
                 match usize::try_from(*target) {
                     Ok(target) if target <= encoder.rom_len() => addr = target,
-                    _ => fail(
-                        spans.operands,
-                        format!("address {target} is outside the ROM"),
-                    ),
+                    _ => fail(spans.operands, AsmErrorKind::OutsideRom { addr: *target }),
                 }
                 continue;
             }
             Body::Directive(Directive::Db(values)) => values.len(),
             Body::Instruction(instruction) => match encoder.size(instruction) {
                 Ok(size) => size,
-                Err(message) => {
-                    fail(spans.head, message);
+                Err(kind) => {
+                    fail(spans.head, kind);
                     continue;
                 }
             },
@@ -112,11 +103,11 @@ fn emit(
     let mut lines = Vec::new();
     let labels = Labels::new(labels);
     for item in placed {
-        let mut fail = |span: Range<usize>, message: String| {
+        let mut fail = |span: Range<usize>, kind: AsmErrorKind| {
             errors.push(AsmError {
                 line: item.line,
                 span,
-                message,
+                kind,
             });
         };
         let words = match &item.body {
@@ -129,18 +120,18 @@ fn emit(
         };
         let words = match words {
             Ok(words) => words,
-            Err(message) => {
-                fail(item.spans.operands_or_head(), message);
+            Err(kind) => {
+                fail(item.spans.operands_or_head(), kind);
                 continue;
             }
         };
         let end = item.addr + words.len();
         if end > image.len() {
-            fail(item.spans.body(), "code does not fit in the ROM".into());
+            fail(item.spans.body(), AsmErrorKind::RomFull);
             continue;
         }
         if let Some(addr) = (item.addr..end).find(|&a| used[a]) {
-            fail(item.spans.body(), format!("overlaps code at 0x{addr:02X}"));
+            fail(item.spans.body(), AsmErrorKind::Overlap { addr });
             continue;
         }
         for (offset, &w) in words.iter().enumerate() {
@@ -156,9 +147,9 @@ fn emit(
     (image, lines)
 }
 
-fn word(value: i64, mask: u16) -> Result<u16, String> {
+fn word(value: i64, mask: u16) -> Result<u16, AsmErrorKind> {
     u16::try_from(value)
         .ok()
         .filter(|&w| w <= mask)
-        .ok_or_else(|| format!("value {value} does not fit in a word"))
+        .ok_or(AsmErrorKind::WordRange { value })
 }

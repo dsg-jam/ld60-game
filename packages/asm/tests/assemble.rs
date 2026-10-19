@@ -1,4 +1,5 @@
 use ld60_asm::{Encoder, Instruction, Labels, assemble};
+use ld60_machine::AsmErrorKind;
 
 struct Toy;
 
@@ -11,22 +12,24 @@ impl Encoder for Toy {
         16
     }
 
-    fn size(&self, instruction: &Instruction) -> Result<usize, String> {
+    fn size(&self, instruction: &Instruction) -> Result<usize, AsmErrorKind> {
         match instruction.mnemonic.as_str() {
             "NOP" => Ok(1),
             "JMP" => Ok(2),
-            other => Err(format!("unknown mnemonic '{other}'")),
+            other => Err(AsmErrorKind::UnknownMnemonic {
+                mnemonic: other.to_string(),
+            }),
         }
     }
 
-    fn encode(&self, instruction: &Instruction, labels: &Labels) -> Result<Vec<u16>, String> {
+    fn encode(&self, instruction: &Instruction, labels: &Labels) -> Result<Vec<u16>, AsmErrorKind> {
         match instruction.mnemonic.as_str() {
             "NOP" => Ok(vec![0x00]),
             "JMP" => {
                 let target = labels.value(&instruction.operands[0])?;
                 Ok(vec![
                     0xB0,
-                    u16::try_from(target).map_err(|e| e.to_string())?,
+                    u16::try_from(target).map_err(|_| AsmErrorKind::WordRange { value: target })?,
                 ])
             }
             _ => unreachable!(),
@@ -55,6 +58,19 @@ fn reports_all_errors_with_line_numbers() {
     let errors = assemble("FOO\nJMP nowhere\nx: NOP\nx: NOP", &Toy).unwrap_err();
     let lines: Vec<_> = errors.iter().map(|e| e.line).collect();
     assert_eq!(lines, vec![1, 2, 4]);
+    let kinds: Vec<_> = errors.into_iter().map(|e| e.kind).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            AsmErrorKind::UnknownMnemonic {
+                mnemonic: "FOO".into()
+            },
+            AsmErrorKind::UnknownLabel {
+                name: "nowhere".into()
+            },
+            AsmErrorKind::DuplicateLabel { name: "x".into() },
+        ]
+    );
 }
 
 #[test]

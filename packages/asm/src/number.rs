@@ -1,5 +1,9 @@
-pub fn parse_number(text: &str) -> Result<i64, String> {
-    let invalid = || format!("invalid number '{text}'");
+use ld60_machine::AsmErrorKind;
+
+pub fn parse_number(text: &str) -> Result<i64, AsmErrorKind> {
+    let invalid = || AsmErrorKind::InvalidNumber {
+        text: text.to_string(),
+    };
     let (negative, body) = match text.strip_prefix('-') {
         Some(rest) => (true, rest),
         None => (false, text),
