@@ -184,6 +184,10 @@ impl<K: Copy> Keypad<K> {
         Self { rows, style, keys }
     }
 
+    pub(crate) fn keys(&self) -> &[PlacedKey<K>] {
+        &self.keys
+    }
+
     /// Spawns the keys under `parent`, each with the bundle `extra` returns
     /// for it.
     pub(crate) fn spawn_keys<B: Bundle>(

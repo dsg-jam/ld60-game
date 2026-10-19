@@ -1,17 +1,23 @@
 mod demand;
+mod served;
+mod tools;
 
 use bevy::prelude::*;
-use ld60_devices::DeviceKind;
-use ld60_levels::{Catalog, GAME_SEED, LevelSource};
+use ld60_calco::{Errata, Revision};
+use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_levels::{Catalog, GAME_SEED, LevelSource, Reference};
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
 
 pub(crate) use self::demand::Demand;
+use self::served::Served;
+pub(crate) use self::tools::ComputerTool;
 use super::clock::Clock;
 use super::job::{Job, JobItem};
 use super::pickup::Pickup;
 use super::receipt::Receipt;
 use super::rent::RentNote;
+use super::salvage::{Find, SalvageCrate};
 use crate::player::focus::{Focus, Focused};
 
 /// What the landlord takes the first time the planet sets.
@@ -24,7 +30,12 @@ const SPECIAL_ODDS: u32 = 3;
 const RUN_SEEDS: u64 = 1 << 32;
 
 /// What is left on the counter when the shop closes.
-type Leftovers = Or<(With<JobItem>, With<Receipt>, With<RentNote>)>;
+type Leftovers = Or<(
+    With<JobItem>,
+    With<Receipt>,
+    With<RentNote>,
+    With<SalvageCrate>,
+)>;
 
 pub(crate) struct RunPlugin;
 
@@ -46,8 +57,13 @@ pub(crate) struct Run {
     /// Money in the till.
     till: u32,
     /// The devices with a sign in the shop window. Locals only bring these.
+    /// Their manuals are in the binder.
     signs: Vec<DeviceKind>,
+    /// The chip revisions with errata pages in the binder.
+    errata: Vec<Revision>,
+    tools: Vec<ComputerTool>,
     demand: Demand,
+    served: Served,
     /// The level folders of the special jobs done in this run.
     specials: Vec<String>,
     stats: Stats,
@@ -64,6 +80,8 @@ pub(crate) struct Stats {
     pub(crate) earned: u32,
     /// All rent paid.
     pub(crate) rent: u32,
+    /// All money paid to the scrap trader.
+    pub(crate) spent: u32,
     /// How often the planet set with the rent paid.
     pub(crate) cycles: u32,
 }
@@ -75,7 +93,8 @@ pub(crate) enum Origin {
     Lesson { step: usize, source: LevelSource },
     /// A hand-written job between the generated ones.
     Special(LevelSource),
-    /// Generated job `number` on `device`, counted from 0 after the tutorial.
+    /// Generated job `number` on `device`, counted from 0 for each device
+    /// after the tutorial.
     Generated { device: DeviceKind, number: u32 },
 }
 
@@ -101,7 +120,10 @@ impl Default for Run {
             tutorial: true,
             till: 0,
             signs: vec![DeviceKind::Tally2],
+            errata: Vec::new(),
+            tools: Vec::new(),
             demand: Demand::default(),
+            served: Served::default(),
             specials: Vec::new(),
             stats: Stats::default(),
         }
@@ -131,6 +153,78 @@ impl Run {
         &self.demand
     }
 
+    /// Counts the runs since the game started, from 0.
+    pub(crate) fn number(&self) -> u32 {
+        self.number
+    }
+
+    pub(crate) fn signs(&self) -> &[DeviceKind] {
+        &self.signs
+    }
+
+    pub(crate) fn errata(&self) -> &[Revision] {
+        &self.errata
+    }
+
+    /// Whether the binder has the errata pages for every known bug of `chip`.
+    pub(crate) fn explains(&self, chip: ChipSpec) -> bool {
+        let ChipSpec::Calco(chip) = chip;
+        Errata::for_chip(chip)
+            .iter()
+            .all(|erratum| self.errata.contains(&erratum.revision()))
+    }
+
+    /// The chip revisions in the manuals of the binder, in the order of
+    /// [`Revision::ALL`].
+    pub(crate) fn chips(&self) -> Vec<Revision> {
+        Revision::ALL
+            .into_iter()
+            .filter(|revision| {
+                self.signs
+                    .iter()
+                    .any(|&device| Reference::revisions(device).contains(revision))
+            })
+            .collect()
+    }
+
+    pub(crate) fn owns(&self, find: Find) -> bool {
+        match find {
+            Find::Device(device) => self.signs.contains(&device),
+            Find::Tool(tool) => self.tools.contains(&tool),
+            Find::Errata(revision) => self.errata.contains(&revision),
+        }
+    }
+
+    /// Whether the scrap trader can offer `find`. The shop must not own it
+    /// yet and must be able to use it.
+    pub(crate) fn wants(&self, find: Find) -> bool {
+        let usable = match find {
+            Find::Device(_) => true,
+            Find::Tool(tool) => tool
+                .needs()
+                .is_none_or(|needed| self.tools.contains(&needed)),
+            Find::Errata(revision) => self.chips().contains(&revision),
+        };
+        usable && !self.owns(find)
+    }
+
+    /// Pays for `find` from the till and puts it in the shop. Returns
+    /// whether the till held enough.
+    pub(crate) fn buy(&mut self, find: Find) -> bool {
+        let price = find.price();
+        if self.till < price || self.owns(find) {
+            return false;
+        }
+        self.till -= price;
+        self.stats.spent += price;
+        match find {
+            Find::Device(device) => self.signs.push(device),
+            Find::Tool(tool) => self.tools.push(tool),
+            Find::Errata(revision) => self.errata.push(revision),
+        }
+        true
+    }
+
     /// The seed of the current job.
     pub(crate) fn seed(&self) -> u64 {
         GAME_SEED + RUN_SEEDS * u64::from(self.number) + u64::from(self.job)
@@ -139,9 +233,9 @@ impl Run {
     /// Where the current job comes from.
     ///
     /// The tutorial comes first. After it, a special job can come once its
-    /// sign hangs in the window and the run has reached [`Special::from`].
-    /// Otherwise the job is generated for one of the signs, picked by
-    /// [`Demand`].
+    /// sign hangs in the window, the shop took [`Special::from`] jobs on its
+    /// device and the binder explains the bugs of its chip. Otherwise the
+    /// job is generated for one of the signs, picked by [`Demand`].
     ///
     /// [`Special::from`]: ld60_levels::Special::from
     pub(crate) fn pick(&self, catalog: &Catalog) -> Origin {
@@ -157,14 +251,14 @@ impl Run {
                 source: source.clone(),
             };
         }
-        let number = (job - tutorial.len()) as u32;
         let mut rng = SmallRng::seed_from_u64(self.seed());
         let special = catalog.specials().find(|(source, from)| {
-            number >= *from
-                && !self.specials.contains(&source.path)
-                && source
-                    .load()
-                    .is_ok_and(|level| self.signs.contains(&level.device))
+            !self.specials.contains(&source.path)
+                && source.load().is_ok_and(|level| {
+                    self.signs.contains(&level.device)
+                        && self.served.jobs(level.device) >= *from
+                        && self.explains(level.chip)
+                })
         });
         if let Some((source, _)) = special
             && rng.random_ratio(1, SPECIAL_ODDS)
@@ -175,7 +269,10 @@ impl Run {
             .demand
             .pick(&self.signs, &mut rng)
             .unwrap_or(DeviceKind::Tally2);
-        Origin::Generated { device, number }
+        Origin::Generated {
+            device,
+            number: self.served.jobs(device),
+        }
     }
 
     /// Takes in what the customer paid for `job`. Once the device leaves
@@ -189,6 +286,9 @@ impl Run {
             return;
         }
         self.job += 1;
+        if !matches!(job.origin, Origin::Lesson { .. }) {
+            self.served.add(job.level.device);
+        }
         match pickup {
             Pickup::Paid(_) => {
                 self.stats.fixed += 1;
@@ -249,7 +349,16 @@ impl Run {
 }
 
 #[cfg(test)]
+impl Run {
+    pub(crate) fn add_till(&mut self, amount: u32) {
+        self.till += amount;
+    }
+}
+
+#[cfg(test)]
 mod tests {
+    use ld60_levels::Difficulty;
+
     use super::*;
     use crate::player::focus::{FocusOn, FocusTarget, View};
     use crate::workshop::levels::Levels;
@@ -309,6 +418,10 @@ mod tests {
             (0..40)
                 .map(|job| {
                     run.job = job;
+                    run.served = Served::default();
+                    for _ in 0..job {
+                        run.served.add(DeviceKind::Summa6);
+                    }
                     run.pick(&levels)
                 })
                 .collect::<Vec<_>>()
@@ -342,9 +455,12 @@ mod tests {
         let levels = Levels::on_disk();
         let mut run = Run::default().next();
         run.signs = vec![DeviceKind::Summa6];
-        run.job = 100;
+        run.errata = vec![Revision::B];
+        for _ in 0..100 {
+            run.served.add(DeviceKind::Summa6);
+        }
         let mut seen = Vec::new();
-        while run.job < 300 && seen.len() < levels.specials().count() {
+        while run.job < 200 && seen.len() < levels.specials().count() {
             let Origin::Special(source) = run.pick(&levels) else {
                 run.job += 1;
                 continue;
@@ -354,6 +470,62 @@ mod tests {
             run.settle(&job(&run), &Pickup::Paid(1));
         }
         assert_eq!(seen.len(), levels.specials().count());
+    }
+
+    #[test]
+    fn errata_jobs_need_the_errata_pages() {
+        const ERRATA: &str = "summa6/05-errata";
+        let levels = Levels::on_disk();
+        let mut run = Run::default().next();
+        run.signs.push(DeviceKind::Summa6);
+        for _ in 0..100 {
+            run.served.add(DeviceKind::Summa6);
+        }
+        run.specials = levels
+            .specials()
+            .map(|(source, _)| source.path.clone())
+            .take_while(|path| path != ERRATA)
+            .collect();
+        let dealt = |run: &mut Run| {
+            (0..200).any(|job| {
+                run.job = job;
+                matches!(run.pick(&levels), Origin::Special(source) if source.path == ERRATA)
+            })
+        };
+        assert!(!dealt(&mut run));
+        run.errata.push(Revision::B);
+        assert!(dealt(&mut run));
+    }
+
+    #[test]
+    fn generated_jobs_skip_chips_the_binder_cannot_explain() {
+        let run = Run::default().next();
+        let chips =
+            |difficulty: fn(u32) -> Difficulty| (8..40).map(move |job| difficulty(job).chip());
+        assert!(
+            chips(|job| Difficulty::for_job(job, DeviceKind::Summa6))
+                .any(|chip| !run.explains(chip))
+        );
+        assert!(
+            chips(|job| Difficulty::for_shop(job, DeviceKind::Summa6, &[]))
+                .all(|chip| run.explains(chip))
+        );
+    }
+
+    #[test]
+    fn a_new_sign_starts_with_easy_jobs() {
+        let mut run = Run::default().next();
+        for _ in 0..30 {
+            run.served.add(DeviceKind::Tally2);
+        }
+        run.signs = vec![DeviceKind::Summa6];
+        assert_eq!(
+            run.pick(&Levels::on_disk()),
+            Origin::Generated {
+                device: DeviceKind::Summa6,
+                number: 0
+            }
+        );
     }
 
     #[test]
@@ -379,6 +551,7 @@ mod tests {
             }
         );
         assert!(run.demand.percent(DeviceKind::Tally2) < 100);
+        assert_eq!(run.served.jobs(DeviceKind::Tally2), 2);
     }
 
     #[test]
@@ -387,6 +560,7 @@ mod tests {
         run.settle(&job(&run), &Pickup::Paid(4));
         assert_eq!((run.job, run.stats.fixed), (1, 1));
         assert_eq!(run.demand, Demand::default());
+        assert_eq!(run.served, Served::default());
     }
 
     #[test]

@@ -37,8 +37,12 @@ impl Plugin for RentPlugin {
 pub(crate) struct RentNote(Rent);
 
 impl RentNote {
+    pub(crate) fn rent(&self) -> Rent {
+        self.0
+    }
+
     /// The landlord takes the rent and leaves a note about it.
-    fn collect(
+    pub(super) fn collect(
         _: On<PlanetSet>,
         mut run: ResMut<Run>,
         notes: Query<Entity, With<RentNote>>,

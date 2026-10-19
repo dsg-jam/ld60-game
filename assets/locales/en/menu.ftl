@@ -16,6 +16,7 @@ closed-fixed = Gadgets fixed: { $jobs }
 closed-lost = Gadgets taken home broken: { $jobs }
 closed-earned = Money taken in: ${ $amount }
 closed-rent = Rent paid: ${ $amount }
+closed-spent = Paid to the scrap trader: ${ $amount }
 
 settings-volume = Volume
 settings-sensitivity = Mouse sensitivity

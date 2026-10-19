@@ -209,6 +209,24 @@ impl Paper {
         self.current = 0;
     }
 
+    pub(crate) fn current_page(&self) -> usize {
+        self.current
+    }
+
+    /// Opens page `index`, counted from 0, or the last page if there are
+    /// fewer.
+    pub(crate) fn open_page(&mut self, index: usize) {
+        self.current = index.min(self.pages.len().saturating_sub(1));
+    }
+
+    /// Where `hit` lies on the sheet, from -0.5 to 0.5 on both axes with the
+    /// top of the page at +0.5.
+    pub(crate) fn sheet_point(&self, hit: Vec3, sheets: &Query<&GlobalTransform>) -> Option<Vec2> {
+        let sheet = sheets.get(self.sheet).ok()?;
+        // The sheet lies in its local XY plane with the top of the page at +Y.
+        Some(sheet.affine().inverse().transform_point3(hit).truncate() / self.size)
+    }
+
     /// Opens the first of `pages` and returns the old pages.
     pub(crate) fn replace_pages(&mut self, pages: Vec<Entity>) -> Vec<Entity> {
         self.current = 0;
@@ -240,11 +258,13 @@ impl Paper {
         let Ok(mut paper) = papers.get_mut(click.entity) else {
             return;
         };
-        let (Some(hit), Ok(sheet)) = (click.hit.position, sheets.get(paper.sheet)) else {
+        let Some(local) = click
+            .hit
+            .position
+            .and_then(|hit| paper.sheet_point(hit, &sheets))
+        else {
             return;
         };
-        // The sheet lies in its local XY plane with the top of the page at +Y.
-        let local = sheet.affine().inverse().transform_point3(hit).truncate() / paper.size;
         if local.y > CORNER_ZONE - 0.5 {
             return;
         }

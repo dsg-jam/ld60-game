@@ -51,6 +51,7 @@ impl StatsPage {
                 line(Message::new("closed-lost").with("jobs", stats.lost)),
                 line(Message::new("closed-earned").with("amount", stats.earned)),
                 line(Message::new("closed-rent").with("amount", stats.rent)),
+                line(Message::new("closed-spent").with("amount", stats.spent)),
             ],
         )
     }

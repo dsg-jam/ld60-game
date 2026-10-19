@@ -1,4 +1,5 @@
 mod candle;
+mod sign;
 
 use bevy::prelude::*;
 
@@ -56,7 +57,7 @@ pub(crate) struct FrontPlugin;
 
 impl Plugin for FrontPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(candle::CandlePlugin)
+        app.add_plugins((candle::CandlePlugin, sign::SignPlugin))
             .add_observer(Front::on_add);
     }
 }

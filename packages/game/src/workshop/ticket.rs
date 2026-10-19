@@ -4,7 +4,6 @@ use ld60_levels::Level;
 
 use super::job::Job;
 use super::levels::Levels;
-use super::service::ServiceSheet;
 use crate::audio::{Play, Sound};
 use crate::device::DeviceName;
 use crate::geometry::block::Block;
@@ -37,9 +36,6 @@ const STAMP_INK: Color = Color::srgba(0.72, 0.12, 0.1, 0.8);
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 440.0;
 
-/// Writes the contents of a page about the job.
-type PageContent = fn(&mut ChildSpawnerCommands, &Level);
-
 pub(crate) struct TicketPlugin;
 
 impl Plugin for TicketPlugin {
@@ -56,8 +52,7 @@ impl Plugin for TicketPlugin {
     }
 }
 
-/// The job ticket for a device on the bench, on a clipboard with the
-/// service sheet for its model below it.
+/// The job ticket for a device on the bench, on a clipboard.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct JobTicket {
@@ -84,17 +79,13 @@ impl JobTicket {
         };
         let level = &ticket.level;
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
-        let pages = Self::pages(level);
-        let count = pages.len();
-        let pages = pages
-            .into_iter()
-            .enumerate()
-            .map(|(index, (footer, content))| {
-                Paper::spawn_page(&mut commands, &canvas, (index + 1, count), footer, |page| {
-                    content(page, level);
-                })
-            })
-            .collect();
+        let page = Paper::spawn_page(
+            &mut commands,
+            &canvas,
+            (1, 1),
+            Message::new("ticket-footer"),
+            |page| Self::write(page, level),
+        );
         let board = Block::new(BOARD_SIZE);
         let clip = Block::new(CLIP_SIZE)
             .on_top_of(&board)
@@ -116,27 +107,13 @@ impl JobTicket {
             clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));
         });
         commands.entity(add.entity).insert((
-            Paper::new(sheet, SHEET_SIZE, pages),
+            Paper::new(sheet, SHEET_SIZE, vec![page]),
             FocusTarget {
                 prompt: "click-ticket",
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(sheet_center)),
             },
         ));
-    }
-
-    /// The footer and contents of each page on the clipboard.
-    fn pages(level: &Level) -> [(Message, PageContent); 3] {
-        let sheet = ServiceSheet::new(level.board());
-        [
-            (Message::new("ticket-footer"), Self::write),
-            (sheet.footer(), |page, level| {
-                ServiceSheet::new(level.board()).write(page);
-            }),
-            (sheet.footer(), |page, level| {
-                ServiceSheet::new(level.board()).write_line_tests(page);
-            }),
-        ]
     }
 
     /// The job number, as the ticket and the receipt print it.
@@ -370,11 +347,11 @@ mod tests {
         let locale = Locale::on_disk();
         for source in Levels::on_disk().levels() {
             let level = source.load().unwrap();
-            for (footer, content) in JobTicket::pages(&level) {
-                locale.assert_formats([footer]);
-                locale.assert_formats(Localized::spawned_by(|page| content(page, &level)));
-            }
+            locale.assert_formats(Localized::spawned_by(|page| {
+                JobTicket::write(page, &level);
+            }));
         }
+        locale.assert_formats([Message::new("ticket-footer")]);
     }
 
     #[test]

@@ -59,7 +59,7 @@ impl Demand {
         }
     }
 
-    fn index(device: DeviceKind) -> usize {
+    pub(super) fn index(device: DeviceKind) -> usize {
         DeviceKind::ALL
             .iter()
             .position(|&kind| kind == device)

@@ -1,8 +1,11 @@
 hint-back = Back
 
 click-bell = Ring bell
+click-binder = Open binder
+click-buy = Buy
+click-buy-short = Not enough money in the till
 click-computer = Use computer
-click-datasheet = Inspect datasheet
+click-crate = Look in crate
 click-device = Inspect device
 click-lamp-off = Switch off lamp
 click-lamp-on = Switch on lamp
