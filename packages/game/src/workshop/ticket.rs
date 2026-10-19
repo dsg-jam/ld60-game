@@ -10,17 +10,20 @@ use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::Paper;
+use crate::parts::paper::{Binding, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 pub(super) const BOARD_SIZE: Vec3 = Vec3::new(0.18, 0.005, 0.26);
-/// The sheet sits a little towards the player, below the clip.
-const SHEET_OFFSET: f32 = 0.012;
 const SHEET_GAP: f32 = 0.0003;
-const CLIP_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.025);
+/// How far the top edge of the sheet reaches under the clip.
+const SHEET_UNDER_CLIP: f32 = 0.01;
+/// The jaw of the clip, pressing the sheet onto the board.
+const JAW: Vec3 = Vec3::new(0.085, 0.0025, 0.02);
+/// The spring housing behind the jaw.
+const SPRING: Vec3 = Vec3::new(0.06, 0.009, 0.008);
 const BOARD: Color = Color::srgb_u8(0x7a, 0x5a, 0x3c);
 const CLIP: Color = Color::srgb_u8(0xa8, 0xac, 0xb0);
 /// Top left corner of the stamp on the canvas.
@@ -87,11 +90,19 @@ impl JobTicket {
             |page| Self::write(page, level),
         );
         let board = Block::new(BOARD_SIZE);
-        let clip = Block::new(CLIP_SIZE)
+        let spring = Block::new(SPRING)
             .on_top_of(&board)
-            .translated(Vec3::Z * (CLIP_SIZE.z - BOARD_SIZE.z) / 2.0);
-
-        let sheet_center = Vec3::new(0.0, board.max().y + SHEET_GAP, SHEET_OFFSET);
+            .translated(Vec3::Z * (SPRING.z - BOARD_SIZE.z) / 2.0);
+        let jaw = Block::new(JAW).on_top_of(&board).translated(Vec3::new(
+            0.0,
+            SHEET_GAP,
+            (JAW.z - BOARD_SIZE.z) / 2.0,
+        ));
+        let sheet_center = Vec3::new(
+            0.0,
+            board.max().y + SHEET_GAP,
+            jaw.max().z - SHEET_UNDER_CLIP + SHEET_SIZE.y / 2.0,
+        );
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|clipboard| {
             clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
@@ -104,10 +115,13 @@ impl JobTicket {
                     &mut materials,
                 ))
                 .id();
-            clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));
+            for clip in [spring, jaw] {
+                clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));
+            }
         });
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, vec![page]),
+            Binding::clip(SHEET_SIZE),
             FocusTarget {
                 prompt: "click-ticket",
                 focus: Focus::Paper,
