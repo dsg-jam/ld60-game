@@ -11,12 +11,12 @@ use bevy::{
 
 use self::contents::{Contents, Section};
 use self::index::{Hover, PageLink, PinButton};
-use self::model::{DividerTab, Parts, SPINE_CANVAS, TAB_LABEL};
+use self::model::{Cover, DividerTab, Parts, SPINE_CANVAS, TAB_LABEL};
 pub(crate) use self::pins::{Pins, Sheet};
 use super::job::{Job, JobId};
 use super::run::Run;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{INK, Paper};
+use crate::parts::paper::{Binding, INK, Paper};
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use crate::player::hints::KeyHint;
@@ -24,6 +24,8 @@ use crate::player::hints::KeyHint;
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const TAB_FONT_SIZE: f32 = 30.0;
 const PIN_KEY: KeyCode = KeyCode::KeyP;
+/// Shows the stack below through the punched holes.
+const HOLE: Color = Color::srgb_u8(0x8a, 0x84, 0x76);
 
 pub(crate) struct ManualsPlugin;
 
@@ -50,7 +52,7 @@ impl Plugin for ManualsPlugin {
                     ShopManuals::switch_on_keys,
                     ShopManuals::pin_on_key,
                     ShopManuals::show_open,
-                    DividerTab::raise_open,
+                    ShopManuals::stack_pages,
                     PinButton::show_state,
                     ShopManuals::show_pin_hint,
                 )
@@ -128,10 +130,12 @@ impl ShopManuals {
             .insert(ScreenSurface::new(&pages));
         commands.entity(add.entity).insert((
             Paper::new(parts.sheet, model::SHEET_SIZE, Vec::new()),
+            Binding::rings(model::SHEET_SIZE, model::ring_gap()),
+            Cover::default(),
             FocusTarget {
                 prompt: "click-manuals",
                 focus: Focus::Paper,
-                view: View::Local(open.mul_transform(Paper::reading_view(Parts::sheet_center()))),
+                view: View::Local(open.mul_transform(Parts::reading_view())),
             },
             parts,
             Filed {
@@ -182,7 +186,7 @@ impl ShopManuals {
     fn file(
         run: Res<Run>,
         mut files: Query<(Entity, &mut Paper, &mut Filed, &Parts)>,
-        tabs: Query<(Entity, &ChildOf), With<DividerTab>>,
+        tabs: Query<(Entity, &DividerTab)>,
         mut commands: Commands,
     ) {
         let contents = Contents::of(&run);
@@ -201,26 +205,30 @@ impl ShopManuals {
                         &filed.pages,
                         (index + 1, count),
                         page.0.footer(),
-                        |content| contents.write(file, page, content),
+                        |content| {
+                            contents.write(file, page, content);
+                            Self::punch(content);
+                        },
                     )
                 })
                 .collect();
             for page in paper.replace_pages(pages) {
                 commands.entity(page).despawn();
             }
-            for (tab, parent) in &tabs {
-                if parent.parent() == parts.open {
+            for (tab, divider) in &tabs {
+                if divider.file == file {
                     commands.entity(tab).despawn();
                 }
             }
             commands.entity(parts.open).with_children(|open| {
-                let slots = Section::ALL
+                let starts = Section::ALL
                     .iter()
                     .enumerate()
-                    .filter(|&(_, &section)| contents.start_of_section(section).is_some())
-                    .map(|(slot, _)| slot);
-                for (position, slot) in slots.enumerate() {
-                    DividerTab::spawn(open, parts, (slot, position), &filed.labels);
+                    .filter_map(|(slot, &section)| {
+                        Some((slot, contents.start_of_section(section)?))
+                    });
+                for (position, (slot, start)) in starts.enumerate() {
+                    DividerTab::spawn(open, file, (slot, position, start), &filed.labels);
                 }
             });
             filed.contents = contents.clone();
@@ -321,17 +329,42 @@ impl ShopManuals {
         hint.set_if_neq(KeyHint(action));
     }
 
+    /// The holes the rings go through, near the spine edge of the page.
+    fn punch(page: &mut ChildSpawnerCommands) {
+        let scale = CANVAS_SIZE.x as f32 / model::SHEET_SIZE.x;
+        let radius = model::HOLE_RADIUS * scale;
+        for hole in model::holes() {
+            page.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(model::HOLE_INSET * scale - radius),
+                    top: px(hole * scale - radius),
+                    width: px(2.0 * radius),
+                    height: px(2.0 * radius),
+                    border_radius: BorderRadius::MAX,
+                    ..default()
+                },
+                BackgroundColor(HOLE),
+            ));
+        }
+    }
+
     /// The file lies open while the player reads it and stands closed
-    /// otherwise.
+    /// otherwise. Its cover swings open once it lies on the mat and swings
+    /// shut before it stands up again.
     fn show_open(
+        time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
-        files: Query<(Entity, &Parts)>,
+        mut files: Query<(Entity, &Parts, &mut Cover)>,
+        mut transforms: Query<&mut Transform>,
         mut visibilities: Query<&mut Visibility>,
         mut surfaces: Query<&mut ScreenSurface>,
     ) {
-        for (file, parts) in &files {
+        for (file, parts, mut cover) in &mut files {
             let open = *state.get() == Focus::Paper && focused.get() == Some(file);
+            let lying =
+                parts.swing_cover(&mut cover, open, time.delta_secs(), &mut transforms) || open;
             let shown = |shown: bool| {
                 if shown {
                     Visibility::Inherited
@@ -340,10 +373,10 @@ impl ShopManuals {
                 }
             };
             if let Ok(mut visibility) = visibilities.get_mut(parts.open) {
-                visibility.set_if_neq(shown(open));
+                visibility.set_if_neq(shown(lying));
             }
             if let Ok(mut visibility) = visibilities.get_mut(parts.closed) {
-                visibility.set_if_neq(shown(!open));
+                visibility.set_if_neq(shown(!lying));
             }
             if let Ok(mut surface) = surfaces.get_mut(parts.sheet)
                 && surface.active != open
@@ -352,47 +385,50 @@ impl ShopManuals {
             }
         }
     }
+
+    /// Moves the turned pages and dividers to the front cover and the rest
+    /// to the back cover.
+    fn stack_pages(
+        files: Query<(Entity, &Paper, &Parts), Changed<Paper>>,
+        dividers: Query<(Entity, &DividerTab, &ChildOf)>,
+        mut transforms: Query<&mut Transform>,
+        mut visibilities: Query<&mut Visibility>,
+        mut commands: Commands,
+    ) {
+        for (file, paper, parts) in &files {
+            let pages = (paper.current_page(), paper.page_count());
+            parts.stack_pages(pages, &mut transforms, &mut visibilities);
+            for (entity, divider, parent) in &dividers {
+                if divider.file != file {
+                    continue;
+                }
+                let holder = parts.holder(divider.start <= pages.0);
+                if parent.parent() != holder {
+                    commands.entity(entity).insert(ChildOf(holder));
+                }
+                divider.place(pages, entity, &mut transforms);
+            }
+        }
+    }
 }
 
 impl DividerTab {
     fn open_on_click(
         click: On<PointerClick>,
-        tabs: Query<(&DividerTab, &ChildOf)>,
-        parents: Query<&ChildOf>,
+        tabs: Query<&DividerTab>,
         mut files: Query<(&mut Paper, &Filed)>,
     ) {
         if click.button != PointerButton::Primary {
             return;
         }
-        let Ok((tab, open)) = tabs.get(click.entity) else {
+        let Ok(tab) = tabs.get(click.entity) else {
             return;
         };
-        let Ok(file) = parents.get(open.parent()) else {
-            return;
-        };
-        let Ok((mut paper, filed)) = files.get_mut(file.parent()) else {
+        let Ok((mut paper, filed)) = files.get_mut(tab.file) else {
             return;
         };
         if let Some(page) = filed.contents.start_of_section(Section::ALL[tab.slot]) {
             paper.open_page(page);
-        }
-    }
-
-    /// The tab of the open section reaches out further than the others.
-    fn raise_open(
-        files: Query<(&Paper, &Filed, &Parts), Changed<Paper>>,
-        mut tabs: Query<(&DividerTab, &ChildOf, &mut Transform)>,
-    ) {
-        for (paper, filed, parts) in &files {
-            let open = filed
-                .contents
-                .entry_at(paper.current_page())
-                .map(|entry| entry.section());
-            for (tab, parent, mut transform) in &mut tabs {
-                if parent.parent() == parts.open {
-                    transform.translation = tab.raised(open == Some(Section::ALL[tab.slot]));
-                }
-            }
         }
     }
 }
@@ -597,13 +633,12 @@ mod tests {
     #[test]
     fn only_sections_with_entries_get_a_tab() {
         let (mut world, file) = world_with_file();
-        let open = world.get::<Parts>(file).unwrap().open;
         let slots = |world: &mut World| -> Vec<usize> {
             world
-                .query::<(&DividerTab, &ChildOf)>()
+                .query::<&DividerTab>()
                 .iter(world)
-                .filter(|(_, parent)| parent.parent() == open)
-                .map(|(tab, _)| tab.slot)
+                .filter(|tab| tab.file == file)
+                .map(|tab| tab.slot)
                 .collect()
         };
         assert_eq!(slots(&mut world), [0, 1]);
