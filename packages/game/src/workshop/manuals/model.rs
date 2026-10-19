@@ -197,6 +197,7 @@ impl Parts {
                 parts.sheet = open
                     .spawn(Paper::sheet(
                         pages,
+                        "manuals",
                         SHEET_SIZE,
                         sheet_center(STACK_DEPTH),
                         meshes,

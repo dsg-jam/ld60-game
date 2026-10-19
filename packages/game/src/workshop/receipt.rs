@@ -103,6 +103,7 @@ impl Receipt {
             sheet = slip
                 .spawn(Paper::sheet(
                     &canvas,
+                    ("receipt", receipt.till),
                     SHEET_SIZE,
                     Self::sheet_center(),
                     &mut meshes,

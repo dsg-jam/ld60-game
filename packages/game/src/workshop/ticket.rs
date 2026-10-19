@@ -106,7 +106,13 @@ impl JobTicket {
         commands.entity(add.entity).with_children(|clipboard| {
             clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
             sheet = clipboard
-                .spawn(Paper::sheet(&canvas, SHEET_SIZE, sheet_center, &mut meshes))
+                .spawn(Paper::sheet(
+                    &canvas,
+                    ("ticket", &level.id),
+                    SHEET_SIZE,
+                    sheet_center,
+                    &mut meshes,
+                ))
                 .id();
             for clip in [spring, jaw] {
                 clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));

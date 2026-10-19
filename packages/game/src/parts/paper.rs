@@ -2,10 +2,12 @@ mod leaf;
 mod sheet;
 
 use std::f32::consts::FRAC_PI_2;
+use std::hash::Hash;
 
 use bevy::{
     input::mouse::{MouseScrollUnit, MouseWheel},
     picking::{events::PointerClick, pointer::PointerButton},
+    platform::hash::fixed_hash_one,
     prelude::*,
 };
 
@@ -195,13 +197,17 @@ impl Paper {
 
     /// A sheet of `size` showing `canvas`, centered on `at`. It faces up
     /// with the top of the page away from the player.
+    ///
+    /// `document` picks the wrinkles and stains, so the same document looks
+    /// the same every time.
     pub(crate) fn sheet(
         canvas: &UiCanvas,
+        document: impl Hash,
         size: Vec2,
         at: Vec3,
         meshes: &mut Assets<Mesh>,
     ) -> impl Bundle {
-        let wrinkles = Wrinkles::new(size, canvas.camera.to_bits());
+        let wrinkles = Wrinkles::new(size, fixed_hash_one(document));
         (
             Mesh3d(meshes.add(wrinkles.mesh())),
             wrinkles,

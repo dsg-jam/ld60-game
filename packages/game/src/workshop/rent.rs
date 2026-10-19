@@ -105,11 +105,13 @@ impl RentNote {
             Message::new("rent-footer"),
             |page| note.write(page),
         );
+        let document = ("rent", note.0);
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|note| {
             sheet = note
                 .spawn(Paper::sheet(
                     &canvas,
+                    document,
                     SHEET_SIZE,
                     Self::sheet_center(),
                     &mut meshes,

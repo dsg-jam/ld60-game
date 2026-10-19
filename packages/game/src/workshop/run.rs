@@ -116,7 +116,7 @@ pub(crate) enum Origin {
 }
 
 /// The landlord's visit when the planet sets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Rent {
     /// The landlord took `amount` from the till and comes for `next` the
     /// next time.
