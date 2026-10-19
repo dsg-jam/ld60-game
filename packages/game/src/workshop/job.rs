@@ -240,7 +240,11 @@ impl Job {
         if let Origin::Lesson { step, .. } = job.origin
             && let Some(note) = TutorialNote::for_step(step)
         {
-            commands.spawn((note, JobItem, counter.place(tutorial::SPOT, tutorial::YAW)));
+            commands.spawn((
+                note,
+                JobItem,
+                counter.place_on_mat(tutorial::SPOT, tutorial::YAW),
+            ));
         }
     }
 }

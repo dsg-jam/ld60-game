@@ -5,17 +5,23 @@ tutorial-signed = - Marta, who ran this bench before you
 
 tutorial-1 =
     .title = To whoever sits at this bench next
-    .welcome = The locals bring in old human gadgets. They do not know how they work, but they pay to have them fixed. Here is how a job goes.
-    .ticket = Read the job ticket first. The complaint says what the gadget does wrong, in the owner's words. The binder on the mat holds the human manual of the gadget, with its buttons and their codes.
-    .computer = Then use the computer. It shows the firmware of the gadget. Find the line that causes the fault and change it.
-    .flash = Press F6 FLASH to burn your firmware into the gadget. Then use "{ click-device }" and try its buttons.
-    .finish = When it works, use "{ click-stamp }", then "{ click-bell }". The owner tries the gadget before they pay. If it still fails, they bring it back.
-    .time = These first customers are old friends of mine and are in no hurry. After them, every flash and every customer visit takes time. Watch the ringed planet. When it sets, the landlord comes for the rent.
+    .welcome = The locals bring us old human gadgets. They pay well to have them fixed.
+    .ticket = 1. Read the job ticket. It says what the gadget does wrong.
+    .computer = 2. Use the computer. Find the wrong line and change it.
+    .flash = 3. Press F6 FLASH to put your fix into the gadget.
+    .try = 4. Use "{ click-device }" and try its buttons.
+    .finish = 5. If it works, stamp the ticket and ring the bell.
 
 tutorial-2 =
     .title = About the chip
-    .datasheet = These gadgets think with a CalCo chip. Its datasheet is in the binder, behind the blue tabs. Use "{ click-binder }", then click a tab or press the up and down arrows to go from tab to tab. The datasheet says what each instruction does.
-    .lines = Go through the firmware one line at a time and count along with it. Often the fault is one wrong number or one line too many.
-    .versions = F3 VERSIONS keeps your earlier tries, so you can go back to one. F2 NOTES is a page for your own notes.
-    .rent = Keep enough money in the till for the rent. It goes up each time the planet sets.
-    .trader = After the rent, the scrap trader leaves a crate of human finds on the counter. Buy a dead gadget and its manual, and the locals start to bring that kind too. The trader only guesses what things are, so read the tags with care.
+    .datasheet = The binder holds the manual of each gadget and the datasheet of its chip. The datasheet says what each instruction does.
+    .lines = Go through the firmware one line at a time. Often one number is wrong or one line is too many.
+    .versions = F3 VERSIONS keeps your earlier tries. F2 NOTES is a page for your own notes.
+    .rent = After this customer, every flash and every visit takes time. When the ringed planet sets, the landlord comes for the rent.
+    .trader = After the rent, a scrap trader leaves a crate on the counter. Buy a gadget there, and the locals start to bring that kind too.
+
+tutorial-step-fix = Click the computer and change the wrong line
+tutorial-step-flash = Press F6 to flash your fix into the gadget
+tutorial-step-try = Click the gadget and try its buttons
+tutorial-step-stamp = If it works, click the stamp
+tutorial-step-ring = Ring the bell to hand the gadget back
