@@ -3,7 +3,7 @@ mod synth;
 use std::sync::Arc;
 
 use bevy::{
-    audio::Volume,
+    audio::{SpatialScale, Volume},
     ecs::entity::{EntityHashMap, EntityHashSet},
     platform::collections::HashMap,
     prelude::*,
@@ -21,6 +21,14 @@ const DUCKED: f32 = 0.35;
 const KEY_WIDTH: f32 = 0.018;
 /// Meters between the ears of the player.
 const EAR_GAP: f32 = 0.2;
+/// So small that rodio never fades a sound with distance. Sounds on the
+/// desk are all within reach.
+const NEAR: SpatialScale = SpatialScale::new(0.002);
+/// Rodio plays a sound straight ahead at three quarters of its volume on
+/// both ears.
+const CENTER_LOSS: f32 = 0.75;
+/// How much each press of a key varies in pitch and volume.
+const KEY_NUDGE: f32 = 0.025;
 /// Sounds that would stand out if they always came the same get this many
 /// takes, played in random order.
 const TAKES: u32 = 6;
@@ -166,6 +174,11 @@ pub(crate) struct Mixer {
 #[derive(Event, Debug)]
 pub(crate) struct Play(pub(crate) Sound);
 
+/// Plays a [`Sound`] from a point in the world, so the player hears where
+/// it comes from.
+#[derive(Event, Debug)]
+pub(crate) struct PlayAt(pub(crate) Sound, pub(crate) Vec3);
+
 /// Whether pressing keys makes a sound.
 #[derive(Resource, Debug)]
 pub(crate) struct KeyClicks(pub(crate) bool);
@@ -211,6 +224,7 @@ impl Plugin for AudioPlugin {
                 (Sounds::click_keys, Sounds::turn_pages).run_if(resource_exists::<Sounds>),
             )
             .add_observer(Sounds::play)
+            .add_observer(Sounds::play_at)
             .add_observer(listen);
     }
 }
@@ -259,16 +273,49 @@ impl Sounds {
         }
     }
 
-    /// Keys sound as they go down and as they come back up.
+    fn play_at(
+        play: On<PlayAt>,
+        sounds: Option<ResMut<Sounds>>,
+        mixer: Res<Mixer>,
+        mut commands: Commands,
+    ) {
+        let PlayAt(sound, at) = *play;
+        if let Some(mut sounds) = sounds
+            && let Some(source) = sounds.0.get_mut(&sound).map(|takes| takes.next().clone())
+        {
+            commands.spawn(Self::spatial(
+                source,
+                at,
+                PlaybackSettings::DESPAWN
+                    .with_volume(Volume::Linear(sound.volume() * mixer.gain())),
+            ));
+        }
+    }
+
+    /// `source` playing from `at`, as loud as with `settings` alone when
+    /// straight ahead.
+    fn spatial(source: Handle<AudioSource>, at: Vec3, settings: PlaybackSettings) -> impl Bundle {
+        (
+            AudioPlayer(source),
+            settings
+                .with_spatial(true)
+                .with_spatial_scale(NEAR)
+                .with_volume(settings.volume * Volume::Linear(1.0 / CENTER_LOSS)),
+            Transform::from_translation(at),
+        )
+    }
+
+    /// Keys sound from where they are as they go down and as they come
+    /// back up.
     fn click_keys(
         mut sounds: ResMut<Sounds>,
         enabled: Res<KeyClicks>,
         mixer: Res<Mixer>,
-        keys: Query<(Entity, &PressableKey), Changed<PressableKey>>,
+        keys: Query<(Entity, &PressableKey, &GlobalTransform), Changed<PressableKey>>,
         mut down: Local<EntityHashSet>,
         mut commands: Commands,
     ) {
-        for (entity, key) in &keys {
+        for (entity, key, transform) in &keys {
             let sound = if key.is_pressed() {
                 if !down.insert(entity) {
                     continue;
@@ -286,14 +333,17 @@ impl Sounds {
             let Some(takes) = sounds.0.get_mut(&sound) else {
                 continue;
             };
-            // Keys differ a little in pitch, so typing doesn't sound like a
-            // loop.
+            // Each key differs a little in pitch, and so does each press,
+            // so typing doesn't sound like a loop.
             let own = 1.0 + (entity.to_bits() % 5) as f32 * 0.01 - 0.02;
-            let pitch = (KEY_WIDTH / key.width()).powf(0.2) * own;
-            commands.spawn((
-                AudioPlayer(takes.next().clone()),
+            let pitch = (KEY_WIDTH / key.width()).powf(0.2) * own * takes.nudge(KEY_NUDGE);
+            let loudness = takes.nudge(4.0 * KEY_NUDGE);
+            let volume = sound.volume() * mixer.gain() * loudness;
+            commands.spawn(Self::spatial(
+                takes.next().clone(),
+                transform.translation(),
                 PlaybackSettings::DESPAWN
-                    .with_volume(Volume::Linear(sound.volume() * mixer.gain()))
+                    .with_volume(Volume::Linear(volume))
                     .with_speed(pitch),
             ));
         }
@@ -322,6 +372,12 @@ impl<T> Takes<T> {
             dice: Noise::new(seed),
             last: None,
         }
+    }
+
+    /// A factor from `1 - amount` to `1 + amount`, for playing a take a
+    /// little differently each time.
+    fn nudge(&mut self, amount: f32) -> f32 {
+        1.0 + self.dice.next() * amount
     }
 
     /// One of the takes, never the same one twice in a row unless there is
