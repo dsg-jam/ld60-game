@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::{
     asset::RenderAssetUsages,
-    light::VolumetricLight,
+    light::{FogVolume, VolumetricLight},
     material::OpaqueRendererMethod,
     mesh::{Indices, PrimitiveTopology},
     picking::{events::PointerPress, pointer::PointerButton},
@@ -50,6 +50,10 @@ const DUST: Dust = Dust {
 const SOFT_EDGE: f32 = 0.75;
 /// Soft light that comes through the shade all around.
 const FILL_INTENSITY: f32 = 1_200.0;
+/// Dusty air, which the light cone shows up in.
+const HAZE: Color = Color::srgb_u8(0xd8, 0xcc, 0xb8);
+const HAZE_DENSITY: f32 = 0.04;
+const HAZE_GLOW: f32 = 1.0;
 
 const SHADE: Color = Color::srgb_u8(0xe0, 0x8a, 0x4f);
 const METAL: Color = Color::srgb_u8(0x7d, 0x86, 0x8c);
@@ -178,6 +182,23 @@ impl Lamp {
                     },
                     VolumetricLight,
                     Transform::from_translation(bulb).looking_to(Vec3::NEG_Y, Vec3::X),
+                ));
+                // Only around the cone down to the desk, as the haze costs
+                // for every pixel it covers.
+                let spread = bulb.y * cone.tan();
+                let haze = Block::between(
+                    bulb.with_y(0.0) - Vec3::new(spread, 0.0, spread),
+                    bulb + Vec3::new(spread, 0.0, spread),
+                );
+                lamp.spawn((
+                    Name::new("lamp haze"),
+                    FogVolume {
+                        fog_color: HAZE,
+                        density_factor: HAZE_DENSITY,
+                        light_intensity: HAZE_GLOW,
+                        ..default()
+                    },
+                    haze.transform().with_scale(haze.size),
                 ));
             });
     }
