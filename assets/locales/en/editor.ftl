@@ -66,3 +66,32 @@ editor-version-errors =
 editor-version-error = ERROR
 editor-version-auto = AUTO
 editor-version-flashed = FLASHED
+
+editor-command-test = F4 TEST
+editor-command-trace-on = F7 TRACE ON
+editor-command-trace-off = F7 TRACE OFF
+editor-command-break = F9 BREAK
+editor-command-step = F10 STEP
+editor-command-go = F11 GO
+
+editor-bench-pass = TEST PASSED. THE CUSTOMER WILL FIND NOTHING WRONG.
+editor-bench-dead = TEST FAILED: THE DEVICE DOES NOT START
+editor-bench-wrong-start = TEST FAILED: AT START IT SHOWS { $shown }, NOT { $expected }
+editor-bench-wrong = TEST FAILED: AFTER { $keys } IT SHOWS { $shown }, NOT { $expected }
+editor-bench-froze-start = TEST FAILED: IT FREEZES AT START
+editor-bench-froze = TEST FAILED: IT FREEZES AFTER { $keys }
+
+editor-debug-line = LINE { $line }
+editor-debug-address = ADDRESS { $address }
+editor-debug-held = CHIP HELD AT { $place }
+editor-debug-stepped = STEPPED TO { $place }
+editor-debug-waiting = THE CHIP WAITS FOR A KEY AT { $place }. PRESS ONE ON THE DEVICE.
+editor-debug-break = STOPPED AT THE BREAKPOINT ON { $place }
+editor-debug-running = CHIP RUNNING. IT WAITS FOR A KEY.
+editor-debug-timeout = CHIP RUNNING. IT NEVER WAITS FOR A KEY.
+editor-debug-not-held = THE CHIP IS ALREADY RUNNING
+editor-debug-ram = RAM  { $cells }
+
+editor-break-set = BREAKPOINT ON LINE { $line }
+editor-break-cleared = BREAKPOINT REMOVED FROM LINE { $line }
+editor-break-no-code = LINE { $line } HAS NO CODE IN THE CHIP

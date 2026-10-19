@@ -1,12 +1,18 @@
+mod bench;
+mod breakpoints;
 mod chip_title;
 mod clicks;
+mod debugger;
 mod edits;
 mod footer;
 mod highlight;
 mod history;
 mod lexer;
+mod listing;
 mod notes;
 mod page;
+mod shades;
+mod trace;
 pub(super) mod undo;
 mod versions;
 
@@ -21,12 +27,18 @@ use bevy::{
     ui_widgets::TextInput,
 };
 
+use self::bench::Verdict;
+use self::breakpoints::Breakpoints;
 use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
+use self::debugger::DebugPanel;
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
+use self::listing::Listing;
 use self::notes::Notes;
 use self::page::{Page, PageTitle};
+use self::shades::Shades;
+use self::trace::TraceView;
 use self::undo::Undo;
 use self::versions::VersionsPage;
 #[cfg(feature = "debug_port")]
@@ -50,6 +62,8 @@ const INDENT: &str = "    ";
 const SCROLL_LINES: f32 = 3.0;
 /// Matches the default line height of 1.2 times the font size.
 const LINE_HEIGHT: f32 = FONT_SIZE * 1.2;
+/// Room left of the source for clicking breakpoints.
+const MARGIN: f32 = FONT_SIZE;
 
 pub(super) struct EditorPlugin;
 
@@ -69,7 +83,25 @@ impl Plugin for EditorPlugin {
                 Highlight::place.after(UiSystems::PostLayout),
             ),
         )
-        .add_systems(Update, (Editor::load_job, Command::show_labels))
+        .init_resource::<Listing>()
+        .init_resource::<Breakpoints>()
+        .init_resource::<TraceView>()
+        .init_resource::<Shades>()
+        .add_systems(
+            Update,
+            (
+                Editor::load_job,
+                Command::show_labels,
+                Command::show_owned,
+                (
+                    (Listing::follow_job, Breakpoints::follow_job),
+                    Breakpoints::toggle_on_margin,
+                    Breakpoints::arm,
+                    (Shades::update, DebugPanel::update),
+                )
+                    .chain(),
+            ),
+        )
         .add_systems(
             Update,
             ChipTitle::update.run_if(resource_changed_or_removed::<Job>),
@@ -80,6 +112,11 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::run_on_click)
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
+        .add_observer(Verdict::run_on_command)
+        .add_observer(DebugPanel::run_on_command)
+        .add_observer(Breakpoints::toggle_on_run)
+        .add_observer(TraceView::toggle_on_run)
+        .add_observer(Listing::follow_flash)
         .add_observer(Editor::scroll_on_wheel);
         app.add_plugins((page::PagePlugin, versions::VersionsPlugin));
         #[cfg(feature = "debug_port")]
@@ -137,6 +174,7 @@ impl Editor {
                     Node {
                         flex_grow: 1.0,
                         overflow: Overflow::clip(),
+                        padding: UiRect::left(px(MARGIN)),
                         ..default()
                     },
                     TextInput,
@@ -156,6 +194,7 @@ impl Editor {
                 ),
                 Notes::bundle(font.clone()),
                 VersionsPage::bundle(font.clone()),
+                DebugPanel::bundle(font.clone()),
                 (
                     Status,
                     Localized::verbatim(""),
@@ -164,13 +203,20 @@ impl Editor {
                 ),
                 (
                     Node {
+                        flex_wrap: FlexWrap::Wrap,
                         column_gap: px(FONT_SIZE * 2.0),
+                        row_gap: px(ROW_GAP),
                         ..default()
                     },
-                    // `Command::show_labels` fills in the labels.
+                    // `Command::show_labels` fills in the labels and
+                    // `Command::show_owned` shows the ones of owned tools.
                     Children::spawn(SpawnIter(Command::ALL.into_iter().map(move |command| {
                         (
                             command,
+                            Node {
+                                display: Display::None,
+                                ..default()
+                            },
                             Localized::verbatim(""),
                             font.clone(),
                             TextColor(PHOSPHOR_DIM),

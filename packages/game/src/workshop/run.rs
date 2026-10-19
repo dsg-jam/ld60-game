@@ -187,10 +187,15 @@ impl Run {
             .collect()
     }
 
+    /// Whether the shop computer has `tool`.
+    pub(crate) fn has(&self, tool: ComputerTool) -> bool {
+        self.tools.contains(&tool)
+    }
+
     pub(crate) fn owns(&self, find: Find) -> bool {
         match find {
             Find::Device(device) => self.signs.contains(&device),
-            Find::Tool(tool) => self.tools.contains(&tool),
+            Find::Tool(tool) => self.has(tool),
             Find::Errata(revision) => self.errata.contains(&revision),
         }
     }
@@ -352,6 +357,14 @@ impl Run {
 impl Run {
     pub(crate) fn add_till(&mut self, amount: u32) {
         self.till += amount;
+    }
+
+    /// A run whose shop computer has every tool.
+    pub(crate) fn with_all_tools() -> Self {
+        Self {
+            tools: ComputerTool::ALL.to_vec(),
+            ..Self::default()
+        }
     }
 }
 
