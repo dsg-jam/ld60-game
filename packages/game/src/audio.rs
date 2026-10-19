@@ -338,9 +338,17 @@ impl<T> Takes<T> {
     }
 }
 
-/// The player hears the city from where the camera is.
+/// The player hears the world from where the camera is.
+///
+/// Rodio makes a sound louder on the ear farther from it, so the ears
+/// swap places to put sounds on the right side.
 fn listen(add: On<Add<PlayerCamera>>, mut commands: Commands) {
-    commands
-        .entity(add.entity)
-        .insert(SpatialListener::new(EAR_GAP));
+    let SpatialListener {
+        left_ear_offset,
+        right_ear_offset,
+    } = SpatialListener::new(EAR_GAP);
+    commands.entity(add.entity).insert(SpatialListener {
+        left_ear_offset: right_ear_offset,
+        right_ear_offset: left_ear_offset,
+    });
 }
