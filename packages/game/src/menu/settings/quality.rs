@@ -37,11 +37,6 @@ impl Quality {
         !matches!(self, Self::Low)
     }
 
-    /// Whether the planet light casts shadows.
-    pub(crate) const fn shadows(self) -> bool {
-        !matches!(self, Self::Low)
-    }
-
     pub(crate) const fn ambient_occlusion(self) -> Option<ScreenSpaceAmbientOcclusionQualityLevel> {
         match self {
             Self::Low => None,
