@@ -14,6 +14,7 @@ import package::geometry::{
     noise::{TAU, hash, noise, visible},
 };
 import package::parts::paper::punch::punched;
+import package::parts::paper::press::printed;
 
 struct Sheet {
     size: vec2<f32>,
@@ -21,6 +22,9 @@ struct Sheet {
     page: f32,
     /// How much grime and stains show, from 0 to 1.
     stains: f32,
+    /// How the page was printed, see `press.wesl`.
+    press: u32,
+    run: f32,
     /// Point on the fold, its angle and depth, in meters from the top left.
     folds: array<vec4<f32>, 2>,
     /// Center and radius of each punched hole, in meters from the top left.
@@ -31,30 +35,11 @@ struct Sheet {
 @group(constants::MATERIAL_BIND_GROUP) @binding(101) var print_texture: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(102) var print_sampler: sampler;
 
-/// Texels one bilinear tap covers well.
-const TAP_SPAN: f32 = 1.5;
-const MAX_TAPS: f32 = 4.0;
 const COFFEE: vec3<f32> = vec3<f32>(0.78, 0.6, 0.4);
 const GRIME: vec3<f32> = vec3<f32>(0.7, 0.64, 0.54);
 const AGED: vec3<f32> = vec3<f32>(1.0, 0.96, 0.86);
 /// Spacing of the ridges of a fingerprint, in meters.
 const RIDGES: f32 = 0.00045;
-
-/// The print, averaged over the pixel. The canvas has no mipmaps, so far
-/// away and at a slant one tap would skip over the letters.
-fn print(uv: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> vec4<f32> {
-    let texels = vec2<f32>(textureDimensions(print_texture));
-    let footprint = vec2<f32>(length(dx * texels), length(dy * texels));
-    let taps = clamp(ceil(footprint / TAP_SPAN), vec2<f32>(1.0), vec2<f32>(MAX_TAPS));
-    var sum = vec4<f32>(0.0);
-    for (var j = 0.0; j < taps.y; j += 1.0) {
-        for (var i = 0.0; i < taps.x; i += 1.0) {
-            let offset = (vec2<f32>(i, j) + 0.5) / taps - 0.5;
-            sum += textureSampleLevel(print_texture, print_sampler, uv + dx * offset.x + dy * offset.y, 0.0);
-        }
-    }
-    return sum / (taps.x * taps.y);
-}
 
 /// Distance of `p` from a fold line.
 fn fold_distance(p: vec2<f32>, fold: vec4<f32>) -> f32 {
@@ -103,9 +88,11 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         crease = max(crease, punch.y);
     }
     relief += 0.0002 * crease * (fiber - 0.5);
+    let printing = printed(print_texture, print_sampler, in.uv, dpdx(in.uv), dpdy(in.uv), sheet.press, sheet.run, s);
+    relief += printing.relief;
     pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, relief);
 
-    let ink = print(in.uv, dpdx(in.uv), dpdy(in.uv)).rgb;
+    let ink = printing.color;
     // 1 on bare paper, 0 under the ink, so stains stay under the print.
     let bare = smoothstep(0.25, 0.75, dot(ink, vec3<f32>(0.3, 0.6, 0.1)));
     var stain = vec3<f32>(1.0);

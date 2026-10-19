@@ -1,4 +1,5 @@
 mod leaf;
+mod press;
 mod sheet;
 
 use std::f32::consts::FRAC_PI_2;
@@ -22,6 +23,7 @@ pub(crate) use self::leaf::{
 };
 pub(crate) use self::sheet::{PaperMaterial, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
+pub(crate) use self::press::{Press, Print};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{self, Focus, Focused};
@@ -392,13 +394,20 @@ impl Paper {
         }
     }
 
+    /// Shows the open page, printed the way its [`Print`] says.
     pub(crate) fn show_current(
         papers: Query<&Paper, (Changed<Paper>, Without<ShowsOwnPages>)>,
         mut nodes: Query<&mut Node>,
         sheets: Query<&MeshMaterial3d<PaperMaterial>>,
+        prints: Query<&Print>,
         mut materials: ResMut<Assets<PaperMaterial>>,
+        mut commands: Commands,
     ) {
         for paper in &papers {
+            if let Some(&page) = paper.pages.get(paper.current) {
+                let print = prints.get(page).copied().unwrap_or_default();
+                commands.entity(paper.sheet).insert(print);
+            }
             if let Some(mut material) = sheets
                 .get(paper.sheet)
                 .ok()

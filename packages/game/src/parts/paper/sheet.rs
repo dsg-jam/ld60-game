@@ -10,6 +10,7 @@ use bevy::{
 };
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
+use super::press::Print;
 use super::{Binding, PAPER_REFLECTANCE, PAPER_SHADE, Paper};
 
 /// About one vertex per this many meters. Wrinkles are broad, so this is
@@ -30,8 +31,10 @@ pub(super) struct SheetPlugin;
 impl Plugin for SheetPlugin {
     fn build(&self, app: &mut App) {
         load_shader_library!(app, "punch.wesl");
+        load_shader_library!(app, "press.wesl");
         embedded_asset!(app, "sheet.wesl");
         app.add_plugins(MaterialPlugin::<PaperMaterial>::default())
+            .add_systems(Update, Sheet::follow_print)
             .add_observer(Sheet::add_material)
             .add_observer(Self::hold_bound_edge);
     }
@@ -81,6 +84,9 @@ struct SheetParams {
     page: f32,
     /// How much grime and stains show, from 0 to 1.
     stains: f32,
+    /// The [`Press`](super::press::Press) the page was printed on.
+    press: u32,
+    run: f32,
     /// Two folds as a point on the line, its angle and its depth, in the
     /// sheet's space: meters from the top left corner, with y down.
     folds: [Vec4; 2],
@@ -335,13 +341,14 @@ impl Wrinkles {
 impl Sheet {
     fn add_material(
         add: On<Add<SheetPrint>>,
-        sheets: Query<(&SheetPrint, &Wrinkles, Option<&SheetGlow>)>,
+        sheets: Query<(&SheetPrint, &Wrinkles, Option<&SheetGlow>, Option<&Print>)>,
         mut materials: ResMut<Assets<PaperMaterial>>,
         mut commands: Commands,
     ) {
-        let Ok((SheetPrint(print), &wrinkles, glow)) = sheets.get(add.entity) else {
+        let Ok((SheetPrint(print), &wrinkles, glow, printed)) = sheets.get(add.entity) else {
             return;
         };
+        let printed = printed.copied().unwrap_or_default();
         let material = materials.add(ExtendedMaterial {
             base: StandardMaterial {
                 base_color: PAPER_SHADE,
@@ -356,6 +363,8 @@ impl Sheet {
                     seed: (wrinkles.seed % SEEDS) as f32,
                     page: 0.0,
                     stains: 1.0,
+                    press: printed.press as u32,
+                    run: printed.run,
                     folds: wrinkles.folds,
                     holes: [Vec4::ZERO; 2],
                 },
@@ -380,6 +389,19 @@ impl Sheet {
     /// and a radius.
     pub(crate) fn punch(&mut self, holes: [Vec3; 2]) {
         self.params.holes = holes.map(|hole| hole.extend(0.0));
+    }
+
+    /// Prints the page a sheet shows the way its [`Print`] says.
+    fn follow_print(
+        sheets: Query<(&Print, &MeshMaterial3d<PaperMaterial>), Changed<Print>>,
+        mut materials: ResMut<Assets<PaperMaterial>>,
+    ) {
+        for (print, material) in &sheets {
+            if let Some(mut material) = materials.get_mut(material) {
+                material.extension.params.press = print.press as u32;
+                material.extension.params.run = print.run;
+            }
+        }
     }
 
     /// Stains each page of a sheet in its own way.

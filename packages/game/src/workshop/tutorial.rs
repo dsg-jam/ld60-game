@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::run::Run;
 use crate::locale::Message;
 use crate::menu::AppState;
-use crate::parts::paper::Paper;
+use crate::parts::paper::{Paper, Press, Print};
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
@@ -121,6 +121,7 @@ impl TutorialNote {
         let page = Paper::spawn_single(&mut commands, &canvas, note.footer(), |page| {
             note.write(page);
         });
+        commands.entity(page).insert(note.print());
         let document = ("tutorial", note.0);
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|note| {
@@ -137,6 +138,11 @@ impl TutorialNote {
         commands
             .entity(add.entity)
             .insert(Paper::new(sheet, SHEET_SIZE, vec![page]));
+    }
+
+    /// Marta typed her notes.
+    pub(super) fn print(self) -> Print {
+        Press::Typewriter.run(("tutorial", self.0))
     }
 
     pub(super) fn write(self, page: &mut ChildSpawnerCommands) {

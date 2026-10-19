@@ -8,6 +8,7 @@ use super::datasheet::ChipSheet;
 use super::pins::Sheet;
 use crate::device::DeviceName;
 use crate::locale::{Localized, Message};
+use crate::parts::paper::{Press, Print};
 use crate::workshop::run::Run;
 use crate::workshop::service::ServiceSheet;
 use crate::workshop::tutorial::TutorialNote;
@@ -107,6 +108,22 @@ impl Entry {
                 .with("revision", revision.to_string())
                 .into(),
             Self::Note(note) => note.label().into(),
+        }
+    }
+
+    /// How the shop's copy was printed. Each manual is a print of its own.
+    pub(super) fn print(self) -> Print {
+        match self {
+            Self::Manual(device) => match device {
+                DeviceKind::Tally2 => Press::Offset,
+                DeviceKind::Summa6 => Press::Photocopy,
+                DeviceKind::Lock4 => Press::Spirit,
+            }
+            .run(device),
+            Self::Chip(revision) => Press::Offset.run(("datasheet", revision)),
+            // Errata come as slips from a small print shop.
+            Self::Errata(revision) => Press::Letterpress.run(("errata", revision)),
+            Self::Note(note) => note.print(),
         }
     }
 

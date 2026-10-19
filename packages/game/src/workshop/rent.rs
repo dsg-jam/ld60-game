@@ -6,7 +6,7 @@ use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
 use crate::menu::AppState;
-use crate::parts::paper::Paper;
+use crate::parts::paper::{Paper, Press};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 
@@ -105,6 +105,8 @@ impl RentNote {
             Message::new("rent-footer"),
             |page| note.write(page),
         );
+        // The landlord runs his notes off on a spirit duplicator.
+        commands.entity(page).insert(Press::Spirit.run("rent"));
         let document = ("rent", note.0);
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|note| {

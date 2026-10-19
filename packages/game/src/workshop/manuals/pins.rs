@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::contents::{Contents, Entry, Page};
-use crate::parts::paper::Paper;
+use crate::parts::paper::{Paper, Print};
 use crate::parts::screen::UiCanvas;
 use crate::workshop::run::Run;
 use crate::workshop::tutorial::TutorialNote;
@@ -43,15 +43,16 @@ impl Sheet {
     /// top.
     pub(crate) fn spawn(self, commands: &mut Commands, canvas: &UiCanvas) -> Option<Entity> {
         let page = self.page()?;
-        Some(Paper::spawn_single(
-            commands,
-            canvas,
-            page.footer(),
-            |content| {
-                content.spawn(self.band());
-                page.write(content);
-            },
-        ))
+        let spawned = Paper::spawn_single(commands, canvas, page.footer(), |content| {
+            content.spawn(self.band());
+            page.write(content);
+        });
+        commands.entity(spawned).insert(self.print());
+        Some(spawned)
+    }
+
+    pub(crate) fn print(self) -> Print {
+        self.entry.print()
     }
 }
 

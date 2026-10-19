@@ -195,9 +195,10 @@ impl PinBoard {
                 if let Some(page) = slot.page.take() {
                     commands.entity(page).despawn();
                 }
-                slot.page = sheets
-                    .get(index)
-                    .and_then(|sheet| sheet.spawn(&mut commands, &slot.canvas));
+                slot.page = sheets.get(index).and_then(|sheet| {
+                    commands.entity(slot.sheet).insert(sheet.print());
+                    sheet.spawn(&mut commands, &slot.canvas)
+                });
                 if let Ok(mut visibility) = visibilities.get_mut(slot.sheet) {
                     visibility.set_if_neq(shown(slot.page.is_some()));
                 }

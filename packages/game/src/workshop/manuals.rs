@@ -179,13 +179,17 @@ impl ShopManuals {
                 .into_iter()
                 .enumerate()
                 .map(|(index, page)| {
-                    Paper::spawn_page(
+                    let spawned = Paper::spawn_page(
                         &mut commands,
                         &filed.pages,
                         (index + 1, count),
                         page.0.footer(),
                         |content| contents.write(file, page, content),
-                    )
+                    );
+                    if let Some(sheet) = page.1 {
+                        commands.entity(spawned).insert(sheet.print());
+                    }
+                    spawned
                 })
                 .collect();
             for page in paper.replace_pages(pages) {
