@@ -32,6 +32,14 @@ const STRAW_HEIGHT: f32 = 0.045;
 const FIND_SIZE: Vec3 = Vec3::new(0.06, 0.012, 0.04);
 const TAG_SIZE: Vec3 = Vec3::new(0.09, 0.0004, 0.063);
 const TAG_CANVAS: UVec2 = UVec2::new(320, 224);
+/// Where each find sits in the crate, from -1 to 1 along x and z. The first
+/// find is at the front left, nearest to the player.
+const CELLS: [Vec2; MOST] = [
+    Vec2::new(-1.0, 1.0),
+    Vec2::new(1.0, 1.0),
+    Vec2::new(-1.0, -1.0),
+    Vec2::new(1.0, -1.0),
+];
 const FEWEST: usize = 3;
 const MOST: usize = 4;
 const CRATE_WOOD: Color = Color::srgb_u8(0x8a, 0x6a, 0x44);
@@ -190,14 +198,10 @@ impl SalvageCrate {
                 }
             }
             for (index, &find) in finds.iter().enumerate() {
-                let cell = Vec2::new(
-                    if index % 2 == 0 { -1.0 } else { 1.0 },
-                    if index < 2 { -1.0 } else { 1.0 },
-                ) * inside
-                    / 4.0;
+                let cell = CELLS[index] * inside / 4.0;
                 let lump = Block::new(FIND_SIZE.with_y(FIND_SIZE.y * (1.0 + index as f32 * 0.3)))
                     .translated(Vec3::new(cell.x, straw.max().y, cell.y));
-                let tag = Block::new(TAG_SIZE).on_top_of(&lump);
+                let tag = Block::new(TAG_SIZE).resting_on(&lump, Vec2::ZERO);
                 let region = Rect::new(
                     index as f32 / MOST as f32,
                     0.0,
@@ -233,13 +237,27 @@ impl ForSale {
             },
             BorderColor::all(INK_FADED),
             children![
-                Paper::heading(Message::new("paper-quote").with("text", find.guess())),
-                Paper::faded(find.note()),
-                Node {
-                    flex_grow: 1.0,
-                    ..default()
-                },
-                Paper::title(Self::price(find)),
+                (
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        flex_grow: 1.0,
+                        min_height: px(0),
+                        row_gap: px(6),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    children![
+                        Paper::heading(Message::new("paper-quote").with("text", find.guess())),
+                        Paper::faded(find.note()),
+                    ],
+                ),
+                (
+                    Node {
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                    children![Paper::title(Self::price(find))],
+                ),
             ],
         )
     }
