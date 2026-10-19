@@ -32,6 +32,8 @@ const TRAVEL_TIME: f32 = 1.6;
 const TURN_DISTANCE: f32 = 1.0;
 /// Seconds for the turn at the end of a [`Travel`].
 const TURN_TIME: f32 = 0.6;
+/// How far through the turn of a [`Travel`] the player can take over.
+const TAKE_OVER_TURN: f32 = 0.5;
 
 pub(super) struct CameraPlugin;
 
@@ -45,6 +47,7 @@ impl Plugin for CameraPlugin {
                 (
                     PlayerCamera::follow
                         .after(Focused::leave_on_input)
+                        .after(LookAngles::update)
                         .run_if(not(in_state(AppState::Title))),
                     PlayerCamera::match_quality.run_if(
                         resource_changed::<Settings>
@@ -96,6 +99,24 @@ impl PlayerCamera {
     /// Whether the camera at `at` has come to rest on the seat.
     pub(crate) fn seated(&self, at: &Transform) -> bool {
         self.travel.is_none() && at.translation.distance(self.seat.translation) < SEATED_DISTANCE
+    }
+
+    /// Whether the player may look around, which on a [`Travel`] starts
+    /// during the turn.
+    pub(super) fn steerable(&self) -> bool {
+        self.travel
+            .as_ref()
+            .is_none_or(|travel| travel.turned() >= TAKE_OVER_TURN)
+    }
+
+    /// Lets the player turn the camera for the rest of a [`Travel`]. Returns
+    /// whether the camera was still turning on its own.
+    pub(super) fn take_over(&mut self) -> bool {
+        let Some(travel) = self.travel.as_mut().filter(|travel| !travel.manual) else {
+            return false;
+        };
+        travel.manual = true;
+        true
     }
 
     fn stop_travel(mut cameras: Query<&mut PlayerCamera>) {
@@ -189,6 +210,8 @@ struct Travel {
     elapsed: f32,
     /// When the camera started to turn towards the goal.
     turn_start: Option<f32>,
+    /// Whether the player turns the camera, so only the move is left.
+    manual: bool,
 }
 
 impl Travel {
@@ -198,6 +221,7 @@ impl Travel {
             to,
             elapsed: 0.0,
             turn_start: None,
+            manual: false,
         }
     }
 
@@ -212,8 +236,14 @@ impl Travel {
             self.turn_start = Some(self.elapsed);
         }
         let turned = self.turned();
-        transform.rotation = self.from.rotation.slerp(goal.rotation, turned);
-        moved >= 1.0 && turned >= 1.0
+        if self.manual {
+            transform
+                .rotation
+                .smooth_nudge(&goal.rotation, LOOK_DECAY_RATE, dt);
+        } else {
+            transform.rotation = self.from.rotation.slerp(goal.rotation, turned);
+        }
+        moved >= 1.0 && (self.manual || turned >= 1.0)
     }
 
     /// How far the camera turned towards the goal, from 0 to 1.
@@ -295,5 +325,33 @@ mod tests {
             assert!(seconds < TRAVEL_TIME + TURN_TIME);
         }
         assert_eq!(transform, seat());
+    }
+
+    #[test]
+    fn taking_over_keeps_the_view() {
+        let mut camera = PlayerCamera {
+            seat: seat(),
+            travel: Some(Travel::new(street(), seat().translation)),
+        };
+        let mut transform = street();
+        while !camera.steerable() {
+            camera
+                .travel
+                .as_mut()
+                .unwrap()
+                .step(&mut transform, seat(), DT);
+        }
+        assert!(camera.take_over());
+        assert!(!camera.take_over());
+        let before = transform.rotation;
+        camera.travel.as_mut().unwrap().step(
+            &mut transform,
+            Transform {
+                rotation: before,
+                ..seat()
+            },
+            DT,
+        );
+        assert!(transform.rotation.angle_between(before) < 1e-3);
     }
 }

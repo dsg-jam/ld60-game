@@ -1,3 +1,5 @@
+use std::f32::consts::{PI, TAU};
+
 use bevy::{
     camera::RenderTarget,
     ecs::system::SystemParam,
@@ -57,19 +59,37 @@ impl LookAngles {
         ))
     }
 
+    /// The look angles that turn `seat` to `rotation`.
+    fn facing(seat: Transform, rotation: Quat) -> Self {
+        let (seat_yaw, seat_pitch, _) = seat.rotation.to_euler(EulerRot::YXZ);
+        let (yaw, pitch, _) = rotation.to_euler(EulerRot::YXZ);
+        Self {
+            yaw: (yaw - seat_yaw + PI).rem_euclid(TAU) - PI,
+            pitch: pitch - seat_pitch,
+        }
+    }
+
     /// Turns freely, but never past looking straight up or down.
-    fn update(
+    ///
+    /// Moving the mouse while the camera turns on its own takes over from
+    /// where it looks.
+    pub(super) fn update(
         gaze: Gaze,
         motion: Res<AccumulatedMouseMotion>,
         settings: Res<Settings>,
-        camera: Single<&PlayerCamera>,
+        camera: Single<(&mut PlayerCamera, &Transform)>,
         mut angles: ResMut<LookAngles>,
     ) {
-        if !gaze.looking_around() {
+        let (mut camera, transform) = camera.into_inner();
+        if !gaze.looking_around() || motion.delta == Vec2::ZERO || !camera.steerable() {
             return;
         }
+        let seat = camera.seat();
+        if camera.take_over() {
+            *angles = Self::facing(seat, transform.rotation);
+        }
         let delta = motion.delta * SENSITIVITY * settings.sensitivity();
-        let (_, seat_pitch, _) = camera.seat().rotation.to_euler(EulerRot::YXZ);
+        let (_, seat_pitch, _) = seat.rotation.to_euler(EulerRot::YXZ);
         angles.yaw -= delta.x;
         angles.pitch =
             (angles.pitch - delta.y).clamp(-MAX_PITCH - seat_pitch, MAX_PITCH - seat_pitch);
@@ -188,4 +208,21 @@ fn center_pointer(
         },
         PointerAction::Move { delta: Vec2::ZERO },
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn facing_finds_the_angles_of_a_view() {
+        let seat = Transform::from_xyz(0.0, 1.5, 0.7).looking_at(Vec3::new(0.0, 0.8, 0.0), Vec3::Y);
+        let angles = LookAngles {
+            yaw: 2.5,
+            pitch: 0.3,
+        };
+        let found = LookAngles::facing(seat, angles.apply(seat).rotation);
+        assert!((found.yaw - angles.yaw).abs() < 1e-4, "{found:?}");
+        assert!((found.pitch - angles.pitch).abs() < 1e-4, "{found:?}");
+    }
 }
