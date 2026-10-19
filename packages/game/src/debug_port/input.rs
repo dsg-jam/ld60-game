@@ -19,8 +19,10 @@ use serde_json::Value;
 /// pixels and also moves the system cursor. `click` is `left` or `right`.
 /// `scroll` turns the wheel by that many lines, negative is down. A list of
 /// numbers scrolls by that many pixels each, like a trackpad.
-/// `key` is a `KeyCode` name. `text` types each character. Send `pointer`
-/// in an earlier call than `click`, so the click sees what is under it.
+/// `key` is a `KeyCode` name. `text` types each character. Each click and
+/// key presses and releases, or only presses with `"hold": "down"` and only
+/// releases with `"hold": "up"`. Send `pointer` in an earlier call than
+/// `click`, so the click sees what is under it.
 /// Device and computer keys see a key once per frame, so send repeated
 /// presses of the same key in separate calls.
 pub(super) fn input(
@@ -34,6 +36,12 @@ pub(super) fn input(
 ) -> BrpResult {
     let (entity, mut window) = window.into_inner();
     let params = params.unwrap_or_default();
+    let states: &[ButtonState] = match params.get("hold").map(Value::as_str) {
+        None => &[ButtonState::Pressed, ButtonState::Released],
+        Some(Some("down")) => &[ButtonState::Pressed],
+        Some(Some("up")) => &[ButtonState::Released],
+        Some(_) => return Err(invalid("`hold` must be \"down\" or \"up\"")),
+    };
 
     if let Some(pointer) = params.get("pointer") {
         let position = pointer
@@ -61,7 +69,7 @@ pub(super) fn input(
             Some("right") => MouseButton::Right,
             _ => return Err(invalid("`click` must be \"left\" or \"right\"")),
         };
-        for state in [ButtonState::Pressed, ButtonState::Released] {
+        for &state in states {
             let input = MouseButtonInput {
                 button,
                 state,
@@ -111,7 +119,7 @@ pub(super) fn input(
         typed.extend(text.chars().map(character));
     }
     for (key_code, logical_key, text) in typed {
-        for state in [ButtonState::Pressed, ButtonState::Released] {
+        for &state in states {
             let input = KeyboardInput {
                 key_code,
                 logical_key: logical_key.clone(),
