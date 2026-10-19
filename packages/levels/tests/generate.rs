@@ -429,6 +429,19 @@ fn later_jobs_are_harder_and_pay_more() {
 }
 
 #[test]
+fn the_bonus_stops_growing() {
+    for device in DeviceKind::ALL {
+        let tenth = Difficulty::for_job(10, device);
+        let late = Difficulty::for_job(39, device);
+        assert_eq!(tenth.reward(1), late.reward(1));
+        assert_eq!(
+            tenth.reward(1),
+            2 * Difficulty::for_job(0, device).reward(1)
+        );
+    }
+}
+
+#[test]
 fn jobs_only_run_on_chips_with_a_datasheet() {
     let revisions = |device, datasheets: &[Revision]| {
         (0..40)

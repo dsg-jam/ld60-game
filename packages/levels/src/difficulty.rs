@@ -12,6 +12,8 @@ pub(crate) const MAX_SYMPTOM_KEYS: usize = 6;
 const LATE: DateCode = DateCode::new(76, 30);
 /// Rev B chips with the `DS` errata.
 const EARLY: DateCode = DateCode::new(76, 12);
+/// The jobs after which the bonus of [`Difficulty::reward`] stops growing.
+const BONUS_JOBS: u32 = 10;
 
 /// How hard a generated job is.
 ///
@@ -116,14 +118,15 @@ impl Difficulty {
 
     /// What the customer pays for a job with `bugs` bugs.
     ///
-    /// Bigger devices pay more per bug. Later jobs pay a bonus.
+    /// Bigger devices pay more per bug. Later jobs pay a bonus that stops
+    /// growing after 10 jobs.
     pub fn reward(&self, bugs: usize) -> u32 {
         let base = match self.device {
-            DeviceKind::Tally2 => 4,
+            DeviceKind::Tally2 => 6,
             DeviceKind::Summa6 => 10,
             DeviceKind::Lock4 => 14,
         };
-        base * bugs as u32 + base * self.job / 10
+        base * bugs as u32 + base * self.job.min(BONUS_JOBS) / BONUS_JOBS
     }
 
     /// Picks an operator by the [`Difficulty::weights`].
