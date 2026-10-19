@@ -90,6 +90,8 @@ struct PlanetLight;
 
 impl AtmospherePlugin {
     fn spawn_planet_light(clock: Res<Clock>, mut commands: Commands) {
+        // No shadows: the city lights drown them out, and every building
+        // would have to be drawn into them.
         commands.spawn((
             Name::new("planet light"),
             PlanetLight,
@@ -143,13 +145,9 @@ impl AtmospherePlugin {
     fn match_quality(
         settings: Res<Settings>,
         cameras: Query<Entity, With<PlayerCamera>>,
-        mut planet: Query<&mut DirectionalLight, With<PlanetLight>>,
         mut commands: Commands,
     ) {
         let quality = settings.quality();
-        for mut light in &mut planet {
-            light.shadow_maps_enabled = quality.shadows();
-        }
         for camera in &cameras {
             let mut camera = commands.entity(camera);
             if quality.reflections() {
