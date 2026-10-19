@@ -130,6 +130,8 @@ impl Device for CalcoDevice {
                 .collect(),
             minus: self.lit(Annunciator::Minus),
             error: self.lit(Annunciator::Error),
+            open: self.lit(Annunciator::Open),
+            shut: self.lit(Annunciator::Shut),
         }
     }
 }

@@ -33,10 +33,25 @@ impl FromStr for BoardRev {
 pub enum Annunciator {
     Minus,
     Error,
+    Open,
+    Shut,
 }
 
 impl Annunciator {
-    pub const ALL: [Self; 2] = [Self::Minus, Self::Error];
+    pub const ALL: [Self; 4] = [Self::Minus, Self::Error, Self::Open, Self::Shut];
+
+    /// What the display glass prints for it, and how a [`Readout`] shows it
+    /// as text.
+    ///
+    /// [`Readout`]: crate::Readout
+    pub fn mark(self) -> &'static str {
+        match self {
+            Self::Minus => "-",
+            Self::Error => "E",
+            Self::Open => "OPEN",
+            Self::Shut => "SHUT",
+        }
+    }
 }
 
 /// The circuit board around the chip. Board revisions of one model wire the

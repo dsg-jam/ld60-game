@@ -11,8 +11,8 @@ Usage:
   cli play <level> [--fixed] [--seed N] [--variant N] [--board R]
                                          Open a level on the bench
   cli gen --procedural <device> <seed> <job> [--out DIR]
-                                         Generate job number <job> for tally2
-                                         or summa6 and write its level folder
+                                         Generate job number <job> for tally2,
+                                         summa6 or lock4 and write its level folder
   cli asm <file.asm> [--rev A|B|C]       Print the listing of a CalCo file (default Rev C)
   cli gen [--check]                      Regenerate level firmware from its source
 

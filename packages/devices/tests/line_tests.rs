@@ -2,6 +2,7 @@ use ld60_devices::{DeviceKind, LineTest};
 
 const TALLY2_DOC: &str = include_str!("../../../docs/devices/tally2.md");
 const SUMMA6_DOC: &str = include_str!("../../../docs/devices/summa6.md");
+const LOCK4_DOC: &str = include_str!("../../../docs/devices/lock4.md");
 
 /// The rows of the table under `## End of line tests`, as keys and display.
 fn documented(doc: &str) -> Vec<(String, String)> {
@@ -25,6 +26,7 @@ fn docs_list_the_line_tests() {
     for (kind, doc) in [
         (DeviceKind::Tally2, TALLY2_DOC),
         (DeviceKind::Summa6, SUMMA6_DOC),
+        (DeviceKind::Lock4, LOCK4_DOC),
     ] {
         let expected: Vec<_> = kind
             .line_tests()

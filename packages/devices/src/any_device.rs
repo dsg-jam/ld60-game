@@ -15,6 +15,19 @@ macro_rules! each {
     };
 }
 
+const DIGIT_KEYS: [(char, u8); 10] = [
+    ('0', 0x00),
+    ('1', 0x01),
+    ('2', 0x02),
+    ('3', 0x03),
+    ('4', 0x04),
+    ('5', 0x05),
+    ('6', 0x06),
+    ('7', 0x07),
+    ('8', 0x08),
+    ('9', 0x09),
+];
+
 const TALLY2_BOARDS: [Board; 3] = [
     Board {
         kind: DeviceKind::Tally2,
@@ -63,6 +76,42 @@ const SUMMA6_BOARDS: [Board; 3] = [
     },
 ];
 
+const LOCK4_BOARDS: [Board; 3] = [
+    Board {
+        kind: DeviceKind::Lock4,
+        rev: BoardRev::A,
+        display: 1,
+        keys: &lock4_keys([0x0A, 0x0B, 0x0C]),
+        annunciators: &[
+            (Annunciator::Open, 0),
+            (Annunciator::Shut, 1),
+            (Annunciator::Error, 2),
+        ],
+    },
+    Board {
+        kind: DeviceKind::Lock4,
+        rev: BoardRev::B,
+        display: 6,
+        keys: &lock4_keys([0x0E, 0x0D, 0x0F]),
+        annunciators: &[
+            (Annunciator::Open, 2),
+            (Annunciator::Shut, 0),
+            (Annunciator::Error, 1),
+        ],
+    },
+    Board {
+        kind: DeviceKind::Lock4,
+        rev: BoardRev::C,
+        display: 11,
+        keys: &lock4_keys([0x0B, 0x0C, 0x0A]),
+        annunciators: &[
+            (Annunciator::Open, 1),
+            (Annunciator::Shut, 3),
+            (Annunciator::Error, 0),
+        ],
+    },
+];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DeviceKind {
@@ -70,10 +119,12 @@ pub enum DeviceKind {
     Tally2,
     /// 6-digit adding machine.
     Summa6,
+    /// Door lock with a 4-digit code.
+    Lock4,
 }
 
 impl DeviceKind {
-    pub const ALL: [Self; 2] = [Self::Tally2, Self::Summa6];
+    pub const ALL: [Self; 3] = [Self::Tally2, Self::Summa6, Self::Lock4];
 
     pub fn board(self, rev: BoardRev) -> &'static Board {
         &self.boards()[rev as usize]
@@ -84,6 +135,7 @@ impl DeviceKind {
         match self {
             Self::Tally2 => "2",
             Self::Summa6 => "6",
+            Self::Lock4 => "4",
         }
     }
 
@@ -92,6 +144,7 @@ impl DeviceKind {
         match self {
             Self::Tally2 => &TALLY2_BOARDS,
             Self::Summa6 => &SUMMA6_BOARDS,
+            Self::Lock4 => &LOCK4_BOARDS,
         }
     }
 
@@ -99,12 +152,13 @@ impl DeviceKind {
         match self {
             Self::Tally2 => 2,
             Self::Summa6 => 6,
+            Self::Lock4 => 4,
         }
     }
 
     pub fn isa(self) -> IsaKind {
         match self {
-            Self::Tally2 | Self::Summa6 => IsaKind::Calco,
+            Self::Tally2 | Self::Summa6 | Self::Lock4 => IsaKind::Calco,
         }
     }
 }
@@ -191,20 +245,41 @@ impl Device for AnyDevice {
 
 /// Digits 0 to 9 send their value. The other keys differ per board.
 const fn summa6_keys([plus, minus, equals, clear]: [u8; 4]) -> [(char, u8); 14] {
+    let [d0, d1, d2, d3, d4, d5, d6, d7, d8, d9] = DIGIT_KEYS;
     [
-        ('0', 0x00),
-        ('1', 0x01),
-        ('2', 0x02),
-        ('3', 0x03),
-        ('4', 0x04),
-        ('5', 0x05),
-        ('6', 0x06),
-        ('7', 0x07),
-        ('8', 0x08),
-        ('9', 0x09),
+        d0,
+        d1,
+        d2,
+        d3,
+        d4,
+        d5,
+        d6,
+        d7,
+        d8,
+        d9,
         ('+', plus),
         ('-', minus),
         ('=', equals),
+        ('C', clear),
+    ]
+}
+
+/// Digits 0 to 9 send their value. The other keys differ per board.
+const fn lock4_keys([enter, change, clear]: [u8; 3]) -> [(char, u8); 13] {
+    let [d0, d1, d2, d3, d4, d5, d6, d7, d8, d9] = DIGIT_KEYS;
+    [
+        d0,
+        d1,
+        d2,
+        d3,
+        d4,
+        d5,
+        d6,
+        d7,
+        d8,
+        d9,
+        ('#', enter),
+        ('*', change),
         ('C', clear),
     ]
 }

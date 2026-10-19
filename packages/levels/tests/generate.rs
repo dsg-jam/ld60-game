@@ -15,6 +15,7 @@ const JOBS: u64 = 24;
 
 static TALLY2: LazyLock<Vec<Reference>> = LazyLock::new(|| every_chip(DeviceKind::Tally2));
 static SUMMA6: LazyLock<Vec<Reference>> = LazyLock::new(|| every_chip(DeviceKind::Summa6));
+static LOCK4: LazyLock<Vec<Reference>> = LazyLock::new(|| every_chip(DeviceKind::Lock4));
 
 /// The reference for every chip a [`Difficulty`] picks.
 fn every_chip(device: DeviceKind) -> Vec<Reference> {
@@ -225,6 +226,18 @@ fn summa6_jobs_verify_and_undo_one_line_per_bug() {
 }
 
 #[test]
+fn lock4_jobs_verify_and_undo_one_line_per_bug() {
+    let seen = check(DeviceKind::Lock4, &LOCK4);
+    assert!(seen.contains("fault"), "{seen:?}");
+    for operator in Operator::ALL {
+        assert!(seen.contains(&format!("{operator:?}")), "{seen:?}");
+    }
+    for symptom in [Symptom::WrongAnnunciator, Symptom::WrongAfterClear] {
+        assert!(seen.contains(&format!("{symptom:?}")), "{seen:?}");
+    }
+}
+
+#[test]
 fn same_seed_gives_same_job() {
     let difficulty = Difficulty::for_job(5, DeviceKind::Summa6);
     let reference = for_chip(&SUMMA6, &difficulty);
@@ -235,18 +248,20 @@ fn same_seed_gives_same_job() {
 
 #[test]
 fn moves_jobs_to_every_board() {
-    let difficulty = Difficulty::for_job(0, DeviceKind::Summa6);
-    let reference = for_chip(&SUMMA6, &difficulty);
-    let boards: HashSet<_> = (0..16)
-        .map(|seed| {
-            Generated::new(reference, seed, &difficulty)
-                .unwrap()
-                .variant
-                .level
-                .board
-        })
-        .collect();
-    assert_eq!(boards.len(), 3);
+    for (device, references) in [(DeviceKind::Summa6, &SUMMA6), (DeviceKind::Lock4, &LOCK4)] {
+        let difficulty = Difficulty::for_job(0, device);
+        let reference = for_chip(references, &difficulty);
+        let boards: HashSet<_> = (0..16)
+            .map(|seed| {
+                Generated::new(reference, seed, &difficulty)
+                    .unwrap()
+                    .variant
+                    .level
+                    .board
+            })
+            .collect();
+        assert_eq!(boards.len(), 3, "{device:?}");
+    }
 }
 
 #[test]
@@ -293,6 +308,7 @@ fn first_jobs_show_bugs_with_few_keys_on_the_newest_chip() {
         let references = match device {
             DeviceKind::Tally2 => &TALLY2,
             DeviceKind::Summa6 => &SUMMA6,
+            DeviceKind::Lock4 => &LOCK4,
         };
         let reference = for_chip(references, &difficulty);
         for seed in 0..20 {

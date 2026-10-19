@@ -27,7 +27,7 @@ fn original_boards_keep_the_first_wiring() {
 
 #[test]
 fn every_board_fits_in_ram_and_has_unique_codes() {
-    for kind in [DeviceKind::Tally2, DeviceKind::Summa6] {
+    for kind in DeviceKind::ALL {
         for (board, rev) in kind.boards().iter().zip(BoardRev::ALL) {
             assert_eq!(board.rev, rev);
             assert_eq!(board.kind, kind);
@@ -55,4 +55,18 @@ fn board_decides_display_keys_and_annunciators() {
     assert_eq!(readout.digits, [0, 0, 0, 0, 0, 0x0C]);
     assert!(readout.minus && !readout.error);
     assert_eq!(device.board().name(), "6B");
+}
+
+#[test]
+fn lock_lights_open_and_shut() {
+    let source = "LDI A, 0\nST M6\nST M7\nST M8\nST M9\nLDI A, 5\nOUT ANN\nHLT";
+    let image = CHIP.isa().assemble(source).unwrap().image;
+    let board = DeviceKind::Lock4.board(BoardRev::B);
+    let mut device = AnyDevice::new(board, CHIP, Rom::new(RomKind::Eprom, image)).unwrap();
+    device.power_on(1);
+    device.run_until_halt(MAX_STEPS).unwrap();
+    let readout = device.readout();
+    assert!(readout.open && readout.shut && !readout.error);
+    assert_eq!(readout.to_string(), "0000 OPEN SHUT");
+    assert_eq!(device.board().name(), "4B");
 }

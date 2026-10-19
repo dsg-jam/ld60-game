@@ -15,6 +15,16 @@ const SUMMA6_TESTS: [LineTest; 7] = [
     LineTest::new("C 1000-1=", "000999"),
     LineTest::new("C 50-8=", "000042"),
 ];
+const LOCK4_TESTS: [LineTest; 8] = [
+    LineTest::new("", "0000 SHUT"),
+    LineTest::new("C 1234", "1234 SHUT"),
+    LineTest::new("C #", "0000 OPEN"),
+    LineTest::new("C 12#", "0012 SHUT"),
+    LineTest::new("C #C", "0000 SHUT"),
+    LineTest::new("C 1#2#3#", "E"),
+    LineTest::new("C #*", "0000 OPEN SHUT"),
+    LineTest::new("C #*42# 42#", "0042 OPEN"),
+];
 
 /// A check from the factory checklist of a device model.
 ///
@@ -51,6 +61,7 @@ impl DeviceKind {
         match self {
             Self::Tally2 => &TALLY2_TESTS,
             Self::Summa6 => &SUMMA6_TESTS,
+            Self::Lock4 => &LOCK4_TESTS,
         }
     }
 }

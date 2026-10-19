@@ -1,7 +1,7 @@
 # CalCo ISA
 
-CalCo is an 8-bit calculator coprocessor. It drives adding machines and tally
-counters. It works with decimal digits, one digit per byte.
+CalCo is an 8-bit calculator coprocessor. It drives adding machines, tally
+counters and door locks. It works with decimal digits, one digit per byte.
 
 ## Programmer model
 

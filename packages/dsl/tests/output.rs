@@ -1,6 +1,6 @@
 mod common;
 
-use common::{SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
+use common::{LOCK, SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
 use ld60_calco::{ChipInfo, DateCode, Revision};
 use ld60_devices::{Annunciator, BoardRev, ChipSpec, DeviceKind};
 use ld60_dsl::{Flavor, Selection, Target, compile};
@@ -37,8 +37,12 @@ fn every_switch_assembles_on_every_full_revision() {
                 assert!(revision.isa().assemble(&output.asm).is_ok(), "{switch}");
             }
         }
-        for source in [TALLY_0_9, TALLY_1_0] {
-            let output = build(source, revision, DeviceKind::Tally2, Flavor::Fixed, &[]).unwrap();
+        for (source, device) in [
+            (TALLY_0_9, DeviceKind::Tally2),
+            (TALLY_1_0, DeviceKind::Tally2),
+            (LOCK, DeviceKind::Lock4),
+        ] {
+            let output = build(source, revision, device, Flavor::Fixed, &[]).unwrap();
             assert!(revision.isa().assemble(&output.asm).is_ok());
         }
     }
@@ -184,6 +188,42 @@ entry main {
         &[],
     ));
     assert_eq!(error.message, "tally2 has no annunciator 'minus'");
+}
+
+#[test]
+fn lock_lamps_use_the_bits_of_the_board() {
+    let source = "firmware \"L\" for lock4
+entry main {
+    ANN = ann(open, shut)
+    wait
+}
+";
+    let chip = ChipSpec::Calco(ChipInfo {
+        revision: Revision::B,
+        date_code: DateCode::new(76, 30),
+    });
+    let selection = Selection {
+        flavor: Flavor::Fixed,
+        switches: &[],
+    };
+    for rev in BoardRev::ALL {
+        let board = DeviceKind::Lock4.board(rev);
+        let asm = compile(source, &Target::new(chip, board), &selection)
+            .unwrap()
+            .asm;
+        let bit = |a| 1 << board.ann_bit(a).unwrap();
+        let both = bit(Annunciator::Open) | bit(Annunciator::Shut);
+        let expected = format!(
+            "LDI  A, {both}
+        OUT  ANN
+"
+        );
+        assert!(
+            asm.contains(&expected),
+            "{rev:?}
+{asm}"
+        );
+    }
 }
 
 #[test]

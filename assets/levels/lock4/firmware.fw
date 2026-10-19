@@ -1,0 +1,104 @@
+firmware "Lock-4 firmware 1.0" for lock4
+
+cells input[4] at M1    ; display and entry, M4 is the rightmost digit
+cells code[4] at M5     ; door code
+cell  mode at M9        ; 0 shut, 1 open, 2 new code
+cell  wrong at MA       ; wrong codes in a row
+cell  fresh at MB       ; 1 if the next digit starts a new entry
+cell  scratch at MC     ; scratch
+
+const OPEN = 1
+const NEW_CODE = 2
+const TRIES = 3
+
+entry reset {
+    a = 0
+    for i = 4 downto 1 as rclr {
+        code[i] = a
+    }
+    wrong = a
+}
+
+block clrkey {
+    a = 0
+    mode = a
+    ANN = ann(shut)
+    blank()
+}
+
+block main {
+    wait
+    a = KEY
+    match a {
+        0 to 9 => goto digit
+        '*' => goto newkey
+        'C' => goto clrkey
+    }
+}
+
+block enter {
+    a = 1
+    fresh = a
+    a = mode
+    if a == NEW_CODE goto store
+    for i = 4 downto 1 as cmp {
+        a = input[i]
+        if a != code[i] goto bad
+    }
+    a = 0
+    wrong = a
+    a = OPEN
+    mode = a
+    ANN = ann(open)
+    goto main
+bad:
+    a = 0
+    mode = a
+    ANN = ann(shut)
+    a = wrong + 1
+    wrong = a
+    if a < TRIES goto main
+    ANN = ann(shut, error)
+jam:
+    wait
+    a = KEY
+    goto jam
+}
+
+block store {
+    for i = 4 downto 1 as copy {
+        code[i] = input[i]
+    }
+    goto clrkey
+}
+
+block newkey {
+    a = mode
+    if a != OPEN goto main
+    a = NEW_CODE
+    mode = a
+    ANN = ann(open, shut)
+    blank()
+    goto main
+}
+
+block digit {
+    scratch = a
+    a = fresh
+    if a != 0 {
+        blank()
+    }
+    input[1] = input[2]
+    input[2] = input[3]
+    input[3] = input[4]
+    input[4] = scratch
+    goto main
+}
+
+routine blank {
+    a = 0
+    for i = 4 downto 1 as bclr {
+        input[i] = a
+    }
+    fresh = a
+}

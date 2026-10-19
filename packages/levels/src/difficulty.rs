@@ -113,6 +113,7 @@ impl Difficulty {
         let base = match self.device {
             DeviceKind::Tally2 => 4,
             DeviceKind::Summa6 => 10,
+            DeviceKind::Lock4 => 14,
         };
         base * bugs as u32 + base * self.job / 10
     }

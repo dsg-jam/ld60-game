@@ -11,8 +11,8 @@ type Replay = (Option<Result<Readout, RunError>>, Result<Readout, RunError>);
 pub enum Symptom {
     /// The display shows other digits.
     WrongDigit,
-    /// A light like the minus sign is on when it should be off, or the
-    /// other way round.
+    /// A light like the minus sign or the OPEN lamp is on when it should be
+    /// off, or the other way round.
     WrongAnnunciator,
     /// The last key changes nothing.
     NoResponse,
@@ -106,8 +106,9 @@ impl Symptom {
         {
             return Self::NoResponse;
         }
+        let lamps = |readout: &Readout| (readout.minus, readout.open, readout.shut);
         if working.error != mutant.error
-            || (working.minus != mutant.minus && working.digits == mutant.digits)
+            || (lamps(working) != lamps(mutant) && working.digits == mutant.digits)
         {
             return Self::WrongAnnunciator;
         }
