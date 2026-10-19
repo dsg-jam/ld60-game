@@ -1,4 +1,4 @@
-# ld60-game
+# Bugs From Home
 
 A Ludum Dare Jam game
 

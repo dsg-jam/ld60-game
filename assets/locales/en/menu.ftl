@@ -1,4 +1,4 @@
-menu-game = LD60
+menu-game = Bugs From Home
 menu-paused = Paused
 
 menu-start = Start

@@ -1,4 +1,4 @@
-//! A LD60 game.
+//! Bugs From Home, a Ludum Dare game.
 //!
 //! # Features
 //!
@@ -24,7 +24,7 @@ use bevy::asset::AssetMetaCheck;
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 
-const TITLE: &str = "LD60";
+const TITLE: &str = "Bugs From Home";
 /// Meters per second squared, down.
 const GRAVITY: f32 = 9.81;
 
