@@ -10,7 +10,7 @@ mod mutate;
 mod variant;
 
 pub use bench::{assemble, burn, device, initial_rom};
-pub use catalog::{Catalog, CatalogError, LevelSource};
+pub use catalog::{Catalog, CatalogError, LevelSource, Order, Special};
 pub use check::{Outcome, Report, TEST_SEEDS, run, run_line_tests};
 pub use difficulty::Difficulty;
 pub use error::{GenerateError, LevelError, VerifyError};

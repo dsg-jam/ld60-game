@@ -50,7 +50,8 @@ fn every_level_is_solvable_and_starts_broken() {
 
 #[test]
 fn tutorial_starts_on_the_smallest_chip() {
-    let chips: Vec<&str> = CATALOG.levels()[..2]
+    let chips: Vec<&str> = CATALOG
+        .tutorial()
         .iter()
         .map(|source| source.load().unwrap().chip.isa().name())
         .collect();
@@ -102,4 +103,14 @@ fn every_level_has_working_variants() {
             variants.len()
         );
     }
+}
+
+#[test]
+fn every_level_is_a_tutorial_or_a_special_job() {
+    let specials: Vec<u32> = CATALOG.specials().map(|(_, from)| from).collect();
+    assert_eq!(
+        CATALOG.tutorial().len() + specials.len(),
+        CATALOG.levels().len()
+    );
+    assert!(specials.is_sorted(), "{specials:?}");
 }
