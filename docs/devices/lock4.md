@@ -5,11 +5,10 @@ The Lock 4 is a door lock with a 4-digit code by DSG Electronics. It runs a
 
 ## Use
 
-Type the code, then press `#`. The right code opens the lock and lights OPEN.
-A wrong code keeps it shut. After 3 wrong codes in a row the lock stops
-listening and lights the error mark until it is powered off. A right code
-resets the count. `C` clears the entry and shuts the lock, but it does not
-reset the count.
+Type the code, then press `#`. The right code opens the lock and lights OPEN. A
+wrong code keeps it shut. After 3 wrong codes in a row the lock stops listening
+and lights the error mark until it is powered off. A right code resets the
+count. `C` clears the entry and shuts the lock, but it does not reset the count.
 
 The code is `0000` after power on. To change it, open the lock and press `*`.
 OPEN and SHUT both light up. Type the new code and press `#`. The lock shuts

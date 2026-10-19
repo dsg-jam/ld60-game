@@ -37,7 +37,12 @@ features = [
 ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { workspace = true, features = ["Document", "Element", "Storage", "Window"] }
+web-sys = { workspace = true, features = [
+  "Document",
+  "Element",
+  "Storage",
+  "Window",
+] }
 
 [lints]
 workspace = true
