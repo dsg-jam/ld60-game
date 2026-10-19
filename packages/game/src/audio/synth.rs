@@ -1,6 +1,7 @@
 mod city;
 mod drops;
 mod keys;
+mod lamp;
 mod paper;
 mod rain;
 mod room;
@@ -16,31 +17,6 @@ pub(super) const SAMPLE_RATE: u32 = 44_100;
 pub(super) struct Samples(Vec<f32>);
 
 impl Samples {
-    /// A key going down: the short tick of the switch, then the dull knock
-    /// of the keycap hitting the bottom.
-    pub(super) fn click() -> Self {
-        const BOTTOM_OUT: f32 = 0.012;
-        let mut noise = Noise::new(3);
-        let mut hiss = Lowpass::new(0.5);
-        let mut thud = Lowpass::new(0.08);
-        Self::generate(0.08, |t| {
-            let white = noise.next();
-            let tick = (white - hiss.next(white)) * (-t * 1_800.0).exp();
-            let knock = if t < BOTTOM_OUT {
-                0.0
-            } else {
-                let t = t - BOTTOM_OUT;
-                let attack = (t * 1_000.0).min(1.0);
-                let body = (TAU * 180.0 * t).sin() * (-t * 70.0).exp() * 0.5
-                    + (TAU * 410.0 * t).sin() * (-t * 110.0).exp() * 0.25;
-                let rattle = thud.next(white) * (-t * 400.0).exp() * 2.0;
-                (body + rattle) * attack
-            };
-            tick * 0.4 + knock
-        })
-        .normalized(0.8)
-    }
-
     /// Two soft bell notes going up, for a finished job.
     pub(super) fn chime() -> Self {
         const NOTES: [(f32, f32); 2] = [(0.0, 1_046.5), (0.14, 1_318.5)];
@@ -540,7 +516,7 @@ mod tests {
 
     #[test]
     fn wav_header_matches_data() {
-        let wav = Samples::click().wav();
+        let wav = Samples::chime().wav();
         assert_eq!(&wav[..4], b"RIFF");
         let data_len = u32::from_le_bytes(wav[40..44].try_into().unwrap());
         assert_eq!(wav.len(), 44 + data_len as usize);

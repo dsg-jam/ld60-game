@@ -67,6 +67,7 @@ pub(crate) struct DeskSpots {
     pub(crate) computer: Vec3,
     /// The manuals file, lying open.
     pub(crate) manuals: Vec3,
+    pub(crate) lamp: Vec3,
 }
 
 impl DeskSpots {
@@ -76,6 +77,7 @@ impl DeskSpots {
             seat: counter.seated_view().translation,
             computer: counter.place(COMPUTER_SPOT, 0.0).translation,
             manuals: counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0).translation,
+            lamp: counter.place(LAMP_SPOT, 0.0).translation,
         }
     }
 }

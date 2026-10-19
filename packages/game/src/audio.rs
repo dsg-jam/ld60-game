@@ -39,8 +39,10 @@ pub(crate) struct AudioPlugin;
 /// A one-shot sound.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Sound {
-    /// A switch flipping.
-    Click,
+    /// The desk lamp's switch going on.
+    LampOn,
+    /// The desk lamp's switch going off.
+    LampOff,
     /// A customer paid for a repair.
     Chime,
     /// The rubber stamp hitting the ticket, or a device put down hard.
@@ -84,8 +86,9 @@ pub(crate) enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 12] = [
-        Self::Click,
+    const ALL: [Self; 13] = [
+        Self::LampOn,
+        Self::LampOff,
         Self::Chime,
         Self::Thunk,
         Self::Ding,
@@ -111,7 +114,9 @@ impl Sound {
 
     fn takes(self) -> u32 {
         match self {
-            Self::Detent
+            Self::LampOn
+            | Self::LampOff
+            | Self::Detent
             | Self::Ratchet
             | Self::Latch
             | Self::Unlatch
@@ -126,13 +131,14 @@ impl Sound {
             | Self::PuddleRain
             | Self::AwningRain
             | Self::RoofRain => 2,
-            Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
+            Self::Chime | Self::Thunk | Self::Ding => 1,
         }
     }
 
     fn samples(self, take: u32) -> Samples {
         match self {
-            Self::Click => Samples::click(),
+            Self::LampOn => Samples::lamp_switch(take, true),
+            Self::LampOff => Samples::lamp_switch(take, false),
             Self::Chime => Samples::chime(),
             Self::Thunk => Samples::thunk(),
             Self::Ding => Samples::ding(),
@@ -157,7 +163,7 @@ impl Sound {
 
     pub(crate) fn volume(self) -> f32 {
         match self {
-            Self::Click => 0.35,
+            Self::LampOn | Self::LampOff => 0.35,
             Self::Chime => 0.4,
             Self::Thunk => 0.6,
             Self::Ding => 0.45,

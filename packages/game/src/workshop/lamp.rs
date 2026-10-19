@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use super::dust::Dust;
-use crate::audio::{Play, Sound};
+use crate::audio::{PlayAt, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
@@ -248,7 +248,7 @@ impl Lamp {
     fn toggle_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        mut lamps: Query<(&mut Lamp, &mut Clickable, &Children)>,
+        mut lamps: Query<(&mut Lamp, &mut Clickable, &Children, &GlobalTransform)>,
         mut lights: Query<&mut Visibility, With<LampLight>>,
         mut bulbs: Query<&mut Bulb>,
         mut commands: Commands,
@@ -256,7 +256,7 @@ impl Lamp {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let Ok((mut lamp, mut clickable, children)) = lamps.get_mut(press.entity) else {
+        let Ok((mut lamp, mut clickable, children, transform)) = lamps.get_mut(press.entity) else {
             return;
         };
         press.propagate(false);
@@ -270,6 +270,11 @@ impl Lamp {
                 bulb.on = lamp.on;
             }
         }
-        commands.trigger(Play(Sound::Click));
+        let sound = if lamp.on {
+            Sound::LampOn
+        } else {
+            Sound::LampOff
+        };
+        commands.trigger(PlayAt(sound, transform.translation()));
     }
 }
