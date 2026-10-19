@@ -4,6 +4,7 @@ mod chip_title;
 mod clicks;
 mod debugger;
 mod edits;
+mod errors;
 mod footer;
 mod highlight;
 mod history;
@@ -332,7 +333,7 @@ impl Editor {
                 .map(|error| json!({
                     "line": error.line,
                     "span": [error.span.start, error.span.end],
-                    "message": error.message,
+                    "message": error.kind.to_string(),
                 }))
                 .collect::<Vec<_>>(),
             "text": source,

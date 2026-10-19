@@ -362,6 +362,8 @@ fn mark(line: &str, span: Range<usize>) -> Option<Range<usize>> {
 
 #[cfg(test)]
 mod tests {
+    use ld60_machine::AsmErrorKind;
+
     use super::*;
 
     const ALL: Range<usize> = 0..usize::MAX;
@@ -384,7 +386,7 @@ mod tests {
         AsmError {
             line,
             span,
-            message: String::new(),
+            kind: AsmErrorKind::RomFull,
         }
     }
 
@@ -459,7 +461,13 @@ mod tests {
         assert!(Revision::B.isa().assemble(source).is_ok());
         let isa = Revision::A.isa();
         let errors = isa.assemble(source).unwrap_err();
-        assert_eq!(errors[0].message, "'ADC' is not supported by CalCo Rev A");
+        assert_eq!(
+            errors[0].kind,
+            AsmErrorKind::Unsupported {
+                form: "ADC".into(),
+                isa: "CalCo Rev A",
+            }
+        );
         let lexicon = Lexicon::new(isa, source);
         let underlined: Vec<&str> = Segment::split(
             source,

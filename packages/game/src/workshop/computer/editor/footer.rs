@@ -5,15 +5,13 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
-use ld60_devices::{DeviceError, IsaKind, ProgramError};
-use ld60_levels::LevelError;
 
 use super::Editor;
 use super::breakpoints::Breakpoints;
 use super::page::Page;
 use super::trace::TraceView;
 use crate::audio::KeyClicks;
-use crate::device::{BoardLetter, DeviceName, Emulator};
+use crate::device::Emulator;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{Aside, Focus, Focused};
 use crate::workshop::clock::{Busy, Chore};
@@ -322,63 +320,9 @@ impl Run {
     }
 }
 
-impl From<&LevelError> for Message {
-    /// The first assembler error with its line, or the error itself.
-    fn from(err: &LevelError) -> Self {
-        match err {
-            LevelError::Assemble(errors) => match errors.as_slice() {
-                [] => Self::new("editor-assembly-failed"),
-                [only] => Self::new("editor-asm-error")
-                    .with("line", only.line)
-                    .with("message", only.message.as_str()),
-                [first, rest @ ..] => Self::new("editor-asm-error-more")
-                    .with("line", first.line)
-                    .with("message", first.message.as_str())
-                    .with("more", rest.len()),
-            },
-            LevelError::Parse(message) => {
-                Self::new("editor-error-parse").with("message", message.as_str())
-            }
-            LevelError::Write(_) => Self::new("editor-error-write"),
-            LevelError::BoardNotAllowed(rev) => Self::new("editor-error-board-not-allowed")
-                .with("board", BoardLetter(*rev).to_string()),
-            LevelError::NoRewrite(rev) => {
-                Self::new("editor-error-no-rewrite").with("board", BoardLetter(*rev).to_string())
-            }
-            LevelError::Device(DeviceError::ChipMismatch { device, chip }) => {
-                let chip = match chip {
-                    IsaKind::Calco => "CalCo",
-                };
-                Self::new("editor-error-chip-mismatch")
-                    .with("device", device.name())
-                    .with("chip", chip)
-            }
-            LevelError::Device(DeviceError::RomSize { expected, actual }) => {
-                Self::new("editor-error-rom-size")
-                    .with("expected", *expected)
-                    .with("actual", *actual)
-            }
-        }
-    }
-}
-
-impl From<ProgramError> for Message {
-    fn from(err: ProgramError) -> Self {
-        match err {
-            ProgramError::MaskRom => Self::new("editor-burn-mask-rom"),
-            ProgramError::SizeMismatch => Self::new("editor-burn-size-mismatch"),
-            ProgramError::BitConflict { addr } => {
-                Self::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use ld60_devices::{BoardRev, DeviceKind};
     use ld60_levels::{GAME_SEED, Variant};
-    use ld60_machine::AsmError;
 
     use super::*;
     use crate::locale::Locale;
@@ -435,40 +379,6 @@ mod tests {
             assert!(matches!(status, Localized::Message(_)), "{status:?}");
         }
         Locale::on_disk().assert_formats(statuses);
-    }
-
-    #[test]
-    fn every_error_formats() {
-        let asm = |line| AsmError {
-            line,
-            span: 0..1,
-            message: "unknown mnemonic".into(),
-        };
-        let errors = [
-            LevelError::Assemble(Vec::new()),
-            LevelError::Assemble(vec![asm(1)]),
-            LevelError::Assemble(vec![asm(1), asm(2)]),
-            LevelError::Parse("bad".into()),
-            LevelError::Write(ron::Error::Eof),
-            LevelError::BoardNotAllowed(BoardRev::B),
-            LevelError::NoRewrite(BoardRev::C),
-            LevelError::Device(DeviceError::ChipMismatch {
-                device: DeviceKind::Summa6,
-                chip: IsaKind::Calco,
-            }),
-            LevelError::Device(DeviceError::RomSize {
-                expected: 256,
-                actual: 1,
-            }),
-        ];
-        let burns = [
-            ProgramError::MaskRom,
-            ProgramError::SizeMismatch,
-            ProgramError::BitConflict { addr: 0x1F },
-        ];
-        let locale = Locale::on_disk();
-        locale.assert_formats(errors.iter().map(Message::from));
-        locale.assert_formats(burns.map(Message::from));
     }
 
     #[test]
