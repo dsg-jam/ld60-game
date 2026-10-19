@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::rug::Rug;
+use super::rug::{self, Rug};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
@@ -57,10 +57,12 @@ pub(crate) struct Shop;
 
 impl Shop {
     fn on_add(add: On<Add<Shop>>, mut commands: Commands) {
-        let room = Block::between(
-            Vec3::new(-SIZE.x / 2.0, 0.0, FRONT),
-            Vec3::new(SIZE.x / 2.0, SIZE.y, FRONT + SIZE.z),
-        );
+        let ShopLayout {
+            room,
+            shelf,
+            cabinet,
+            rug,
+        } = ShopLayout::new();
         let (min, max) = (room.min(), room.max());
         let floor = Block::between(min.with_z(FRONT + PILLAR.y), max.with_y(PLATFORM));
         let ceiling = Block::between(min.with_y(max.y - WALL), max);
@@ -77,20 +79,9 @@ impl Shop {
             ))
         });
 
-        // Shelves along the left wall, a cabinet against the right one.
-        let shelf_x = room.min().x + WALL + SHELF_DEPTH / 2.0;
-        let shelf_z = FRONT + BEHIND_COUNTER + SHELF_LENGTH / 2.0;
-        let shelf = Block::new(Vec3::new(SHELF_DEPTH, SHELF_HEIGHT, SHELF_LENGTH))
-            .translated(Vec3::new(shelf_x, PLATFORM, shelf_z));
-        let cabinet = Block::new(CABINET).translated(Vec3::new(
-            room.max().x - WALL - CABINET.x / 2.0,
-            PLATFORM,
-            FRONT + BEHIND_COUNTER + CABINET.z / 2.0,
-        ));
-
         commands.entity(add.entity).with_children(|shop| {
             shop.spawn((Shape::cuboid(&floor, BOARDS), Finish::Planks));
-            shop.spawn((Rug, Transform::from_xyz(0.0, PLATFORM, RUG_Z)));
+            shop.spawn((Rug, Transform::from_translation(rug.bottom())));
             for wall in [ceiling, left, right, back] {
                 shop.spawn((Shape::cuboid(&wall, PLASTER), Finish::Plaster));
             }
@@ -138,5 +129,51 @@ impl Shop {
                 z += size.z + 0.03;
             }
         }
+    }
+}
+
+/// Geometry of the [`Shop`] in its own space, which is the world's.
+pub(crate) struct ShopLayout {
+    /// The whole room including its walls, from the street level up.
+    pub(crate) room: Block,
+    /// Along the left wall.
+    pub(crate) shelf: Block,
+    /// Against the right wall.
+    pub(crate) cabinet: Block,
+    /// On the floor, under the player's seat.
+    pub(crate) rug: Block,
+}
+
+impl ShopLayout {
+    pub(crate) fn new() -> Self {
+        let room = Block::between(
+            Vec3::new(-SIZE.x / 2.0, 0.0, FRONT),
+            Vec3::new(SIZE.x / 2.0, SIZE.y, FRONT + SIZE.z),
+        );
+        let shelf_x = room.min().x + WALL + SHELF_DEPTH / 2.0;
+        let shelf_z = FRONT + BEHIND_COUNTER + SHELF_LENGTH / 2.0;
+        let shelf = Block::new(Vec3::new(SHELF_DEPTH, SHELF_HEIGHT, SHELF_LENGTH))
+            .translated(Vec3::new(shelf_x, PLATFORM, shelf_z));
+        let cabinet = Block::new(CABINET).translated(Vec3::new(
+            room.max().x - WALL - CABINET.x / 2.0,
+            PLATFORM,
+            FRONT + BEHIND_COUNTER + CABINET.z / 2.0,
+        ));
+        Self {
+            room,
+            shelf,
+            cabinet,
+            rug: Block::new(rug::SIZE).translated(Vec3::new(0.0, PLATFORM, RUG_Z)),
+        }
+    }
+
+    /// The air inside the walls, above the floor and under the ceiling.
+    /// Its -Z side is the open front.
+    pub(crate) fn air(&self) -> Block {
+        let (min, max) = (self.room.min(), self.room.max());
+        Block::between(
+            Vec3::new(min.x + WALL, PLATFORM, min.z),
+            Vec3::new(max.x - WALL, max.y - WALL, max.z - WALL),
+        )
     }
 }

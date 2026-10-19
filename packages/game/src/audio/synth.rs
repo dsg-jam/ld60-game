@@ -3,8 +3,11 @@ mod drops;
 mod keys;
 mod paper;
 mod rain;
+mod room;
 
 use std::f32::consts::{PI, TAU};
+
+use self::room::Room;
 
 pub(super) const SAMPLE_RATE: u32 = 44_100;
 
@@ -234,38 +237,72 @@ impl Samples {
         }
     }
 
-    /// Adds the reflections of the shop around the desk: a short, dull
-    /// tail `level` times as loud as the sound, after Jarvelainen and
-    /// Karjalainen, "Reverberation modeling using velvet noise".
-    fn in_room(mut self, seed: u32, level: f32) -> Self {
-        /// Seconds to fall by 60 dB.
-        const DECAY: f32 = 0.12;
-        /// Reflections per second.
-        const DENSITY: f32 = 1_200.0;
-        const PREDELAY: f32 = 0.003;
+    /// Adds the echoes and the tail of `room`. The tail is velvet noise,
+    /// after Jarvelainen and Karjalainen, "Reverberation modeling using
+    /// velvet noise", and gets duller as it dies down.
+    fn in_room(mut self, seed: u32, room: &Room) -> Self {
+        /// Reflections per second in the tail.
+        const DENSITY: f32 = 1_500.0;
+        /// The tail loses its highs above this many hertz.
+        const DULL: f32 = 3_000.0;
         let rate = SAMPLE_RATE as f32;
         let mut dice = Noise::new(seed.wrapping_add(90));
+        let start = room.tail_start * rate;
         let spacing = rate / DENSITY;
-        let taps: Vec<(usize, f32)> = (0..(DECAY * DENSITY) as usize)
+        let mut tail: Vec<(usize, f32)> = (0..((room.decay - room.tail_start).max(0.0) * DENSITY)
+            as usize)
             .map(|index| {
-                let delay = PREDELAY * rate + spacing * (index as f32 + (dice.next() + 1.0) / 2.0);
+                let delay = start + spacing * (index as f32 + (dice.next() + 1.0) / 2.0);
                 let sign = if dice.next() < 0.0 { -1.0 } else { 1.0 };
-                let gain = sign * level * (-6.9 * delay / rate / DECAY).exp();
-                (delay as usize, gain)
+                (
+                    delay as usize,
+                    sign * (-6.9 * delay / rate / room.decay).exp(),
+                )
             })
             .collect();
-        let tail = taps.last().map_or(0, |&(delay, _)| delay);
+        let energy: f32 = tail.iter().map(|(_, gain)| gain * gain).sum();
+        let scale = if energy > 0.0 {
+            (room.tail / energy).sqrt()
+        } else {
+            0.0
+        };
+        for (_, gain) in &mut tail {
+            *gain *= scale;
+        }
+        let echoes: Vec<(usize, f32)> = room
+            .echoes
+            .iter()
+            .map(|echo| ((echo.delay * rate) as usize, echo.gain))
+            .collect();
+        let length = tail
+            .last()
+            .map_or(0, |&(delay, _)| delay)
+            .max(start as usize);
+        // Only the part of the sound that is still audible has to be
+        // reflected.
+        let peak = self
+            .0
+            .iter()
+            .fold(0.0_f32, |max, sample| max.max(sample.abs()));
+        let heard = self
+            .0
+            .iter()
+            .rposition(|sample| sample.abs() > peak * 1e-3)
+            .map_or(0, |last| last + 1);
         let dry = self.0.len();
-        let mut wet = vec![0.0; dry + tail];
-        for &(delay, gain) in &taps {
-            for (out, sample) in wet[delay..].iter_mut().zip(&self.0) {
-                *out += sample * gain;
+        let mut clear = vec![0.0; dry + length];
+        let mut dull = vec![0.0; dry + length];
+        for (taps, wet) in [(&echoes, &mut clear), (&tail, &mut dull)] {
+            for &(delay, gain) in taps {
+                for (out, sample) in wet[delay..].iter_mut().zip(&self.0[..heard]) {
+                    *out += sample * gain;
+                }
             }
         }
-        let mut dull = Lowpass::new(0.25);
-        self.0.resize(dry + tail, 0.0);
-        for (sample, wet) in self.0.iter_mut().zip(wet) {
-            *sample += dull.next(wet);
+        let mut filter = Lowpass::at(DULL);
+        self.0.resize(dry + length, 0.0);
+        for ((sample, clear), dull) in self.0.iter_mut().zip(clear).zip(dull) {
+            *sample += clear + filter.next(dull);
         }
         self
     }

@@ -12,7 +12,7 @@ use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 
 /// The knotted part, long along Z.
-const SIZE: Vec3 = Vec3::new(1.3, 0.008, 1.8);
+pub(super) const SIZE: Vec3 = Vec3::new(1.3, 0.008, 1.8);
 const RED: Color = Color::srgb_u8(0x7a, 0x24, 0x1e);
 const WOOL: Color = Color::srgb_u8(0x9e, 0x8c, 0x6c);
 

@@ -1,9 +1,10 @@
 use std::f32::consts::PI;
 
-use super::{Band, Lowpass, Mode, Noise, Resonator, SAMPLE_RATE, Samples, Vary};
+use super::{Band, Lowpass, Mode, Noise, Resonator, Room, SAMPLE_RATE, Samples, Vary};
+use crate::workshop::DeskSpots;
 
-/// How loud the shop answers a sheet.
-const ROOM: f32 = 0.08;
+/// Meters from the eyes to the open manuals file while reading it.
+const REACH: f32 = 0.33;
 /// Seconds of sound after the sheet lands.
 const SETTLE: f32 = 0.15;
 /// How far a hit moves the body of a sheet, which is light and soft.
@@ -165,7 +166,10 @@ impl Samples {
                 .sum::<f32>();
             crackles + rustle + air + puff + thump * GIVE + ring
         })
-        .in_room(seed, ROOM)
+        .in_room(seed, &{
+            let spots = DeskSpots::new();
+            Room::leaning_in(spots.manuals, spots.seat, REACH)
+        })
         .normalized(0.7)
     }
 }

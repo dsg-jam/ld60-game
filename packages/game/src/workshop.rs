@@ -59,6 +59,27 @@ const MANUALS_OPEN_SPOT: Vec2 = Vec2::new(-0.62, -0.4);
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
 
+/// Where the player sits and where the things that make sounds on the
+/// counter stand, in the world.
+pub(crate) struct DeskSpots {
+    /// The eyes and ears of the seated player.
+    pub(crate) seat: Vec3,
+    pub(crate) computer: Vec3,
+    /// The manuals file, lying open.
+    pub(crate) manuals: Vec3,
+}
+
+impl DeskSpots {
+    pub(crate) fn new() -> Self {
+        let counter = CounterLayout::new();
+        Self {
+            seat: counter.seated_view().translation,
+            computer: counter.place(COMPUTER_SPOT, 0.0).translation,
+            manuals: counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0).translation,
+        }
+    }
+}
+
 pub(crate) struct WorkshopPlugin;
 
 impl Plugin for WorkshopPlugin {

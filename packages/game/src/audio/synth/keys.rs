@@ -1,7 +1,8 @@
-use super::{Lowpass, Mode, Noise, Resonator, Samples, Vary};
+use super::{Lowpass, Mode, Noise, Resonator, Room, Samples, Vary};
+use crate::workshop::DeskSpots;
 
-/// How loud the shop answers a key.
-const ROOM: f32 = 0.06;
+/// Meters from the eyes to the keyboard while sitting at the computer.
+const REACH: f32 = 0.3;
 
 impl Samples {
     /// A linear key switch going down, after recordings of Cherry MX keys
@@ -58,7 +59,7 @@ impl Samples {
                 + spring.iter_mut().map(|mode| mode.next(hit)).sum::<f32>();
             finger + contact + ring
         })
-        .in_room(seed, ROOM)
+        .in_room(seed, &Self::keyboard_room())
         .normalized(0.8)
     }
 
@@ -104,7 +105,12 @@ impl Samples {
                 + spring.iter_mut().map(|mode| mode.next(hit)).sum::<f32>()
                 + contact
         })
-        .in_room(seed.wrapping_add(1), ROOM)
+        .in_room(seed.wrapping_add(1), &Self::keyboard_room())
         .normalized(0.8)
+    }
+
+    fn keyboard_room() -> Room {
+        let spots = DeskSpots::new();
+        Room::leaning_in(spots.computer, spots.seat, REACH)
     }
 }
