@@ -144,8 +144,9 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         stain *= mix(vec3<f32>(1.0), COFFEE, coffee * 0.55);
     }
 
-    let color = pbr_input.material.base_color.rgb * ink * mix(vec3<f32>(1.0), stain, bare);
-    pbr_input.material.base_color = vec4<f32>(color, 1.0);
+    let paper = ink * mix(vec3<f32>(1.0), stain, bare);
+    pbr_input.material.base_color = vec4<f32>(pbr_input.material.base_color.rgb * paper, 1.0);
+    pbr_input.material.emissive = vec4<f32>(pbr_input.material.emissive.rgb * paper, pbr_input.material.emissive.a);
 
     var out: FragmentOutput;
 @if(PREPASS_PIPELINE) {

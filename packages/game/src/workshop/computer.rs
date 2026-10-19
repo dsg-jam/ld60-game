@@ -71,7 +71,6 @@ impl Computer {
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
         mut crt_materials: ResMut<Assets<CrtMaterial>>,
     ) {
         let layout = ComputerLayout::new();
@@ -99,7 +98,6 @@ impl Computer {
             &layout.monitor,
             &mut images,
             &mut meshes,
-            &mut materials,
         );
         commands
             .entity(add.entity)

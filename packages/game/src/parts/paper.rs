@@ -13,7 +13,7 @@ use bevy::{
 
 pub(crate) use self::leaf::Binding;
 use self::leaf::{Leaf, LeafLook};
-use self::sheet::{PaperMaterial, SheetPlugin, SheetPrint, Wrinkles};
+use self::sheet::{PaperMaterial, SheetGlow, SheetPlugin, SheetPrint, Wrinkles};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{Focus, Focused};
@@ -213,6 +213,28 @@ impl Paper {
             wrinkles,
             SheetPrint(canvas.image.clone()),
             Transform::from_translation(at).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+        )
+    }
+
+    /// Like [`Paper::sheet`], but upright and hanging from a clip on its top
+    /// edge. It gives off `glow` where it is bare, so it stays readable in
+    /// the shade.
+    pub(crate) fn hanging_sheet(
+        canvas: &UiCanvas,
+        document: impl Hash,
+        size: Vec2,
+        at: Vec3,
+        glow: LinearRgba,
+        meshes: &mut Assets<Mesh>,
+    ) -> impl Bundle {
+        let mut wrinkles = Wrinkles::new(size, fixed_hash_one(document));
+        wrinkles.hold(&Binding::clip(size));
+        (
+            Mesh3d(meshes.add(wrinkles.mesh())),
+            wrinkles,
+            SheetPrint(canvas.image.clone()),
+            SheetGlow(glow),
+            Transform::from_translation(at),
         )
     }
 

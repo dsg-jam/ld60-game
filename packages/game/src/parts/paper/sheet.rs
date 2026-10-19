@@ -91,6 +91,10 @@ struct SheetParams {
 #[derive(Component, Debug)]
 pub(super) struct SheetPrint(pub(super) Handle<Image>);
 
+/// Light a sheet gives off where the paper is bare.
+#[derive(Component, Debug)]
+pub(super) struct SheetGlow(pub(super) LinearRgba);
+
 /// The shape of a crumpled sheet that was flattened again.
 #[derive(Component, Debug, Clone, Copy)]
 pub(super) struct Wrinkles {
@@ -252,16 +256,17 @@ impl Wrinkles {
 impl Sheet {
     fn add_material(
         add: On<Add<SheetPrint>>,
-        sheets: Query<(&SheetPrint, &Wrinkles)>,
+        sheets: Query<(&SheetPrint, &Wrinkles, Option<&SheetGlow>)>,
         mut materials: ResMut<Assets<PaperMaterial>>,
         mut commands: Commands,
     ) {
-        let Ok((SheetPrint(print), &wrinkles)) = sheets.get(add.entity) else {
+        let Ok((SheetPrint(print), &wrinkles, glow)) = sheets.get(add.entity) else {
             return;
         };
         let material = materials.add(ExtendedMaterial {
             base: StandardMaterial {
                 base_color: PAPER_SHADE,
+                emissive: glow.map_or(LinearRgba::BLACK, |glow| glow.0),
                 perceptual_roughness: ROUGHNESS,
                 reflectance: PAPER_REFLECTANCE,
                 ..default()

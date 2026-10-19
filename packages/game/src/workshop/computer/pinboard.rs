@@ -4,7 +4,7 @@ use super::monitor::Monitor;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
-use crate::parts::paper::{PAPER_REFLECTANCE, PAPER_SHADE};
+use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::Aside;
 use crate::workshop::manuals::Pins;
@@ -76,7 +76,6 @@ impl PinBoard {
         monitor: &Monitor,
         images: &mut Assets<Image>,
         meshes: &mut Assets<Mesh>,
-        materials: &mut Assets<StandardMaterial>,
     ) -> Self {
         let body = monitor.body;
         let hinge = Vec3::new(
@@ -97,7 +96,7 @@ impl PinBoard {
             Vec3::splat(RAIL_THICKNESS / 2.0).with_x(0.0),
         );
         let canvases: Vec<_> = (0..Pins::MAX)
-            .map(|_| UiCanvas::spawn_smooth(commands, images, CANVAS_SIZE, parent))
+            .map(|_| UiCanvas::spawn_print(commands, images, CANVAS_SIZE, parent))
             .collect();
         let mut slots = Vec::new();
         let mut parts = [Entity::PLACEHOLDER; 2];
@@ -130,17 +129,14 @@ impl PinBoard {
                         );
                         let sheet = board
                             .spawn((
-                                Mesh3d(meshes.add(Rectangle::from_size(SHEET_SIZE))),
-                                MeshMaterial3d(materials.add(StandardMaterial {
-                                    base_color: PAPER_SHADE,
-                                    base_color_texture: Some(canvas.image.clone()),
-                                    emissive: SHEET_GLOW,
-                                    emissive_texture: Some(canvas.image.clone()),
-                                    perceptual_roughness: 0.95,
-                                    reflectance: PAPER_REFLECTANCE,
-                                    ..default()
-                                })),
-                                Transform::from_translation(center),
+                                Paper::hanging_sheet(
+                                    &canvas,
+                                    ("pinned", index),
+                                    SHEET_SIZE,
+                                    center,
+                                    SHEET_GLOW,
+                                    meshes,
+                                ),
                                 Visibility::Hidden,
                             ))
                             .id();
