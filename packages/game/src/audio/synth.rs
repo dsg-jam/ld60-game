@@ -233,6 +233,42 @@ impl Samples {
         }
     }
 
+    /// Adds the reflections of the shop around the desk: a short, dull
+    /// tail `level` times as loud as the sound, after Jarvelainen and
+    /// Karjalainen, "Reverberation modeling using velvet noise".
+    fn in_room(mut self, seed: u32, level: f32) -> Self {
+        /// Seconds to fall by 60 dB.
+        const DECAY: f32 = 0.12;
+        /// Reflections per second.
+        const DENSITY: f32 = 1_200.0;
+        const PREDELAY: f32 = 0.003;
+        let rate = SAMPLE_RATE as f32;
+        let mut dice = Noise::new(seed.wrapping_add(90));
+        let spacing = rate / DENSITY;
+        let taps: Vec<(usize, f32)> = (0..(DECAY * DENSITY) as usize)
+            .map(|index| {
+                let delay = PREDELAY * rate + spacing * (index as f32 + (dice.next() + 1.0) / 2.0);
+                let sign = if dice.next() < 0.0 { -1.0 } else { 1.0 };
+                let gain = sign * level * (-6.9 * delay / rate / DECAY).exp();
+                (delay as usize, gain)
+            })
+            .collect();
+        let tail = taps.last().map_or(0, |&(delay, _)| delay);
+        let dry = self.0.len();
+        let mut wet = vec![0.0; dry + tail];
+        for &(delay, gain) in &taps {
+            for (out, sample) in wet[delay..].iter_mut().zip(&self.0) {
+                *out += sample * gain;
+            }
+        }
+        let mut dull = Lowpass::new(0.25);
+        self.0.resize(dry + tail, 0.0);
+        for (sample, wet) in self.0.iter_mut().zip(wet) {
+            *sample += dull.next(wet);
+        }
+        self
+    }
+
     fn normalized(mut self, peak: f32) -> Self {
         let max = self
             .0
@@ -310,6 +346,25 @@ impl Mode {
             decay,
             gain,
         }
+    }
+
+    /// `count` modes at random between `low` and `high` hertz, so a part
+    /// rings with a cluster of close tones instead of a few clean ones.
+    /// Each mode rings for about `q` cycles and is as loud as `gain` or a
+    /// little quieter.
+    fn scatter(vary: &mut Vary, low: f32, high: f32, count: usize, q: f32, gain: f32) -> Vec<Self> {
+        let step = (high / low).ln() / count as f32;
+        (0..count)
+            .map(|index| {
+                let along = index as f32 + vary.by(0.5) - 0.5;
+                let frequency = low * (step * along).exp();
+                Self::new(
+                    frequency,
+                    PI * frequency / (q * vary.by(0.3)),
+                    gain * (1.0 - 0.2 * vary.by(1.0)),
+                )
+            })
+            .collect()
     }
 }
 
