@@ -68,7 +68,9 @@ pub(super) enum Action {
     Back,
     /// Goes to the title screen.
     Title,
-    /// Opens the shop again after it closed.
+    /// Asks before a new run starts.
+    Restart,
+    /// Starts a new run.
     NewRun,
     /// Browsers have no way to close the game, so only native builds quit.
     #[cfg(not(target_arch = "wasm32"))]

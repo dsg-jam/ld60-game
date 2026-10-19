@@ -20,6 +20,7 @@ const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
 pub(super) const ENTRIES: &[(Action, &str)] = &[
     (Action::Resume, "menu-resume"),
     (Action::Settings, "menu-settings"),
+    (Action::Restart, "menu-restart"),
     (Action::Title, "menu-title"),
     #[cfg(not(target_arch = "wasm32"))]
     (Action::Quit, "menu-quit"),

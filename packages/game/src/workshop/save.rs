@@ -105,6 +105,7 @@ mod tests {
     use crate::workshop::clock::PlanetSet;
     use crate::workshop::levels::Levels;
     use crate::workshop::rent::RentNote;
+    use crate::workshop::run::NewRun;
     use crate::workshop::salvage::Find;
 
     fn world(store: Store) -> World {
@@ -187,6 +188,25 @@ mod tests {
         let reopened = saved.clone().reopened();
         assert_eq!(reopened.run, saved.run.next());
         assert_eq!(reopened.clock, Clock::default());
+    }
+
+    #[test]
+    fn a_new_run_replaces_the_save() {
+        let mut world = world(Store::in_temp("new-run"));
+        world.init_resource::<Focused>();
+        world.init_resource::<NextState<Focus>>();
+        world.add_observer(Run::restart);
+        let mut run = Run::default().next();
+        run.add_till(40);
+        world.insert_resource(run.clone());
+        world.insert_resource(Clock::from(23));
+        written(&mut world);
+        world.trigger(NewRun);
+        world.flush();
+        let saved = written(&mut world);
+        assert_eq!(saved.run, run.next());
+        assert_eq!(saved.clock, Clock::default());
+        assert_eq!(saved.clone().reopened(), saved);
     }
 
     #[test]

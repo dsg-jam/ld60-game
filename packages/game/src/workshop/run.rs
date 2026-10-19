@@ -388,7 +388,7 @@ impl Run {
     }
 
     /// Clears the counter and opens the shop again with an empty till.
-    fn restart(
+    pub(super) fn restart(
         _: On<NewRun>,
         mut run: ResMut<Run>,
         mut clock: ResMut<Clock>,

@@ -10,6 +10,9 @@ menu-quit = Quit
 menu-back = Back
 menu-closed = Shop closed
 menu-new-run = Open the shop again
+menu-restart = New run
+menu-restart-warning = The current run and its save are lost.
+menu-start-over = Start over
 
 closed-cycles = Planet sets with the rent paid: { $cycles }
 closed-fixed = Gadgets fixed: { $jobs }

@@ -2,6 +2,7 @@ mod closed;
 mod credits;
 mod list;
 mod pause;
+mod restart;
 mod settings;
 mod title;
 
@@ -10,6 +11,7 @@ use bevy::prelude::*;
 use self::closed::StatsPage;
 use self::credits::{Credits, CreditsHandle, CreditsPage};
 use self::list::{Action, Entries};
+use self::restart::RestartPage;
 pub(crate) use self::settings::Settings;
 use self::settings::SettingsPage;
 use crate::audio::Mixer;
@@ -74,6 +76,8 @@ pub(crate) enum Page {
     Entries,
     Settings,
     Credits,
+    /// Asks before a new run replaces the current one.
+    Restart,
 }
 
 /// Whether the player has started playing.
@@ -144,6 +148,9 @@ impl Column {
             (_, Page::Settings) => {
                 column.with_child((DespawnOnExit(Page::Settings), SettingsPage::bundle()));
             }
+            (_, Page::Restart) => {
+                column.with_child((DespawnOnExit(Page::Restart), RestartPage::bundle()));
+            }
             (AppState::Closed, Page::Entries) => {
                 column.with_child((
                     DespawnOnExit(Page::Entries),
@@ -188,13 +195,17 @@ impl Action {
                 next_state.set(AppState::Playing);
             }
             Self::NewRun => {
+                started.0 = true;
                 commands.trigger(NewRun);
                 next_state.set(AppState::Playing);
             }
             Self::Settings => next_page.set(Page::Settings),
             Self::Credits => next_page.set(Page::Credits),
+            Self::Restart => next_page.set(Page::Restart),
             Self::Back => match (*app_state.get(), page.map(|page| *page.get())) {
-                (_, Some(Page::Settings | Page::Credits)) => next_page.set(Page::Entries),
+                (_, Some(Page::Settings | Page::Credits | Page::Restart)) => {
+                    next_page.set(Page::Entries)
+                }
                 // Browsers only lock the cursor after a click.
                 (AppState::Paused, _) if cfg!(not(target_arch = "wasm32")) => {
                     next_state.set(AppState::Playing);
@@ -238,6 +249,7 @@ mod tests {
                 menu.spawn(Entries::bundle(entries));
             }
             menu.spawn(SettingsPage::bundle());
+            menu.spawn(RestartPage::bundle());
         });
         let settings = Settings::default();
         let toggled = Settings::toggled_hints();
@@ -246,5 +258,36 @@ mod tests {
             texts.push(toggled.value(setting).into());
         }
         Locale::on_disk().assert_formats(texts);
+    }
+
+    #[test]
+    fn a_new_run_is_asked_for_first() {
+        let mut app = App::new();
+        app.add_plugins(bevy::state::app::StatesPlugin)
+            .init_state::<AppState>()
+            .add_sub_state::<Page>()
+            .init_resource::<Started>()
+            .init_resource::<Run>()
+            .add_message::<AppExit>()
+            .add_observer(Action::apply)
+            .add_observer(|_: On<NewRun>, mut run: ResMut<Run>| *run = run.next());
+        let mut pick = |action| {
+            app.world_mut().trigger(action);
+            app.update();
+            let world = app.world();
+            (
+                *world.resource::<State<AppState>>().get(),
+                world.get_resource::<State<Page>>().map(|page| *page.get()),
+            )
+        };
+        assert_eq!(
+            pick(Action::Restart),
+            (AppState::Title, Some(Page::Restart))
+        );
+        assert_eq!(pick(Action::Back), (AppState::Title, Some(Page::Entries)));
+        pick(Action::Restart);
+        assert_eq!(pick(Action::NewRun), (AppState::Playing, None));
+        assert!(app.world().resource::<Started>().0);
+        assert_eq!(*app.world().resource::<Run>(), Run::default().next());
     }
 }

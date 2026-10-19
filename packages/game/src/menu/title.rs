@@ -29,6 +29,7 @@ pub(super) const START_ENTRIES: &[(Action, &str)] = &[
 /// saved run waits.
 pub(super) const CONTINUE_ENTRIES: &[(Action, &str)] = &[
     (Action::Start, "menu-continue"),
+    (Action::Restart, "menu-restart"),
     (Action::Settings, "menu-settings"),
     (Action::Credits, "menu-credits"),
     #[cfg(not(target_arch = "wasm32"))]
