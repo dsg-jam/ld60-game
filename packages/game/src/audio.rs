@@ -15,9 +15,10 @@ use crate::player::camera::PlayerCamera;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
-/// Keys this wide in meters play at their natural pitch. Wider keys sound
-/// lower.
-const KEY_WIDTH: f32 = 0.018;
+/// Keys at least this wide in meters, like the space bar, rest on a
+/// stabilizer wire and sound a little lower.
+const LONG_KEY: f32 = 0.08;
+const LONG_KEY_PITCH: f32 = 0.94;
 /// Meters between the ears of the player.
 const EAR_GAP: f32 = 0.2;
 /// So small that rodio never fades a sound with distance. Sounds on the
@@ -26,8 +27,8 @@ const NEAR: SpatialScale = SpatialScale::new(0.002);
 /// Rodio plays a sound straight ahead at three quarters of its volume on
 /// both ears.
 const CENTER_LOSS: f32 = 0.75;
-/// How much each press of a key varies in pitch and volume.
-const KEY_NUDGE: f32 = 0.025;
+/// How much each press of a key varies in volume.
+const KEY_NUDGE: f32 = 0.15;
 /// Sounds that would stand out if they always came the same get this many
 /// takes, played in random order.
 const TAKES: u32 = 6;
@@ -164,8 +165,8 @@ impl Sound {
             Self::Ratchet => 0.12,
             Self::Latch | Self::Unlatch => 0.5,
             Self::Static => 0.4,
-            Self::KeyDown => 0.43,
-            Self::KeyUp => 0.26,
+            Self::KeyDown => 0.21,
+            Self::KeyUp => 0.12,
             Self::PageTurn => 0.29,
             Self::DividerTurn => 0.35,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
@@ -346,12 +347,12 @@ impl Sounds {
             let Some(takes) = sounds.0.get_mut(&sound) else {
                 continue;
             };
-            // Each key differs a little in pitch, and so does each press,
-            // so typing doesn't sound like a loop.
-            let own = 1.0 + (entity.to_bits() % 5) as f32 * 0.01 - 0.02;
-            let pitch = (KEY_WIDTH / key.width()).powf(0.2) * own * takes.nudge(KEY_NUDGE);
-            let loudness = takes.nudge(4.0 * KEY_NUDGE);
-            let volume = sound.volume() * mixer.gain() * loudness;
+            let pitch = if key.width() < LONG_KEY {
+                1.0
+            } else {
+                LONG_KEY_PITCH
+            };
+            let volume = sound.volume() * mixer.gain() * takes.nudge(KEY_NUDGE);
             commands.spawn(Self::spatial(
                 takes.next().clone(),
                 transform.translation(),
