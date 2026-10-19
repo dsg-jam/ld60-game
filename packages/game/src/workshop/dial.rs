@@ -28,7 +28,9 @@ const STICK: Vec3 = Vec3::new(0.006, 0.003, 0.085);
 const PLANET: Vec3 = Vec3::new(0.026, 0.004, 0.026);
 const RING: Vec3 = Vec3::new(0.05, 0.003, 0.006);
 const RING_TILT: f32 = 0.35;
-const PIN: Vec3 = Vec3::new(0.014, 0.008, 0.014);
+const PIN: Vec3 = Vec3::new(0.014, 0.012, 0.014);
+/// Space between the marks and the hand.
+const HAND_GAP: f32 = 0.002;
 
 const WOOD: Color = Color::srgb_u8(0x6a, 0x4e, 0x36);
 const CREAM: Color = Color::srgb_u8(0xd8, 0xc8, 0xa0);
@@ -82,9 +84,10 @@ impl Dial {
                 (MARK, INK)
             };
             let turn = Self::hand_rotation(phase);
-            let at = paint.center + turn * Vec3::NEG_Z * MARK_RADIUS;
+            let at = paint.center.with_y(paint.max().y) + turn * Vec3::NEG_Z * MARK_RADIUS;
             (Block::new(size), turn, at, color)
         });
+        let hand_at = paint.max().y + SET_MARK.y.max(MARK.y) + HAND_GAP;
         let pin = Block::new(PIN).on_top_of(&face);
         let stick = Block::new(STICK).translated(Vec3::NEG_Z * STICK.z / 2.0);
         let planet = Block::new(PLANET).translated(Vec3::NEG_Z * STICK.z);
@@ -102,17 +105,17 @@ impl Dial {
                 for (x, width, height) in ROOFS {
                     let roof = Block::new(Vec3::new(width, HORIZON.y, height))
                         .on_top_of(&face)
-                        .translated(Vec3::new(x, 0.0, height / 2.0));
+                        .translated(Vec3::new(x, 0.0, (HORIZON.z + height) / 2.0));
                     dial.spawn(Shape::cuboid(&roof, INK));
                 }
                 for (mark, turn, at, color) in marks {
                     dial.spawn(Shape::cuboid(&mark, color))
-                        .insert(Transform::from_translation(at).with_rotation(turn));
+                        .insert(Transform::from_translation(at + mark.center).with_rotation(turn));
                 }
                 dial.spawn((Shape::cylinder(&pin, METAL), Finish::Metal));
                 dial.spawn((
                     Hand,
-                    Transform::from_translation(Vec3::Y * paint.max().y)
+                    Transform::from_translation(Vec3::Y * hand_at)
                         .with_rotation(Self::hand_rotation(clock.phase())),
                     Visibility::default(),
                 ))
