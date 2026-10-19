@@ -398,10 +398,14 @@ impl Sheet {
     ) {
         for (print, material) in &sheets {
             if let Some(mut material) = materials.get_mut(material) {
-                material.extension.params.press = print.press as u32;
-                material.extension.params.run = print.run;
+                material.extension.set_print(*print);
             }
         }
+    }
+
+    pub(crate) fn set_print(&mut self, print: Print) {
+        self.params.press = print.press as u32;
+        self.params.run = print.run;
     }
 
     /// Stains each page of a sheet in its own way.

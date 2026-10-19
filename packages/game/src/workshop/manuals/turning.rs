@@ -12,7 +12,8 @@ use super::model::{HOLE_RADIUS, Parts, holes};
 use super::pose::Pose;
 use super::stack::{Item, Stack, Turning};
 use crate::parts::paper::{
-    Leaf, LeafShape, LeafSpec, Paper, PaperMaterial, Stiffness, Wrinkles, blank_print, reprinted,
+    Leaf, LeafShape, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles, blank_print,
+    reprinted,
 };
 
 /// What the file needs to turn its leaves.
@@ -143,6 +144,7 @@ impl Stack {
         mut nodes: Query<(&mut Node, &mut UiTargetCamera)>,
         mut cameras: Query<&mut Camera>,
         sheets: Query<&MeshMaterial3d<PaperMaterial>>,
+        prints: Query<&Print>,
         mut materials: ResMut<Assets<PaperMaterial>>,
     ) {
         for (paper, stack, parts, filed, kit) in &files {
@@ -186,6 +188,10 @@ impl Stack {
                     && let Some(mut material) = materials.get_mut(material)
                 {
                     material.extension.set_page(page);
+                    let print = paper.page(page).and_then(|page| prints.get(page).ok());
+                    material
+                        .extension
+                        .set_print(print.copied().unwrap_or_default());
                 }
             }
         }
