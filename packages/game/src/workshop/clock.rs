@@ -12,16 +12,22 @@ const CYCLE: u32 = 40;
 /// well up.
 const OPENING: u32 = CYCLE / 4;
 /// How far the planet swings to each side of straight across the street, in
-/// radians.
-const SWING: f32 = 1.0;
-/// The planet's height above the horizon at rise and set, in radians.
-const LOW: f32 = -0.1;
-/// The planet's height above the horizon at its highest, in radians.
-const HIGH: f32 = 0.65;
-/// How quickly the planet glides to the time on the clock.
-const GLIDE_RATE: f32 = 2.0;
-/// Closer than this, the planet is on time, in ticks.
-const ON_TIME: f32 = 0.001;
+/// radians. At the ends it is behind the buildings next to the low ones
+/// across the street.
+const SWING: f32 = 0.7;
+/// The planet's height above the horizon at rise and set, in radians. Low
+/// enough to hide behind the buildings at the sides.
+const LOW: f32 = 0.3;
+/// The planet's height above the horizon at its highest, in radians. It
+/// passes over the low buildings across the street, below the noren.
+const HIGH: f32 = 0.58;
+/// Angular radius of the planet, in radians.
+pub(crate) const PLANET_SIZE: f32 = 0.09;
+/// Share of the cycle after rise and before set when the planet is still
+/// behind the buildings.
+const BEHIND: f32 = 0.1;
+/// Seconds the planet takes to glide to the time on the clock.
+const GLIDE_TIME: f32 = 1.2;
 
 pub(crate) struct ClockPlugin;
 
@@ -44,6 +50,10 @@ pub(crate) struct Clock {
     ticks: u32,
     /// Where the planet is shown, in ticks. It glides after `ticks`.
     shown: f32,
+    /// Where the planet was shown when the glide started, in ticks.
+    from: f32,
+    /// How far the glide has come, from 0 to 1.
+    glided: f32,
 }
 
 /// The shop spends time on `0`. Tutorial jobs take no time.
@@ -67,10 +77,7 @@ pub(crate) struct PlanetSet;
 
 impl Default for Clock {
     fn default() -> Self {
-        Self {
-            ticks: OPENING,
-            shown: OPENING as f32,
-        }
+        Self::from(OPENING)
     }
 }
 
@@ -80,6 +87,8 @@ impl From<u32> for Clock {
         Self {
             ticks,
             shown: ticks as f32,
+            from: ticks as f32,
+            glided: 1.0,
         }
     }
 }
@@ -105,6 +114,8 @@ impl Clock {
     pub(crate) fn advance(&mut self, ticks: u32) -> u32 {
         let before = self.sets();
         self.ticks += ticks;
+        self.from = self.shown;
+        self.glided = 0.0;
         self.sets() - before
     }
 
@@ -113,19 +124,33 @@ impl Clock {
         self.ticks / CYCLE
     }
 
-    /// Towards the planet as it is shown. It rises to the right of the shop
-    /// front, climbs across the street and sets to the left.
+    /// How far the planet as it is shown has come from rise to set, from 0
+    /// to 1.
+    pub(crate) fn phase(&self) -> f32 {
+        (self.shown / CYCLE as f32).fract()
+    }
+
+    /// Towards the planet as it is shown. It rises behind the buildings to
+    /// the right of the shop front, climbs over the low buildings across the
+    /// street and sets behind the buildings to the left.
     pub(crate) fn planet(&self) -> Vec3 {
-        let phase = (self.shown / CYCLE as f32).fract();
+        let phase = self.phase();
         let across = SWING * (1.0 - 2.0 * phase);
         let up = LOW + (HIGH - LOW) * (PI * phase).sin();
         Vec3::new(up.cos() * across.sin(), up.sin(), -up.cos() * across.cos())
     }
 
-    /// How much of its light the planet gives at its height, from 0 below
-    /// the horizon to 1 well above it.
+    /// How much of its light the planet gives, from 0 at rise and set to 1
+    /// once it is clear of the buildings.
     pub(crate) fn planet_light(&self) -> f32 {
-        (self.planet().y * 4.0).clamp(0.0, 1.0)
+        ((PI * self.phase()).sin() / (PI * BEHIND).sin()).min(1.0)
+    }
+
+    /// Moves the shown planet on by `secs` of its glide to the time.
+    fn glide_by(&mut self, secs: f32) {
+        self.glided = (self.glided + secs / GLIDE_TIME).min(1.0);
+        let eased = EaseFunction::SmoothStep.sample_clamped(self.glided);
+        self.shown = self.from + (self.ticks as f32 - self.from) * eased;
     }
 
     fn pass(
@@ -143,13 +168,9 @@ impl Clock {
     }
 
     fn glide(time: Res<Time>, mut clock: ResMut<Clock>) {
-        let goal = clock.ticks as f32;
-        if (goal - clock.shown).abs() < ON_TIME {
-            return;
+        if clock.glided < 1.0 {
+            clock.glide_by(time.delta_secs());
         }
-        clock
-            .shown
-            .smooth_nudge(&goal, GLIDE_RATE, time.delta_secs());
     }
 }
 
@@ -213,36 +234,46 @@ mod tests {
     #[test]
     fn planet_crosses_the_sky_in_front_of_the_shop() {
         let at = |ticks: f32| {
-            Clock {
-                ticks: 0,
-                shown: ticks,
-            }
-            .planet()
+            let mut clock = Clock::from(0);
+            clock.shown = ticks;
+            clock.planet()
         };
+        let yaw = |planet: Vec3| planet.x.atan2(-planet.z);
         let cycle = CYCLE as f32;
         let (rise, noon, set) = (at(0.0), at(cycle / 2.0), at(cycle - 0.01));
-        assert!(rise.y < 0.0 && set.y < 0.0);
-        assert!(rise.x > 0.0 && set.x < 0.0);
-        assert!(noon.y > 0.5 && noon.z < -0.7 && noon.x.abs() < 0.01);
+        // Rise and set are behind the buildings next to the low ones across.
+        assert!(yaw(rise) > 0.6 && yaw(set) < -0.6, "{rise} {set}");
+        assert!(rise.y.asin() < 0.35 && set.y.asin() < 0.35, "{rise} {set}");
+        // Noon is about where the planet hung before the clock.
+        let before = Vec3::new(-0.09, 0.545, -0.834).normalize();
+        assert!(noon.angle_between(before) < 0.2, "{noon}");
         for t in 0..CYCLE {
             let planet = at(t as f32);
             assert!(planet.z < 0.0, "{planet}");
             assert!((planet.length() - 1.0).abs() < 1e-5, "{planet}");
+            assert!(planet.y.asin() <= HIGH + 1e-5, "{planet}");
         }
-        assert_eq!(
-            Clock {
-                ticks: 0,
-                shown: 0.0
-            }
-            .planet_light(),
-            0.0
-        );
+        assert_eq!(Clock::from(0).planet_light(), 0.0);
+        assert_eq!(Clock::from(CYCLE / 2).planet_light(), 1.0);
     }
 
     #[test]
     fn the_shop_opens_with_the_planet_up() {
         let clock = Clock::default();
-        assert!(clock.planet().y > 0.3, "{}", clock.planet());
+        assert!(clock.planet().y > 0.45, "{}", clock.planet());
         assert_eq!(clock.planet_light(), 1.0);
+    }
+
+    #[test]
+    fn planet_glides_to_the_time_in_one_go() {
+        let mut clock = Clock::default();
+        clock.advance(Chore::HandIn.ticks());
+        clock.glide_by(GLIDE_TIME / 2.0);
+        let goal = clock.ticks as f32;
+        let halfway = (OPENING as f32 + goal) / 2.0;
+        assert!((clock.shown - halfway).abs() < 1e-4, "{}", clock.shown);
+        clock.glide_by(GLIDE_TIME / 2.0);
+        assert_eq!(clock.shown, goal);
+        assert_eq!(clock.glided, 1.0);
     }
 }

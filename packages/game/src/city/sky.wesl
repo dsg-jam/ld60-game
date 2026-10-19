@@ -19,6 +19,8 @@ struct Sky {
     rain: f32,
     /// How far the wind has blown the clouds, in meters.
     drift: vec2<f32>,
+    /// How clear of the buildings the planet is, from 0 to 1.
+    planet_clear: f32,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> sky: Sky;
@@ -50,6 +52,14 @@ const BAND_DARK: vec3<f32> = vec3<f32>(0.26, 0.38, 0.42);
 const RING: vec3<f32> = vec3<f32>(0.55, 0.48, 0.4);
 const RING_INNER: f32 = 1.35;
 const RING_OUTER: f32 = 2.3;
+/// Haze around the planet that its light scatters in.
+const HALO: vec3<f32> = vec3<f32>(0.05, 0.055, 0.07);
+/// The clouds thin out within this many planet radii of its center, and
+/// are thinnest within the inner one.
+const GAP_OUTER: f32 = 1.8;
+const GAP_INNER: f32 = 1.1;
+/// Share of the clouds left in front of the planet.
+const GAP_LEFT: f32 = 0.08;
 const STAR_CELLS: f32 = 300.0;
 
 fn fbm(p: vec2<f32>, salt: f32) -> f32 {
@@ -117,6 +127,13 @@ fn planet(d: vec3<f32>, background: vec3<f32>) -> vec3<f32> {
     return color;
 }
 
+/// The glow of the haze around the planet, strongest at its edge. It fades
+/// while the planet is behind the buildings.
+fn halo(d: vec3<f32>) -> vec3<f32> {
+    let off = acos(clamp(dot(d, sky.planet), -1.0, 1.0)) / sky.planet_size;
+    return HALO * exp(-max(off - 1.0, 0.0) * 0.8) * mix(0.6, 1.0, sky.rain) * sky.planet_clear;
+}
+
 /// Noise from 0 to 1 that changes from pixel to pixel without clumping,
 /// after Jimenez, "Next Generation Post Processing in Call of Duty: Advanced
 /// Warfare".
@@ -182,12 +199,16 @@ fn clouds(origin: vec3<f32>, d: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
     // Light scattered forward towards the planet glows a little brighter.
     let phase = 0.6 + 0.4 * pow(max(dot(d, sky.planet), 0.0), 2.0);
     let fade = 1.0 - smoothstep(CLOUD_REACH * 0.4, CLOUD_REACH, start);
+    // The planet always shows through, at least as a glow.
+    let r = sky.planet_size;
+    let gap = smoothstep(cos(r * GAP_OUTER), cos(r * GAP_INNER), dot(d, sky.planet));
+    let thin = fade * mix(1.0, GAP_LEFT, gap);
     var light = vec3<f32>(0.0);
     var through = 1.0;
     for (var i = 0u; i < CLOUD_STEPS; i++) {
         let t = start + (f32(i) + jitter) * step;
         let p = origin + d * t;
-        let density = cloud_density(p) * fade;
+        let density = cloud_density(p) * thin;
         if density <= 0.0 {
             continue;
         }
@@ -214,7 +235,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let clear = 1.0 - 0.8 * sky.rain;
     color += stars(d) * smoothstep(0.05, 0.4, up) * clear;
     let without_planet = color;
-    color = mix(planet(d, color), without_planet, 0.3 + 0.4 * sky.rain);
+    color = mix(planet(d, color), without_planet, 0.1 + 0.3 * sky.rain) + halo(d);
 
     let clouds = clouds(view.world_position, d, in.position.xy);
     color = color * clouds.a + clouds.rgb;

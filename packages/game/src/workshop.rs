@@ -3,6 +3,7 @@ pub(crate) mod clock;
 mod clutter;
 mod computer;
 mod counter;
+mod dial;
 mod dust;
 mod front;
 pub(crate) mod job;
@@ -22,12 +23,15 @@ mod ticket;
 mod tools;
 mod tutorial;
 
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::prelude::*;
 
 use self::binder::Binder;
 use self::clutter::Clutter;
 use self::computer::Computer;
 use self::counter::{Counter, CounterLayout};
+use self::dial::Dial;
 use self::front::Front;
 use self::lamp::Lamp;
 use self::radio::Radio;
@@ -47,6 +51,8 @@ const BELL_SPOT: Vec2 = Vec2::new(0.23, -0.75);
 /// On the mat, see [`CounterLayout::place_on_mat`].
 const BINDER_SPOT: Vec2 = Vec2::new(-0.69, -0.19);
 const BINDER_YAW: f32 = 0.15;
+/// On the left wall, just behind the pillar of the shop front.
+const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
 
 pub(crate) struct WorkshopPlugin;
 
@@ -71,6 +77,7 @@ impl Plugin for WorkshopPlugin {
         ))
         .add_plugins((
             clock::ClockPlugin,
+            dial::DialPlugin,
             rent::RentPlugin,
             run::RunPlugin,
             salvage::SalvagePlugin,
@@ -112,6 +119,11 @@ fn spawn_stage(mut commands: Commands) {
         Name::new("binder"),
         Binder,
         counter.place_on_mat(BINDER_SPOT, BINDER_YAW),
+    ));
+    commands.spawn((
+        Name::new("planet dial"),
+        Dial,
+        Transform::from_translation(DIAL_SPOT).with_rotation(Quat::from_rotation_y(FRAC_PI_2)),
     ));
     commands.spawn((
         Name::new("camera"),

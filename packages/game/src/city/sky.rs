@@ -14,18 +14,16 @@ use bevy::{
 use super::atmosphere::SKY;
 use super::weather::{WIND, Weather};
 use crate::player::camera::PlayerCamera;
-use crate::workshop::clock::Clock;
+use crate::workshop::clock::{Clock, PLANET_SIZE};
 
 /// Far away, but still inside the camera's far plane.
 const RADIUS: f32 = 900.0;
-/// Angular radius of the planet, in radians.
-const PLANET_SIZE: f32 = 0.06;
 /// The planet's axis, which its rings go around.
 const PLANET_AXIS: Vec3 = Vec3::new(0.4, 1.0, -0.1);
 /// Towards the sun, which lights the planet from the side.
 const SUN: Vec3 = Vec3::new(-1.0, 0.2, 0.6);
 /// Light of the planet's lit side.
-const PLANET_LIGHT: f32 = 0.3;
+const PLANET_LIGHT: f32 = 0.55;
 const ZENITH: f32 = 0.25;
 /// The wind blows this many times stronger at the height of the clouds.
 const ALOFT: f32 = 5.0;
@@ -75,6 +73,8 @@ struct SkyParams {
     rain: f32,
     /// How far the wind has blown the clouds, in meters.
     drift: Vec2,
+    /// How clear of the buildings the planet is, from 0 to 1.
+    planet_clear: f32,
 }
 
 /// The dome the sky is drawn on, centered on the camera.
@@ -122,6 +122,7 @@ impl SkyMaterial {
                     sun: SUN.normalize(),
                     rain: 0.0,
                     drift: Vec2::ZERO,
+                    planet_clear: clock.planet_light(),
                 },
                 clouds: images.add(Self::cloud_noise()),
             })),
@@ -156,6 +157,7 @@ impl SkyMaterial {
     fn follow_clock(clock: Res<Clock>, mut materials: ResMut<Assets<SkyMaterial>>) {
         for (_, material) in materials.iter_mut() {
             material.params.planet = clock.planet();
+            material.params.planet_clear = clock.planet_light();
         }
     }
 }

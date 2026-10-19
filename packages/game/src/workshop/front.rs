@@ -203,3 +203,23 @@ impl Front {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workshop::clock::{Clock, PLANET_SIZE};
+    use crate::workshop::counter::CounterLayout;
+
+    #[test]
+    fn the_whole_planet_shows_under_the_noren() {
+        let eye = CounterLayout::new().seated_view().translation;
+        let bottom = BEAM_HEIGHT - NOREN_LENGTH;
+        let distance = eye.z - (FRONT + PILLAR.y / 2.0);
+        for clock in (0..).map(Clock::from).take_while(|clock| clock.sets() == 0) {
+            let planet = clock.planet();
+            let yaw = planet.x.atan2(-planet.z);
+            let edge = (bottom - eye.y).atan2(distance / yaw.cos());
+            assert!(planet.y.asin() + PLANET_SIZE < edge, "{planet} {edge}");
+        }
+    }
+}
