@@ -9,24 +9,40 @@ use ld60_devices::{DeviceError, IsaKind, ProgramError};
 use ld60_levels::LevelError;
 
 use super::Editor;
+use super::breakpoints::Breakpoints;
 use super::page::Page;
+use super::trace::TraceView;
 use crate::audio::KeyClicks;
 use crate::device::{BoardLetter, DeviceName, Emulator};
 use crate::locale::{Localized, Message};
 use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
+use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
 /// A command in the footer below the editor.
 ///
 /// Each one runs by clicking it or with its function key. Macs send function
 /// keys to the media controls unless Fn is held, so the mouse always works.
+/// The commands of a [`ComputerTool`] only show once the shop owns it.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Command {
     Notes,
     Versions,
+    Test,
     Assemble,
     Flash,
+    Trace,
     Clicks,
+    Break,
+    Step,
+    Go,
+}
+
+/// The settings that some command labels show.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Switches {
+    pub(super) clicks: bool,
+    pub(super) trace: bool,
 }
 
 /// The line above the footer that reports what a command did.
@@ -34,43 +50,97 @@ pub(super) enum Command {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 5] = [
+    pub(super) const ALL: [Self; 10] = [
         Self::Notes,
         Self::Versions,
+        Self::Test,
         Self::Assemble,
         Self::Flash,
+        Self::Trace,
         Self::Clicks,
+        Self::Break,
+        Self::Step,
+        Self::Go,
     ];
 
     fn key(self) -> KeyCode {
         match self {
             Self::Notes => KeyCode::F2,
             Self::Versions => KeyCode::F3,
+            Self::Test => KeyCode::F4,
             Self::Assemble => KeyCode::F5,
             Self::Flash => KeyCode::F6,
+            Self::Trace => KeyCode::F7,
             Self::Clicks => KeyCode::F8,
+            Self::Break => KeyCode::F9,
+            Self::Step => KeyCode::F10,
+            Self::Go => KeyCode::F11,
         }
     }
 
-    pub(super) fn label(self, clicks: bool) -> Message {
+    /// The tool the command belongs to.
+    pub(super) const fn tool(self) -> Option<ComputerTool> {
+        match self {
+            Self::Test => Some(ComputerTool::TestBench),
+            Self::Trace => Some(ComputerTool::Trace),
+            Self::Break => Some(ComputerTool::Breakpoints),
+            Self::Step | Self::Go => Some(ComputerTool::Debugger),
+            Self::Notes | Self::Versions | Self::Assemble | Self::Flash | Self::Clicks => None,
+        }
+    }
+
+    /// Whether the shop has what the command needs.
+    pub(super) fn available(self, shop: &ShopRun) -> bool {
+        self.tool().is_none_or(|tool| shop.has(tool))
+    }
+
+    pub(super) fn label(self, switches: Switches) -> Message {
         Message::new(match self {
             Self::Notes => "editor-command-notes",
             Self::Versions => "editor-command-versions",
+            Self::Test => "editor-command-test",
             Self::Assemble => "editor-command-assemble",
             Self::Flash => "editor-command-flash",
-            Self::Clicks if clicks => "editor-command-clicks-on",
+            Self::Trace if switches.trace => "editor-command-trace-on",
+            Self::Trace => "editor-command-trace-off",
+            Self::Clicks if switches.clicks => "editor-command-clicks-on",
             Self::Clicks => "editor-command-clicks-off",
+            Self::Break => "editor-command-break",
+            Self::Step => "editor-command-step",
+            Self::Go => "editor-command-go",
         })
     }
 
-    /// Labels new commands and follows the key clicks setting.
+    /// Labels new commands and follows the settings they show.
     pub(super) fn show_labels(
         clicks: Res<KeyClicks>,
+        trace: Res<TraceView>,
         mut labels: Query<(Ref<Command>, &mut Localized)>,
     ) {
+        let switches = Switches {
+            clicks: clicks.0,
+            trace: trace.0,
+        };
         for (command, mut label) in &mut labels {
-            if clicks.is_changed() || command.is_added() {
-                label.set_if_neq(command.label(clicks.0).into());
+            if clicks.is_changed() || trace.is_changed() || command.is_added() {
+                label.set_if_neq(command.label(switches).into());
+            }
+        }
+    }
+
+    /// Shows the commands of the tools the shop owns.
+    pub(super) fn show_owned(shop: Res<ShopRun>, mut labels: Query<(Ref<Command>, &mut Node)>) {
+        for (command, mut node) in &mut labels {
+            if !shop.is_changed() && !command.is_added() {
+                continue;
+            }
+            let display = if command.available(&shop) {
+                Display::Flex
+            } else {
+                Display::None
+            };
+            if node.display != display {
+                node.display = display;
             }
         }
     }
@@ -78,6 +148,7 @@ impl Command {
     pub(super) fn run_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         pages: Query<(), With<Page>>,
+        shop: Res<ShopRun>,
         mut commands: Commands,
     ) {
         if !pages.contains(input.focused_entity) {
@@ -85,6 +156,7 @@ impl Command {
         }
         let Some(command) = Self::ALL
             .into_iter()
+            .filter(|command| command.available(&shop))
             .find(|command| command.key() == input.input.key_code)
         else {
             return;
@@ -127,18 +199,29 @@ pub(super) struct Run(pub(super) Command);
 pub(super) struct Flashed(pub(super) String);
 
 impl Run {
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
         job: Option<ResMut<Job>>,
         mut clicks: ResMut<KeyClicks>,
+        breakpoints: Res<Breakpoints>,
         mut emulators: Query<&mut Emulator>,
         mut status: Single<&mut Localized, With<Status>>,
         mut commands: Commands,
     ) {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
-            (Command::Notes | Command::Versions, _) => return,
+            (
+                Command::Notes
+                | Command::Versions
+                | Command::Test
+                | Command::Trace
+                | Command::Break
+                | Command::Step
+                | Command::Go,
+                _,
+            ) => return,
             (Command::Clicks, _) => {
                 clicks.0 = !clicks.0;
                 return;
@@ -149,7 +232,13 @@ impl Run {
                 Err(err) => Message::from(&err),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
-                Ok(mut emulator) => Self::flash(&mut job, &mut emulator, &source, &mut commands),
+                Ok(mut emulator) => Self::flash(
+                    &mut job,
+                    &mut emulator,
+                    &breakpoints,
+                    &source,
+                    &mut commands,
+                ),
                 Err(_) => Message::new("editor-no-device"),
             },
         };
@@ -161,6 +250,7 @@ impl Run {
     fn flash(
         job: &mut ResMut<Job>,
         emulator: &mut Emulator,
+        breakpoints: &Breakpoints,
         source: &str,
         commands: &mut Commands,
     ) -> Message {
@@ -168,6 +258,7 @@ impl Run {
             Ok(assembly) => assembly,
             Err(err) => return Message::from(&err),
         };
+        let addresses = breakpoints.addresses(&assembly);
         let rom = match ld60_levels::burn(&job.level, emulator.rom(), assembly.image) {
             Ok(rom) => rom,
             Err(err) => return err.into(),
@@ -176,6 +267,7 @@ impl Run {
             Ok(device) => device,
             Err(err) => return Message::from(&err),
         };
+        emulator.set_breakpoints(addresses);
         emulator.restart(device);
         commands.trigger(Flashed(source.into()));
         commands.trigger(Busy(Chore::Flash));
@@ -254,6 +346,7 @@ mod tests {
     fn status(job: bool, powered: bool, source: &str, command: Command) -> Localized {
         let mut world = World::new();
         world.init_resource::<KeyClicks>();
+        world.init_resource::<Breakpoints>();
         if job {
             let job = Job::load(&Levels::on_disk(), 0).unwrap().unwrap();
             if powered {
@@ -335,9 +428,34 @@ mod tests {
 
     #[test]
     fn every_label_formats() {
-        let labels = Command::ALL
-            .into_iter()
-            .flat_map(|command| [command.label(true), command.label(false)]);
+        let labels = Command::ALL.into_iter().flat_map(|command| {
+            [true, false].into_iter().flat_map(move |clicks| {
+                [true, false].map(|trace| command.label(Switches { clicks, trace }))
+            })
+        });
         Locale::on_disk().assert_formats(labels);
+    }
+
+    #[test]
+    fn shows_only_the_commands_of_owned_tools() {
+        let mut world = World::new();
+        world.init_resource::<ShopRun>();
+        let labels: Vec<_> = Command::ALL
+            .into_iter()
+            .map(|command| world.spawn((command, Node::default())).id())
+            .collect();
+        let show = world.register_system(Command::show_owned);
+        let shown = |world: &World| -> Vec<Command> {
+            labels
+                .iter()
+                .filter(|&&label| world.get::<Node>(label).unwrap().display != Display::None)
+                .map(|&label| *world.get::<Command>(label).unwrap())
+                .collect()
+        };
+        world.run_system(show).unwrap();
+        assert!(shown(&world).iter().all(|command| command.tool().is_none()));
+        world.insert_resource(ShopRun::with_all_tools());
+        world.run_system(show).unwrap();
+        assert_eq!(shown(&world), Command::ALL);
     }
 }

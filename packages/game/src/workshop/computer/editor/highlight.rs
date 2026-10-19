@@ -4,13 +4,14 @@ use std::ops::Range;
 use bevy::{
     math::Affine2,
     prelude::*,
-    text::{EditableText, TextLineYBounds, TextViewport},
+    text::{EditableText, TextBackgroundColor, TextLineYBounds, TextViewport},
     ui::UiGlobalTransform,
 };
 use ld60_machine::AsmError;
 
 use super::Editor;
 use super::lexer::{Kind, Lexicon};
+use super::shades::{Shade, Shades};
 use crate::workshop::job::{Job, JobId};
 
 const MNEMONIC: Color = Color::srgb(0.82, 1.0, 0.84);
@@ -54,6 +55,7 @@ pub(super) struct Segment {
     pub(super) kind: Kind,
     /// Part of the source the assembler rejects.
     pub(super) error: bool,
+    pub(super) shade: Shade,
 }
 
 /// The byte ranges of assembler errors, by 0-based line.
@@ -79,6 +81,7 @@ impl Highlight {
     /// match the editor text in the same frame.
     pub(super) fn refresh(
         job: Option<Res<Job>>,
+        shades: Res<Shades>,
         editor: Single<Ref<EditableText>, With<Editor>>,
         overlay: Single<(
             Entity,
@@ -87,7 +90,12 @@ impl Highlight {
             &TextFont,
             Option<&Children>,
         )>,
-        mut spans: Query<(&mut TextSpan, &mut TextColor, Has<Underline>)>,
+        mut spans: Query<(
+            &mut TextSpan,
+            &mut TextColor,
+            &mut TextBackgroundColor,
+            Has<Underline>,
+        )>,
         mut commands: Commands,
     ) {
         let (root, mut highlight, mut padding, font, children) = overlay.into_inner();
@@ -108,7 +116,7 @@ impl Highlight {
             highlight.job = job_id;
         }
         let lines = highlight.visible(&editor.viewport);
-        if !changed && lines == highlight.lines {
+        if !changed && !shades.is_changed() && lines == highlight.lines {
             return;
         }
         highlight.lines = lines.clone();
@@ -119,7 +127,7 @@ impl Highlight {
             padding.0 = "\n".repeat(padding_lines);
         }
         let source = &highlight.source;
-        let segments = Segment::split(source, &highlight.lexicon, &highlight.marks, lines);
+        let segments = Segment::split(source, &highlight.lexicon, &highlight.marks, &shades, lines);
 
         let children = children
             .map(|children| children.to_vec())
@@ -127,12 +135,19 @@ impl Highlight {
         for (index, segment) in segments.iter().enumerate() {
             let text = &source[segment.range.clone()];
             let color = TextColor(segment.color());
-            let Some((entity, (mut span, mut span_color, underlined))) = children
-                .get(index)
-                .and_then(|&entity| Some((entity, spans.get_mut(entity).ok()?)))
+            let background = TextBackgroundColor(segment.shade.color());
+            let Some((entity, (mut span, mut span_color, mut span_background, underlined))) =
+                children
+                    .get(index)
+                    .and_then(|&entity| Some((entity, spans.get_mut(entity).ok()?)))
             else {
-                let mut span =
-                    commands.spawn((TextSpan::new(text), font.clone(), color, ChildOf(root)));
+                let mut span = commands.spawn((
+                    TextSpan::new(text),
+                    font.clone(),
+                    color,
+                    background,
+                    ChildOf(root),
+                ));
                 if segment.error {
                     span.insert((Underline, UnderlineColor(ERROR)));
                 }
@@ -142,6 +157,7 @@ impl Highlight {
                 span.0 = text.into();
             }
             span_color.set_if_neq(color);
+            span_background.set_if_neq(background);
             if segment.error && !underlined {
                 commands
                     .entity(entity)
@@ -182,6 +198,12 @@ impl Highlight {
         ));
     }
 
+    /// The 0-based line at `y` physical pixels below the top of the editor
+    /// text, once the line height is known.
+    pub(super) fn line_at(&self, y: f32) -> Option<usize> {
+        (self.pitch > 0.0 && y >= 0.0).then(|| (y / self.pitch) as usize)
+    }
+
     /// The lines to style for the editor view. All lines until the line
     /// height is known.
     fn visible(&self, viewport: &TextViewport) -> Range<usize> {
@@ -202,6 +224,7 @@ impl Segment {
         source: &str,
         lexicon: &Lexicon,
         marks: &Marks,
+        shades: &Shades,
         lines: Range<usize>,
     ) -> Vec<Self> {
         let mut segments = Vec::new();
@@ -212,6 +235,7 @@ impl Segment {
             if index < lines.start {
                 continue;
             }
+            let shade = shades.line(index);
             let tokens = lexicon.tokens(line);
             let marked: Vec<_> = marks
                 .line(index)
@@ -237,11 +261,18 @@ impl Segment {
                     .iter()
                     .any(|mark| mark.start <= range.start && range.end <= mark.end);
                 let range = start + range.start..start + range.end;
-                push(&mut segments, source, range, kind, error);
+                push(&mut segments, source, range, kind, error, shade);
             }
             let end = start + line.len();
             if end < source.len() {
-                push(&mut segments, source, end..end + 1, Kind::Text, false);
+                push(
+                    &mut segments,
+                    source,
+                    end..end + 1,
+                    Kind::Text,
+                    false,
+                    shade,
+                );
             }
         }
         segments
@@ -280,10 +311,18 @@ impl Marks {
 
 /// Appends a segment, or grows the last one if the style looks the same.
 /// Whitespace has no color, so it joins any neighbor.
-fn push(segments: &mut Vec<Segment>, source: &str, range: Range<usize>, kind: Kind, error: bool) {
+fn push(
+    segments: &mut Vec<Segment>,
+    source: &str,
+    range: Range<usize>,
+    kind: Kind,
+    error: bool,
+    shade: Shade,
+) {
     let blank = |range: &Range<usize>| source[range.clone()].trim().is_empty();
     if let Some(last) = segments.last_mut()
         && last.error == error
+        && last.shade == shade
     {
         if last.kind == kind || blank(&range) {
             last.range.end = range.end;
@@ -295,7 +334,12 @@ fn push(segments: &mut Vec<Segment>, source: &str, range: Range<usize>, kind: Ki
             return;
         }
     }
-    segments.push(Segment { range, kind, error });
+    segments.push(Segment {
+        range,
+        kind,
+        error,
+        shade,
+    });
 }
 
 /// The part of `line` to underline for an error at `span`.
@@ -324,10 +368,16 @@ mod tests {
 
     fn styles<'a>(source: &'a str, errors: &[AsmError]) -> Vec<(&'a str, Kind, bool)> {
         let lexicon = Lexicon::new(ld60_calco::Revision::C.isa(), source);
-        Segment::split(source, &lexicon, &Marks::new(errors), ALL)
-            .into_iter()
-            .map(|segment| (&source[segment.range], segment.kind, segment.error))
-            .collect()
+        Segment::split(
+            source,
+            &lexicon,
+            &Marks::new(errors),
+            &Shades::default(),
+            ALL,
+        )
+        .into_iter()
+        .map(|segment| (&source[segment.range], segment.kind, segment.error))
+        .collect()
     }
 
     fn error(line: usize, span: Range<usize>) -> AsmError {
@@ -340,7 +390,13 @@ mod tests {
 
     fn joined(source: &str, lines: Range<usize>) -> String {
         let lexicon = Lexicon::new(ld60_calco::Revision::C.isa(), source);
-        let segments = Segment::split(source, &lexicon, &Marks::default(), lines);
+        let segments = Segment::split(
+            source,
+            &lexicon,
+            &Marks::default(),
+            &Shades::default(),
+            lines,
+        );
         assert!(
             segments
                 .windows(2)
@@ -405,11 +461,17 @@ mod tests {
         let errors = isa.assemble(source).unwrap_err();
         assert_eq!(errors[0].message, "'ADC' is not supported by CalCo Rev A");
         let lexicon = Lexicon::new(isa, source);
-        let underlined: Vec<&str> = Segment::split(source, &lexicon, &Marks::new(&errors), ALL)
-            .into_iter()
-            .filter(|segment| segment.error)
-            .map(|segment| &source[segment.range])
-            .collect();
+        let underlined: Vec<&str> = Segment::split(
+            source,
+            &lexicon,
+            &Marks::new(&errors),
+            &Shades::default(),
+            ALL,
+        )
+        .into_iter()
+        .filter(|segment| segment.error)
+        .map(|segment| &source[segment.range])
+        .collect();
         assert_eq!(underlined, ["ADC"]);
     }
 
@@ -419,5 +481,30 @@ mod tests {
         assert_eq!(mark("A\u{fc}", 3..9), Some(1..3));
         assert_eq!(mark("A\u{fc}", 2..2), Some(0..1));
         assert_eq!(mark("", 0..0), None);
+    }
+
+    #[test]
+    fn keeps_shaded_lines_apart() {
+        use crate::workshop::computer::editor::listing::Listing;
+        use ld60_machine::Isa;
+
+        let source = "NOP\nNOP\nNOP";
+        let isa = ld60_calco::Revision::C.isa();
+        let listing = Listing::new(isa.assemble(source).unwrap());
+        let shades = Shades::new(&listing, [1], [], None);
+        let lexicon = Lexicon::new(isa, source);
+        let segments = Segment::split(source, &lexicon, &Marks::default(), &shades, ALL);
+        let shaded: Vec<_> = segments
+            .iter()
+            .map(|segment| (&source[segment.range.clone()], segment.shade))
+            .collect();
+        assert_eq!(
+            shaded,
+            [
+                ("NOP\n", Shade::Plain),
+                ("NOP\n", Shade::Traced),
+                ("NOP", Shade::Plain)
+            ]
+        );
     }
 }
