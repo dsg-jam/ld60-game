@@ -110,7 +110,6 @@ impl TutorialNote {
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
         let Ok(&note) = notes.get(add.entity) else {
             return;
@@ -130,7 +129,6 @@ impl TutorialNote {
                     SHEET_SIZE,
                     Self::sheet_center(),
                     &mut meshes,
-                    &mut materials,
                 ))
                 .id();
         });

@@ -75,7 +75,6 @@ impl JobTicket {
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
         let Ok(ticket) = tickets.get(add.entity) else {
             return;
@@ -107,13 +106,7 @@ impl JobTicket {
         commands.entity(add.entity).with_children(|clipboard| {
             clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
             sheet = clipboard
-                .spawn(Paper::sheet(
-                    &canvas,
-                    SHEET_SIZE,
-                    sheet_center,
-                    &mut meshes,
-                    &mut materials,
-                ))
+                .spawn(Paper::sheet(&canvas, SHEET_SIZE, sheet_center, &mut meshes))
                 .id();
             for clip in [spring, jaw] {
                 clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Metal));

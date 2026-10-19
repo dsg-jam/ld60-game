@@ -200,7 +200,6 @@ impl Parts {
                         SHEET_SIZE,
                         sheet_center(STACK_DEPTH),
                         meshes,
-                        materials,
                     ))
                     .id();
                 let pivot = turn_pivot();

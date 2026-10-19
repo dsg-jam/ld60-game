@@ -1,4 +1,5 @@
 mod leaf;
+mod sheet;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -10,6 +11,7 @@ use bevy::{
 
 pub(crate) use self::leaf::Binding;
 use self::leaf::{Leaf, LeafLook};
+use self::sheet::{PaperMaterial, SheetPlugin, SheetPrint, Wrinkles};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{Focus, Focused};
@@ -45,19 +47,20 @@ pub(crate) struct PaperPlugin;
 
 impl Plugin for PaperPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                Paper::flip_on_keys,
-                Paper::flip_on_scroll,
-                Paper::show_current,
-                Binding::turn_pages,
-                Leaf::animate,
+        app.add_plugins(SheetPlugin)
+            .add_systems(
+                Update,
+                (
+                    Paper::flip_on_keys,
+                    Paper::flip_on_scroll,
+                    Paper::show_current,
+                    Binding::turn_pages,
+                    Leaf::animate,
+                )
+                    .chain(),
             )
-                .chain(),
-        )
-        .init_resource::<LeafLook>()
-        .add_observer(Paper::flip_on_click);
+            .init_resource::<LeafLook>()
+            .add_observer(Paper::flip_on_click);
     }
 }
 
@@ -197,17 +200,14 @@ impl Paper {
         size: Vec2,
         at: Vec3,
         meshes: &mut Assets<Mesh>,
-        materials: &mut Assets<StandardMaterial>,
     ) -> impl Bundle {
+        let wrinkles = Wrinkles::new(size, canvas.camera.to_bits());
         (
-            Mesh3d(meshes.add(Rectangle::from_size(size))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color_texture: Some(canvas.image.clone()),
-                perceptual_roughness: 0.95,
-                base_color: PAPER_SHADE,
-                reflectance: PAPER_REFLECTANCE,
-                ..default()
-            })),
+            Mesh3d(meshes.add(wrinkles.mesh())),
+            SheetPrint {
+                print: canvas.image.clone(),
+                wrinkles,
+            },
             Transform::from_translation(at).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         )
     }
@@ -392,8 +392,20 @@ impl Paper {
         }
     }
 
-    pub(crate) fn show_current(papers: Query<&Paper, Changed<Paper>>, mut nodes: Query<&mut Node>) {
+    pub(crate) fn show_current(
+        papers: Query<&Paper, Changed<Paper>>,
+        mut nodes: Query<&mut Node>,
+        sheets: Query<&MeshMaterial3d<PaperMaterial>>,
+        mut materials: ResMut<Assets<PaperMaterial>>,
+    ) {
         for paper in &papers {
+            if let Some(mut material) = sheets
+                .get(paper.sheet)
+                .ok()
+                .and_then(|sheet| materials.get_mut(sheet))
+            {
+                material.extension.set_page(paper.current);
+            }
             for (index, &page) in paper.pages.iter().enumerate() {
                 if let Ok(mut node) = nodes.get_mut(page) {
                     node.display = if index == paper.current {

@@ -84,7 +84,6 @@ impl Receipt {
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
         let Ok(receipt) = receipts.get(add.entity) else {
             return;
@@ -107,7 +106,6 @@ impl Receipt {
                     SHEET_SIZE,
                     Self::sheet_center(),
                     &mut meshes,
-                    &mut materials,
                 ))
                 .id();
         });
