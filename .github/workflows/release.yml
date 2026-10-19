@@ -55,7 +55,7 @@ jobs:
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - uses: jetli/trunk-action@v0.5.1
-      - run: trunk build --release --public-url "/${{ github.event.repository.name }}/"
+      - run: trunk build --release --public-url ./
         working-directory: packages/game
       - run: cd dist && zip -r ../bugs-from-home-web.zip .
       - uses: actions/upload-artifact@v4
