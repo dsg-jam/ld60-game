@@ -18,6 +18,8 @@ struct Sheet {
     size: vec2<f32>,
     seed: f32,
     page: f32,
+    /// How much grime and stains show, from 0 to 1.
+    stains: f32,
     /// Point on the fold, its angle and depth, in meters from the top left.
     folds: array<vec4<f32>, 2>,
 }
@@ -90,7 +92,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     }
     let fiber = noise(p * vec2<f32>(2500.0, 900.0), sheet.seed);
     relief += 0.000015 * fiber * visible(0.0004, pixel);
-    pbr_input.N = bumped(normalize(in.world_normal), in.world_position.xyz, relief);
+    pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, relief);
 
     let ink = print(in.uv, dpdx(in.uv), dpdy(in.uv)).rgb;
     // 1 on bare paper, 0 under the ink, so stains stay under the print.
@@ -125,13 +127,13 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         }
         let thumb = fingerprint(p, center, h.y * TAU, pixel, s + 10.0 + f32(i));
         grime += 0.6 * thumb;
-        pbr_input.material.perceptual_roughness = mix(pbr_input.material.perceptual_roughness, 0.7, thumb);
+        pbr_input.material.perceptual_roughness = mix(pbr_input.material.perceptual_roughness, 0.7, thumb * sheet.stains);
     }
-    stain *= mix(vec3<f32>(1.0), GRIME, min(grime, 1.0));
+    stain *= mix(vec3<f32>(1.0), GRIME, min(grime, 1.0) * sheet.stains);
 
     // A ring left by the bottom of a mug, often partly off the page.
     let h = hash(vec2<f32>(s, 3.0), 80.0);
-    if h.w < 0.5 {
+    if h.w < 0.5 * sheet.stains {
         let center = size * (vec2<f32>(h.x, h.y) * 1.3 - 0.15);
         let radius = mix(0.034, 0.042, h.z);
         let r = length(p - center) + 0.0012 * noise(p * 150.0, s + 6.0);

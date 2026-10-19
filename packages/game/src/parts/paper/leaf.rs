@@ -2,7 +2,8 @@ use std::f32::consts::PI;
 
 use bevy::prelude::*;
 
-use super::{PAPER, PAPER_REFLECTANCE, PAPER_SHADE, Paper};
+use super::sheet::{PaperMaterial, Sheet};
+use super::{PAPER, PAPER_SHADE, Paper};
 use crate::player::focus::Focused;
 
 /// Seconds a page takes to turn over.
@@ -50,6 +51,11 @@ impl Binding {
             shown: 0,
             strip: None,
         }
+    }
+
+    /// Points from the middle of the sheet to the edge the binding grips.
+    pub(super) fn held(&self) -> Vec3 {
+        -self.across
     }
 
     /// The axis the page turns up about.
@@ -131,23 +137,13 @@ impl Binding {
 
 /// The look of a turning page, plain paper on both sides.
 #[derive(Resource, Debug)]
-pub(super) struct LeafLook(Handle<StandardMaterial>);
+pub(super) struct LeafLook(Handle<PaperMaterial>);
 
 impl FromWorld for LeafLook {
     fn from_world(world: &mut World) -> Self {
         let paper = PAPER.to_linear() * PAPER_SHADE.to_linear().red;
-        Self(
-            world
-                .resource_mut::<Assets<StandardMaterial>>()
-                .add(StandardMaterial {
-                    base_color: paper.into(),
-                    perceptual_roughness: 0.95,
-                    reflectance: PAPER_REFLECTANCE,
-                    double_sided: true,
-                    cull_mode: None,
-                    ..default()
-                }),
-        )
+        let material = Sheet::blank(&mut world.resource_mut::<Assets<Image>>(), paper.into());
+        Self(world.resource_mut::<Assets<PaperMaterial>>().add(material))
     }
 }
 

@@ -204,10 +204,8 @@ impl Paper {
         let wrinkles = Wrinkles::new(size, canvas.camera.to_bits());
         (
             Mesh3d(meshes.add(wrinkles.mesh())),
-            SheetPrint {
-                print: canvas.image.clone(),
-                wrinkles,
-            },
+            wrinkles,
+            SheetPrint(canvas.image.clone()),
             Transform::from_translation(at).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         )
     }
