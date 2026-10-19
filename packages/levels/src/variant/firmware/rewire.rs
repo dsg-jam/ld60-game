@@ -5,7 +5,7 @@ use ld60_devices::Board;
 
 use self::flags::Flags;
 use super::Firmware;
-use crate::variant::line::{Line, splice};
+use crate::variant::line::{Line, immediate, number, splice};
 use crate::variant::ram_map::RamMap;
 
 impl Firmware {
@@ -219,24 +219,11 @@ fn key_compare(from: &Board, to: &Board, old: u8, read: Flags) -> Option<u8> {
     })
 }
 
-/// Writes `value` in the style of `original`, hex or decimal.
-fn immediate(original: &str, value: u8) -> String {
-    if original.starts_with("0x") || original.starts_with("0X") {
-        format!("0x{value:02X}")
-    } else {
-        value.to_string()
-    }
-}
-
 fn is_port(operands: &[&str], name: &str, port: u8) -> bool {
     match operands {
         [operand] => operand.eq_ignore_ascii_case(name) || number(operand) == Some(port),
         _ => false,
     }
-}
-
-fn number(text: &str) -> Option<u8> {
-    u8::try_from(ld60_asm::parse_number(text).ok()?).ok()
 }
 
 #[cfg(test)]
