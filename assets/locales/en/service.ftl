@@ -1,4 +1,5 @@
-service-footer = DSG ELECTRONICS   { $device }
+service-footer = DSG ELECTRONICS  { $device }
+service-title = { $device }  BOARD { $board }
 
 service-summary-tally2 = 2-digit tally counter. Service sheet for board { $board }.
 service-summary-summa6 = 6-digit adding machine. Service sheet for board { $board }.
@@ -30,6 +31,7 @@ service-fault-liquid = Liquid can leave a RAM bit stuck at 0 or 1.
 service-fault-eprom = Old EPROMs can lose bits.
 
 service-line-tests = END OF LINE TESTS
+service-line-tests-short = LINE TESTS
 service-line-tests-factory = Every unit passes these at the factory.
 service-line-tests-how = Power on, then press the keys of each line and check the display.
 service-line-tests-spaces = Spaces only group the keys.

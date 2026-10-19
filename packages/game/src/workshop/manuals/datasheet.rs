@@ -8,26 +8,20 @@ use crate::parts::paper::Paper;
 /// The instruction table needs tighter rows to fit on one page.
 const TABLE_ROW_GAP: f32 = 3.0;
 
-/// The CalCo datasheet of one chip revision.
+/// The CalCo datasheet of one chip revision, and its errata pages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct ChipSheet {
     revision: Revision,
-    /// Whether the errata pages of the revision are filed with it.
-    errata: bool,
 }
 
 impl ChipSheet {
-    pub(super) fn new(revision: Revision, errata: bool) -> Self {
-        Self { revision, errata }
+    pub(super) fn new(revision: Revision) -> Self {
+        Self { revision }
     }
 
-    /// The contents of each page.
-    pub(super) const PAGES: [fn(&mut ChildSpawnerCommands, Self); 4] = [
-        Self::overview,
-        Self::instructions,
-        Self::conditions,
-        Self::errata,
-    ];
+    /// The contents of each page of the datasheet.
+    pub(super) const PAGES: [fn(&mut ChildSpawnerCommands, Self); 3] =
+        [Self::overview, Self::instructions, Self::conditions];
 
     pub(super) fn footer(self) -> Message {
         Message::new("datasheet-footer").with("revision", self.revision.to_string())
@@ -60,7 +54,7 @@ impl ChipSheet {
             if op.is_none_or(|op| revision.supports(op)) {
                 page.spawn(Paper::row([
                     (name, 80.0),
-                    (Message::new(text).into(), 480.0),
+                    (Message::new(text).into(), 464.0),
                 ]));
             }
         }
@@ -84,14 +78,14 @@ impl ChipSheet {
                 (Localized::verbatim(port.name), 60.0),
                 (Localized::verbatim(direction), 50.0),
                 (Localized::verbatim(format!("{:X}", port.port)), 30.0),
-                (Localized::verbatim(port.function), 420.0),
+                (Localized::verbatim(port.function), 404.0),
             ]));
         }
     }
 
     fn instructions(page: &mut ChildSpawnerCommands, sheet: Self) {
         let revision = sheet.revision;
-        const WIDTHS: [f32; 5] = [70.0, 120.0, 314.0, 28.0, 28.0];
+        const WIDTHS: [f32; 5] = [70.0, 120.0, 298.0, 28.0, 28.0];
         let row = |cells: [Localized; 5]| {
             let mut widths = WIDTHS.into_iter();
             Paper::row(cells.map(|cell| (cell, widths.next().unwrap_or_default())))
@@ -134,7 +128,7 @@ impl ChipSheet {
             page.spawn(Paper::row([
                 (Localized::verbatim(format!("{:X}", cond.code())), 40.0),
                 (Localized::verbatim(cond.mnemonic()), 80.0),
-                (Self::condition(cond).into(), 440.0),
+                (Self::condition(cond).into(), 424.0),
             ]));
         }
         let compares = if revision.supports(Op::Cmp(Addr::Direct(0))) {
@@ -168,15 +162,10 @@ impl ChipSheet {
         })
     }
 
-    fn errata(page: &mut ChildSpawnerCommands, sheet: Self) {
+    /// The errata page of the revision.
+    pub(super) fn errata(page: &mut ChildSpawnerCommands, sheet: Self) {
         let revision = sheet.revision;
         page.spawn(Paper::heading(Message::new("datasheet-errata")));
-        if !sheet.errata {
-            page.spawn(Paper::text(
-                Message::new("datasheet-errata-missing").with("revision", revision.to_string()),
-            ));
-            return;
-        }
         let errata: Vec<_> = Erratum::ALL
             .iter()
             .filter(|erratum| erratum.revision() == revision)
@@ -207,13 +196,14 @@ mod tests {
     fn every_page_formats() {
         let locale = Locale::on_disk();
         for revision in Revision::ALL {
-            for errata in [false, true] {
-                let sheet = ChipSheet::new(revision, errata);
-                locale.assert_formats([sheet.footer()]);
-                for content in ChipSheet::PAGES {
-                    locale.assert_formats(Localized::spawned_by(|page| content(page, sheet)));
-                }
+            let sheet = ChipSheet::new(revision);
+            locale.assert_formats([sheet.footer()]);
+            for content in ChipSheet::PAGES {
+                locale.assert_formats(Localized::spawned_by(|page| content(page, sheet)));
             }
+            locale.assert_formats(Localized::spawned_by(|page| {
+                ChipSheet::errata(page, sheet);
+            }));
         }
     }
 }

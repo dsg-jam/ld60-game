@@ -27,6 +27,16 @@ impl ServiceSheet {
         Message::new("service-footer").with("device", self.board.kind.model())
     }
 
+    /// Like `2B`.
+    pub(super) fn board_name(self) -> Localized {
+        Localized::verbatim(self.board.name())
+    }
+
+    /// Like `BOARD 2B`.
+    pub(super) fn board_heading(self) -> Message {
+        Message::new("service-board").with("board", self.board.name())
+    }
+
     pub(super) fn write(self, page: &mut ChildSpawnerCommands) {
         let board = self.board;
         let summary = match board.kind {
@@ -34,7 +44,11 @@ impl ServiceSheet {
             DeviceKind::Summa6 => "service-summary-summa6",
             DeviceKind::Lock4 => "service-summary-lock4",
         };
-        page.spawn(Paper::title(board.kind.model()));
+        page.spawn(Paper::title(
+            Message::new("service-title")
+                .with("device", board.kind.model())
+                .with("board", board.name()),
+        ));
         page.spawn(Paper::faded(
             Message::new(summary).with("board", board.name()),
         ));
@@ -65,9 +79,7 @@ impl ServiceSheet {
             }
         }
 
-        page.spawn(Paper::heading(
-            Message::new("service-board").with("board", board.name()),
-        ));
+        page.spawn(Paper::heading(self.board_heading()));
         page.spawn(Paper::text(Message::new("service-board-chip")));
         page.spawn(Paper::text(Message::new("service-board-ram")));
 

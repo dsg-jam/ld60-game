@@ -9,7 +9,7 @@ use crate::workshop::run::ComputerTool;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) enum Find {
     /// A dead unit with its human manual. Buying it hangs its sign in the
-    /// window and files the manual in the binder.
+    /// window and files the manual in the manuals file.
     Device(DeviceKind),
     Tool(ComputerTool),
     /// Loose errata pages for one chip revision.

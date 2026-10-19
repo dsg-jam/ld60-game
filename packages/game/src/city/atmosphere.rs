@@ -15,6 +15,7 @@ use super::weather::Weather;
 use crate::geometry::block::Block;
 use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
+use crate::player::focus::Focus;
 use crate::workshop::clock::Clock;
 use crate::workshop::shop;
 
@@ -35,6 +36,9 @@ const AMBIENT_BRIGHTNESS: f32 = 20.0;
 const MOON: Color = Color::srgb_u8(0x9a, 0xa8, 0xd0);
 const MOON_ILLUMINANCE: f32 = 15.0;
 const BLOOM_INTENSITY: f32 = 0.35;
+/// While the player reads a paper up close, the bright page would glow over
+/// its own print.
+const READING_BLOOM_INTENSITY: f32 = 0.05;
 /// Haze over the street that lights shine through.
 const STREET_HAZE: Color = Color::srgb_u8(0xc8, 0xc0, 0xd8);
 const HAZE_DENSITY: f32 = 0.02;
@@ -65,6 +69,7 @@ impl Plugin for AtmospherePlugin {
                 (
                     (Self::thicken_fog, StreetHaze::thicken).run_if(resource_changed::<Weather>),
                     Self::follow_planet.run_if(resource_changed::<Clock>),
+                    Self::dim_bloom_for_reading.run_if(state_changed::<Focus>),
                     Self::match_quality.run_if(
                         resource_changed::<Settings>
                             .or_else(any_match_filter::<Added<PlayerCamera>>),
@@ -110,6 +115,20 @@ impl AtmospherePlugin {
         for (mut light, mut transform) in &mut planet {
             light.illuminance = MOON_ILLUMINANCE * clock.planet_light();
             *transform = Self::planet_view(&clock);
+        }
+    }
+
+    fn dim_bloom_for_reading(
+        focus: Res<State<Focus>>,
+        mut blooms: Query<&mut Bloom, With<PlayerCamera>>,
+    ) {
+        let intensity = if *focus.get() == Focus::Paper {
+            READING_BLOOM_INTENSITY
+        } else {
+            BLOOM_INTENSITY
+        };
+        for mut bloom in &mut blooms {
+            bloom.intensity = intensity;
         }
     }
 

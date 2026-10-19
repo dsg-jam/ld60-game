@@ -15,10 +15,12 @@ use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
 use super::clock::Clock;
 use super::job::{Job, JobItem};
+use super::manuals::Pins;
 use super::pickup::Pickup;
 use super::receipt::Receipt;
 use super::rent::RentNote;
 use super::salvage::{Find, SalvageCrate};
+use super::tutorial::TutorialNote;
 use crate::player::focus::{Focus, Focused};
 
 /// What the landlord takes the first time the planet sets.
@@ -58,10 +60,16 @@ pub(crate) struct Run {
     /// Money in the till.
     till: u32,
     /// The devices with a sign in the shop window. Locals only bring these.
-    /// Their manuals are in the binder.
+    /// Their manuals are in the manuals file.
     signs: Vec<DeviceKind>,
-    /// The chip revisions with errata pages in the binder.
+    /// The chip revisions with errata pages in the manuals file.
     errata: Vec<Revision>,
+    /// The tutorial steps whose notes are filed in the manuals file.
+    #[serde(default)]
+    notes: Vec<usize>,
+    /// The sheets of the manuals file pinned to the monitor.
+    #[serde(default)]
+    pins: Pins,
     tools: Vec<ComputerTool>,
     demand: Demand,
     served: Served,
@@ -122,6 +130,8 @@ impl Default for Run {
             till: 0,
             signs: vec![DeviceKind::Tally2],
             errata: Vec::new(),
+            notes: Vec::new(),
+            pins: Pins::default(),
             tools: Vec::new(),
             demand: Demand::default(),
             served: Served::default(),
@@ -133,11 +143,13 @@ impl Default for Run {
 
 impl Run {
     /// The run after this one. The player knows the shop by then, so it
-    /// skips the tutorial.
+    /// skips the tutorial. The notes stay filed and the pinned sheets go
+    /// back into the file.
     pub(crate) fn next(&self) -> Self {
         Self {
             number: self.number + 1,
             tutorial: false,
+            notes: self.notes.clone(),
             ..Self::default()
         }
     }
@@ -173,7 +185,42 @@ impl Run {
         &self.errata
     }
 
-    /// Whether the binder has the errata pages for every known bug of `chip`.
+    /// The tutorial steps whose notes are filed, in the order they were
+    /// filed.
+    pub(crate) fn notes(&self) -> &[usize] {
+        &self.notes
+    }
+
+    /// Files the note of tutorial step `step` in the manuals file.
+    pub(crate) fn file_note(&mut self, step: usize) {
+        if !self.notes.contains(&step) {
+            self.notes.push(step);
+        }
+    }
+
+    /// Files the notes of the tutorial steps the shop is past. Saves from
+    /// before the manuals file kept no notes.
+    pub(crate) fn file_past_notes(&mut self) {
+        let past = if self.tutorial {
+            self.job as usize
+        } else {
+            usize::MAX
+        };
+        for note in TutorialNote::before(past) {
+            self.file_note(note.0);
+        }
+    }
+
+    pub(crate) fn pins(&self) -> &Pins {
+        &self.pins
+    }
+
+    pub(crate) fn pins_mut(&mut self) -> &mut Pins {
+        &mut self.pins
+    }
+
+    /// Whether the manuals file has the errata pages for every known bug of
+    /// `chip`.
     pub(crate) fn explains(&self, chip: ChipSpec) -> bool {
         let ChipSpec::Calco(chip) = chip;
         Errata::for_chip(chip)
@@ -181,7 +228,7 @@ impl Run {
             .all(|erratum| self.errata.contains(&erratum.revision()))
     }
 
-    /// The chip revisions in the manuals of the binder, in the order of
+    /// The chip revisions in the manuals file, in the order of
     /// [`Revision::ALL`].
     pub(crate) fn chips(&self) -> Vec<Revision> {
         Revision::ALL
@@ -246,7 +293,7 @@ impl Run {
     ///
     /// The tutorial comes first. After it, a special job can come once its
     /// sign hangs in the window, the shop took [`Special::from`] jobs on its
-    /// device and the binder explains the bugs of its chip. Otherwise the
+    /// device and the manuals file explains the bugs of its chip. Otherwise the
     /// job is generated for one of the signs, picked by [`Demand`].
     ///
     /// [`Special::from`]: ld60_levels::Special::from
@@ -298,8 +345,9 @@ impl Run {
             return;
         }
         self.job += 1;
-        if !matches!(job.origin, Origin::Lesson { .. }) {
-            self.served.add(job.level.device);
+        match job.origin {
+            Origin::Lesson { step, .. } => self.file_note(step),
+            _ => self.served.add(job.level.device),
         }
         match pickup {
             Pickup::Paid(_) => {
@@ -382,6 +430,7 @@ mod tests {
     use super::*;
     use crate::player::focus::{FocusOn, FocusTarget, View};
     use crate::workshop::levels::Levels;
+    use crate::workshop::manuals::Sheet;
     use crate::workshop::pickup::Complaint;
 
     fn job(run: &Run) -> Job {
@@ -409,6 +458,43 @@ mod tests {
                 number: 0
             }
         );
+    }
+
+    #[test]
+    fn tutorial_notes_stay_filed() {
+        let mut run = Run::default();
+        run.settle(&job(&run), &Pickup::Paid(4));
+        assert_eq!(run.notes(), [0]);
+        assert_eq!(run.next().notes(), [0]);
+    }
+
+    #[test]
+    fn old_saves_file_the_notes_of_past_steps() {
+        let mut run = Run::default();
+        run.file_past_notes();
+        assert!(run.notes().is_empty());
+        run.job = 1;
+        run.file_past_notes();
+        assert_eq!(run.notes(), [0]);
+        let mut later = Run::default().next();
+        later.file_past_notes();
+        assert_eq!(later.notes(), [0, 1]);
+    }
+
+    #[test]
+    fn pinned_sheets_go_back_for_the_next_run() {
+        let mut run = Run::default();
+        run.pins_mut().toggle(Sheet::example());
+        assert!(!run.pins().is_empty());
+        assert!(run.next().pins().is_empty());
+    }
+
+    #[test]
+    fn pins_are_saved_with_the_run() {
+        let mut run = Run::default();
+        run.pins_mut().toggle(Sheet::example());
+        let text = ron::to_string(&run).unwrap();
+        assert_eq!(ron::from_str::<Run>(&text).unwrap(), run);
     }
 
     #[test]
@@ -527,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn generated_jobs_skip_chips_the_binder_cannot_explain() {
+    fn generated_jobs_skip_chips_the_manuals_cannot_explain() {
         let run = Run::default().next();
         let chips =
             |difficulty: fn(u32) -> Difficulty| (8..40).map(move |job| difficulty(job).chip());

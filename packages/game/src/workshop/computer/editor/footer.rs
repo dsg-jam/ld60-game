@@ -15,6 +15,7 @@ use super::trace::TraceView;
 use crate::audio::KeyClicks;
 use crate::device::{BoardLetter, DeviceName, Emulator};
 use crate::locale::{Localized, Message};
+use crate::player::focus::{Aside, Focus, Focused};
 use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
@@ -36,6 +37,8 @@ pub(super) enum Command {
     Break,
     Step,
     Go,
+    /// Turns the view to the pinned sheets and back.
+    Pinned,
 }
 
 /// The settings that some command labels show.
@@ -50,7 +53,7 @@ pub(super) struct Switches {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 10] = [
+    pub(super) const ALL: [Self; 11] = [
         Self::Notes,
         Self::Versions,
         Self::Test,
@@ -61,6 +64,7 @@ impl Command {
         Self::Break,
         Self::Step,
         Self::Go,
+        Self::Pinned,
     ];
 
     fn key(self) -> KeyCode {
@@ -75,6 +79,7 @@ impl Command {
             Self::Break => KeyCode::F9,
             Self::Step => KeyCode::F10,
             Self::Go => KeyCode::F11,
+            Self::Pinned => KeyCode::F12,
         }
     }
 
@@ -85,13 +90,22 @@ impl Command {
             Self::Trace => Some(ComputerTool::Trace),
             Self::Break => Some(ComputerTool::Breakpoints),
             Self::Step | Self::Go => Some(ComputerTool::Debugger),
-            Self::Notes | Self::Versions | Self::Assemble | Self::Flash | Self::Clicks => None,
+            Self::Notes
+            | Self::Versions
+            | Self::Assemble
+            | Self::Flash
+            | Self::Clicks
+            | Self::Pinned => None,
         }
     }
 
-    /// Whether the shop has what the command needs.
+    /// Whether the shop has what the command needs. [`Command::Pinned`]
+    /// needs a pinned sheet.
     pub(super) fn available(self, shop: &ShopRun) -> bool {
-        self.tool().is_none_or(|tool| shop.has(tool))
+        match self {
+            Self::Pinned => !shop.pins().is_empty(),
+            _ => self.tool().is_none_or(|tool| shop.has(tool)),
+        }
     }
 
     pub(super) fn label(self, switches: Switches) -> Message {
@@ -108,6 +122,7 @@ impl Command {
             Self::Break => "editor-command-break",
             Self::Step => "editor-command-step",
             Self::Go => "editor-command-go",
+            Self::Pinned => "editor-command-pinned",
         })
     }
 
@@ -145,6 +160,7 @@ impl Command {
         }
     }
 
+    /// [`Command::Pinned`] is left to [`Command::look_aside_on_key`].
     pub(super) fn run_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         pages: Query<(), With<Page>>,
@@ -156,7 +172,7 @@ impl Command {
         }
         let Some(command) = Self::ALL
             .into_iter()
-            .filter(|command| command.available(&shop))
+            .filter(|&command| command != Self::Pinned && command.available(&shop))
             .find(|command| command.key() == input.input.key_code)
         else {
             return;
@@ -164,6 +180,22 @@ impl Command {
         input.propagate(false);
         if input.input.state.is_pressed() && !input.input.repeat {
             commands.trigger(Run(command));
+        }
+    }
+
+    /// The key of [`Command::Pinned`] also works while the editor has no
+    /// focus, which it loses while the player looks at the pinned sheets.
+    pub(super) fn look_aside_on_key(
+        keys: Res<ButtonInput<KeyCode>>,
+        state: Res<State<Focus>>,
+        shop: Res<ShopRun>,
+        mut commands: Commands,
+    ) {
+        if *state.get() == Focus::Computer
+            && keys.just_pressed(Self::Pinned.key())
+            && Self::Pinned.available(&shop)
+        {
+            commands.trigger(Run(Self::Pinned));
         }
     }
 
@@ -199,6 +231,17 @@ pub(super) struct Run(pub(super) Command);
 pub(super) struct Flashed(pub(super) String);
 
 impl Run {
+    /// [`Command::Pinned`] opens the [`Aside`] of the computer, or closes
+    /// it.
+    pub(super) fn look_aside(run: On<Run>, focused: Res<Focused>, mut asides: Query<&mut Aside>) {
+        if run.0 != Command::Pinned {
+            return;
+        }
+        if let Some(mut aside) = focused.get().and_then(|entity| asides.get_mut(entity).ok()) {
+            aside.open = !aside.open;
+        }
+    }
+
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
@@ -219,7 +262,8 @@ impl Run {
                 | Command::Trace
                 | Command::Break
                 | Command::Step
-                | Command::Go,
+                | Command::Go
+                | Command::Pinned,
                 _,
             ) => return,
             (Command::Clicks, _) => {
@@ -340,6 +384,7 @@ mod tests {
     use crate::locale::Locale;
     use crate::workshop::computer::editor::undo::Undo;
     use crate::workshop::levels::Levels;
+    use crate::workshop::manuals::Sheet;
 
     /// What the status line says after `command` runs on `source`, with or
     /// without the first job and its device.
@@ -455,6 +500,11 @@ mod tests {
         world.run_system(show).unwrap();
         assert!(shown(&world).iter().all(|command| command.tool().is_none()));
         world.insert_resource(ShopRun::with_all_tools());
+        world.run_system(show).unwrap();
+        assert_eq!(shown(&world), Command::ALL[..Command::ALL.len() - 1]);
+        let mut shop = ShopRun::with_all_tools();
+        shop.pins_mut().toggle(Sheet::example());
+        world.insert_resource(shop);
         world.run_system(show).unwrap();
         assert_eq!(shown(&world), Command::ALL);
     }

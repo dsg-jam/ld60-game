@@ -18,7 +18,13 @@ impl Plugin for FocusPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<Focus>()
             .init_resource::<Focused>()
-            .add_systems(Update, Focused::leave_on_input)
+            .add_systems(
+                Update,
+                (
+                    Focused::leave_on_input,
+                    Aside::close_unfocused.run_if(resource_changed::<Focused>),
+                ),
+            )
             .add_observer(FocusOn::apply)
             .add_observer(FocusTarget::make_clickable)
             .add_observer(FocusTarget::focus_on_press);
@@ -64,6 +70,30 @@ pub(crate) enum View {
     Local(Transform),
     /// A fixed pose in the world.
     World(Transform),
+}
+
+/// A second camera pose of a [`FocusTarget`], to look aside while focused
+/// on it. Going back with right click or Escape first comes back from the
+/// aside.
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct Aside {
+    /// Relative to the target.
+    pub(crate) view: Transform,
+    pub(crate) open: bool,
+}
+
+impl Aside {
+    pub(crate) fn new(view: Transform) -> Self {
+        Self { view, open: false }
+    }
+
+    fn close_unfocused(focused: Res<Focused>, mut asides: Query<(Entity, &mut Aside)>) {
+        for (entity, mut aside) in &mut asides {
+            if aside.open && focused.get() != Some(entity) {
+                aside.open = false;
+            }
+        }
+    }
 }
 
 impl FocusTarget {
@@ -142,16 +172,22 @@ impl Focused {
         next.set(Focus::Desk);
     }
 
-    /// Right click or Escape goes back to the desk.
+    /// Right click or Escape goes back to the desk, or from an open
+    /// [`Aside`] back to the focused view.
     pub(super) fn leave_on_input(
         mouse: Res<ButtonInput<MouseButton>>,
         keys: Res<ButtonInput<KeyCode>>,
         mut focused: ResMut<Focused>,
         mut next: ResMut<NextState<Focus>>,
+        mut asides: Query<&mut Aside>,
     ) {
         let leave = mouse.just_pressed(MouseButton::Right) || keys.just_pressed(KeyCode::Escape);
-        if leave && focused.0.is_some() {
-            focused.leave(&mut next);
+        let Some(entity) = focused.0.filter(|_| leave) else {
+            return;
+        };
+        match asides.get_mut(entity) {
+            Ok(mut aside) if aside.open => aside.open = false,
+            _ => focused.leave(&mut next),
         }
     }
 
@@ -204,4 +240,33 @@ pub(crate) fn under_mouse<'a>(
         .into_iter()
         .flat_map(|hits| hits.keys())
         .flat_map(|&hit| iter::once(hit).chain(parents.iter_ancestors(hit)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_comes_back_from_the_aside_first() {
+        let mut world = World::new();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<NextState<Focus>>();
+        let mut aside = Aside::new(Transform::IDENTITY);
+        aside.open = true;
+        let target = world.spawn(aside).id();
+        world.insert_resource(Focused(Some(target)));
+        let escape = |world: &mut World| {
+            let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+            keys.release(KeyCode::Escape);
+            keys.clear();
+            keys.press(KeyCode::Escape);
+            world.run_system_cached(Focused::leave_on_input).unwrap();
+        };
+        escape(&mut world);
+        assert!(!world.get::<Aside>(target).unwrap().open);
+        assert_eq!(world.resource::<Focused>().get(), Some(target));
+        escape(&mut world);
+        assert_eq!(world.resource::<Focused>().get(), None);
+    }
 }

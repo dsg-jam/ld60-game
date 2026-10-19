@@ -18,11 +18,12 @@ impl Plugin for SavePlugin {
             .load::<SavedShop>(Slot::Shop)
         {
             let SavedShop {
-                run,
+                mut run,
                 clock,
                 bench,
                 salvage,
             } = saved.reopened();
+            run.file_past_notes();
             app.insert_resource(run).insert_resource(clock);
             if let Some(bench) = bench {
                 app.insert_resource(bench);

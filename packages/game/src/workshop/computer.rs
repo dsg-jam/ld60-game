@@ -1,17 +1,19 @@
 mod editor;
 mod keyboard;
 mod monitor;
+mod pinboard;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
 
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
+use self::pinboard::PinBoard;
 use super::dust::Dust;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
 use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
-use crate::player::focus::{Focus, FocusTarget, View};
+use crate::player::focus::{Aside, Focus, FocusTarget, View};
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);
@@ -38,11 +40,13 @@ impl Plugin for ComputerPlugin {
                 OnExit(Focus::Computer),
                 (Computer::activate::<false>, Editor::release_focus),
             )
+            .add_systems(Update, PinBoard::follow_pins)
             .add_observer(Computer::on_add);
     }
 }
 
 /// A CRT monitor with a keyboard in front of it, resting on the ground.
+/// Pinned sheets of the manuals file hang left of the monitor.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Computer;
@@ -67,6 +71,7 @@ impl Computer {
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
         mut crt_materials: ResMut<Assets<CrtMaterial>>,
     ) {
         let layout = ComputerLayout::new();
@@ -88,9 +93,17 @@ impl Computer {
             motes: DUST_MOTES,
             seed: DUST_SEED,
         };
+        let pins = PinBoard::spawn(
+            &mut commands,
+            add.entity,
+            &layout.monitor,
+            &mut images,
+            &mut meshes,
+            &mut materials,
+        );
         commands
             .entity(add.entity)
-            .insert(dust)
+            .insert((dust, pins, Aside::new(layout.screen_view())))
             .insert(FocusTarget {
                 prompt: "click-computer",
                 focus: Focus::Computer,

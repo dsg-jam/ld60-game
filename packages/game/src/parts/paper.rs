@@ -25,6 +25,12 @@ const CORNER_ZONE: f32 = 0.2;
 const MARGIN: f32 = 48.0;
 /// Camera height above a sheet while reading it.
 const READING_HEIGHT: f32 = 0.3;
+/// Matte paper reflects little light off its surface, so the print stays
+/// dark under the lamp.
+pub(crate) const PAPER_REFLECTANCE: f32 = 0.1;
+/// Darkens a sheet under the lamp, so the page is not so bright that the
+/// tone mapping washes out its print.
+pub(crate) const PAPER_SHADE: Color = Color::linear_rgb(0.5, 0.5, 0.5);
 
 pub(crate) struct PaperPlugin;
 
@@ -68,7 +74,33 @@ impl Paper {
         footer: impl Into<Localized>,
         content: impl FnOnce(&mut ChildSpawnerCommands),
     ) -> Entity {
-        let footer: Localized = footer.into();
+        let footer = Self::footer(footer.into(), (number, count));
+        Self::spawn_layout(commands, canvas, content, |bottom| {
+            bottom.spawn(Self::corner_mark("<", number > 1));
+            bottom.spawn(Self::footer_line(footer));
+            bottom.spawn(Self::corner_mark(">", number < count));
+        })
+    }
+
+    /// Spawns a loose page on `canvas`, with only `footer` at the bottom.
+    pub(crate) fn spawn_single(
+        commands: &mut Commands,
+        canvas: &UiCanvas,
+        footer: impl Into<Localized>,
+        content: impl FnOnce(&mut ChildSpawnerCommands),
+    ) -> Entity {
+        let footer = footer.into();
+        Self::spawn_layout(commands, canvas, content, |bottom| {
+            bottom.spawn(Self::footer_line(footer));
+        })
+    }
+
+    fn spawn_layout(
+        commands: &mut Commands,
+        canvas: &UiCanvas,
+        content: impl FnOnce(&mut ChildSpawnerCommands),
+        bottom: impl FnOnce(&mut ChildSpawnerCommands),
+    ) -> Entity {
         commands
             .spawn((
                 Node {
@@ -93,20 +125,20 @@ impl Paper {
                     column_gap: px(16),
                     ..default()
                 })
-                .with_children(|bottom| {
-                    bottom.spawn(Self::corner_mark("<", number > 1));
-                    bottom.spawn((
-                        Node {
-                            flex_grow: 1.0,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        children![Self::faded(Self::footer(footer, (number, count)))],
-                    ));
-                    bottom.spawn(Self::corner_mark(">", number < count));
-                });
+                .with_children(bottom);
             })
             .id()
+    }
+
+    fn footer_line(footer: impl Into<Localized>) -> impl Bundle {
+        (
+            Node {
+                flex_grow: 1.0,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            children![Self::faded(footer)],
+        )
     }
 
     fn footer(footer: Localized, (number, count): (usize, usize)) -> Message {
@@ -151,6 +183,8 @@ impl Paper {
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color_texture: Some(canvas.image.clone()),
                 perceptual_roughness: 0.95,
+                base_color: PAPER_SHADE,
+                reflectance: PAPER_REFLECTANCE,
                 ..default()
             })),
             Transform::from_translation(at).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
@@ -319,7 +353,7 @@ mod tests {
         let footer = Paper::footer(Localized::verbatim("DSG"), (1, 2));
         assert_eq!(
             Locale::on_disk().check(&footer.into()),
-            Ok("DSG   PAGE 1 OF 2".into())
+            Ok("DSG  PAGE 1 OF 2".into())
         );
     }
 }

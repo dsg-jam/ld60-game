@@ -93,6 +93,7 @@ impl Plugin for EditorPlugin {
                 Editor::load_job,
                 Command::show_labels,
                 Command::show_owned,
+                Command::look_aside_on_key,
                 (
                     (Listing::follow_job, Breakpoints::follow_job),
                     Breakpoints::toggle_on_margin,
@@ -112,6 +113,7 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::run_on_click)
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
+        .add_observer(Run::look_aside)
         .add_observer(Verdict::run_on_command)
         .add_observer(DebugPanel::run_on_command)
         .add_observer(Breakpoints::toggle_on_run)
@@ -204,7 +206,7 @@ impl Editor {
                 (
                     Node {
                         flex_wrap: FlexWrap::Wrap,
-                        column_gap: px(FONT_SIZE * 2.0),
+                        column_gap: px(FONT_SIZE * 1.5),
                         row_gap: px(ROW_GAP),
                         ..default()
                     },

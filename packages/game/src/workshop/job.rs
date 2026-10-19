@@ -220,7 +220,7 @@ impl Job {
         }
     }
 
-    fn spawn_items(job: Option<Res<Job>>, mut commands: Commands) {
+    fn spawn_items(job: Option<Res<Job>>, run: Res<Run>, mut commands: Commands) {
         let Some(job) = job else {
             return;
         };
@@ -238,6 +238,7 @@ impl Job {
             counter.place(TICKET_SPOT, TICKET_YAW),
         ));
         if let Origin::Lesson { step, .. } = job.origin
+            && !run.notes().contains(&step)
             && let Some(note) = TutorialNote::for_step(step)
         {
             commands.spawn((
@@ -476,6 +477,16 @@ mod tests {
         let notes: Vec<_> = world.query::<&TutorialNote>().iter(&world).collect();
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].0, 0);
+    }
+
+    #[test]
+    fn a_filed_note_stays_in_the_file() {
+        let mut world = World::new();
+        let mut run = Run::default();
+        run.file_note(0);
+        world.insert_resource(run);
+        follow(&mut world, Levels::on_disk());
+        assert_eq!(world.query::<&TutorialNote>().iter(&world).count(), 0);
     }
 
     #[test]

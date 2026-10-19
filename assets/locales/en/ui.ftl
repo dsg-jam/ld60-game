@@ -1,7 +1,9 @@
 hint-back = Back
+hint-pin = Pin to monitor
+hint-unpin = Unpin
 
 click-bell = Ring bell
-click-binder = Open binder
+click-manuals = Open shop manuals
 click-buy = Buy
 click-buy-short = Not enough money in the till
 click-computer = Use computer

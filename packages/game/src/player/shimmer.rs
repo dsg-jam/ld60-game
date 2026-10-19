@@ -158,7 +158,8 @@ impl Shimmer {
         });
     }
 
-    /// Extent of the overlays on `target` along [`SWEEP_DIRECTION`] on screen.
+    /// Extent of the visible overlays on `target` along [`SWEEP_DIRECTION`]
+    /// on screen.
     ///
     /// Screen units are view space x and y divided by the depth, so a band
     /// at a fixed value is a straight line on screen.
@@ -166,13 +167,14 @@ impl Shimmer {
         target: Entity,
         view_from_world: Affine3A,
         children: &Query<&Children>,
-        overlays: &Query<(&Aabb, &GlobalTransform), With<ShimmerOverlay>>,
+        overlays: &Query<(&Aabb, &GlobalTransform, &InheritedVisibility), With<ShimmerOverlay>>,
     ) -> Option<(f32, f32)> {
         let direction = SWEEP_DIRECTION.normalize();
         let mut extent: Option<(f32, f32)> = None;
-        for (aabb, transform) in children
+        for (aabb, transform, _) in children
             .iter_descendants(target)
             .filter_map(|entity| overlays.get(entity).ok())
+            .filter(|(_, _, visibility)| visibility.get())
         {
             let center = Vec3::from(aabb.center);
             let half = Vec3::from(aabb.half_extents);
@@ -209,7 +211,7 @@ impl Shimmer {
         targets: Query<(), With<Clickable>>,
         parents: Query<&ChildOf>,
         children: Query<&Children>,
-        overlays: Query<(&Aabb, &GlobalTransform), With<ShimmerOverlay>>,
+        overlays: Query<(&Aabb, &GlobalTransform, &InheritedVisibility), With<ShimmerOverlay>>,
         camera: Single<&GlobalTransform, With<PlayerCamera>>,
         mut shimmers: Query<(Entity, &mut Shimmer)>,
         mut materials: ResMut<Assets<ShimmerMaterial>>,

@@ -22,6 +22,7 @@ const FILES: &[&str] = &[
     "device.ftl",
     "editor.ftl",
     "levels.ftl",
+    "manuals.ftl",
     "menu.ftl",
     "paper.ftl",
     "receipt.ftl",

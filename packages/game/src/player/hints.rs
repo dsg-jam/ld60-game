@@ -16,6 +16,8 @@ const TEXT_SIZE: f32 = 18.0;
 const GAP: f32 = 6.0;
 /// From the bottom left corner to the hint for going back.
 const CORNER: f32 = 24.0;
+/// Between the hint for going back and the [`KeyHint`].
+const KEY_HINT_GAP: f32 = 18.0;
 pub(crate) const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
 pub(crate) const ACCENT: Color = Color::srgb_u8(0xff, 0xb0, 0x50);
@@ -29,8 +31,9 @@ pub(super) struct HintsPlugin;
 impl Plugin for HintsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<IconFont>()
+            .init_resource::<KeyHint>()
             .add_systems(Startup, BackHint::spawn)
-            .add_systems(Update, BackHint::update);
+            .add_systems(Update, (BackHint::update, KeyHint::update));
     }
 }
 
@@ -60,6 +63,19 @@ pub(super) struct Caption;
 /// Says that right click or Escape goes back to the desk, while focused.
 #[derive(Component, Debug)]
 struct BackHint;
+
+/// A key that the focused thing reacts to and what it does, shown after
+/// the hint for going back.
+#[derive(Resource, Clone, Debug, Default, PartialEq)]
+pub(crate) struct KeyHint(pub(crate) Option<(&'static str, Message)>);
+
+/// The parts of the [`KeyHint`] line.
+#[derive(Component, Debug)]
+enum KeyHintPart {
+    Row,
+    Key,
+    Action,
+}
 
 impl FromWorld for IconFont {
     fn from_world(world: &mut World) -> Self {
@@ -146,6 +162,35 @@ impl BackHint {
                 Icon::MouseRight.spawn(hint, &font);
                 Icon::Escape.spawn(hint, &font);
                 hint.spawn((Caption, Localized::from(Message::new("hint-back"))));
+                hint.spawn((
+                    KeyHintPart::Row,
+                    Node {
+                        display: Display::None,
+                        align_items: AlignItems::Center,
+                        column_gap: px(GAP),
+                        margin: UiRect::left(px(KEY_HINT_GAP)),
+                        ..default()
+                    },
+                    Pickable::IGNORE,
+                    children![
+                        (
+                            Node {
+                                padding: UiRect::axes(px(6), px(1)),
+                                border: px(2).all(),
+                                ..default()
+                            },
+                            BorderColor::all(INK),
+                            Pickable::IGNORE,
+                            children![(
+                                KeyHintPart::Key,
+                                Caption,
+                                TextColor(ACCENT),
+                                Localized::verbatim("")
+                            )],
+                        ),
+                        (KeyHintPart::Action, Caption, Localized::verbatim("")),
+                    ],
+                ));
             });
     }
 
@@ -159,5 +204,34 @@ impl BackHint {
         } else {
             Visibility::Hidden
         });
+    }
+}
+
+impl KeyHint {
+    fn update(
+        hint: Res<KeyHint>,
+        mut parts: Query<(&KeyHintPart, &mut Node, Option<&mut Localized>)>,
+    ) {
+        if !hint.is_changed() {
+            return;
+        }
+        for (part, mut node, text) in &mut parts {
+            match (part, &hint.0, text) {
+                (KeyHintPart::Row, action, _) => {
+                    node.display = if action.is_some() {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    };
+                }
+                (KeyHintPart::Key, Some((key, _)), Some(mut text)) => {
+                    *text = Localized::verbatim(*key);
+                }
+                (KeyHintPart::Action, Some((_, action)), Some(mut text)) => {
+                    *text = action.clone().into();
+                }
+                _ => {}
+            }
+        }
     }
 }

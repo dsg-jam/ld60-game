@@ -1,10 +1,11 @@
 # Notes from the human who ran the shop before, one for each tutorial job.
 
-tutorial-footer = LEFT ON THE COUNTER
+tutorial-footer = NOTES FROM MARTA
 tutorial-signed = - Marta, who ran this bench before you
 
 tutorial-1 =
     .title = To whoever sits at this bench next
+    .label = FIRST JOB
     .welcome = The locals bring us old human gadgets. They pay well to have them fixed.
     .ticket = 1. Read the job ticket. It says what the gadget does wrong.
     .computer = 2. Use the computer. Find the wrong line and change it.
@@ -14,7 +15,8 @@ tutorial-1 =
 
 tutorial-2 =
     .title = About the chip
-    .datasheet = The binder holds the manual of each gadget and the datasheet of its chip. The datasheet says what each instruction does.
+    .label = ABOUT THE CHIP
+    .datasheet = The SHOP MANUALS file holds the manual of each gadget and the datasheet of its chip. The datasheet says what each instruction does.
     .lines = Go through the firmware one line at a time. Often one number is wrong or one line is too many.
     .versions = F3 VERSIONS keeps your earlier tries. F2 NOTES is a page for your own notes.
     .rent = After this customer, every flash and every visit takes time. When the ringed planet sets, the landlord comes for the rent.

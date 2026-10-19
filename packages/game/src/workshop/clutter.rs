@@ -21,12 +21,12 @@ const SCREWS: [(Vec2, f32); 3] = [
 
 const NOTES: [(Vec2, f32, Color); 2] = [
     (
-        Vec2::new(-0.2, -0.55),
+        Vec2::new(-0.04, -0.55),
         0.2,
         Color::srgb_u8(0xe8, 0xd4, 0x6a),
     ),
     (
-        Vec2::new(-0.1, -0.68),
+        Vec2::new(0.0, -0.75),
         -0.3,
         Color::srgb_u8(0xe6, 0x9a, 0xa0),
     ),

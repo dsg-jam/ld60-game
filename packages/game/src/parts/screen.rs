@@ -58,9 +58,29 @@ impl UiCanvas {
         size: UVec2,
         owner: Entity,
     ) -> Self {
+        Self::spawn_sampled(commands, images, (size, ImageSampler::nearest()), owner)
+    }
+
+    /// Like [`UiCanvas::spawn`], but sampled smoothly, for text that shows
+    /// smaller than the canvas draws it.
+    pub(crate) fn spawn_smooth(
+        commands: &mut Commands,
+        images: &mut Assets<Image>,
+        size: UVec2,
+        owner: Entity,
+    ) -> Self {
+        Self::spawn_sampled(commands, images, (size, ImageSampler::linear()), owner)
+    }
+
+    fn spawn_sampled(
+        commands: &mut Commands,
+        images: &mut Assets<Image>,
+        (size, sampler): (UVec2, ImageSampler),
+        owner: Entity,
+    ) -> Self {
         let mut image =
             Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
-        image.sampler = ImageSampler::nearest();
+        image.sampler = sampler;
         // So lights can follow what it shows.
         image.texture_descriptor.usage |= TextureUsages::COPY_SRC;
         let image = images.add(image);

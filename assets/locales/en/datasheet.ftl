@@ -1,6 +1,4 @@
-binder-tab-chip = CALCO { $revision }
-
-datasheet-footer = DSG ELECTRONICS   CALCO REV { $revision }
+datasheet-footer = DSG ELECTRONICS  CALCO REV { $revision }
 datasheet-subtitle = 8-bit calculator coprocessor. One decimal digit per byte.
 
 datasheet-registers = REGISTERS
@@ -39,5 +37,4 @@ datasheet-notes = NOTES
 
 datasheet-errata = ERRATA
 datasheet-no-errata = No known bugs in Rev { $revision }.
-datasheet-errata-missing = No errata pages filed for Rev { $revision }.
 datasheet-affects = Affects: { $chips }

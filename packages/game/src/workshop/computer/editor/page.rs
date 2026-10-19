@@ -8,7 +8,7 @@ use super::{PHOSPHOR, PHOSPHOR_DIM};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::locale::{Localized, Message};
-use crate::player::focus::Focus;
+use crate::player::focus::{Aside, Focus};
 
 pub(super) struct PagePlugin;
 
@@ -16,7 +16,13 @@ impl Plugin for PagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ActivePage>()
             .add_systems(OnEnter(Focus::Computer), ActivePage::take_focus)
-            .add_systems(Update, Page::show.run_if(resource_changed::<ActivePage>))
+            .add_systems(
+                Update,
+                (
+                    Page::show.run_if(resource_changed::<ActivePage>),
+                    ActivePage::follow_aside,
+                ),
+            )
             .add_observer(Page::switch_on_run);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.page", Page::debug_state);
@@ -109,14 +115,39 @@ impl Page {
 }
 
 impl ActivePage {
+    /// The screen gives up the keyboard while the player looks aside, so
+    /// typing does not go into a page out of sight.
+    fn follow_aside(
+        asides: Query<&Aside, Changed<Aside>>,
+        state: Res<State<Focus>>,
+        active: Res<ActivePage>,
+        pages: Query<(Entity, &Page)>,
+        mut focus: ResMut<InputFocus>,
+    ) {
+        if *state.get() != Focus::Computer {
+            return;
+        }
+        for aside in &asides {
+            if aside.open {
+                focus.clear();
+            } else {
+                Self::focus_active(&active, &pages, &mut focus);
+            }
+        }
+    }
+
+    fn focus_active(active: &ActivePage, pages: &Query<(Entity, &Page)>, focus: &mut InputFocus) {
+        if let Some((entity, _)) = pages.iter().find(|(_, page)| **page == active.0) {
+            focus.set(entity, FocusCause::Navigated);
+        }
+    }
+
     fn take_focus(
         active: Res<ActivePage>,
         pages: Query<(Entity, &Page)>,
         mut focus: ResMut<InputFocus>,
     ) {
-        if let Some((entity, _)) = pages.iter().find(|(_, page)| **page == active.0) {
-            focus.set(entity, FocusCause::Navigated);
-        }
+        Self::focus_active(&active, &pages, &mut focus);
     }
 }
 

@@ -11,7 +11,7 @@ use bevy::{
     prelude::*,
 };
 
-use super::focus::{FocusTarget, Focused, View};
+use super::focus::{Aside, FocusTarget, Focused, View};
 use super::look::LookAngles;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
@@ -117,16 +117,22 @@ impl PlayerCamera {
         time: Res<Time>,
         focused: Res<Focused>,
         angles: Res<LookAngles>,
-        targets: Query<(&FocusTarget, &GlobalTransform)>,
+        targets: Query<(&FocusTarget, Option<&Aside>, &GlobalTransform)>,
         camera: Single<(&mut PlayerCamera, &mut Transform)>,
     ) {
         let (mut camera, mut transform) = camera.into_inner();
         let focus_view = focused
             .get()
             .and_then(|entity| targets.get(entity).ok())
-            .map(|(target, global)| match target.view {
-                View::Local(view) => global.mul_transform(view).compute_transform(),
-                View::World(view) => view,
+            .map(|(target, aside, global)| {
+                let view = match aside.filter(|aside| aside.open) {
+                    Some(aside) => View::Local(aside.view),
+                    None => target.view,
+                };
+                match view {
+                    View::Local(view) => global.mul_transform(view).compute_transform(),
+                    View::World(view) => view,
+                }
             });
         let (goal, decay_rate) = match focus_view {
             Some(view) => (view, DECAY_RATE),
