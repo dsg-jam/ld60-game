@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::message::{MessageUpdateSystems, signal_message_update_system},
     input::{
         InputSystems,
         keyboard::{Key, KeyboardInput},
@@ -45,6 +46,15 @@ impl Plugin for PausePlugin {
             Update,
             (pause_on_escape, pause_on_blur, pause_on_lost_lock)
                 .run_if(in_state(AppState::Playing)),
+        )
+        // Messages expire after fixed updates, which stop with virtual time.
+        // Without this, systems that wait out the pause read its messages
+        // after it, like a lost focus that pauses again.
+        .add_systems(
+            First,
+            signal_message_update_system
+                .before(MessageUpdateSystems)
+                .run_if(|time: Res<Time<Virtual>>| time.is_paused()),
         )
         .add_systems(OnEnter(AppState::Paused), (spawn, stop_time))
         .add_systems(OnExit(AppState::Paused), start_time);
@@ -126,4 +136,57 @@ fn stop_time(mut time: ResMut<Time<Virtual>>) {
 
 fn start_time(mut time: ResMut<Time<Virtual>>) {
     time.unpause();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use bevy::{
+        input::InputPlugin,
+        state::app::StatesPlugin,
+        time::{TimePlugin, TimeUpdateStrategy},
+    };
+
+    use super::*;
+
+    #[test]
+    fn a_focus_lost_while_paused_does_not_pause_again() {
+        let mut app = App::new();
+        app.add_plugins((
+            TaskPoolPlugin::default(),
+            TimePlugin,
+            StatesPlugin,
+            InputPlugin,
+        ))
+        .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+            16,
+        )))
+        .add_message::<WindowFocused>()
+        .init_state::<AppState>()
+        .init_state::<Focus>()
+        .init_resource::<CursorLock>()
+        .add_plugins(PausePlugin);
+        let window = app.world_mut().spawn(PrimaryWindow).id();
+        let focus = |app: &mut App, focused| {
+            app.world_mut()
+                .write_message(WindowFocused { window, focused });
+            for _ in 0..5 {
+                app.update();
+            }
+            *app.world().resource::<State<AppState>>().get()
+        };
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::Playing);
+        assert_eq!(focus(&mut app, true), AppState::Playing);
+        assert_eq!(focus(&mut app, false), AppState::Paused);
+        for focused in [true, false, true] {
+            focus(&mut app, focused);
+        }
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::Playing);
+        assert_eq!(focus(&mut app, true), AppState::Playing);
+    }
 }
