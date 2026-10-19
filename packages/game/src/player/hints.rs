@@ -16,7 +16,7 @@ const TEXT_SIZE: f32 = 18.0;
 const GAP: f32 = 6.0;
 /// From the bottom left corner to the hint for going back.
 const CORNER: f32 = 24.0;
-/// Between the hint for going back and the [`KeyHint`].
+/// Between the hint for going back, the [`ClickHint`] and the [`KeyHint`].
 const KEY_HINT_GAP: f32 = 18.0;
 pub(crate) const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
@@ -32,8 +32,12 @@ impl Plugin for HintsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<IconFont>()
             .init_resource::<KeyHint>()
+            .init_resource::<ClickHint>()
             .add_systems(Startup, BackHint::spawn)
-            .add_systems(Update, (BackHint::update, KeyHint::update));
+            .add_systems(
+                Update,
+                (BackHint::update, KeyHint::update, ClickHint::update),
+            );
     }
 }
 
@@ -68,6 +72,18 @@ struct BackHint;
 /// the hint for going back.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub(crate) struct KeyHint(pub(crate) Option<(&'static str, Message)>);
+
+/// What a left click does where the mouse is, shown after the hint for
+/// going back.
+#[derive(Resource, Clone, Debug, Default, PartialEq)]
+pub(crate) struct ClickHint(pub(crate) Option<Message>);
+
+/// The parts of the [`ClickHint`] line.
+#[derive(Component, Debug)]
+enum ClickHintPart {
+    Row,
+    Action,
+}
 
 /// The parts of the [`KeyHint`] line.
 #[derive(Component, Debug)]
@@ -163,6 +179,21 @@ impl BackHint {
                 Icon::Escape.spawn(hint, &font);
                 hint.spawn((Caption, Localized::from(Message::new("hint-back"))));
                 hint.spawn((
+                    ClickHintPart::Row,
+                    Node {
+                        display: Display::None,
+                        align_items: AlignItems::Center,
+                        column_gap: px(GAP),
+                        margin: UiRect::left(px(KEY_HINT_GAP)),
+                        ..default()
+                    },
+                    Pickable::IGNORE,
+                ))
+                .with_children(|row| {
+                    Icon::MouseLeft.spawn(row, &font);
+                    row.spawn((ClickHintPart::Action, Caption, Localized::verbatim("")));
+                });
+                hint.spawn((
                     KeyHintPart::Row,
                     Node {
                         display: Display::None,
@@ -228,6 +259,32 @@ impl KeyHint {
                     *text = Localized::verbatim(*key);
                 }
                 (KeyHintPart::Action, Some((_, action)), Some(mut text)) => {
+                    *text = action.clone().into();
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+impl ClickHint {
+    fn update(
+        hint: Res<ClickHint>,
+        mut parts: Query<(&ClickHintPart, &mut Node, Option<&mut Localized>)>,
+    ) {
+        if !hint.is_changed() {
+            return;
+        }
+        for (part, mut node, text) in &mut parts {
+            match (part, &hint.0, text) {
+                (ClickHintPart::Row, action, _) => {
+                    node.display = if action.is_some() {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    };
+                }
+                (ClickHintPart::Action, Some(action), Some(mut text)) => {
                     *text = action.clone().into();
                 }
                 _ => {}
