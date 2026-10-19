@@ -107,8 +107,56 @@ pub(crate) struct Wrinkles {
     folds: [Vec4; 2],
     /// Direction and length in waves per meter, phase and height.
     waves: [(Vec2, f32, f32); 4],
-    /// Corner, reach and lift.
-    curls: [(Vec2, f32, f32); 2],
+    curls: [Curl; 2],
+    /// The direction the whole sheet bends along, and how far its ends rise
+    /// above its middle.
+    bend: (Vec2, f32),
+    /// How far a held sheet bows away from what it is held against.
+    bow: f32,
+}
+
+/// A corner of a sheet lifting off, bent along a straight line across it
+/// like real paper.
+#[derive(Debug, Clone, Copy)]
+struct Curl {
+    corner: Vec2,
+    /// Points from the corner into the sheet, across the line it bends
+    /// along.
+    inward: Vec2,
+    /// From the corner to the line it bends along.
+    reach: f32,
+    lift: f32,
+}
+
+impl Curl {
+    fn random(size: Vec2, lift: f32, rng: &mut SmallRng) -> Self {
+        let corner = Vec2::new(
+            if rng.random_bool(0.5) { 0.0 } else { size.x },
+            if rng.random_bool(0.6) { size.y } else { 0.0 },
+        );
+        let diagonal = (size / 2.0 - corner).normalize();
+        Self {
+            corner,
+            inward: Vec2::from_angle(rng.random_range(-0.35..0.35)).rotate(diagonal),
+            reach: size.min_element() * rng.random_range(0.3..0.55),
+            lift,
+        }
+    }
+
+    fn height(&self, p: Vec2) -> f32 {
+        let beyond = (1.0 - (p - self.corner).dot(self.inward) / self.reach).max(0.0);
+        self.lift * beyond * beyond
+    }
+
+    /// Moves the curl to the other side of the sheet, if it is on the side
+    /// of `held`.
+    fn away_from(&mut self, held: Vec2, size: Vec2) {
+        let from_middle = (self.corner - size / 2.0).dot(held);
+        if from_middle > 0.0 {
+            self.corner -= 2.0 * from_middle * held;
+            self.inward = self.inward.reflect(held);
+        }
+    }
 }
 
 impl Wrinkles {
@@ -147,25 +195,37 @@ impl Wrinkles {
                 height * rng.random_range(0.5..1.0),
             )
         });
-        let curls = std::array::from_fn(|_| {
-            let corner = Vec2::new(
-                if rng.random_bool(0.5) { 0.0 } else { size.x },
-                if rng.random_bool(0.6) { size.y } else { 0.0 },
-            );
-            let lift = if rng.random_bool(0.6) {
-                rng.random_range(0.002..0.005)
-            } else {
-                0.0
-            };
-            (corner, rng.random_range(0.03..0.06), lift)
-        });
+        // Mostly one corner lifts clearly, sometimes a second a little.
+        let lift = if rng.random_bool(0.85) {
+            rng.random_range(0.0025..0.006)
+        } else {
+            0.0
+        };
+        let first = Curl::random(size, lift, &mut rng);
+        let lift = if rng.random_bool(0.4) {
+            rng.random_range(0.001..0.003)
+        } else {
+            0.0
+        };
+        let second = Curl::random(size, lift, &mut rng);
+        let along = if rng.random_bool(0.5) {
+            Vec2::X
+        } else {
+            Vec2::Y
+        };
+        let bend = (
+            Vec2::from_angle(rng.random_range(-0.3..0.3)).rotate(along),
+            rng.random_range(0.0008..0.0025) * if rng.random_bool(0.75) { 1.0 } else { -1.0 },
+        );
         Self {
             size,
             seed,
             held: None,
             folds,
             waves,
-            curls,
+            curls: [first, second],
+            bend,
+            bow: rng.random_range(0.0015..0.003),
         }
     }
 
@@ -185,9 +245,19 @@ impl Wrinkles {
         for (wave, phase, amplitude) in self.waves {
             height += amplitude * (wave.dot(p) + phase).sin();
         }
-        for (corner, reach, lift) in self.curls {
-            let near = (1.0 - p.distance(corner) / reach).max(0.0);
-            height += lift * near * near;
+        for curl in &self.curls {
+            height += curl.height(p);
+        }
+        let (along, rise) = self.bend;
+        let half = (self.size * along.abs()).element_sum() / 2.0;
+        let from_middle = (p - self.size / 2.0).dot(along) / half;
+        height += rise * from_middle * from_middle;
+        if let Some(held) = self.held {
+            // Pressed down under the clip, the sheet bulges out a third of
+            // the way down and lies back towards its free end.
+            let length = (self.size * held.abs()).element_sum();
+            let t = (length / 2.0 - (p - self.size / 2.0).dot(held)) / length;
+            height += self.bow * 6.75 * t * (1.0 - t) * (1.0 - t);
         }
         height
     }
@@ -206,7 +276,11 @@ impl Wrinkles {
     /// under a clip or around the rings.
     pub(super) fn hold(&mut self, binding: &Binding) {
         // The sheet's y runs down the page, the mesh's y up.
-        self.held = Some(binding.held() * Vec2::new(1.0, -1.0));
+        let held = binding.held() * Vec2::new(1.0, -1.0);
+        for curl in &mut self.curls {
+            curl.away_from(held, self.size);
+        }
+        self.held = Some(held);
     }
 
     /// A grid facing +Z like a [`Rectangle`], displaced by the wrinkles.
