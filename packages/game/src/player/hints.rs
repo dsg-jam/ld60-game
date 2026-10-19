@@ -2,7 +2,7 @@ use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeig
 
 use super::{cursor, look::Gaze};
 use crate::locale::{Localized, Message};
-use crate::menu::{AppState, Settings};
+use crate::menu::Settings;
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";
 const ICON_SIZE: f32 = 64.0;
@@ -29,9 +29,8 @@ pub(super) struct HintsPlugin;
 impl Plugin for HintsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<IconFont>()
-            .init_resource::<NextStep>()
-            .add_systems(Startup, (BackHint::spawn, StepHint::spawn))
-            .add_systems(Update, (BackHint::update, StepHint::update));
+            .add_systems(Startup, BackHint::spawn)
+            .add_systems(Update, BackHint::update);
     }
 }
 
@@ -61,15 +60,6 @@ pub(super) struct Caption;
 /// Says that right click or Escape goes back to the desk, while focused.
 #[derive(Component, Debug)]
 struct BackHint;
-
-/// What the player should do next, if anything. Shown at the bottom of the
-/// screen while playing.
-#[derive(Resource, Default, Debug, PartialEq)]
-pub(crate) struct NextStep(pub(crate) Option<Message>);
-
-/// The line that shows the [`NextStep`].
-#[derive(Component, Debug)]
-struct StepHint;
 
 impl FromWorld for IconFont {
     fn from_world(world: &mut World) -> Self {
@@ -169,46 +159,5 @@ impl BackHint {
         } else {
             Visibility::Hidden
         });
-    }
-}
-
-impl StepHint {
-    fn spawn(mut commands: Commands) {
-        commands.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: percent(100),
-                bottom: px(CORNER),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            Pickable::IGNORE,
-            children![(StepHint, Caption, TextColor(ACCENT), Visibility::Hidden)],
-        ));
-    }
-
-    fn update(
-        next: Res<NextStep>,
-        state: Res<State<AppState>>,
-        settings: Res<Settings>,
-        hint: Single<(Entity, &mut Visibility, Option<&Localized>), With<StepHint>>,
-        mut commands: Commands,
-    ) {
-        let (entity, mut visibility, current) = hint.into_inner();
-        let shown = next
-            .0
-            .as_ref()
-            .filter(|_| *state.get() == AppState::Playing && settings.hints());
-        visibility.set_if_neq(if shown.is_some() {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        });
-        if let Some(message) = shown {
-            let text = Localized::from(message.clone());
-            if current != Some(&text) {
-                commands.entity(entity).insert(text);
-            }
-        }
     }
 }

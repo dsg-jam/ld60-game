@@ -19,9 +19,3 @@ tutorial-2 =
     .versions = F3 VERSIONS keeps your earlier tries. F2 NOTES is a page for your own notes.
     .rent = After this customer, every flash and every visit takes time. When the ringed planet sets, the landlord comes for the rent.
     .trader = After the rent, a scrap trader leaves a crate on the counter. Buy a gadget there, and the locals start to bring that kind too.
-
-tutorial-step-fix = Click the computer and change the wrong line
-tutorial-step-flash = Press F6 to flash your fix into the gadget
-tutorial-step-try = Click the gadget and try its buttons
-tutorial-step-stamp = If it works, click the stamp
-tutorial-step-ring = Ring the bell to hand the gadget back
