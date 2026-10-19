@@ -34,6 +34,13 @@ const TURN_DISTANCE: f32 = 1.0;
 const TURN_TIME: f32 = 0.6;
 /// How far through the turn of a [`Travel`] the player can take over.
 const TAKE_OVER_TURN: f32 = 0.5;
+/// How far ambient occlusion reaches, in meters. Things on the desk are a
+/// few centimeters big, so Bevy's default of most of a meter darkens a sheet
+/// over the whole stack it lies on.
+const OCCLUSION_RADIUS: f32 = 0.15;
+/// How thick things are assumed to be, in meters, so light passes behind a
+/// sheet of paper.
+const OCCLUSION_THICKNESS: f32 = 0.03;
 
 pub(super) struct CameraPlugin;
 
@@ -136,7 +143,8 @@ impl PlayerCamera {
             match settings.quality().ambient_occlusion() {
                 Some(quality_level) => camera.insert(ScreenSpaceAmbientOcclusion {
                     quality_level,
-                    ..default()
+                    radius: OCCLUSION_RADIUS,
+                    constant_object_thickness: OCCLUSION_THICKNESS,
                 }),
                 None => camera.remove::<ScreenSpaceAmbientOcclusion>(),
             };
