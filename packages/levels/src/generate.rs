@@ -1,19 +1,23 @@
 mod probe;
 mod symptom;
 
+use std::ops::RangeInclusive;
 use std::slice;
 
-use ld60_calco::Revision;
-use ld60_devices::{BoardRev, ChipSpec, DeviceKind, Rom, RomKind};
+use ld60_calco::{RAM_LEN, Revision};
+use ld60_devices::{BoardRev, ChipSpec, DeviceKind, Fault, Rom, RomKind};
 use ld60_dsl::{Flavor, Selection, Target};
+use ld60_machine::StuckBit;
 
 use self::probe::Probe;
 pub use self::symptom::Symptom;
 use crate::check::run_cases;
+use crate::difficulty::MAX_SYMPTOM_KEYS;
 use crate::mutate::{Mutation, Operator};
 use crate::variant::rng::Rng;
 use crate::{
-    GenerateError, Level, RomSpec, TEST_SEEDS, TestCase, Variant, initial_rom, run_line_tests,
+    Difficulty, GenerateError, JobText, Level, RomSpec, TEST_SEEDS, TestCase, Variant, initial_rom,
+    run_line_tests,
 };
 
 /// Tries with fresh bugs before [`Generated::new`] gives up.
@@ -25,7 +29,8 @@ const REWRITES: u64 = 8;
 /// Random key sequences tried as passing tests after the end of line tests.
 const RANDOM_TESTS: usize = 32;
 const MAX_RANDOM_KEYS: u64 = 5;
-const REWARD_PER_BUG: u32 = 5;
+/// Stuck RAM bits tried before the board stays without one.
+const FAULT_TRIES: usize = 16;
 
 /// The working firmware of a device model.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,6 +149,7 @@ impl Reference {
             tests: Vec::new(),
             reward: 0,
             firmware: None,
+            text: None,
         }
     }
 }
@@ -152,32 +158,41 @@ impl Generated {
     /// The [`Level::id`] of every generated job.
     pub const ID: &str = "generated";
 
-    /// Makes the job for `seed`. Higher `difficulty` adds more bugs, up to 3.
-    /// If no job with that many bugs is found, the job gets fewer.
+    /// Makes the job for `seed` with the bugs and faults of `difficulty`.
+    ///
+    /// The `reference` should be compiled for [`Difficulty::chip`]. The first
+    /// bug shows within [`Difficulty::symptom_keys`] keys and the others
+    /// within its end. If no such bug is found, any length is allowed. If no
+    /// job with [`Difficulty::bugs`] bugs is found, the job gets fewer.
     ///
     /// The job moves to a board picked by the seed. Then each bug changes
     /// one line, and a test shows each bug with the fewest keys. The other
     /// tests pass on the buggy firmware. The job always passes
     /// [`Variant::verify`].
-    pub fn new(reference: &Reference, seed: u64, difficulty: u32) -> Result<Self, GenerateError> {
-        let working = Self::working(reference, seed);
-        (1..=Self::bug_count(difficulty))
+    pub fn new(
+        reference: &Reference,
+        seed: u64,
+        difficulty: &Difficulty,
+    ) -> Result<Self, GenerateError> {
+        let working = Self::working(reference, seed, difficulty.fault_chance());
+        let lengths = [difficulty.symptom_keys().clone(), 0..=MAX_SYMPTOM_KEYS];
+        let job = (1..=difficulty.bugs())
             .rev()
             .find_map(|bugs| {
-                (0..ATTEMPTS).find_map(|attempt| {
-                    let mut rng = Rng::new(seed, &format!("bug {attempt}"));
-                    Self::attempt(&working, &mut rng, bugs)
+                lengths.iter().find_map(|keys| {
+                    (0..ATTEMPTS).find_map(|attempt| {
+                        let mut rng = Rng::new(seed, &format!("bug {attempt}"));
+                        Self::attempt(&working, &mut rng, difficulty, bugs, keys)
+                    })
                 })
             })
-            .ok_or(GenerateError::NoBug)
+            .ok_or(GenerateError::NoBug)?;
+        Ok(job.with_text(seed))
     }
 
-    fn bug_count(difficulty: u32) -> usize {
-        (1 + difficulty as usize / 4).min(3)
-    }
-
-    /// The reference moved to the board for `seed`, as a job that keeps it there.
-    fn working(reference: &Reference, seed: u64) -> Variant {
+    /// The reference moved to the board for `seed`, as a job that keeps it
+    /// there. With `fault_chance` percent, the board gets a stuck RAM bit.
+    fn working(reference: &Reference, seed: u64, fault_chance: u32) -> Variant {
         let original = Variant {
             level: reference.level(seed),
             buggy: reference.asm.clone(),
@@ -190,10 +205,20 @@ impl Generated {
             .unwrap_or(original);
         working.level.boards = vec![working.level.board];
         working.level.keep_layout = true;
+        let mut rng = Rng::new(seed, "fault");
+        if (rng.below(100) as u32) < fault_chance {
+            working = working.with_harmless_fault(&mut rng);
+        }
         working
     }
 
-    fn attempt(working: &Variant, rng: &mut Rng, bugs: usize) -> Option<Self> {
+    fn attempt(
+        working: &Variant,
+        rng: &mut Rng,
+        difficulty: &Difficulty,
+        bugs: usize,
+        keys: &RangeInclusive<usize>,
+    ) -> Option<Self> {
         let level = &working.level;
         let lines: Vec<String> = working.fixed.lines().map(String::from).collect();
         let fixed = initial_rom(level, &working.fixed).ok()?;
@@ -202,7 +227,7 @@ impl Generated {
             if chosen.len() == bugs {
                 break;
             }
-            let operator = Operator::ALL[rng.below(Operator::ALL.len())];
+            let operator = difficulty.operator(rng);
             let candidates: Vec<Mutation> = Mutation::candidates(&lines, operator)
                 .into_iter()
                 .filter(|m| chosen.iter().all(|(other, ..)| other.apart(m)))
@@ -215,9 +240,13 @@ impl Generated {
             let Ok(mutant_rom) = initial_rom(level, &mutant) else {
                 continue;
             };
-            let Some(probe) = Probe::find(level, &working.fixed, &mutant) else {
+            let Some(probe) = Probe::find(level, &working.fixed, &mutant, *keys.end()) else {
                 continue;
             };
+            let shortest = if chosen.is_empty() { *keys.start() } else { 0 };
+            if !(shortest..=*keys.end()).contains(&probe.keys.len()) {
+                continue;
+            }
             if chosen.iter().any(|(_, c)| same_keys(&c.keys, &probe.keys)) {
                 continue;
             }
@@ -268,7 +297,7 @@ impl Generated {
         }
         let mut level = level.clone();
         level.tests = tests;
-        level.reward = REWARD_PER_BUG * bugs as u32;
+        level.reward = difficulty.reward(bugs);
         let variant = Variant {
             level,
             buggy,
@@ -287,6 +316,25 @@ impl Generated {
             })
             .collect();
         Some(Self { variant, bugs })
+    }
+
+    /// Picks the customer and how they describe the first bug. The other
+    /// bugs get a remark each.
+    fn with_text(mut self, seed: u64) -> Self {
+        let mut rng = Rng::new(seed, "text");
+        let level = &mut self.variant.level;
+        level.text = Some(JobText {
+            customer: JobText::CUSTOMERS[rng.below(JobText::CUSTOMERS.len())].into(),
+            symptom: self.bugs[0].symptom,
+            take: 1 + rng.below(JobText::TAKES as usize) as u32,
+        });
+        for bug in &self.bugs[1..] {
+            let remark = JobText::also(bug.symptom);
+            if !level.remarks.contains(&remark) {
+                level.remarks.push(remark);
+            }
+        }
+        self
     }
 }
 
@@ -316,6 +364,24 @@ impl TestCase {
 }
 
 impl Variant {
+    /// The job with a stuck RAM bit that changes nothing the customer sees,
+    /// or the job as it is if no such bit is found.
+    fn with_harmless_fault(self, rng: &mut Rng) -> Self {
+        (0..FAULT_TRIES)
+            .find_map(|_| {
+                let bit = StuckBit {
+                    cell: rng.below(RAM_LEN) as u8,
+                    bit: rng.below(4) as u8,
+                    high: rng.below(2) == 1,
+                };
+                let mut faulty = self.clone();
+                faulty.level.faults.push(Fault::StuckRamBit(bit));
+                faulty.level.remarks.push(JobText::FAULT_REMARK.into());
+                (faulty.behaves_like(&self) && faulty.passes_line_tests()).then_some(faulty)
+            })
+            .unwrap_or(self)
+    }
+
     fn passes_line_tests(&self) -> bool {
         initial_rom(&self.level, &self.fixed)
             .and_then(|rom| run_line_tests(&self.level, &rom, TEST_SEEDS))

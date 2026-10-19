@@ -4,7 +4,6 @@ use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, RunError};
 
 use crate::{Level, TEST_SEEDS, device, initial_rom};
 
-const MAX_KEYS: usize = 6;
 /// Key presses tried before the search gives up.
 const MAX_PRESSES: usize = 4096;
 
@@ -25,9 +24,14 @@ struct Node {
 impl Probe {
     /// Searches breadth first, so the result has the fewest keys.
     ///
-    /// Returns `None` if no sequence of up to [`MAX_KEYS`] keys tells the two
+    /// Returns `None` if no sequence of up to `max_keys` keys tells the two
     /// apart within the search budget.
-    pub(crate) fn find(level: &Level, working: &str, mutant: &str) -> Option<Self> {
+    pub(crate) fn find(
+        level: &Level,
+        working: &str,
+        mutant: &str,
+        max_keys: usize,
+    ) -> Option<Self> {
         let boot = |firmware| {
             let mut device = device(level, initial_rom(level, firmware).ok()?).ok()?;
             device.power_on(TEST_SEEDS[0]);
@@ -50,7 +54,7 @@ impl Probe {
         }]);
         let mut presses = 0;
         while let Some(node) = queue.pop_front() {
-            if node.keys.len() == MAX_KEYS {
+            if node.keys.len() >= max_keys {
                 continue;
             }
             for &key in &keys {

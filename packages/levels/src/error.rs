@@ -9,6 +9,7 @@ use crate::Report;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LevelError {
     Parse(String),
+    Write(ron::Error),
     BoardNotAllowed(BoardRev),
     NoRewrite(BoardRev),
     Assemble(Vec<AsmError>),
@@ -19,6 +20,7 @@ impl fmt::Display for LevelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Parse(message) => write!(f, "invalid level file: {message}"),
+            Self::Write(_) => f.write_str("cannot write the level file"),
             Self::NoRewrite(rev) => {
                 write!(f, "no rewrite for board revision {rev:?} passes the checks")
             }
@@ -34,7 +36,18 @@ impl fmt::Display for LevelError {
     }
 }
 
-impl std::error::Error for LevelError {}
+impl std::error::Error for LevelError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Write(error) => Some(error),
+            Self::Device(_)
+            | Self::Parse(_)
+            | Self::BoardNotAllowed(_)
+            | Self::NoRewrite(_)
+            | Self::Assemble(_) => None,
+        }
+    }
+}
 
 impl From<DeviceError> for LevelError {
     fn from(error: DeviceError) -> Self {

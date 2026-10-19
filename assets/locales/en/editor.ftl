@@ -23,6 +23,7 @@ editor-assembly-failed = ASSEMBLY FAILED
 editor-asm-error = line { $line }: { $message }
 editor-asm-error-more = line { $line }: { $message } (+{ $more } MORE)
 editor-error-parse = invalid level file: { $message }
+editor-error-write = cannot write the level file
 editor-error-board-not-allowed = the job does not allow board revision { $board }
 editor-error-no-rewrite = no rewrite for board revision { $board } passes the checks
 editor-error-chip-mismatch = { $device } cannot use a { $chip } chip

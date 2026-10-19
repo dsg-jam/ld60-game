@@ -201,6 +201,7 @@ impl From<&LevelError> for Message {
             LevelError::Parse(message) => {
                 Self::new("editor-error-parse").with("message", message.as_str())
             }
+            LevelError::Write(_) => Self::new("editor-error-write"),
             LevelError::BoardNotAllowed(rev) => Self::new("editor-error-board-not-allowed")
                 .with("board", BoardLetter(*rev).to_string()),
             LevelError::NoRewrite(rev) => {
@@ -308,6 +309,7 @@ mod tests {
             LevelError::Assemble(vec![asm(1)]),
             LevelError::Assemble(vec![asm(1), asm(2)]),
             LevelError::Parse("bad".into()),
+            LevelError::Write(ron::Error::Eof),
             LevelError::BoardNotAllowed(BoardRev::B),
             LevelError::NoRewrite(BoardRev::C),
             LevelError::Device(DeviceError::ChipMismatch {

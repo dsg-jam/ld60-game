@@ -51,7 +51,8 @@ struct LevelLoader;
 impl Levels {
     /// The `attribute` of the message of `level`, in the player's language.
     pub(crate) fn text(level: &Level, attribute: impl Into<String>) -> Message {
-        let message = Message::new(level.id.clone()).attribute(attribute.into());
+        let (id, attribute) = level.message(&attribute.into());
+        let message = Message::new(id).attribute(attribute);
         level
             .text_args()
             .into_iter()
@@ -191,8 +192,8 @@ fn is_update<A: Asset>(event: &AssetEvent<A>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use ld60_devices::BoardRev;
-    use ld60_levels::Variant;
+    use ld60_devices::{BoardRev, DeviceKind};
+    use ld60_levels::{Difficulty, Generated, JobText, Reference, Symptom, TestCase, Variant};
 
     use super::*;
     use crate::locale::Locale;
@@ -211,6 +212,83 @@ mod tests {
                 assert!(locale.has(&text), "{text:?}");
             }
         }
+    }
+
+    /// A generated job with every remark a generated job can have.
+    fn generated() -> Level {
+        let source = std::fs::read_to_string(format!(
+            "{}/levels/{}",
+            env!("LD60_ASSETS"),
+            Reference::source(DeviceKind::Summa6)
+        ))
+        .unwrap();
+        let difficulty = Difficulty::for_job(0, DeviceKind::Summa6);
+        let reference = Reference::compile(DeviceKind::Summa6, difficulty.chip(), &source).unwrap();
+        let mut level = Generated::new(&reference, 0, &difficulty)
+            .unwrap()
+            .variant
+            .level;
+        level.remarks = Symptom::ALL
+            .into_iter()
+            .map(JobText::also)
+            .chain([JobText::FAULT_REMARK.into()])
+            .collect();
+        level
+    }
+
+    /// `level` with `text` about a first test that presses `keys`.
+    fn told(level: &Level, text: JobText, keys: &str) -> Level {
+        let mut level = level.clone();
+        level.tests[0] = TestCase {
+            keys: keys.into(),
+            display: "000046".into(),
+        };
+        level.text = Some(text);
+        level
+    }
+
+    #[test]
+    fn every_generated_job_has_its_text() {
+        let base = generated();
+        let mut texts = Vec::new();
+        for customer in JobText::CUSTOMERS {
+            for symptom in Symptom::ALL {
+                for take in 1..=JobText::TAKES {
+                    let text = JobText {
+                        customer: customer.into(),
+                        symptom,
+                        take,
+                    };
+                    let woke = symptom.shows_on_wake().then_some("");
+                    for keys in ["12+34="].into_iter().chain(woke) {
+                        let level = told(&base, text.clone(), keys);
+                        let remarks = level.remarks.iter().map(|key| Level::remark(key));
+                        for attribute in [Level::CUSTOMER.into(), Level::COMPLAINT.into()]
+                            .into_iter()
+                            .chain(remarks)
+                        {
+                            texts.push(Levels::text(&level, attribute));
+                        }
+                    }
+                }
+            }
+        }
+        Locale::on_disk().assert_formats(texts);
+    }
+
+    #[test]
+    fn generated_complaints_name_the_keys() {
+        let text = JobText {
+            customer: JobText::CUSTOMERS[0].into(),
+            symptom: Symptom::NoResponse,
+            take: 1,
+        };
+        let level = told(&generated(), text, "12+34=");
+        let complaint = Levels::text(&level, Level::COMPLAINT);
+        let complaint = Locale::on_disk().text(&complaint.into());
+        assert!(complaint.contains("12+34="), "{complaint}");
+        assert!(complaint.contains("the = button"), "{complaint}");
+        assert!(complaint.contains("000046"), "{complaint}");
     }
 
     #[test]
