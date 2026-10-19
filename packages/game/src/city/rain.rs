@@ -1,3 +1,5 @@
+mod sound;
+
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
     prelude::*,
@@ -34,9 +36,12 @@ pub(super) struct RainPlugin;
 impl Plugin for RainPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "rain.wesl");
-        app.add_plugins(MaterialPlugin::<RainMaterial>::default())
-            .add_systems(Startup, RainMaterial::spawn)
-            .add_systems(Update, RainMaterial::light_up);
+        app.add_plugins((
+            MaterialPlugin::<RainMaterial>::default(),
+            sound::RainSoundPlugin,
+        ))
+        .add_systems(Startup, RainMaterial::spawn)
+        .add_systems(Update, RainMaterial::light_up);
     }
 }
 

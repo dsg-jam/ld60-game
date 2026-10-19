@@ -24,8 +24,10 @@ const PAINT_HEIGHT: f32 = 0.004;
 /// Share of the ground under water, from 0 to 1.
 pub(super) const ROAD_PUDDLES: f32 = 1.0;
 const WALK_PUDDLES: f32 = 0.1;
-/// Seed of the road's wet look, which places its puddles.
+/// Seeds of the wet look of the road and the sidewalks, which place their
+/// puddles.
 pub(super) const ROAD_SEED: f32 = 1.0;
+const WALK_SEED: f32 = 2.0;
 
 const LAMP_SPACING: f32 = 18.0;
 const LAMP_HEIGHT: f32 = 6.5;
@@ -69,7 +71,11 @@ impl StreetPlugin {
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
         let asphalt = wet.add(Wet::material(matte(ASPHALT, 0.9), ROAD_PUDDLES, ROAD_SEED));
-        let concrete = wet.add(Wet::material(matte(CONCRETE, 0.92), WALK_PUDDLES, 2.0));
+        let concrete = wet.add(Wet::material(
+            matte(CONCRETE, 0.92),
+            WALK_PUDDLES,
+            WALK_SEED,
+        ));
         let curb = wet.add(Wet::material(matte(CURB, 0.8), 0.0, 3.0));
         let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, ROAD_SEED));
         let slab =
@@ -216,5 +222,15 @@ impl StreetPlugin {
                 x += LAMP_SPACING;
             }
         }
+    }
+}
+
+/// How far the water at `p` on the road or the sidewalks is above the level
+/// where a puddle starts. Positive in a puddle.
+pub(super) fn water(p: Vec2, wetness: f32) -> f32 {
+    if (FAR_CURB..NEAR_CURB).contains(&p.y) {
+        Wet::puddle(p, wetness, ROAD_PUDDLES, ROAD_SEED)
+    } else {
+        Wet::puddle(p, wetness, WALK_PUDDLES, WALK_SEED)
     }
 }

@@ -10,7 +10,8 @@ fn pcg(seed: u32) -> u32 {
     (word >> 22) ^ word
 }
 
-fn hash1(cell: Vec2, salt: f32) -> f32 {
+/// A random number from 0 to 1 for a cell, like `hash1` in `noise.wesl`.
+pub(crate) fn hash1(cell: Vec2, salt: f32) -> f32 {
     let state = pcg(cell.x as i32 as u32 ^ pcg(cell.y as i32 as u32 ^ pcg((salt * 977.0) as u32)));
     state as f32 / u32::MAX as f32
 }

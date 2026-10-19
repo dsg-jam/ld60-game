@@ -1,3 +1,5 @@
+mod sound;
+
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
     prelude::*,
@@ -10,6 +12,7 @@ use super::buildings::Skyline;
 use super::rng;
 use super::weather::Weather;
 use crate::GRAVITY;
+use crate::geometry::noise::hash1;
 use crate::geometry::quads::Quads;
 
 const SEED: u64 = 7;
@@ -17,6 +20,9 @@ const DROPS_PER_METER: f32 = 4.0;
 const PERIOD: (f32, f32) = (0.5, 2.0);
 /// Seconds a drop takes at least to form after the last one fell.
 const FORMING: f32 = 0.2;
+/// Salts of the random numbers of each fall, as in `drips.wesl`.
+const CHANCE: f32 = 1.0;
+const WAIT: f32 = 2.0;
 const WIDTH: f32 = 0.008;
 const BRIGHTNESS: f32 = 2.5;
 
@@ -25,13 +31,16 @@ pub(super) struct DripsPlugin;
 impl Plugin for DripsPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "drips.wesl");
-        app.add_plugins(MaterialPlugin::<DripMaterial>::default())
-            .init_resource::<DripEdges>()
-            .add_systems(Startup, DripMaterial::spawn.after(Skyline::spawn))
-            .add_systems(
-                Update,
-                DripMaterial::follow_weather.run_if(resource_changed::<Weather>),
-            );
+        app.add_plugins((
+            MaterialPlugin::<DripMaterial>::default(),
+            sound::DripSoundPlugin,
+        ))
+        .init_resource::<DripEdges>()
+        .add_systems(Startup, DripMaterial::spawn.after(Skyline::spawn))
+        .add_systems(
+            Update,
+            DripMaterial::follow_weather.run_if(resource_changed::<Weather>),
+        );
     }
 }
 
@@ -167,6 +176,26 @@ impl Drip {
     fn fall(&self) -> f32 {
         (2.0 * self.anchor.y / GRAVITY).sqrt()
     }
+
+    /// When the drop of `round` lands, if it falls at all while `amount` of
+    /// the drops fall. Matches the vertex shader in `drips.wesl`.
+    fn lands(&self, round: f32, amount: f32) -> Option<f32> {
+        let cell = Vec2::new(round, self.seed);
+        (hash1(cell, CHANCE) < amount).then(|| {
+            let wait = hash1(cell, WAIT) * (self.period - self.fall());
+            (round - self.phase) * self.period + wait + self.fall()
+        })
+    }
+
+    /// The times at which drops land after `from` and up to `to` seconds,
+    /// on the wrapped clock of the shaders.
+    pub(super) fn landing(&self, from: f32, to: f32, amount: f32) -> impl Iterator<Item = f32> {
+        let first = (from / self.period + self.phase).floor() as i32 - 1;
+        let last = (to / self.period + self.phase).floor() as i32;
+        (first..=last)
+            .filter_map(move |round| self.lands(round as f32, amount))
+            .filter(move |&at| from < at && at <= to)
+    }
 }
 
 impl Material for DripMaterial {
@@ -180,5 +209,49 @@ impl Material for DripMaterial {
 
     fn alpha_mode(&self) -> AlphaMode {
         AlphaMode::Add
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn drip() -> Drip {
+        let mut drip = Drip {
+            anchor: Vec3::new(1.0, 3.4, -2.0),
+            period: 0.6,
+            seed: 1234.0,
+            phase: 0.3,
+            light: LinearRgba::WHITE,
+        };
+        drip.period = drip.period.max(drip.fall() + FORMING);
+        drip
+    }
+
+    #[test]
+    fn drops_land_once_whatever_the_frames() {
+        let drip = drip();
+        let whole: Vec<f32> = drip.landing(0.0, 60.0, 0.6).collect();
+        let mut framed = Vec::new();
+        let mut t = 0.0;
+        while t < 60.0 {
+            let next = (t + 1.0 / 60.0_f32).min(60.0);
+            framed.extend(drip.landing(t, next, 0.6));
+            t = next;
+        }
+        assert_eq!(whole, framed);
+        assert!(whole.len() > 10);
+    }
+
+    #[test]
+    fn drops_fall_irregularly_and_less_in_light_rain() {
+        let drip = drip();
+        let heavy: Vec<f32> = drip.landing(0.0, 300.0, 1.0).collect();
+        let light = drip.landing(0.0, 300.0, 0.3).count();
+        let gaps: Vec<f32> = heavy.windows(2).map(|pair| pair[1] - pair[0]).collect();
+        let shortest = gaps.iter().copied().fold(f32::MAX, f32::min);
+        let longest = gaps.iter().copied().fold(0.0, f32::max);
+        assert!(longest - shortest > 0.3 * drip.period);
+        assert!(light < heavy.len() / 2);
     }
 }

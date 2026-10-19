@@ -65,10 +65,20 @@ pub(crate) enum Sound {
     PageTurn,
     /// A divider of card turning over, stiffer and slower than a page.
     DividerTurn,
-    /// Rain on the street, a loop.
-    Rain,
+    /// Rain on the road, a loop.
+    AsphaltRain,
+    /// Rain on the sidewalk, a loop.
+    ConcreteRain,
+    /// Rain on a puddle, a loop.
+    PuddleRain,
+    /// Rain on a canvas awning, a loop.
+    AwningRain,
     /// Rain on the shop's roof, a loop.
     RoofRain,
+    /// A drip off an awning hitting the ground.
+    Drip,
+    /// A drip off an awning falling into a puddle.
+    Plunk,
 }
 
 impl Sound {
@@ -107,10 +117,15 @@ impl Sound {
             | Self::Unlatch
             | Self::Static
             | Self::PageTurn
-            | Self::DividerTurn => TAKES,
+            | Self::DividerTurn
+            | Self::Drip
+            | Self::Plunk => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
-            Self::Rain => 3,
-            Self::RoofRain => 2,
+            Self::AsphaltRain
+            | Self::ConcreteRain
+            | Self::PuddleRain
+            | Self::AwningRain
+            | Self::RoofRain => 2,
             Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
         }
     }
@@ -130,8 +145,13 @@ impl Sound {
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
             Self::DividerTurn => Samples::divider_turn(take),
-            Self::Rain => Samples::rain(take),
+            Self::AsphaltRain => Samples::asphalt_rain(take),
+            Self::ConcreteRain => Samples::concrete_rain(take),
+            Self::PuddleRain => Samples::puddle_rain(take),
+            Self::AwningRain => Samples::awning_rain(take),
             Self::RoofRain => Samples::roof_rain(take),
+            Self::Drip => Samples::drip(take),
+            Self::Plunk => Samples::plunk(take),
         }
     }
 
@@ -149,8 +169,11 @@ impl Sound {
             Self::KeyUp => 0.26,
             Self::PageTurn => 0.29,
             Self::DividerTurn => 0.35,
-            Self::Rain => 0.1,
-            Self::RoofRain => 0.15,
+            Self::AsphaltRain | Self::ConcreteRain => 0.125,
+            Self::PuddleRain => 0.35,
+            Self::AwningRain => 0.2,
+            Self::RoofRain => 0.125,
+            Self::Drip | Self::Plunk => 0.25,
         }
     }
 }
