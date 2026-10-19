@@ -14,7 +14,7 @@ import bevy_pbr::render::{
 };
 import package::geometry::{
     bump::bumped,
-    floor::{plank, plank_color, plank_height, rug_color, rug_height},
+    floor::{plank, plank_color, plank_height, rug, rug_height},
     noise::{PI, hash1, noise, visible},
     wear::{dings, floor_marks, grip_ridge, rust, scratches, scuffs},
     wood::{fiber_sheen, wood},
@@ -245,9 +245,11 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             bumps = (0.0006 * noise(uv * 60.0, s + 2.0) + 0.0003 * noise(uv * 200.0, s + 3.0)) * visible(0.005, pixel);
         }
         case RUG: {
-            color = rug_color(uv, h.xz, color, s);
+            let look = rug(uv, h.xz, color, s, pixel);
+            color = look.color;
+            rough = mix(rough, 0.55, look.gloss);
             pbr_input.material.reflectance = vec3<f32>(0.2);
-            bumps = rug_height(uv, pixel);
+            bumps = rug_height(uv, pixel) * (1.0 - 0.7 * look.worn);
         }
         case PERFORATED: {
             let open = hole(uv, pixel);
