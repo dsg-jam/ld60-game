@@ -1,8 +1,12 @@
+mod quality;
+
 use bevy::prelude::*;
 
 use super::list::{Action, Entries, Entry};
 use crate::audio::Mixer;
 use crate::locale::{Localized, Message};
+
+use self::quality::Quality;
 
 /// Room for the name of a setting, so the values line up.
 const LABEL_WIDTH: f32 = 340.0;
@@ -35,6 +39,7 @@ pub(crate) struct Settings {
     sensitivity: u8,
     /// Whether the mouse buttons and keys to use are shown.
     hints: bool,
+    quality: Quality,
 }
 
 /// One of the [`Settings`].
@@ -43,6 +48,7 @@ pub(super) enum Setting {
     Volume,
     Sensitivity,
     Hints,
+    Quality,
 }
 
 /// Steps a [`Setting`] up or down.
@@ -67,6 +73,7 @@ impl Default for Settings {
             volume: 8,
             sensitivity: 4,
             hints: true,
+            quality: Quality::default(),
         }
     }
 }
@@ -84,6 +91,10 @@ impl Settings {
 
     pub(crate) const fn hints(&self) -> bool {
         self.hints
+    }
+
+    pub(crate) const fn quality(&self) -> Quality {
+        self.quality
     }
 
     fn apply(settings: Res<Settings>, mut mixer: ResMut<Mixer>) {
@@ -110,18 +121,20 @@ impl Settings {
             }
             Setting::Hints if self.hints => Message::new("settings-on"),
             Setting::Hints => Message::new("settings-off"),
+            Setting::Quality => Message::new(self.quality.label()),
         }
     }
 }
 
 impl Setting {
-    pub(super) const ALL: [Self; 3] = [Self::Volume, Self::Sensitivity, Self::Hints];
+    pub(super) const ALL: [Self; 4] = [Self::Volume, Self::Sensitivity, Self::Hints, Self::Quality];
 
     const fn label(self) -> &'static str {
         match self {
             Self::Volume => "settings-volume",
             Self::Sensitivity => "settings-sensitivity",
             Self::Hints => "settings-hints",
+            Self::Quality => "settings-quality",
         }
     }
 }
@@ -145,6 +158,15 @@ impl Adjust {
                 settings.sensitivity = step(settings.sensitivity, 1, SENSITIVITY_STEPS);
             }
             Setting::Hints => settings.hints = !settings.hints,
+            Setting::Quality => {
+                let levels = Quality::ALL.len() as u8 - 1;
+                let index = Quality::ALL
+                    .iter()
+                    .position(|quality| *quality == settings.quality)
+                    .unwrap_or_default();
+                let index = step(u8::try_from(index).unwrap_or_default(), 0, levels);
+                settings.quality = Quality::ALL[usize::from(index)];
+            }
         }
     }
 }

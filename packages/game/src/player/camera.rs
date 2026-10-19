@@ -5,6 +5,7 @@ use bevy::{
         prepass::DeferredPrepass,
         tonemapping::{DebandDither, Tonemapping},
     },
+    ecs::schedule::common_conditions::any_match_filter,
     pbr::{DefaultOpaqueRendererMethod, ScreenSpaceAmbientOcclusion},
     post_process::bloom::Bloom,
     prelude::*,
@@ -14,7 +15,7 @@ use super::focus::{FocusTarget, Focused, View};
 use super::look::LookAngles;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
-use crate::menu::AppState;
+use crate::menu::{AppState, Settings};
 
 /// How quickly the camera moves to a new view.
 const DECAY_RATE: f32 = 8.0;
@@ -41,9 +42,15 @@ impl Plugin for CameraPlugin {
         app.insert_resource(DefaultOpaqueRendererMethod::deferred())
             .add_systems(
                 Update,
-                PlayerCamera::follow
-                    .after(Focused::leave_on_input)
-                    .run_if(not(in_state(AppState::Title))),
+                (
+                    PlayerCamera::follow
+                        .after(Focused::leave_on_input)
+                        .run_if(not(in_state(AppState::Title))),
+                    PlayerCamera::match_quality.run_if(
+                        resource_changed::<Settings>
+                            .or_else(any_match_filter::<Added<PlayerCamera>>),
+                    ),
+                ),
             );
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
@@ -65,8 +72,6 @@ impl Plugin for CameraPlugin {
     // Deferred shading doesn't work with multisampling.
     Msaa::Off,
     Smaa,
-    // Grounds small things on the surfaces they rest on.
-    ScreenSpaceAmbientOcclusion,
 )]
 pub(crate) struct PlayerCamera {
     /// Pose while sitting at the counter, before looking around.
@@ -88,6 +93,24 @@ impl PlayerCamera {
 
     pub(crate) fn seat(&self) -> Transform {
         self.seat
+    }
+
+    /// Ambient occlusion grounds small things on the surfaces they rest on.
+    fn match_quality(
+        settings: Res<Settings>,
+        cameras: Query<Entity, With<PlayerCamera>>,
+        mut commands: Commands,
+    ) {
+        for camera in &cameras {
+            let mut camera = commands.entity(camera);
+            match settings.quality().ambient_occlusion() {
+                Some(quality_level) => camera.insert(ScreenSpaceAmbientOcclusion {
+                    quality_level,
+                    ..default()
+                }),
+                None => camera.remove::<ScreenSpaceAmbientOcclusion>(),
+            };
+        }
     }
 
     fn follow(
