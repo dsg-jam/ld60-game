@@ -2,7 +2,7 @@ use bevy::{
     anti_alias::smaa::Smaa,
     camera::Hdr,
     core_pipeline::{
-        prepass::DeferredPrepass,
+        prepass::{DeferredPrepass, DepthPrepass, NormalPrepass},
         tonemapping::{DebandDither, Tonemapping},
     },
     ecs::schedule::common_conditions::any_match_filter,
@@ -69,6 +69,10 @@ impl Plugin for CameraPlugin {
     Bloom = Bloom::NATURAL,
     Tonemapping::TonyMcMapface,
     DeferredPrepass,
+    // Without these the deferred lighting keeps the size of the first
+    // window after a resize, unless an effect that needs them came first.
+    DepthPrepass,
+    NormalPrepass,
     // Deferred shading doesn't work with multisampling.
     Msaa::Off,
     Smaa,
