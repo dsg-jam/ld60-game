@@ -54,7 +54,7 @@ const CAR_WIDTH: f32 = 1.9;
 const CABIN_WIDTH: f32 = 1.6;
 const VAN_WIDTH: f32 = 2.0;
 const HOVER_WIDTH: f32 = 1.5;
-const WHEEL_RADIUS: f32 = 0.33;
+pub(super) const WHEEL_RADIUS: f32 = 0.33;
 const WHEEL_WIDTH: f32 = 0.26;
 /// How far the wheels stick out of the body.
 const WHEEL_OUT: f32 = 0.04;
@@ -82,6 +82,13 @@ const HEADLIGHT: Color = Color::srgb_u8(0xff, 0xf4, 0xe0);
 const TAILLIGHT: Color = Color::srgb_u8(0xff, 0x18, 0x10);
 const TIRE: Color = Color::srgb_u8(0x10, 0x10, 0x12);
 
+/// The kinds of cars on the street.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Body {
+    Sedan,
+    Van,
+}
+
 /// Meshes and materials shared by all vehicles.
 pub(super) struct Fleet {
     sedan_hull: Handle<Mesh>,
@@ -98,6 +105,22 @@ pub(super) struct Fleet {
     head: Handle<StandardMaterial>,
     tail: Handle<StandardMaterial>,
     tire: Handle<SurfaceMaterial>,
+}
+
+impl Body {
+    fn width(self) -> f32 {
+        match self {
+            Self::Sedan => CAR_WIDTH,
+            Self::Van => VAN_WIDTH,
+        }
+    }
+
+    /// Where the wheels touch the road, the front ones first.
+    pub(super) fn wheels(self) -> [Vec3; 4] {
+        let track = self.width() / 2.0 - WHEEL_WIDTH / 2.0 + WHEEL_OUT;
+        [(1.0, -1.0), (1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)]
+            .map(|(x, z)| Vec3::new(x * WHEELBASE, 0.0, z * track))
+    }
 }
 
 impl Fleet {
@@ -145,26 +168,37 @@ impl Fleet {
         })
     }
 
-    pub(super) fn car(&self, parts: &mut ChildSpawnerCommands, kit: &Kit, rng: &mut impl Rng) {
+    pub(super) fn car(
+        &self,
+        parts: &mut ChildSpawnerCommands,
+        kit: &Kit,
+        rng: &mut impl Rng,
+    ) -> Body {
         let paint = self.paints.pick(rng).clone();
-        let (width, front, rear) = if rng.random_bool(VAN_CHANCE) {
-            self.van_details(parts, kit, &paint, rng);
-            (VAN_WIDTH, 2.5, -2.45)
+        let body = if rng.random_bool(VAN_CHANCE) {
+            Body::Van
         } else {
-            parts.spawn(Self::part(&self.sedan_hull, &paint));
-            parts.spawn(Self::part(&self.sedan_cabin, &self.glass));
-            (CAR_WIDTH, 2.3, -2.3)
+            Body::Sedan
         };
-        for x in [-WHEELBASE, WHEELBASE] {
-            for side in [-1.0, 1.0] {
-                let z = side * (width / 2.0 - WHEEL_WIDTH / 2.0 + WHEEL_OUT);
-                parts.spawn((
-                    Mesh3d(self.wheel.clone()),
-                    MeshMaterial3d(self.tire.clone()),
-                    Transform::from_xyz(x, WHEEL_RADIUS, z)
-                        .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
-                ));
+        let (front, rear) = match body {
+            Body::Van => {
+                self.van_details(parts, kit, &paint, rng);
+                (2.5, -2.45)
             }
+            Body::Sedan => {
+                parts.spawn(Self::part(&self.sedan_hull, &paint));
+                parts.spawn(Self::part(&self.sedan_cabin, &self.glass));
+                (2.3, -2.3)
+            }
+        };
+        let width = body.width();
+        for wheel in body.wheels() {
+            parts.spawn((
+                Mesh3d(self.wheel.clone()),
+                MeshMaterial3d(self.tire.clone()),
+                Transform::from_translation(wheel + Vec3::Y * WHEEL_RADIUS)
+                    .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
+            ));
         }
         self.lights(parts, kit, front, rear, 0.6, width);
         if rng.random_bool(UNDERGLOW_CHANCE) {
@@ -174,6 +208,7 @@ impl Fleet {
             );
             parts.spawn(kit.cuboid(&strip, self.glows.pick(rng).clone()));
         }
+        body
     }
 
     /// Body, glass, a stripe, door seams and wheel arches of a van.

@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use rand::RngExt;
 
 use self::flying::SkyCar;
-use self::models::Fleet;
+use self::models::{Body, Fleet};
 use self::spray::Spray;
 use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng, turned_to};
 use crate::geometry::surface::SurfaceMaterial;
@@ -64,6 +64,7 @@ struct Lane {
 #[derive(Component, Debug)]
 struct Vehicle {
     velocity: f32,
+    body: Body,
 }
 
 impl Vehicle {
@@ -88,21 +89,21 @@ impl Vehicle {
             let spacing = span / lane.vehicles as f32;
             for index in 0..lane.vehicles {
                 let x = -span / 2.0 + spacing * (index as f32 + rng.random_range(0.0..0.6));
-                let vehicle = Vehicle {
-                    velocity: lane.velocity,
-                };
                 // Local +X is the front.
                 let facing = turned_to(lane.velocity);
-                commands
-                    .spawn((
-                        vehicle,
-                        Transform::from_xyz(x, lane.height, lane.z).with_rotation(facing),
-                        Visibility::default(),
-                    ))
-                    .with_children(|parts| {
-                        fleet.car(parts, &kit, &mut rng);
-                        parts.spawn(spray.bundle());
-                    });
+                let mut car = commands.spawn((
+                    Transform::from_xyz(x, lane.height, lane.z).with_rotation(facing),
+                    Visibility::default(),
+                ));
+                let mut body = Body::Sedan;
+                car.with_children(|parts| {
+                    body = fleet.car(parts, &kit, &mut rng);
+                    parts.spawn(spray.bundle());
+                });
+                car.insert(Vehicle {
+                    velocity: lane.velocity,
+                    body,
+                });
             }
         }
         SkyCar::spawn_all(&mut commands, &fleet, &kit, &mut rng);

@@ -4,7 +4,7 @@ use bevy::{
 };
 
 use super::weather::Weather;
-use crate::audio::{Mixer, Sound, Takes};
+use crate::audio::{Mixer, Sound};
 
 /// So small that rodio's own fall off with the squared distance never kicks
 /// in. [`Emitter`] fades with distance instead.
@@ -40,13 +40,9 @@ impl Plugin for SoundscapePlugin {
     }
 }
 
-/// The sounds of the city, made once.
+/// Marks the sounds of the city as made.
 #[derive(Resource)]
-pub(super) struct CitySounds {
-    pub(super) tires: Vec<Handle<AudioSource>>,
-    pub(super) hover: Vec<Handle<AudioSource>>,
-    pub(super) splash: Takes<Handle<AudioSource>>,
-}
+pub(super) struct CitySounds;
 
 /// A sound out in the city, heard from where it is. It fades with distance
 /// and shifts in pitch while it moves towards or away from the player.
@@ -85,11 +81,6 @@ impl CitySounds {
         };
         let street = add(Sound::Rain);
         let roof = add(Sound::RoofRain);
-        let sounds = Self {
-            tires: add(Sound::Tires),
-            hover: add(Sound::Hover),
-            splash: Takes::new(add(Sound::Splash), 0),
-        };
         let rain = RAIN_AT
             .into_iter()
             .map(|at| (Rain::Street, at))
@@ -111,7 +102,7 @@ impl CitySounds {
                 Transform::from_translation(at),
             ));
         }
-        commands.insert_resource(sounds);
+        commands.insert_resource(Self);
     }
 }
 
@@ -126,12 +117,6 @@ impl Emitter {
             distance: None,
             receding: 0.0,
         }
-    }
-
-    pub(super) fn with_level(mut self, level: f32) -> Self {
-        self.level = level;
-        self.heard = level;
-        self
     }
 
     /// Plays `source` from here with `settings`, `distance` meters from the

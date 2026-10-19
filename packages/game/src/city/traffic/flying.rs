@@ -80,6 +80,11 @@ impl SkyCar {
         }
     }
 
+    /// Meters per second, while the car is on a route.
+    pub(super) fn velocity(&self) -> Option<Vec3> {
+        self.route.as_ref().map(|route| route.velocity)
+    }
+
     fn fly(
         time: Res<Time>,
         skyline: Res<Skyline>,
