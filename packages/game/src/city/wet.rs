@@ -8,6 +8,7 @@ use bevy::{
 
 use super::weather::Weather;
 use super::{FAR_CURB, NEAR_CURB};
+use crate::geometry::noise::noise;
 
 /// How dark and glossy the ground gets when fully wet.
 const WETNESS: f32 = 0.6;
@@ -65,6 +66,18 @@ impl Wet {
         }
     }
 
+    /// How far the water at `p` on the ground is above the level where a
+    /// puddle starts, as `wet.wesl` draws it. Positive in a puddle.
+    pub(super) fn puddle(p: Vec2, wetness: f32, puddles: f32, seed: f32) -> f32 {
+        let pools = 0.5 * noise(p * 0.15, seed)
+            + 0.3 * noise(p * 0.4, seed + 1.0)
+            + 0.2 * noise(p * 1.2, seed + 2.0);
+        let curb = (p.y - NEAR_CURB).abs().min((p.y - FAR_CURB).abs());
+        let gutter = 0.25 * (1.0 - smoothstep(0.0, 1.5, curb));
+        let level = 1.0 - 0.5 * wetness * puddles;
+        pools + gutter - level
+    }
+
     fn shader() -> ShaderRef {
         AssetPath::from_path_buf(embedded_path!("wet.wesl"))
             .with_source("embedded")
@@ -89,4 +102,9 @@ impl MaterialExtension for Wet {
     fn deferred_fragment_shader() -> ShaderRef {
         Self::shader()
     }
+}
+
+fn smoothstep(low: f32, high: f32, x: f32) -> f32 {
+    let t = ((x - low) / (high - low)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }

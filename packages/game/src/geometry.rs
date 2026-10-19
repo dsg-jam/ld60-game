@@ -1,6 +1,7 @@
 pub(crate) mod bar;
 pub(crate) mod block;
 pub(crate) mod frame;
+pub(crate) mod noise;
 pub(crate) mod quads;
 pub(crate) mod shape;
 pub(crate) mod surface;

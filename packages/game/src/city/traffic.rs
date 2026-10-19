@@ -1,5 +1,6 @@
 mod flying;
 mod models;
+mod sound;
 mod spray;
 
 use std::error::Error;
@@ -42,9 +43,13 @@ pub(super) struct TrafficPlugin;
 
 impl Plugin for TrafficPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((spray::SprayPlugin, flying::FlyingPlugin))
-            .add_systems(Startup, Vehicle::spawn_all)
-            .add_systems(Update, (Vehicle::drive, Vehicle::rumble));
+        app.add_plugins((
+            spray::SprayPlugin,
+            flying::FlyingPlugin,
+            sound::TrafficSoundPlugin,
+        ))
+        .add_systems(Startup, Vehicle::spawn_all)
+        .add_systems(Update, (Vehicle::drive, Vehicle::rumble));
     }
 }
 

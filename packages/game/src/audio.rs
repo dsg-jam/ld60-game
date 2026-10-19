@@ -12,12 +12,15 @@ use bevy::{
 use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
 use crate::parts::paper::Paper;
+use crate::player::camera::PlayerCamera;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
 /// Keys this wide in meters play at their natural pitch. Wider keys sound
 /// lower.
 const KEY_WIDTH: f32 = 0.018;
+/// Meters between the ears of the player.
+const EAR_GAP: f32 = 0.2;
 /// Sounds that would stand out if they always came the same get this many
 /// takes, played in random order.
 const TAKES: u32 = 6;
@@ -52,6 +55,14 @@ pub(crate) enum Sound {
     KeyUp,
     /// A page of paper turning over.
     PageTurn,
+    /// Rain on the street, a loop.
+    Rain,
+    /// A car's tires on the road, a loop.
+    Tires,
+    /// A car's tire hitting a puddle.
+    Splash,
+    /// A flying car, a loop.
+    Hover,
 }
 
 impl Sound {
@@ -88,8 +99,10 @@ impl Sound {
             | Self::Latch
             | Self::Unlatch
             | Self::Static
-            | Self::PageTurn => TAKES,
+            | Self::PageTurn
+            | Self::Splash => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
+            Self::Rain | Self::Tires | Self::Hover => 3,
             Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
         }
     }
@@ -108,6 +121,10 @@ impl Sound {
             Self::KeyDown => Samples::key_down(take),
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
+            Self::Rain => Samples::rain(take),
+            Self::Tires => Samples::tires(take),
+            Self::Splash => Samples::splash(take),
+            Self::Hover => Samples::hover(take),
         }
     }
 
@@ -123,6 +140,10 @@ impl Sound {
             Self::Static => 0.4,
             Self::KeyDown | Self::KeyUp => 0.4,
             Self::PageTurn => 0.35,
+            Self::Rain => 0.22,
+            Self::Tires => 0.3,
+            Self::Splash => 0.35,
+            Self::Hover => 0.25,
         }
     }
 }
@@ -184,7 +205,8 @@ impl Plugin for AudioPlugin {
                 Update,
                 (Sounds::click_keys, Sounds::turn_pages).run_if(resource_exists::<Sounds>),
             )
-            .add_observer(Sounds::play);
+            .add_observer(Sounds::play)
+            .add_observer(listen);
     }
 }
 
@@ -309,4 +331,11 @@ impl<T> Takes<T> {
         self.last = Some(pick);
         &self.takes[pick]
     }
+}
+
+/// The player hears the city from where the camera is.
+fn listen(add: On<Add<PlayerCamera>>, mut commands: Commands) {
+    commands
+        .entity(add.entity)
+        .insert(SpatialListener::new(EAR_GAP));
 }

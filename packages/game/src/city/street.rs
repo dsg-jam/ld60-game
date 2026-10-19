@@ -22,8 +22,10 @@ const DASH_GAP: f32 = 4.0;
 const PAINT_HEIGHT: f32 = 0.004;
 
 /// Share of the ground under water, from 0 to 1.
-const ROAD_PUDDLES: f32 = 1.0;
+pub(super) const ROAD_PUDDLES: f32 = 1.0;
 const WALK_PUDDLES: f32 = 0.1;
+/// Seed of the road's wet look, which places its puddles.
+pub(super) const ROAD_SEED: f32 = 1.0;
 
 const LAMP_SPACING: f32 = 18.0;
 const LAMP_HEIGHT: f32 = 6.5;
@@ -66,10 +68,10 @@ impl StreetPlugin {
         mut wet: ResMut<Assets<WetMaterial>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
-        let asphalt = wet.add(Wet::material(matte(ASPHALT, 0.9), ROAD_PUDDLES, 1.0));
+        let asphalt = wet.add(Wet::material(matte(ASPHALT, 0.9), ROAD_PUDDLES, ROAD_SEED));
         let concrete = wet.add(Wet::material(matte(CONCRETE, 0.92), WALK_PUDDLES, 2.0));
         let curb = wet.add(Wet::material(matte(CURB, 0.8), 0.0, 3.0));
-        let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, 1.0));
+        let paint = wet.add(Wet::material(matte(PAINT, 0.6), ROAD_PUDDLES, ROAD_SEED));
         let slab =
             |block: &Block, material: &Handle<WetMaterial>| kit.cuboid(block, material.clone());
 

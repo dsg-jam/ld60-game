@@ -7,6 +7,7 @@ mod market;
 mod rain;
 mod signs;
 mod sky;
+mod soundscape;
 mod street;
 mod traffic;
 mod weather;
@@ -62,6 +63,7 @@ impl Plugin for CityPlugin {
             rain::RainPlugin,
             signs::SignsPlugin,
             sky::SkyPlugin,
+            soundscape::SoundscapePlugin,
             street::StreetPlugin,
             traffic::TrafficPlugin,
             weather::WeatherPlugin,
