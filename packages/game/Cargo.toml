@@ -14,8 +14,8 @@ debug_port = ["bevy/bevy_remote", "dep:serde_json"]
 
 [dependencies]
 fluent-bundle = { workspace = true }
-ld60-calco = { workspace = true }
-ld60-devices = { workspace = true }
+ld60-calco = { workspace = true, features = ["serde"] }
+ld60-devices = { workspace = true, features = ["serde"] }
 ld60-levels = { workspace = true }
 ld60-machine = { workspace = true }
 rand = { workspace = true }
@@ -37,7 +37,7 @@ features = [
 ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { workspace = true, features = ["Document", "Element", "Window"] }
+web-sys = { workspace = true, features = ["Document", "Element", "Storage", "Window"] }
 
 [lints]
 workspace = true
