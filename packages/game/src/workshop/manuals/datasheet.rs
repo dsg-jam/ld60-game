@@ -5,9 +5,6 @@ use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
 use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 
-/// The instruction table needs tighter rows to fit on one page.
-const TABLE_ROW_GAP: f32 = 3.0;
-
 /// The CalCo datasheet of one chip revision, and its errata pages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct ChipSheet {
@@ -91,9 +88,9 @@ impl ChipSheet {
             Paper::row(cells.map(|cell| (cell, widths.next().unwrap_or_default())))
         };
         page.spawn(Paper::heading(Message::new("datasheet-instructions")));
+        // No gaps between the rows, so the table fits on one page.
         page.spawn(Node {
             flex_direction: FlexDirection::Column,
-            row_gap: px(TABLE_ROW_GAP),
             ..default()
         })
         .with_children(|table| {

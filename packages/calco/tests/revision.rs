@@ -4,24 +4,16 @@ use std::collections::BTreeSet;
 
 use common::run;
 use ld60_calco::datasheet::INSTRUCTIONS;
-use ld60_calco::{ChipInfo, Cond, DateCode, Op, Revision};
+use ld60_calco::{ChipInfo, DateCode, Op, Revision};
 use ld60_machine::{AsmErrorKind, Isa};
 
 /// Supported instruction forms in datasheet syntax, like `LD Mn` or `JZ aa`.
 fn forms(revision: Revision) -> Vec<&'static str> {
-    let mut forms = Vec::new();
-    for doc in INSTRUCTIONS.iter().filter(|doc| revision.supports(doc.op)) {
-        match doc.op {
-            Op::Jump(..) => forms.extend(
-                Cond::ALL
-                    .into_iter()
-                    .filter(|&cond| revision.supports(Op::Jump(cond, 0)))
-                    .map(Cond::form),
-            ),
-            _ => forms.push(doc.syntax),
-        }
-    }
-    forms
+    INSTRUCTIONS
+        .iter()
+        .filter(|doc| revision.supports(doc.op))
+        .map(|doc| doc.syntax)
+        .collect()
 }
 
 fn chip(revision: Revision) -> ChipInfo {

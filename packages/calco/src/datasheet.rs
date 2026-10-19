@@ -76,9 +76,41 @@ pub const INSTRUCTIONS: &[InstructionDoc] = &[
     op(Op::St(INDEXED), "An", "ST [B+n]", "M(B+n) <- A", Kept, Kept),
     op(
         Op::Jump(Cond::Always, 0),
-        "Bc aa",
-        "Jcc aa",
-        "If c holds, PC <- aa",
+        "B0 aa",
+        "JMP aa",
+        "PC <- aa",
+        Kept,
+        Kept,
+    ),
+    op(
+        Op::Jump(Cond::Zero, 0),
+        "B1 aa",
+        "JZ aa",
+        "If Z = 1, PC <- aa",
+        Kept,
+        Kept,
+    ),
+    op(
+        Op::Jump(Cond::NotZero, 0),
+        "B2 aa",
+        "JNZ aa",
+        "If Z = 0, PC <- aa",
+        Kept,
+        Kept,
+    ),
+    op(
+        Op::Jump(Cond::Carry, 0),
+        "B3 aa",
+        "JC aa",
+        "If C = 1, PC <- aa",
+        Kept,
+        Kept,
+    ),
+    op(
+        Op::Jump(Cond::NoCarry, 0),
+        "B4 aa",
+        "JNC aa",
+        "If C = 0, PC <- aa",
         Kept,
         Kept,
     ),
@@ -275,28 +307,45 @@ const fn note(op: Op, text: &'static str) -> NoteDoc {
 mod tests {
     use super::*;
     use crate::Revision;
-    use crate::encoder::MNEMONICS;
 
     #[test]
-    fn every_mnemonic_is_documented() {
-        let documented = |mnemonic: &str| {
-            INSTRUCTIONS
+    fn each_revision_documents_exactly_its_mnemonics() {
+        for revision in Revision::ALL {
+            let mut documented: Vec<_> = INSTRUCTIONS
                 .iter()
-                .any(|doc| doc.syntax.split_whitespace().next() == Some(mnemonic))
-                || Cond::ALL.iter().any(|cond| cond.mnemonic() == mnemonic)
-        };
-        let missing: Vec<_> = MNEMONICS.iter().filter(|m| !documented(m)).collect();
-        assert!(
-            missing.is_empty(),
-            "missing from the datasheet: {missing:?}"
-        );
+                .filter(|doc| revision.supports(doc.op))
+                .filter_map(|doc| doc.syntax.split_whitespace().next())
+                .collect();
+            documented.sort_unstable();
+            documented.dedup();
+            let mut mnemonics = revision.mnemonics().to_vec();
+            mnemonics.sort_unstable();
+            assert_eq!(documented, mnemonics, "Rev {revision}");
+        }
     }
 
     #[test]
     fn rows_match_their_op() {
         for doc in INSTRUCTIONS {
-            let hex = u8::from_str_radix(&doc.hex[..2].replace(['n', 'p', 'c'], "0"), 16);
+            let hex = u8::from_str_radix(&doc.hex[..2].replace(['n', 'p'], "0"), 16);
             assert_eq!(hex.map(|first| Op::decode(first, 0)), Ok(doc.op), "{doc:?}");
+        }
+    }
+
+    #[test]
+    fn jump_rows_match_their_condition() {
+        for cond in Cond::ALL {
+            let rows: Vec<_> = INSTRUCTIONS
+                .iter()
+                .filter(|doc| doc.op == Op::Jump(cond, 0))
+                .collect();
+            assert_eq!(rows.len(), 1, "{cond:?}");
+            assert_eq!(rows[0].syntax, cond.form());
+            assert_eq!(rows[0].hex, format!("B{:X} aa", cond.code()));
+            if cond != Cond::Always {
+                let operation = format!("If {}, PC <- aa", cond.description());
+                assert_eq!(rows[0].operation, operation);
+            }
         }
     }
 
@@ -318,7 +367,9 @@ mod tests {
                 "LDI A, ii",
                 "CPI ii",
                 "IN p",
-                "Jcc aa"
+                "JMP aa",
+                "JZ aa",
+                "JC aa"
             ]
         );
     }

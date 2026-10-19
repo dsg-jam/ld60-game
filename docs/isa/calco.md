@@ -73,7 +73,11 @@ Indexed addresses wrap inside RAM. `[B+3]` with B = 0x0E reads `M1`.
 | 8p    | `OUT p`     | port p <- A                         | - | - |
 | 9n    | `LD [B+n]`  | A <- M(B+n)                         | - | - |
 | An    | `ST [B+n]`  | M(B+n) <- A                         | - | - |
-| Bc aa | `Jcc aa`    | If condition c holds, PC <- aa      | - | - |
+| B0 aa | `JMP aa`    | PC <- aa                            | - | - |
+| B1 aa | `JZ aa`     | If Z = 1, PC <- aa                  | - | - |
+| B2 aa | `JNZ aa`    | If Z = 0, PC <- aa                  | - | - |
+| B3 aa | `JC aa`     | If C = 1, PC <- aa                  | - | - |
+| B4 aa | `JNC aa`    | If C = 0, PC <- aa                  | - | - |
 | Cn    | `ADC [B+n]` | A <- A + M(B+n) + C                 | * | * |
 | Dn    | `SBC [B+n]` | A <- A - M(B+n) - C                 | * | * |
 | En    | `CMP [B+n]` | Compute A - M(B+n), discard result  | * | * |
