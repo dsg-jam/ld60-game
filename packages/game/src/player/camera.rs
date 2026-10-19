@@ -23,15 +23,15 @@ const DECAY_RATE: f32 = 8.0;
 const LOOK_DECAY_RATE: f32 = 25.0;
 /// Distance from the seat below which the camera counts as seated.
 const SEATED_DISTANCE: f32 = 0.01;
-/// Slower rate for long moves, like from the street to the seat.
-const TRAVEL_DECAY_RATE: f32 = 2.0;
-/// Moves longer than this, in meters, use [`TRAVEL_DECAY_RATE`].
+/// Moves longer than this, in meters, are a [`Travel`].
 const TRAVEL_DISTANCE: f32 = 1.5;
-/// On a long move the camera keeps facing ahead until it is this close, about
-/// over the counter, and only then turns.
+/// Seconds for a [`Travel`] to reach its goal.
+const TRAVEL_TIME: f32 = 1.6;
+/// On a [`Travel`] the camera keeps facing ahead until it is this close,
+/// about over the counter, and only then turns.
 const TURN_DISTANCE: f32 = 1.0;
-/// A long move ends once the camera is this close to its goal, in meters.
-const ARRIVED: f32 = 0.02;
+/// Seconds for the turn at the end of a [`Travel`].
+const TURN_TIME: f32 = 0.6;
 
 pub(super) struct CameraPlugin;
 
@@ -51,7 +51,8 @@ impl Plugin for CameraPlugin {
                             .or_else(any_match_filter::<Added<PlayerCamera>>),
                     ),
                 ),
-            );
+            )
+            .add_systems(OnEnter(AppState::Title), PlayerCamera::stop_travel);
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(Update, CameraOverride::apply.after(PlayerCamera::follow))
@@ -80,19 +81,12 @@ impl Plugin for CameraPlugin {
 pub(crate) struct PlayerCamera {
     /// Pose while sitting at the counter, before looking around.
     seat: Transform,
-    /// On a long move, like from the street to the seat.
-    traveling: bool,
+    travel: Option<Travel>,
 }
 
 impl PlayerCamera {
     pub(crate) fn seated_at(seat: Transform) -> impl Bundle {
-        (
-            Self {
-                seat,
-                traveling: false,
-            },
-            seat,
-        )
+        (Self { seat, travel: None }, seat)
     }
 
     pub(crate) fn seat(&self) -> Transform {
@@ -101,7 +95,13 @@ impl PlayerCamera {
 
     /// Whether the camera at `at` has come to rest on the seat.
     pub(crate) fn seated(&self, at: &Transform) -> bool {
-        !self.traveling && at.translation.distance(self.seat.translation) < SEATED_DISTANCE
+        self.travel.is_none() && at.translation.distance(self.seat.translation) < SEATED_DISTANCE
+    }
+
+    fn stop_travel(mut cameras: Query<&mut PlayerCamera>) {
+        for mut camera in &mut cameras {
+            camera.travel = None;
+        }
     }
 
     /// Ambient occlusion grounds small things on the surfaces they rest on.
@@ -152,26 +152,75 @@ impl PlayerCamera {
             }
         };
 
-        let distance = transform.translation.distance(goal.translation);
-        if distance > TRAVEL_DISTANCE {
-            camera.traveling = true;
-        } else if distance < ARRIVED {
-            camera.traveling = false;
-        }
-        let (decay_rate, turning) = if camera.traveling {
-            (TRAVEL_DECAY_RATE, distance < TURN_DISTANCE)
-        } else {
-            (decay_rate, true)
-        };
         let dt = time.delta_secs();
+        if camera
+            .travel
+            .as_ref()
+            .is_some_and(|travel| travel.to.distance(goal.translation) > SEATED_DISTANCE)
+        {
+            camera.travel = None;
+        }
+        if camera.travel.is_none()
+            && transform.translation.distance(goal.translation) > TRAVEL_DISTANCE
+        {
+            camera.travel = Some(Travel::new(*transform, goal.translation));
+        }
+        if let Some(travel) = &mut camera.travel {
+            if travel.step(&mut transform, goal, dt) {
+                camera.travel = None;
+            }
+            return;
+        }
         transform
             .translation
             .smooth_nudge(&goal.translation, decay_rate, dt);
-        if turning {
-            transform
-                .rotation
-                .smooth_nudge(&goal.rotation, decay_rate, dt);
+        transform
+            .rotation
+            .smooth_nudge(&goal.rotation, decay_rate, dt);
+    }
+}
+
+/// A long move, like from the street to the seat, that eases in and out
+/// over [`TRAVEL_TIME`].
+#[derive(Debug)]
+struct Travel {
+    from: Transform,
+    to: Vec3,
+    elapsed: f32,
+    /// When the camera started to turn towards the goal.
+    turn_start: Option<f32>,
+}
+
+impl Travel {
+    fn new(from: Transform, to: Vec3) -> Self {
+        Self {
+            from,
+            to,
+            elapsed: 0.0,
+            turn_start: None,
         }
+    }
+
+    /// Moves `transform` on towards `goal`. Returns whether it arrived.
+    fn step(&mut self, transform: &mut Transform, goal: Transform, dt: f32) -> bool {
+        self.elapsed += dt;
+        let moved = EaseFunction::SmoothStep.sample_clamped(self.elapsed / TRAVEL_TIME);
+        transform.translation = self.from.translation.lerp(goal.translation, moved);
+        if self.turn_start.is_none()
+            && transform.translation.distance(goal.translation) < TURN_DISTANCE
+        {
+            self.turn_start = Some(self.elapsed);
+        }
+        let turned = self.turned();
+        transform.rotation = self.from.rotation.slerp(goal.rotation, turned);
+        moved >= 1.0 && turned >= 1.0
+    }
+
+    /// How far the camera turned towards the goal, from 0 to 1.
+    fn turned(&self) -> f32 {
+        self.turn_start.map_or(0.0, |start| {
+            EaseFunction::SmoothStep.sample_clamped((self.elapsed - start) / TURN_TIME)
+        })
     }
 }
 
@@ -216,5 +265,35 @@ impl CameraOverride {
         };
         pose.0 = Some(Transform::from_translation(point("eye")?).looking_at(point("at")?, Vec3::Y));
         Ok(serde_json::Value::Null)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const DT: f32 = 1.0 / 60.0;
+
+    fn street() -> Transform {
+        Transform::from_xyz(2.0, 1.5, -5.0).looking_at(Vec3::new(0.0, 1.4, 0.0), Vec3::Y)
+    }
+
+    fn seat() -> Transform {
+        Transform::from_xyz(0.0, 1.55, 0.7).looking_at(Vec3::new(0.0, 0.8, 0.0), Vec3::Y)
+    }
+
+    #[test]
+    fn a_travel_faces_ahead_then_settles_on_time() {
+        let mut transform = street();
+        let mut travel = Travel::new(transform, seat().translation);
+        let mut seconds = 0.0;
+        while !travel.step(&mut transform, seat(), DT) {
+            seconds += DT;
+            if transform.translation.distance(seat().translation) > TURN_DISTANCE {
+                assert_eq!(transform.rotation, street().rotation);
+            }
+            assert!(seconds < TRAVEL_TIME + TURN_TIME);
+        }
+        assert_eq!(transform, seat());
     }
 }
