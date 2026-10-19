@@ -5,6 +5,28 @@
     <title>LD60</title>
     <link data-trunk rel="rust" data-bin="ld60-game" data-wasm-opt="z" />
     <link data-trunk rel="copy-dir" href="../../assets" />
+    <script>
+      // Browsers start audio suspended until a user gesture.
+      (() => {
+        const contexts = [];
+        const Base = window.AudioContext;
+        window.AudioContext = new Proxy(Base, {
+          construct(target, args) {
+            const context = new target(...args);
+            contexts.push(context);
+            return context;
+          },
+        });
+        const resume = () => {
+          for (const context of contexts) {
+            if (context.state !== "running") context.resume();
+          }
+        };
+        for (const event of ["pointerdown", "keydown", "touchstart"]) {
+          document.addEventListener(event, resume, { capture: true });
+        }
+      })();
+    </script>
     <style>
     html,
     body {
