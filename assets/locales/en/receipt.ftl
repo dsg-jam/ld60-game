@@ -6,7 +6,7 @@ receipt-paid = PAID
 receipt-amount = ${ $amount }
 receipt-note-heading = NOTE FROM THE CUSTOMER
 receipt-till = TILL
-receipt-till-total = ${ $amount } taken in so far.
+receipt-till-total = ${ $amount } in the till.
 
 receipt-note = { $complaint } { $reaction }
 

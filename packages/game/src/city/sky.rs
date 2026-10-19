@@ -14,12 +14,10 @@ use bevy::{
 use super::atmosphere::SKY;
 use super::weather::{WIND, Weather};
 use crate::player::camera::PlayerCamera;
+use crate::workshop::clock::Clock;
 
 /// Far away, but still inside the camera's far plane.
 const RADIUS: f32 = 900.0;
-/// Where the planet hangs: straight across from the shop, above the low
-/// buildings there.
-pub(super) const PLANET: Vec3 = Vec3::new(-0.09, 0.545, -0.834);
 /// Angular radius of the planet, in radians.
 const PLANET_SIZE: f32 = 0.06;
 /// The planet's axis, which its rings go around.
@@ -48,6 +46,7 @@ impl Plugin for SkyPlugin {
                     SkyMaterial::follow_camera,
                     SkyMaterial::drift,
                     SkyMaterial::follow_weather.run_if(resource_changed::<Weather>),
+                    SkyMaterial::follow_clock.run_if(resource_changed::<Clock>),
                 ),
             );
     }
@@ -90,6 +89,7 @@ impl SkyMaterial {
     }
 
     fn spawn(
+        clock: Res<Clock>,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<SkyMaterial>>,
@@ -115,7 +115,7 @@ impl SkyMaterial {
                 params: SkyParams {
                     horizon: SKY.to_linear().to_vec3(),
                     zenith: ZENITH,
-                    planet: PLANET.normalize(),
+                    planet: clock.planet(),
                     planet_size: PLANET_SIZE,
                     axis: PLANET_AXIS.normalize(),
                     planet_light: PLANET_LIGHT,
@@ -149,6 +149,13 @@ impl SkyMaterial {
     fn follow_weather(weather: Res<Weather>, mut materials: ResMut<Assets<SkyMaterial>>) {
         for (_, material) in materials.iter_mut() {
             material.params.rain = weather.rain;
+        }
+    }
+
+    /// Moves the planet across the sky with the time.
+    fn follow_clock(clock: Res<Clock>, mut materials: ResMut<Assets<SkyMaterial>>) {
+        for (_, material) in materials.iter_mut() {
+            material.params.planet = clock.planet();
         }
     }
 }

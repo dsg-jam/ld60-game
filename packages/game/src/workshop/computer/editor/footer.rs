@@ -13,6 +13,7 @@ use super::page::Page;
 use crate::audio::KeyClicks;
 use crate::device::{BoardLetter, DeviceName, Emulator};
 use crate::locale::{Localized, Message};
+use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
 
 /// A command in the footer below the editor.
@@ -177,6 +178,7 @@ impl Run {
         };
         emulator.restart(device);
         commands.trigger(Flashed(source.into()));
+        commands.trigger(Busy(Chore::Flash));
         if !job.flashed {
             job.flashed = true;
         }

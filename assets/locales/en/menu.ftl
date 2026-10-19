@@ -8,6 +8,14 @@ menu-settings = Settings
 menu-title = Main menu
 menu-quit = Quit
 menu-back = Back
+menu-closed = Shop closed
+menu-new-run = Open the shop again
+
+closed-cycles = Planet sets with the rent paid: { $cycles }
+closed-fixed = Gadgets fixed: { $jobs }
+closed-lost = Gadgets taken home broken: { $jobs }
+closed-earned = Money taken in: ${ $amount }
+closed-rent = Rent paid: ${ $amount }
 
 settings-volume = Volume
 settings-sensitivity = Mouse sensitivity

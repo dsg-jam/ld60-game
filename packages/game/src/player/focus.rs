@@ -105,7 +105,7 @@ pub(crate) struct FocusOn {
 }
 
 impl FocusOn {
-    fn apply(
+    pub(crate) fn apply(
         focus_on: On<FocusOn>,
         targets: Query<&FocusTarget>,
         mut focused: ResMut<Focused>,
@@ -137,7 +137,7 @@ impl Focused {
         })
     }
 
-    fn leave(&mut self, next: &mut NextState<Focus>) {
+    pub(crate) fn leave(&mut self, next: &mut NextState<Focus>) {
         self.0 = None;
         next.set(Focus::Desk);
     }

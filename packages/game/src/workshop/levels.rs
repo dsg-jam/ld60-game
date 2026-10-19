@@ -2,7 +2,8 @@ use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     prelude::*,
 };
-use ld60_levels::{Catalog, Level, LevelSource};
+use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_levels::{Catalog, GenerateError, Level, LevelSource, Order, Reference};
 
 use crate::locale::Message;
 
@@ -23,11 +24,23 @@ impl Plugin for LevelsPlugin {
 
 /// Every level, once the catalog and the level folders it lists are loaded.
 #[derive(Resource, Debug, Deref)]
-pub(crate) struct Levels(Catalog);
+pub(crate) struct Levels {
+    #[deref]
+    catalog: Catalog,
+    /// The [`Reference::source`] of each device, in the order of
+    /// [`DeviceKind::ALL`].
+    firmware: Vec<String>,
+}
 
 /// The level folders in play order, each with its loaded files.
 #[derive(Asset, TypePath, Debug)]
-struct CatalogFile(Vec<(String, Handle<LevelFile>)>);
+struct CatalogFile {
+    order: Order,
+    levels: Vec<(String, Handle<LevelFile>)>,
+    /// The [`Reference::source`] of each device, in the order of
+    /// [`DeviceKind::ALL`].
+    firmware: Vec<String>,
+}
 
 /// The files of one level folder.
 #[derive(Asset, TypePath, Debug)]
@@ -59,6 +72,19 @@ impl Levels {
             .fold(message, |message, (name, value)| message.with(name, value))
     }
 
+    /// The working firmware of `device`, compiled for `chip`.
+    pub(crate) fn reference(
+        &self,
+        device: DeviceKind,
+        chip: ChipSpec,
+    ) -> Result<Reference, GenerateError> {
+        let index = DeviceKind::ALL
+            .iter()
+            .position(|&kind| kind == device)
+            .unwrap_or_default();
+        Reference::compile(device, chip, &self.firmware[index])
+    }
+
     /// Takes the levels once the catalog and all its levels are loaded, and
     /// again when a file changes.
     fn follow_files(
@@ -78,31 +104,44 @@ impl Levels {
             return;
         };
         let levels = catalog
-            .0
+            .levels
             .iter()
             .map(|(path, handle)| Some(files.get(handle)?.source(path.clone())))
             .collect();
         if let Some(levels) = levels {
-            commands.insert_resource(Self(Catalog::new(levels)));
+            commands.insert_resource(Self {
+                catalog: Catalog::new(catalog.order.clone(), levels),
+                firmware: catalog.firmware.clone(),
+            });
         }
     }
 }
 
 #[cfg(test)]
 impl Levels {
+    const DIR: &str = concat!(env!("LD60_ASSETS"), "/levels");
+
     /// The levels in the repository, for tests.
     pub(crate) fn on_disk() -> Self {
-        Self(
-            Catalog::read(std::path::Path::new(concat!(
-                env!("LD60_ASSETS"),
-                "/levels"
-            )))
-            .unwrap(),
-        )
+        Self::new(Catalog::read(std::path::Path::new(Self::DIR)).unwrap())
     }
 
+    /// The order of the catalog in the repository.
+    pub(crate) fn order_on_disk() -> Order {
+        let file = format!("{}/{}", Self::DIR, Catalog::FILE);
+        Catalog::order(&std::fs::read_to_string(file).unwrap()).unwrap()
+    }
+
+    /// `catalog` with the firmware in the repository.
     pub(crate) fn new(catalog: Catalog) -> Self {
-        Self(catalog)
+        let firmware = DeviceKind::ALL
+            .iter()
+            .map(|&device| {
+                let file = format!("{}/{}", Self::DIR, Reference::source(device));
+                std::fs::read_to_string(file).unwrap()
+            })
+            .collect();
+        Self { catalog, firmware }
     }
 }
 
@@ -136,15 +175,29 @@ impl AssetLoader for CatalogLoader {
     ) -> Result<CatalogFile, BevyError> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
-        let levels = Catalog::order(&String::from_utf8(bytes)?)?
-            .into_iter()
+        let order = Catalog::order(&String::from_utf8(bytes)?)?;
+        let levels = order
+            .paths()
             .map(|path| {
-                let file = LevelSource::file(&path, LevelSource::LEVEL_FILE);
+                let file = LevelSource::file(path, LevelSource::LEVEL_FILE);
                 let file = load_context.path().resolve_embed_str(&file)?;
-                Ok((path, load_context.load(file)))
+                Ok((path.to_owned(), load_context.load(file)))
             })
             .collect::<Result<_, BevyError>>()?;
-        Ok(CatalogFile(levels))
+        let mut firmware = Vec::new();
+        for device in DeviceKind::ALL {
+            let file = load_context
+                .path()
+                .resolve_embed_str(Reference::source(device))?;
+            firmware.push(String::from_utf8(
+                load_context.read_asset_bytes(file).await?,
+            )?);
+        }
+        Ok(CatalogFile {
+            order,
+            levels,
+            firmware,
+        })
     }
 
     fn extensions(&self) -> &[&str] {

@@ -11,11 +11,11 @@ use bevy::{
 
 use self::height_fog::HeightFog;
 use super::FACADES;
-use super::sky::PLANET;
 use super::weather::Weather;
 use crate::geometry::block::Block;
 use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
+use crate::workshop::clock::Clock;
 use crate::workshop::shop;
 
 /// Air lit by the city, which everything fades into far away.
@@ -64,6 +64,7 @@ impl Plugin for AtmospherePlugin {
                 Update,
                 (
                     (Self::thicken_fog, StreetHaze::thicken).run_if(resource_changed::<Weather>),
+                    Self::follow_planet.run_if(resource_changed::<Clock>),
                     Self::match_quality.run_if(
                         resource_changed::<Settings>
                             .or_else(any_match_filter::<Added<PlayerCamera>>),
@@ -83,17 +84,33 @@ struct StreetHaze;
 struct PlanetLight;
 
 impl AtmospherePlugin {
-    fn spawn_planet_light(mut commands: Commands) {
+    fn spawn_planet_light(clock: Res<Clock>, mut commands: Commands) {
         commands.spawn((
             Name::new("planet light"),
             PlanetLight,
             DirectionalLight {
                 color: MOON,
-                illuminance: MOON_ILLUMINANCE,
+                illuminance: MOON_ILLUMINANCE * clock.planet_light(),
                 ..default()
             },
-            Transform::from_translation(PLANET).looking_at(Vec3::ZERO, Vec3::Y),
+            Self::planet_view(&clock),
         ));
+    }
+
+    /// Looking from the planet down at the shop.
+    fn planet_view(clock: &Clock) -> Transform {
+        Transform::from_translation(clock.planet()).looking_at(Vec3::ZERO, Vec3::Y)
+    }
+
+    /// The light falls from where the planet is and fades as it sets.
+    fn follow_planet(
+        clock: Res<Clock>,
+        mut planet: Query<(&mut DirectionalLight, &mut Transform), With<PlanetLight>>,
+    ) {
+        for (mut light, mut transform) in &mut planet {
+            light.illuminance = MOON_ILLUMINANCE * clock.planet_light();
+            *transform = Self::planet_view(&clock);
+        }
     }
 
     /// Rain makes the air hazier.

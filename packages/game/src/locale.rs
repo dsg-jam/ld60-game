@@ -25,8 +25,10 @@ const FILES: &[&str] = &[
     "menu.ftl",
     "paper.ftl",
     "receipt.ftl",
+    "rent.ftl",
     "service.ftl",
     "ticket.ftl",
+    "tutorial.ftl",
     "ui.ftl",
 ];
 

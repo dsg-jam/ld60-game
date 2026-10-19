@@ -68,6 +68,8 @@ pub(super) enum Action {
     Back,
     /// Goes to the title screen.
     Title,
+    /// Opens the shop again after it closed.
+    NewRun,
     /// Browsers have no way to close the game, so only native builds quit.
     #[cfg(not(target_arch = "wasm32"))]
     Quit,

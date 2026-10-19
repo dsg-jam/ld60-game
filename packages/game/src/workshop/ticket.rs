@@ -47,7 +47,8 @@ impl Plugin for TicketPlugin {
         app.add_observer(JobTicket::on_add).add_systems(
             Update,
             (
-                TicketStatus::update.run_if(resource_exists_and_changed::<Job>),
+                (TicketStatus::update, TicketPays::update)
+                    .run_if(resource_exists_and_changed::<Job>),
                 Landing::animate,
             )
                 .chain(),
@@ -143,6 +144,13 @@ impl JobTicket {
         Localized::verbatim(level.id.to_uppercase())
     }
 
+    fn row(label: &'static str, value: Localized) -> impl Bundle {
+        Paper::row([
+            (Message::new(label).into(), LABEL_WIDTH),
+            (value, VALUE_WIDTH),
+        ])
+    }
+
     fn write(page: &mut ChildSpawnerCommands, level: &Level) {
         let chip = match level.chip {
             ChipSpec::Calco(info) => Message::new("ticket-chip-calco")
@@ -169,11 +177,12 @@ impl JobTicket {
             ("ticket-chip", chip.into()),
             ("ticket-rom", Message::new(rom).into()),
         ] {
-            page.spawn(Paper::row([
-                (Message::new(label).into(), LABEL_WIDTH),
-                (value, VALUE_WIDTH),
-            ]));
+            page.spawn(Self::row(label, value));
         }
+        page.spawn((
+            TicketPays,
+            Self::row("ticket-reward", TicketPays::text(level.reward)),
+        ));
         page.spawn(Paper::heading(Message::new("ticket-complaint")));
         page.spawn(Paper::text(
             Message::new("paper-quote").with("text", Levels::text(level, Level::COMPLAINT)),
@@ -222,6 +231,36 @@ impl TicketStatus {
                 commands.entity(stamp).remove::<Landing>();
             } else if *visibility == Visibility::Hidden && !landing {
                 commands.entity(stamp).insert(Landing::default());
+            }
+        }
+    }
+}
+
+/// The row on the job ticket with what the customer pays, which drops with
+/// each return.
+#[derive(Component, Debug)]
+struct TicketPays;
+
+impl TicketPays {
+    fn text(amount: u32) -> Localized {
+        Message::new("receipt-amount").with("amount", amount).into()
+    }
+
+    /// The amount is the last text in the row.
+    fn update(
+        job: Res<Job>,
+        rows: Query<Entity, With<TicketPays>>,
+        children: Query<&Children>,
+        mut texts: Query<&mut Localized>,
+    ) {
+        let pays = Self::text(job.reward());
+        for row in &rows {
+            let amount = children
+                .iter_descendants(row)
+                .filter(|&entity| texts.contains(entity))
+                .last();
+            if let Some(mut text) = amount.and_then(|amount| texts.get_mut(amount).ok()) {
+                text.set_if_neq(pays.clone());
             }
         }
     }
@@ -336,6 +375,24 @@ mod tests {
                 locale.assert_formats(Localized::spawned_by(|page| content(page, &level)));
             }
         }
+    }
+
+    #[test]
+    fn pays_drops_with_each_return() {
+        let mut world = World::new();
+        let mut job = Job::load(&Levels::on_disk(), 0).unwrap().unwrap();
+        let full = job.level.reward;
+        job.returns = 1;
+        let cut = job.reward();
+        assert!(cut < full);
+        world.insert_resource(job);
+        let amount = world.spawn(TicketPays::text(full)).id();
+        world.spawn(TicketPays).add_children(&[amount]);
+        world.run_system_cached(TicketPays::update).unwrap();
+        assert_eq!(
+            *world.get::<Localized>(amount).unwrap(),
+            TicketPays::text(cut)
+        );
     }
 
     #[test]
