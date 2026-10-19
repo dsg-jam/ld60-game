@@ -1,3 +1,5 @@
+mod keys;
+
 use std::f32::consts::{PI, TAU};
 
 pub(super) const SAMPLE_RATE: u32 = 44_100;
@@ -367,6 +369,16 @@ impl Resonator {
                 }
             })
             .collect()
+    }
+
+    /// Like [`Self::bank`], but each mode rings as loud as its gain however
+    /// high it is.
+    fn even(modes: &[Mode], pitch: f32) -> Vec<Self> {
+        let mut bank = Self::bank(modes, pitch);
+        for (resonator, mode) in bank.iter_mut().zip(modes) {
+            resonator.gain *= (TAU * mode.frequency * pitch / SAMPLE_RATE as f32).sin();
+        }
+        bank
     }
 
     fn next(&mut self, input: f32) -> f32 {

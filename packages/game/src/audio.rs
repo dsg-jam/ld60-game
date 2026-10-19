@@ -7,11 +7,11 @@ use bevy::{audio::Volume, ecs::entity::EntityHashSet, platform::collections::Has
 use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
 
-const CLICK_VOLUME: f32 = 0.35;
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
-/// Keys differ a little in pitch, so typing doesn't sound like a loop.
-const CLICK_PITCHES: [f32; 5] = [0.92, 0.97, 1.0, 1.04, 1.08];
+/// Keys this wide in meters play at their natural pitch. Wider keys sound
+/// lower.
+const KEY_WIDTH: f32 = 0.018;
 /// Sounds that would stand out if they always came the same get this many
 /// takes, played in random order.
 const TAKES: u32 = 6;
@@ -40,12 +40,16 @@ pub(crate) enum Sound {
     Unlatch,
     /// A radio between two stations.
     Static,
+    /// A key switch bottoming out.
+    KeyDown,
+    /// A key switch springing back up.
+    KeyUp,
 }
 
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 10] = [
         Self::Click,
         Self::Chime,
         Self::Thunk,
@@ -54,6 +58,8 @@ impl Sound {
         Self::Ratchet,
         Self::Latch,
         Self::Unlatch,
+        Self::KeyDown,
+        Self::KeyUp,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -69,6 +75,7 @@ impl Sound {
     fn takes(self) -> u32 {
         match self {
             Self::Detent | Self::Ratchet | Self::Latch | Self::Unlatch | Self::Static => TAKES,
+            Self::KeyDown | Self::KeyUp => 2 * TAKES,
             Self::Click | Self::Chime | Self::Thunk | Self::Ding => 1,
         }
     }
@@ -84,12 +91,14 @@ impl Sound {
             Self::Latch => Samples::latch(take),
             Self::Unlatch => Samples::unlatch(take),
             Self::Static => Samples::radio_static(take),
+            Self::KeyDown => Samples::key_down(take),
+            Self::KeyUp => Samples::key_up(take),
         }
     }
 
     pub(crate) fn volume(self) -> f32 {
         match self {
-            Self::Click => CLICK_VOLUME,
+            Self::Click => 0.35,
             Self::Chime => 0.4,
             Self::Thunk => 0.6,
             Self::Ding => 0.45,
@@ -97,6 +106,7 @@ impl Sound {
             Self::Ratchet => 0.12,
             Self::Latch | Self::Unlatch => 0.5,
             Self::Static => 0.4,
+            Self::KeyDown | Self::KeyUp => 0.4,
         }
     }
 }
@@ -203,8 +213,9 @@ impl Sounds {
         }
     }
 
+    /// Keys sound as they go down and as they come back up.
     fn click_keys(
-        sounds: Res<Sounds>,
+        mut sounds: ResMut<Sounds>,
         enabled: Res<KeyClicks>,
         mixer: Res<Mixer>,
         keys: Query<(Entity, &PressableKey), Changed<PressableKey>>,
@@ -212,20 +223,33 @@ impl Sounds {
         mut commands: Commands,
     ) {
         for (entity, key) in &keys {
-            if !key.is_pressed() {
-                down.remove(&entity);
-            } else if down.insert(entity)
-                && enabled.0
-                && let Some(click) = sounds.0.get(&Sound::Click).and_then(Takes::first)
-            {
-                let pitch = CLICK_PITCHES[entity.to_bits() as usize % CLICK_PITCHES.len()];
-                commands.spawn((
-                    AudioPlayer(click.clone()),
-                    PlaybackSettings::DESPAWN
-                        .with_volume(Volume::Linear(CLICK_VOLUME * mixer.gain()))
-                        .with_speed(pitch),
-                ));
+            let sound = if key.is_pressed() {
+                if !down.insert(entity) {
+                    continue;
+                }
+                Sound::KeyDown
+            } else {
+                if !down.remove(&entity) {
+                    continue;
+                }
+                Sound::KeyUp
+            };
+            if !enabled.0 {
+                continue;
             }
+            let Some(takes) = sounds.0.get_mut(&sound) else {
+                continue;
+            };
+            // Keys differ a little in pitch, so typing doesn't sound like a
+            // loop.
+            let own = 1.0 + (entity.to_bits() % 5) as f32 * 0.01 - 0.02;
+            let pitch = (KEY_WIDTH / key.width()).powf(0.2) * own;
+            commands.spawn((
+                AudioPlayer(takes.next().clone()),
+                PlaybackSettings::DESPAWN
+                    .with_volume(Volume::Linear(sound.volume() * mixer.gain()))
+                    .with_speed(pitch),
+            ));
         }
     }
 }
@@ -251,9 +275,5 @@ impl<T> Takes<T> {
         }
         self.last = Some(pick);
         &self.takes[pick]
-    }
-
-    fn first(&self) -> Option<&T> {
-        self.takes.first()
     }
 }

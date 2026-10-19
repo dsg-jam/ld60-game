@@ -203,6 +203,7 @@ impl<K: Copy> Keypad<K> {
                 Finish::Plastic,
                 PressableKey {
                     rest: key.block.center,
+                    width: key.block.size.x,
                     travel: self.style.travel,
                     bindings: key.bindings,
                     active,
@@ -276,6 +277,7 @@ impl<K: Copy> Keypad<K> {
 #[derive(Component, Debug)]
 pub(crate) struct PressableKey {
     rest: Vec3,
+    width: f32,
     travel: f32,
     bindings: &'static [KeyBinding],
     pub(crate) active: bool,
@@ -289,6 +291,11 @@ pub(crate) struct PressableKey {
 impl PressableKey {
     pub(crate) fn is_pressed(&self) -> bool {
         self.pressed
+    }
+
+    /// In meters.
+    pub(crate) fn width(&self) -> f32 {
+        self.width
     }
 
     /// The press keeps bubbling, so a click on a key still reaches its
