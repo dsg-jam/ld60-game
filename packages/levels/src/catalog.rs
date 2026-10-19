@@ -1,12 +1,47 @@
 use std::path::{Path, PathBuf};
 use std::{fmt, fs, io};
 
+use serde::Deserialize;
+
 use crate::{Level, LevelError};
 
-/// All levels in the order they are played.
+/// All levels: the tutorial first, then the special jobs.
 #[derive(Clone, Debug)]
 pub struct Catalog {
+    order: Order,
+    /// In the order of [`Order::paths`].
     levels: Vec<LevelSource>,
+}
+
+/// The level folders that a [`Catalog::FILE`] lists.
+///
+/// ```
+/// use ld60_levels::Catalog;
+///
+/// let order = Catalog::order(
+///     r#"(tutorial: ["tally2/01-clear-key"], jobs: [(level: "summa6/04-coffee", from: 6)])"#,
+/// )
+/// .unwrap();
+/// assert_eq!(
+///     order.paths().collect::<Vec<_>>(),
+///     ["tally2/01-clear-key", "summa6/04-coffee"]
+/// );
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Order {
+    /// The first jobs of a run, in order.
+    pub tutorial: Vec<String>,
+    /// Hand-written jobs that come between the generated ones.
+    pub jobs: Vec<Special>,
+}
+
+/// A hand-written job that comes between the generated ones.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Special {
+    /// The level folder.
+    pub level: String,
+    /// The first generated job number it can come at.
+    pub from: u32,
 }
 
 /// The files of one level.
@@ -29,26 +64,44 @@ impl Catalog {
     /// Lists the level folders in play order.
     pub const FILE: &str = "catalog.ron";
 
-    pub const fn new(levels: Vec<LevelSource>) -> Self {
-        Self { levels }
+    /// The catalog of `order`, with `levels` in the order of
+    /// [`Order::paths`].
+    pub fn new(order: Order, levels: Vec<LevelSource>) -> Self {
+        Self { order, levels }
     }
 
     /// The level folders listed in a [`Catalog::FILE`].
-    pub fn order(source: &str) -> Result<Vec<String>, CatalogError> {
+    pub fn order(source: &str) -> Result<Order, CatalogError> {
         ron::from_str(source).map_err(CatalogError::Order)
     }
 
     /// Reads the catalog and every level in it from `dir`.
     pub fn read(dir: &Path) -> Result<Self, CatalogError> {
-        let levels = Self::order(&read(dir.join(Self::FILE))?)?
-            .into_iter()
-            .map(|path| LevelSource::read(dir, path))
+        let order = Self::order(&read(dir.join(Self::FILE))?)?;
+        let levels = order
+            .paths()
+            .map(|path| LevelSource::read(dir, path.into()))
             .collect::<Result<_, _>>()?;
-        Ok(Self { levels })
+        Ok(Self { order, levels })
     }
 
+    /// Every level, the tutorial first.
     pub fn levels(&self) -> &[LevelSource] {
         &self.levels
+    }
+
+    /// The first jobs of a run.
+    pub fn tutorial(&self) -> &[LevelSource] {
+        &self.levels[..self.order.tutorial.len().min(self.levels.len())]
+    }
+
+    /// The hand-written jobs that come between the generated ones, each with
+    /// [`Special::from`].
+    pub fn specials(&self) -> impl Iterator<Item = (&LevelSource, u32)> {
+        let tutorial = self.tutorial().len();
+        self.levels[tutorial..]
+            .iter()
+            .zip(self.order.jobs.iter().map(|special| special.from))
     }
 
     /// The level in the folder `path`.
@@ -67,6 +120,16 @@ impl Catalog {
     /// The levels in the repository.
     pub(crate) fn in_repository() -> Self {
         Self::read(&Path::new(env!("LD60_ASSETS")).join("levels")).unwrap()
+    }
+}
+
+impl Order {
+    /// Every level folder, the tutorial first.
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.tutorial
+            .iter()
+            .map(String::as_str)
+            .chain(self.jobs.iter().map(|special| special.level.as_str()))
     }
 }
 

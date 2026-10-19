@@ -14,8 +14,8 @@ pub fn run(out: &mut impl Write, data_dir: &Path, check: bool) -> crate::Result<
     let mut files: Vec<(String, PathBuf, String)> = Vec::new();
     let mut errors = Vec::new();
     let order = Catalog::order(&std::fs::read_to_string(data_dir.join(Catalog::FILE))?)?;
-    for path in order {
-        let file = |name| data_dir.join(LevelSource::file(&path, name));
+    for path in order.paths() {
+        let file = |name| data_dir.join(LevelSource::file(path, name));
         let level = Level::from_ron(&std::fs::read_to_string(file(LevelSource::LEVEL_FILE))?)?;
         let Some(firmware) = &level.firmware else {
             continue;
@@ -37,7 +37,7 @@ pub fn run(out: &mut impl Write, data_dir: &Path, check: bool) -> crate::Result<
             (LevelSource::BUGGY_FILE, pair.buggy),
             (LevelSource::FIXED_FILE, pair.fixed),
         ] {
-            let shown = LevelSource::file(&path, name);
+            let shown = LevelSource::file(path, name);
             for warning in &output.warnings {
                 writeln!(out, "{shown}: {}:{warning}", firmware.source)?;
             }
