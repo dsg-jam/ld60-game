@@ -4,7 +4,7 @@ mod tools;
 
 use bevy::prelude::*;
 use ld60_calco::{Errata, Revision};
-use ld60_devices::{ChipSpec, DeviceKind};
+use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_levels::{Catalog, GAME_SEED, LevelSource, Reference};
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
@@ -31,6 +31,8 @@ const RENT_RISE: u32 = 6;
 const SPECIAL_ODDS: u32 = 3;
 /// Keeps the seeds of one run away from those of the next.
 const RUN_SEEDS: u64 = 1 << 32;
+/// The same board comes at most this many jobs in a row.
+const SAME_BOARDS: usize = 2;
 
 /// What is left on the counter when the shop closes.
 type Leftovers = Or<(
@@ -78,6 +80,9 @@ pub(crate) struct Run {
     served: Served,
     /// The level folders of the special jobs done in this run.
     specials: Vec<String>,
+    /// The boards of the last jobs, newest last.
+    #[serde(default)]
+    boards: Vec<BoardRev>,
     stats: Stats,
 }
 
@@ -145,6 +150,7 @@ impl Default for Run {
             demand: Demand::default(),
             served: Served::default(),
             specials: Vec::new(),
+            boards: Vec::new(),
             stats: Stats::default(),
         }
     }
@@ -396,6 +402,10 @@ impl Run {
             return;
         }
         self.job += 1;
+        self.boards.push(job.level.board);
+        if self.boards.len() > SAME_BOARDS {
+            self.boards.remove(0);
+        }
         match job.origin {
             Origin::Lesson { step, .. } => self.file_note(step),
             _ => self.served.add(job.level.device),
@@ -411,6 +421,19 @@ impl Run {
         }
         if let Origin::Special(source) = &job.origin {
             self.specials.push(source.path.clone());
+        }
+    }
+
+    /// The board the next job should not be on, because the last jobs all
+    /// were.
+    pub(crate) fn tired_board(&self) -> Option<BoardRev> {
+        match self.boards.as_slice() {
+            [first, rest @ ..]
+                if rest.len() + 1 == SAME_BOARDS && rest.iter().all(|b| b == first) =>
+            {
+                Some(*first)
+            }
+            _ => None,
         }
     }
 
@@ -828,6 +851,24 @@ mod tests {
             *world.resource::<NextState<Focus>>(),
             NextState::Pending(Focus::Desk)
         ));
+    }
+
+    #[test]
+    fn a_board_comes_at_most_twice_in_a_row() {
+        let levels = Levels::on_disk();
+        let mut run = Run::default().next();
+        let mut boards = Vec::new();
+        for _ in 0..16 {
+            let job = Job::for_run(&run, &levels).unwrap();
+            boards.push(job.level.board);
+            run.settle(&job, &Pickup::Paid(job.level.reward));
+        }
+        assert!(
+            boards
+                .windows(SAME_BOARDS + 1)
+                .all(|w| w.iter().any(|b| *b != w[0])),
+            "{boards:?}"
+        );
     }
 
     #[test]

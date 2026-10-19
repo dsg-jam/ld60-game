@@ -177,7 +177,17 @@ impl Generated {
         seed: u64,
         difficulty: &Difficulty,
     ) -> Result<Self, GenerateError> {
-        let working = Self::working(reference, seed, difficulty.fault_chance());
+        Self::avoiding(reference, seed, difficulty, None)
+    }
+
+    /// Like [`Generated::new`], but not on board `avoid`.
+    pub fn avoiding(
+        reference: &Reference,
+        seed: u64,
+        difficulty: &Difficulty,
+        avoid: Option<BoardRev>,
+    ) -> Result<Self, GenerateError> {
+        let working = Self::working(reference, seed, difficulty.fault_chance(), avoid);
         let lengths = [difficulty.symptom_keys().clone(), 0..=MAX_SYMPTOM_KEYS];
         let job = (1..=difficulty.bugs())
             .rev()
@@ -195,13 +205,22 @@ impl Generated {
 
     /// The reference moved to the board for `seed`, as a job that keeps it
     /// there. With `fault_chance` percent, the board gets a stuck RAM bit.
-    fn working(reference: &Reference, seed: u64, fault_chance: u32) -> Variant {
+    fn working(
+        reference: &Reference,
+        seed: u64,
+        fault_chance: u32,
+        avoid: Option<BoardRev>,
+    ) -> Variant {
         let original = Variant {
             level: reference.level(seed),
             buggy: reference.asm.clone(),
             fixed: reference.asm.clone(),
         };
-        let board = BoardRev::ALL[Rng::new(seed, "board").below(BoardRev::ALL.len())];
+        let boards: Vec<BoardRev> = BoardRev::ALL
+            .into_iter()
+            .filter(|&board| Some(board) != avoid)
+            .collect();
+        let board = boards[Rng::new(seed, "board").below(boards.len())];
         let mut working = (0..REWRITES)
             .filter_map(|n| original.rewrite(board, seed.wrapping_add(n)))
             .find(|v| v.behaves_like(&original) && v.passes_line_tests())

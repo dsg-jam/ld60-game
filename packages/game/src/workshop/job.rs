@@ -97,11 +97,12 @@ impl Job {
     pub(crate) fn new(origin: Origin, run: &Run, levels: &Levels) -> Result<Self, JobError> {
         let seed = run.seed();
         let variant = match &origin {
-            Origin::Lesson { source, .. } | Origin::Special(source) => Variant::new(source, seed)?,
+            Origin::Lesson { source, .. } => Variant::new(source, seed)?,
+            Origin::Special(source) => Variant::avoiding(source, seed, run.tired_board())?,
             &Origin::Generated { device, number } => {
                 let difficulty = Difficulty::for_shop(number, device, &run.chips(), run.errata());
                 let reference = levels.reference(device, difficulty.chip())?;
-                Generated::new(&reference, seed, &difficulty)?.variant
+                Generated::avoiding(&reference, seed, &difficulty, run.tired_board())?.variant
             }
         };
         let Variant {
