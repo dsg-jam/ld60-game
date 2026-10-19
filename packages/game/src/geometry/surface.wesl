@@ -15,8 +15,9 @@ import bevy_pbr::render::{
 import package::geometry::{
     bump::bumped,
     floor::{plank, plank_color, plank_height, rug, rug_height},
-    noise::{PI, hash1, noise, visible},
-    wear::{dings, floor_marks, grip_ridge, rust, scratches, scuffs},
+    metal::steel,
+    noise::{PI, hash1, noise, specks, visible},
+    wear::{dings, floor_marks, grip_ridge, scratches, scuffs},
     wood::{fiber_sheen, wood},
 };
 
@@ -158,6 +159,15 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     var bumps = 0.0;
     // Handled things get scratched.
     var scratchable = false;
+    let scratched = scratches(uv, s, w, pixel);
+    let metal = surface.finish == METAL || surface.finish == PLATED;
+
+    // Edges wear.
+    let smallest = min(h.x, min(h.y, h.z));
+    let width = clamp(smallest * 0.12, 0.002, 0.02) * mix(0.3, 1.6, noise(uv * 40.0, s + 6.0));
+    let edge = (1.0 - smoothstep(0.0, width, edge_distance(p, h))) * w * f32(shaped);
+    // Near the bottom, where grime and water collect.
+    let low = (1.0 - smoothstep(0.0, h.y * 1.2, p.y + h.y)) * f32(shaped);
 
     // Detail of each kind of surface.
     switch surface.finish {
@@ -174,16 +184,11 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             scratchable = true;
         }
         case METAL, PLATED: {
-            let brushed = noise(vec2<f32>(uv.x * 3.0, uv.y * 400.0), s) * visible(0.0025, pixel);
-            rough = mix(rough * 0.7, rough * 1.2, brushed);
-            // Fingerprints dull the shine in patches.
-            rough = mix(rough, rough + 0.2, smoothstep(0.6, 0.8, noise(uv * 30.0, s + 2.0)));
-            let rusty = rust(uv, s, w, pixel) * f32(surface.finish == METAL);
-            color = mix(color, RUST_COLOR * mix(0.7, 1.2, noise(uv * 300.0, s + 3.0)), rusty);
-            rough = mix(rough, 0.9, rusty);
-            metallic = mix(metallic, 0.0, rusty);
-            bumps = 0.00005 * noise(uv * 400.0, s + 5.0) * visible(0.0025, pixel) - 0.0002 * rusty;
-            scratchable = true;
+            let steel = steel(color, rough, uv, edge, low, scratched, surface.finish == PLATED, s, w, pixel);
+            color = steel.color;
+            rough = steel.roughness;
+            metallic *= steel.metallic;
+            bumps = steel.height;
         }
         case WOOD: {
             let grain = wood(p, h, s, pixel);
@@ -263,41 +268,49 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     }
 
     // Edges wear lighter. Paint chips down to primer.
-    let smallest = min(h.x, min(h.y, h.z));
-    let width = clamp(smallest * 0.12, 0.002, 0.02) * mix(0.3, 1.6, noise(uv * 40.0, s + 6.0));
-    let edge = (1.0 - smoothstep(0.0, width, edge_distance(p, h))) * w * f32(shaped);
     if surface.finish == PAINT {
         let chipped = edge * step(0.45, noise(uv * 25.0, s + 7.0));
         color = mix(mix(color, color * 1.3 + 0.05, edge), PRIMER, chipped);
         rough = mix(rough, 0.6, chipped);
-    } else if surface.finish != FABRIC && surface.finish != PAPER && surface.finish != RUG {
+    } else if surface.finish != FABRIC && surface.finish != PAPER && surface.finish != RUG && !metal {
         color = mix(color, color * 1.3 + 0.05, edge * 0.7);
         rough = mix(rough, rough * 0.7, edge);
     }
 
     // Grime near the bottom and in patches.
-    let low = (1.0 - smoothstep(0.0, h.y * 1.2, p.y + h.y)) * f32(shaped);
     let patches = smoothstep(0.6, 0.95, noise(p.xz * 3.0 + vec2<f32>(p.y * 2.0), s + 8.0));
-    // Patches on a floor look like a blurry stain.
-    let grime = w * clamp(low * 0.5 + patches * 0.4 * f32(!flooring), 0.0, 1.0);
+    // Patches on a floor look like a blurry stain, and on metal like a
+    // blurry reflection.
+    let grime = w * clamp(low * 0.5 + patches * 0.4 * f32(!flooring && !metal), 0.0, 1.0);
     color *= 1.0 - 0.35 * grime;
     rough = mix(rough, min(rough + 0.2, 1.0), grime);
+    metallic *= 1.0 - 0.5 * grime;
 
     // A thin film of dust on faces that look up.
     let up = smoothstep(0.6, 1.0, n.y);
     let film = 0.6 * noise(p.xz * 4.0, s + 9.0) + 0.4 * noise(p.xz * 12.0, s + 10.0);
-    let dust = w * up * smoothstep(0.2, 0.9, film) * f32(!flooring);
+    let dust = w * up * smoothstep(0.2, 0.9, film) * f32(!flooring) * select(1.0, 0.4, metal);
     color = mix(color, DUST, dust * 0.3);
     rough = mix(rough, 1.0, dust * 0.5);
+    metallic *= 1.0 - 0.3 * dust;
 
-    let scratched = scratches(uv, s, w, pixel) * f32(scratchable);
-    color = mix(color, color * 1.25 + 0.04, scratched);
-    rough = mix(rough, rough * 0.6, scratched);
+    let scratch = scratched * f32(scratchable);
+    color = mix(color, color * 1.25 + 0.04, scratch);
+    rough = mix(rough, rough * 0.6, scratch);
 
     pbr_input.material.base_color = vec4<f32>(color, pbr_input.material.base_color.a);
     pbr_input.material.perceptual_roughness = clamp(rough, 0.04, 1.0);
     pbr_input.material.metallic = metallic;
     pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, bumps);
+    if metal {
+        // Bumps and curves finer than a pixel spread the highlight instead
+        // of making it sparkle, after Kaplanyan et al., "Filtering
+        // Distributions of Normals for Shading Antialiasing".
+        let n = pbr_input.N;
+        let variance = 0.25 * (dot(dpdx(n), dpdx(n)) + dot(dpdy(n), dpdy(n)));
+        let alpha = pow(pbr_input.material.perceptual_roughness, 4.0) + min(2.0 * variance, 0.18);
+        pbr_input.material.perceptual_roughness = pow(alpha, 0.25);
+    }
 
     var out: FragmentOutput;
 @if(PREPASS_PIPELINE) {

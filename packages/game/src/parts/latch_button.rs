@@ -64,7 +64,7 @@ impl LatchButton {
         let ring = Extrusion::new(Annulus::new(CAP_RADIUS + PLAY, COLLAR.x), COLLAR.y);
         let stem = Block::new(Vec3::new(2.0 * CAP_RADIUS, CAP_HEIGHT, 2.0 * CAP_RADIUS))
             .translated(-Vec3::Y * TRAVEL);
-        let metal = surfaces.add(Finish::Metal.material(COLLAR_COLOR, Form::Freeform, 0.0));
+        let metal = surfaces.add(Finish::Plated.material(COLLAR_COLOR, Form::Freeform, 0.0));
         let plastic = surfaces.add(Finish::Plastic.material(button.color, Form::Freeform, 0.0));
         let dome = meshes.add(Sphere::new(CAP_RADIUS).mesh().uv(24, 12));
         let down = button.down;

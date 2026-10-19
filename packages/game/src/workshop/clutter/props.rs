@@ -66,7 +66,7 @@ impl Finishes {
             ceramic: finish(Finish::Ceramic, CERAMIC),
             stripe: finish(Finish::Ceramic, STRIPE),
             grip: finish(Finish::Grip, GRIP),
-            steel: finish(Finish::Metal, STEEL),
+            steel: finish(Finish::Plated, STEEL),
         }
     }
 }

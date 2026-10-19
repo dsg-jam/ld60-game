@@ -149,8 +149,8 @@ impl Radio {
                     Block::new(Vec3::new(ANTENNA_MOUNT.x, ANTENNA_MOUNT.y, ANTENNA_MOUNT.x))
                         .translated(sunk);
                 let rod = Block::new(Vec3::new(ANTENNA.x, ANTENNA.y, ANTENNA.x)).translated(sunk);
-                antenna.spawn((Shape::cylinder(&mount, CHROME), Finish::Metal));
-                antenna.spawn((Shape::cylinder(&rod, CHROME), Finish::Metal));
+                antenna.spawn((Shape::cylinder(&mount, CHROME), Finish::Plated));
+                antenna.spawn((Shape::cylinder(&rod, CHROME), Finish::Plated));
             });
     }
 

@@ -14,6 +14,7 @@ pub(crate) struct SurfacePlugin;
 impl Plugin for SurfacePlugin {
     fn build(&self, app: &mut App) {
         load_shader_library!(app, "floor.wesl");
+        load_shader_library!(app, "metal.wesl");
         load_shader_library!(app, "wear.wesl");
         load_shader_library!(app, "wood.wesl");
         embedded_asset!(app, "surface.wesl");

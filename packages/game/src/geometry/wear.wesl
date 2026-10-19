@@ -1,11 +1,11 @@
 /// Marks left by use. Each kind of surface wears in its own way: handled
-/// things get scratched, walls get chipped and scuffed, floors get dented,
-/// and steel rusts.
+/// things get scratched, walls get chipped and scuffed and floors get
+/// dented.
 ///
 /// `pixel` is the size of a pixel on the surface in meters. Marks finer
 /// than that fade out, so they don't sparkle as the camera moves.
 
-import package::geometry::noise::{TAU, hash, noise, specks, visible};
+import package::geometry::noise::{TAU, hash, noise, visible};
 
 /// Clusters of scratches where things were rubbed, each with its own
 /// direction. Returns how scratched the point is.
@@ -78,13 +78,6 @@ fn floor_marks(uv: vec2<f32>, s: f32, wear: f32, pixel: f32) -> f32 {
         * smoothstep(0.5, 0.8, noise(uv * 2.0, s + 36.0))
         * visible(0.002, pixel);
     return max(dent, drag * 0.5) * wear;
-}
-
-/// Rust spots on steel, and the small pits they leave.
-fn rust(uv: vec2<f32>, s: f32, wear: f32, pixel: f32) -> f32 {
-    let spots = smoothstep(0.66, 0.78, noise(uv * 45.0, s + 37.0) * 0.6 + noise(uv * 160.0, s + 38.0) * 0.4);
-    let pits = specks(uv, 0.003, 0.2, 0.00015, 0.0003, s + 39.0, pixel);
-    return clamp(spots * 0.9 + pits, 0.0, 1.0) * wear;
 }
 
 /// Ribs along a grip, around its local y axis: 1 on a rib, 0 in the groove
