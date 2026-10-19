@@ -5,31 +5,33 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
+
+env:
+  TRUNK_VERSION: v0.21.14
+  TRUNK_SHA256: f2b4680cd239693a646a2795e4633c625328d7b2a044fbe749fa3a2fe9e7036b
 
 jobs:
   desktop:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             name: linux-x86_64
-          - os: windows-latest
+          - os: windows-2025
             name: windows-x86_64
-          - os: macos-latest
+          - os: macos-26
             name: macos-aarch64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
       - run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo build --release -p ld60-game
       - name: Package
         run: |
@@ -43,44 +45,55 @@ jobs:
             cp target/release/ld60-game "$dir/"
             tar czf "$dir.tar.gz" "$dir"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.name }}
           path: bugs-from-home-*.*
 
   web:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: rustup show
-      - uses: Swatinem/rust-cache@v2
-      - uses: jetli/trunk-action@v0.5.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install trunk
+        run: |
+          archive=trunk-x86_64-unknown-linux-gnu.tar.gz
+          curl -fsSL -o "$RUNNER_TEMP/$archive" "https://github.com/trunk-rs/trunk/releases/download/$TRUNK_VERSION/$archive"
+          echo "$TRUNK_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: trunk build --release --public-url ./
         working-directory: packages/game
       - run: cd dist && zip -r ../bugs-from-home-web.zip .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
           path: bugs-from-home-web.zip
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
 
   pages:
     needs: web
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   release:
     needs: [desktop, web]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           merge-multiple: true
       - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes bugs-from-home-*
