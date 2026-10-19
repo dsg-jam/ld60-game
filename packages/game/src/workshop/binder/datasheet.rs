@@ -1,159 +1,40 @@
-use std::f32::consts::FRAC_PI_4;
-
 use bevy::prelude::*;
 use ld60_calco::datasheet::{INSTRUCTIONS, NOTES, PORTS};
 use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
-use ld60_devices::ChipSpec;
 
-use super::job::Job;
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{PAPER, Paper};
-use crate::parts::screen::UiCanvas;
-use crate::player::focus::{Focus, FocusTarget, View};
+use crate::parts::paper::Paper;
 
-const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
-const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
-/// Pages under the top sheet, to make it look like a stack.
-const STACK_SIZE: Vec3 = Vec3::new(0.16, 0.003, 0.22);
-const STAPLE_SIZE: Vec3 = Vec3::new(0.012, 0.001, 0.002);
-/// Keeps the top sheet from flickering against the stack.
-const SHEET_GAP: f32 = 0.0002;
-/// From the top left corner. The staple runs across the corner.
-const STAPLE_INSET: f32 = 0.007;
 /// The instruction table needs tighter rows to fit on one page.
 const TABLE_ROW_GAP: f32 = 3.0;
-const STAPLE: Color = Color::srgb_u8(0xa0, 0xa4, 0xa8);
 
-pub(crate) struct DatasheetPlugin;
-
-impl Plugin for DatasheetPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_observer(Datasheet::on_add).add_systems(
-            Update,
-            Datasheet::print_for_job
-                .run_if(resource_exists_and_changed::<Job>)
-                .before(Paper::show_current),
-        );
-    }
+/// The CalCo datasheet of one chip revision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ChipSheet {
+    revision: Revision,
+    /// Whether the errata pages of the revision are filed with it.
+    errata: bool,
 }
 
-/// The stapled CalCo datasheet, lying face up. It shows the chip revision
-/// of the current job.
-#[derive(Component, Debug)]
-#[require(Transform, Visibility)]
-pub(crate) struct Datasheet;
-
-/// The canvas of a [`Datasheet`] and the revision its pages show.
-#[derive(Component)]
-struct Printed {
-    canvas: UiCanvas,
-    revision: Option<Revision>,
-}
-
-impl Datasheet {
-    fn on_add(
-        add: On<Add<Datasheet>>,
-        mut commands: Commands,
-        mut images: ResMut<Assets<Image>>,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
-    ) {
-        let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS_SIZE, add.entity);
-        let stack = Block::new(STACK_SIZE);
-        let staple = Block::new(STAPLE_SIZE)
-            .on_top_of(&stack)
-            .translated(Vec3::new(
-                -SHEET_SIZE.x / 2.0 + STAPLE_INSET,
-                SHEET_GAP,
-                -SHEET_SIZE.y / 2.0 + STAPLE_INSET,
-            ));
-
-        let mut sheet = Entity::PLACEHOLDER;
-        commands.entity(add.entity).with_children(|datasheet| {
-            datasheet.spawn((Shape::cuboid(&stack, PAPER), Finish::Paper));
-            sheet = datasheet
-                .spawn(Paper::sheet(
-                    &canvas,
-                    SHEET_SIZE,
-                    Vec3::Y * (stack.max().y + SHEET_GAP),
-                    &mut meshes,
-                    &mut materials,
-                ))
-                .id();
-            datasheet
-                .spawn((Shape::cuboid(&staple, STAPLE), Finish::Metal))
-                .insert(
-                    staple
-                        .transform()
-                        .with_rotation(Quat::from_rotation_y(FRAC_PI_4)),
-                );
-        });
-        commands.entity(add.entity).insert((
-            Paper::new(sheet, SHEET_SIZE, Vec::new()),
-            Printed {
-                canvas,
-                revision: None,
-            },
-            FocusTarget {
-                prompt: "click-datasheet",
-                focus: Focus::Paper,
-                view: View::Local(Paper::reading_view(Vec3::ZERO)),
-            },
-        ));
-    }
-
-    /// Reprints the pages when a job brings another chip revision.
-    fn print_for_job(
-        job: Res<Job>,
-        mut sheets: Query<(&mut Paper, &mut Printed)>,
-        mut commands: Commands,
-    ) {
-        let ChipSpec::Calco(chip) = job.level.chip;
-        for (mut paper, mut printed) in &mut sheets {
-            if printed.revision == Some(chip.revision) {
-                continue;
-            }
-            printed.revision = Some(chip.revision);
-            let pages = Self::print(&mut commands, &printed.canvas, chip.revision);
-            for page in paper.replace_pages(pages) {
-                commands.entity(page).despawn();
-            }
-        }
+impl ChipSheet {
+    pub(super) fn new(revision: Revision, errata: bool) -> Self {
+        Self { revision, errata }
     }
 
     /// The contents of each page.
-    const PAGES: [fn(&mut ChildSpawnerCommands, Revision); 4] = [
+    pub(super) const PAGES: [fn(&mut ChildSpawnerCommands, Self); 4] = [
         Self::overview,
         Self::instructions,
         Self::conditions,
         Self::errata,
     ];
 
-    fn footer(revision: Revision) -> Message {
-        Message::new("datasheet-footer").with("revision", revision.to_string())
+    pub(super) fn footer(self) -> Message {
+        Message::new("datasheet-footer").with("revision", self.revision.to_string())
     }
 
-    fn print(commands: &mut Commands, canvas: &UiCanvas, revision: Revision) -> Vec<Entity> {
-        let footer = Self::footer(revision);
-        Self::PAGES
-            .iter()
-            .enumerate()
-            .map(|(index, content)| {
-                Paper::spawn_page(
-                    commands,
-                    canvas,
-                    (index + 1, Self::PAGES.len()),
-                    footer.clone(),
-                    |page| content(page, revision),
-                )
-            })
-            .collect()
-    }
-
-    fn overview(page: &mut ChildSpawnerCommands, revision: Revision) {
+    fn overview(page: &mut ChildSpawnerCommands, sheet: Self) {
+        let revision = sheet.revision;
         page.spawn(Paper::title(Localized::verbatim("CALCO")));
         page.spawn(Paper::faded(Message::new("datasheet-subtitle")));
         page.spawn(Paper::heading(Message::new("datasheet-registers")));
@@ -208,7 +89,8 @@ impl Datasheet {
         }
     }
 
-    fn instructions(page: &mut ChildSpawnerCommands, revision: Revision) {
+    fn instructions(page: &mut ChildSpawnerCommands, sheet: Self) {
+        let revision = sheet.revision;
         const WIDTHS: [f32; 5] = [70.0, 120.0, 314.0, 28.0, 28.0];
         let row = |cells: [Localized; 5]| {
             let mut widths = WIDTHS.into_iter();
@@ -242,7 +124,8 @@ impl Datasheet {
         page.spawn(Paper::faded(Message::new("datasheet-operand-legend")));
     }
 
-    fn conditions(page: &mut ChildSpawnerCommands, revision: Revision) {
+    fn conditions(page: &mut ChildSpawnerCommands, sheet: Self) {
+        let revision = sheet.revision;
         page.spawn(Paper::heading(Message::new("datasheet-conditions")));
         for cond in Cond::ALL
             .into_iter()
@@ -285,8 +168,15 @@ impl Datasheet {
         })
     }
 
-    fn errata(page: &mut ChildSpawnerCommands, revision: Revision) {
+    fn errata(page: &mut ChildSpawnerCommands, sheet: Self) {
+        let revision = sheet.revision;
         page.spawn(Paper::heading(Message::new("datasheet-errata")));
+        if !sheet.errata {
+            page.spawn(Paper::text(
+                Message::new("datasheet-errata-missing").with("revision", revision.to_string()),
+            ));
+            return;
+        }
         let errata: Vec<_> = Erratum::ALL
             .iter()
             .filter(|erratum| erratum.revision() == revision)
@@ -317,9 +207,12 @@ mod tests {
     fn every_page_formats() {
         let locale = Locale::on_disk();
         for revision in Revision::ALL {
-            locale.assert_formats([Datasheet::footer(revision)]);
-            for content in Datasheet::PAGES {
-                locale.assert_formats(Localized::spawned_by(|page| content(page, revision)));
+            for errata in [false, true] {
+                let sheet = ChipSheet::new(revision, errata);
+                locale.assert_formats([sheet.footer()]);
+                for content in ChipSheet::PAGES {
+                    locale.assert_formats(Localized::spawned_by(|page| content(page, sheet)));
+                }
             }
         }
     }

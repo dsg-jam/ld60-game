@@ -1,8 +1,8 @@
+mod binder;
 pub(crate) mod clock;
 mod clutter;
 mod computer;
 mod counter;
-mod datasheet;
 mod dust;
 mod front;
 pub(crate) mod job;
@@ -14,6 +14,7 @@ mod receipt;
 mod rent;
 mod rug;
 pub(crate) mod run;
+mod salvage;
 mod service;
 pub(crate) mod shop;
 mod ticket;
@@ -22,10 +23,10 @@ mod tutorial;
 
 use bevy::prelude::*;
 
+use self::binder::Binder;
 use self::clutter::Clutter;
 use self::computer::Computer;
 use self::counter::{Counter, CounterLayout};
-use self::datasheet::Datasheet;
 use self::front::Front;
 use self::lamp::Lamp;
 use self::radio::Radio;
@@ -43,8 +44,8 @@ const STAMP_SPOT: Vec2 = Vec2::new(0.1, -0.75);
 const STAMP_YAW: f32 = 0.3;
 const BELL_SPOT: Vec2 = Vec2::new(0.23, -0.75);
 /// On the mat, see [`CounterLayout::place_on_mat`].
-const DATASHEET_SPOT: Vec2 = Vec2::new(-0.69, -0.19);
-const DATASHEET_YAW: f32 = 0.15;
+const BINDER_SPOT: Vec2 = Vec2::new(-0.69, -0.19);
+const BINDER_YAW: f32 = 0.15;
 
 pub(crate) struct WorkshopPlugin;
 
@@ -59,7 +60,7 @@ impl Plugin for WorkshopPlugin {
             radio::RadioPlugin,
             rug::RugPlugin,
             shop::ShopPlugin,
-            datasheet::DatasheetPlugin,
+            binder::BinderPlugin,
             ticket::TicketPlugin,
             job::JobPlugin,
             levels::LevelsPlugin,
@@ -71,6 +72,7 @@ impl Plugin for WorkshopPlugin {
             clock::ClockPlugin,
             rent::RentPlugin,
             run::RunPlugin,
+            salvage::SalvagePlugin,
             tutorial::TutorialPlugin,
         ))
         .add_systems(Startup, spawn_stage);
@@ -105,9 +107,9 @@ fn spawn_stage(mut commands: Commands) {
     ));
     commands.spawn((Name::new("bell"), Tool::Bell, counter.place(BELL_SPOT, 0.0)));
     commands.spawn((
-        Name::new("datasheet"),
-        Datasheet,
-        counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
+        Name::new("binder"),
+        Binder,
+        counter.place_on_mat(BINDER_SPOT, BINDER_YAW),
     ));
     commands.spawn((
         Name::new("camera"),

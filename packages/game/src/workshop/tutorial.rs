@@ -14,7 +14,7 @@ const SHEET_GAP: f32 = 0.0005;
 /// The paragraphs of each note, as attributes of its message.
 const LESSONS: [&[&str]; 2] = [
     &["welcome", "ticket", "computer", "flash", "finish", "time"],
-    &["datasheet", "lines", "versions", "rent"],
+    &["datasheet", "lines", "versions", "rent", "trader"],
 ];
 
 pub(crate) struct TutorialPlugin;

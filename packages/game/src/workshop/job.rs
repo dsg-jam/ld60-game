@@ -95,7 +95,7 @@ impl Job {
         let variant = match &origin {
             Origin::Lesson { source, .. } | Origin::Special(source) => Variant::new(source, seed)?,
             &Origin::Generated { device, number } => {
-                let difficulty = Difficulty::for_job(number, device);
+                let difficulty = Difficulty::for_shop(number, device, run.errata());
                 let reference = levels.reference(device, difficulty.chip())?;
                 Generated::new(&reference, seed, &difficulty)?.variant
             }
