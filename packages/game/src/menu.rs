@@ -1,3 +1,4 @@
+mod closed;
 mod credits;
 mod list;
 mod pause;
@@ -6,6 +7,7 @@ mod title;
 
 use bevy::prelude::*;
 
+use self::closed::StatsPage;
 use self::credits::{Credits, CreditsHandle, CreditsPage};
 use self::list::{Action, Entries};
 pub(crate) use self::settings::Settings;
@@ -13,6 +15,7 @@ use self::settings::SettingsPage;
 use crate::audio::Mixer;
 use crate::locale::{Localized, Message};
 use crate::player::hints::{INK, SHADOW};
+use crate::workshop::run::{NewRun, Run};
 
 const HEADING_SIZE: f32 = 56.0;
 /// From the left edge of the screen to the column.
@@ -30,6 +33,7 @@ impl Plugin for MenuPlugin {
             .add_sub_state::<Page>()
             .init_resource::<Started>()
             .add_plugins((
+                closed::ClosedPlugin,
                 credits::CreditsPlugin,
                 list::ListPlugin,
                 pause::PausePlugin,
@@ -58,11 +62,13 @@ pub(crate) enum AppState {
     Title,
     Playing,
     Paused,
+    /// The landlord closed the shop, so the run is over.
+    Closed,
 }
 
 /// The page a menu shows.
 #[derive(SubStates, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[source(AppState = AppState::Title | AppState::Paused)]
+#[source(AppState = AppState::Title | AppState::Paused | AppState::Closed)]
 pub(crate) enum Page {
     #[default]
     Entries,
@@ -116,10 +122,12 @@ impl Column {
     }
 
     /// Shows the current page in the column.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn fill(
         app_state: Res<State<AppState>>,
         page: Res<State<Page>>,
         started: Res<Started>,
+        run: Res<Run>,
         credits: Res<Assets<Credits>>,
         credits_handle: Res<CreditsHandle>,
         column: Single<Entity, With<Column>>,
@@ -135,6 +143,12 @@ impl Column {
             }
             (_, Page::Settings) => {
                 column.with_child((DespawnOnExit(Page::Settings), SettingsPage::bundle()));
+            }
+            (AppState::Closed, Page::Entries) => {
+                column.with_child((
+                    DespawnOnExit(Page::Entries),
+                    StatsPage::with_entries(run.stats()),
+                ));
             }
             (AppState::Paused, Page::Entries) => {
                 column.with_child((
@@ -157,6 +171,7 @@ impl Column {
 }
 
 impl Action {
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn apply(
         action: On<Action>,
         app_state: Res<State<AppState>>,
@@ -164,11 +179,16 @@ impl Action {
         mut next_state: ResMut<NextState<AppState>>,
         mut next_page: ResMut<NextState<Page>>,
         mut started: ResMut<Started>,
+        mut commands: Commands,
         #[cfg(not(target_arch = "wasm32"))] mut exit: MessageWriter<AppExit>,
     ) {
         match *action {
             Self::Start | Self::Resume => {
                 started.0 = true;
+                next_state.set(AppState::Playing);
+            }
+            Self::NewRun => {
+                commands.trigger(NewRun);
                 next_state.set(AppState::Playing);
             }
             Self::Settings => next_page.set(Page::Settings),
@@ -205,6 +225,11 @@ mod tests {
                 AppState::Paused,
                 Message::new("menu-paused"),
             ));
+            menu.spawn(Column::screen(
+                AppState::Closed,
+                Message::new("menu-closed"),
+            ));
+            menu.spawn(StatsPage::with_entries(Run::default().stats()));
             for entries in [
                 title::START_ENTRIES,
                 title::CONTINUE_ENTRIES,

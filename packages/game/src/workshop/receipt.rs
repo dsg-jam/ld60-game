@@ -3,7 +3,7 @@ use ld60_levels::Level;
 
 use super::counter::CounterLayout;
 use super::levels::Levels;
-use super::pickup::{Earnings, Pickup};
+use super::pickup::Pickup;
 use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
@@ -36,16 +36,17 @@ pub(crate) struct Receipt {
     job: Localized,
     customer: Message,
     pickup: Pickup,
-    earnings: Earnings,
+    /// Money in the till after the pickup.
+    till: u32,
 }
 
 impl Receipt {
-    pub(crate) fn new(level: &Level, pickup: Pickup, earnings: Earnings) -> Self {
+    pub(crate) fn new(level: &Level, pickup: Pickup, till: u32) -> Self {
         Self {
             job: JobTicket::job(level),
             customer: Levels::text(level, Level::CUSTOMER),
             pickup,
-            earnings,
+            till,
         }
     }
 
@@ -142,7 +143,7 @@ impl Receipt {
         }
         page.spawn(Paper::heading(Message::new("receipt-till")));
         page.spawn(Paper::text(
-            Message::new("receipt-till-total").with("amount", self.earnings.0),
+            Message::new("receipt-till-total").with("amount", self.till),
         ));
     }
 }
@@ -167,7 +168,7 @@ mod tests {
             pickups.push(Pickup::Left(complaint));
         }
         for pickup in pickups {
-            let receipt = Receipt::new(&level, pickup, Earnings(10));
+            let receipt = Receipt::new(&level, pickup, 10);
             locale.assert_formats(Localized::spawned_by(|page| receipt.write(page)));
         }
     }

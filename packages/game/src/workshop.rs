@@ -1,3 +1,4 @@
+pub(crate) mod clock;
 mod clutter;
 mod computer;
 mod counter;
@@ -10,11 +11,14 @@ pub(crate) mod levels;
 mod pickup;
 mod radio;
 mod receipt;
+mod rent;
 mod rug;
+pub(crate) mod run;
 mod service;
 pub(crate) mod shop;
 mod ticket;
 mod tools;
+mod tutorial;
 
 use bevy::prelude::*;
 
@@ -62,6 +66,12 @@ impl Plugin for WorkshopPlugin {
             receipt::ReceiptPlugin,
             tools::ToolsPlugin,
             computer::ComputerPlugin,
+        ))
+        .add_plugins((
+            clock::ClockPlugin,
+            rent::RentPlugin,
+            run::RunPlugin,
+            tutorial::TutorialPlugin,
         ))
         .add_systems(Startup, spawn_stage);
     }

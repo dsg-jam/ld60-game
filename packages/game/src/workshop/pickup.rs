@@ -11,10 +11,6 @@ use crate::locale::Message;
 /// How often a customer tries the device before they take it home broken.
 pub(crate) const TRIES: u32 = 3;
 
-/// Money taken in for repairs so far.
-#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Earnings(pub(crate) u32);
-
 /// What the customer did after trying the device.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Pickup {
@@ -46,14 +42,6 @@ pub(crate) enum Complaint {
     },
     /// The device stopped responding during `keys`.
     Froze { keys: String },
-}
-
-impl Earnings {
-    pub(crate) fn add(&mut self, pickup: &Pickup) {
-        if let Pickup::Paid(amount) = pickup {
-            self.0 += amount;
-        }
-    }
 }
 
 impl Pickup {
@@ -217,19 +205,6 @@ mod tests {
             let (level, rom) = buggy(source);
             assert!(Complaint::find(&level, &rom).is_some(), "{}", level.id);
         }
-    }
-
-    #[test]
-    fn only_paid_pickups_add_earnings() {
-        let mut earnings = Earnings(5);
-        earnings.add(&Pickup::HandedBack {
-            complaint: Complaint::Dead,
-            tries_left: 2,
-        });
-        earnings.add(&Pickup::Left(Complaint::Dead));
-        assert_eq!(earnings, Earnings(5));
-        earnings.add(&Pickup::Paid(10));
-        assert_eq!(earnings, Earnings(15));
     }
 
     #[test]

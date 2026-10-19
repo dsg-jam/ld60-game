@@ -9,6 +9,7 @@ ticket-serial = S/N
 ticket-board = BOARD
 ticket-chip = CHIP
 ticket-rom = ROM
+ticket-reward = PAYS
 
 ticket-chip-calco = CalCo rev { $revision }, date code { $date-code }
 ticket-rom-blank = EPROM, blank in stock
