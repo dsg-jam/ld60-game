@@ -35,8 +35,15 @@ pub(super) struct ShimmerPlugin;
 impl Plugin for ShimmerPlugin {
     fn build(&self, app: &mut App) {
         embedded_asset!(app, "shimmer.wesl");
+        // After `Update` has applied its despawns, so a hovered target that
+        // was just removed is gone instead of getting a shimmer.
         app.add_plugins(MaterialPlugin::<ShimmerMaterial>::default())
-            .add_systems(Update, (Shimmer::start, Shimmer::update).chain());
+            .add_systems(
+                PostUpdate,
+                (Shimmer::start, Shimmer::update)
+                    .chain()
+                    .before(TransformSystems::Propagate),
+            );
     }
 }
 
