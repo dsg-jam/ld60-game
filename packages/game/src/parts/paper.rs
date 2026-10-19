@@ -1,6 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
+    input::mouse::{MouseScrollUnit, MouseWheel},
     picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
@@ -23,6 +24,10 @@ const CORNER_MARK: f32 = 34.0;
 const CORNER_ZONE: f32 = 0.2;
 /// Keeps text clear of the edges of the sheet.
 const MARGIN: f32 = 48.0;
+/// Trackpad scrolling this far, in pixels, turns a page.
+const SCROLL_PIXELS: f32 = 40.0;
+/// A pause this long, in seconds, ends a trackpad swipe.
+const SCROLL_PAUSE: f32 = 0.15;
 /// Camera height above a sheet while reading it.
 const READING_HEIGHT: f32 = 0.3;
 /// Matte paper reflects little light off its surface, so the print stays
@@ -36,8 +41,16 @@ pub(crate) struct PaperPlugin;
 
 impl Plugin for PaperPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (Paper::flip_on_keys, Paper::show_current).chain())
-            .add_observer(Paper::flip_on_click);
+        app.add_systems(
+            Update,
+            (
+                Paper::flip_on_keys,
+                Paper::flip_on_scroll,
+                Paper::show_current,
+            )
+                .chain(),
+        )
+        .add_observer(Paper::flip_on_click);
     }
 }
 
@@ -45,7 +58,8 @@ impl Plugin for PaperPlugin {
 ///
 /// While the paper is focused, clicking the `>` in the bottom right corner
 /// or pressing the right arrow turns to the next page. The `<` in the bottom
-/// left corner and the left arrow go back.
+/// left corner and the left arrow go back. Scrolling down turns to the next
+/// page and scrolling up goes back.
 #[derive(Component, Debug)]
 pub(crate) struct Paper {
     sheet: Entity,
@@ -328,6 +342,45 @@ impl Paper {
         }
     }
 
+    /// Each notch of a wheel turns one page. A trackpad swipe turns one page
+    /// once it has gone [`SCROLL_PIXELS`], however long it goes on.
+    fn flip_on_scroll(
+        mut wheel: MessageReader<MouseWheel>,
+        time: Res<Time>,
+        state: Res<State<Focus>>,
+        focused: Res<Focused>,
+        mut papers: Query<&mut Paper>,
+        mut swipe: Local<Swipe>,
+    ) {
+        let now = time.elapsed_secs();
+        let mut turns = 0;
+        for event in wheel.read() {
+            match event.unit {
+                MouseScrollUnit::Line => turns -= event.y.signum() as i32,
+                MouseScrollUnit::Pixel => {
+                    if now - swipe.last > SCROLL_PAUSE {
+                        *swipe = Swipe::default();
+                    }
+                    swipe.last = now;
+                    swipe.travel += event.y;
+                    if !swipe.spent && swipe.travel.abs() >= SCROLL_PIXELS {
+                        swipe.spent = true;
+                        turns -= swipe.travel.signum() as i32;
+                    }
+                }
+            }
+        }
+        if turns == 0 || *state.get() != Focus::Paper {
+            return;
+        }
+        let Some(mut paper) = focused.get().and_then(|entity| papers.get_mut(entity).ok()) else {
+            return;
+        };
+        for _ in 0..turns.unsigned_abs() {
+            paper.turn(turns > 0);
+        }
+    }
+
     pub(crate) fn show_current(papers: Query<&Paper, Changed<Paper>>, mut nodes: Query<&mut Node>) {
         for paper in &papers {
             for (index, &page) in paper.pages.iter().enumerate() {
@@ -341,6 +394,16 @@ impl Paper {
             }
         }
     }
+}
+
+/// The trackpad scrolling since the last pause.
+#[derive(Debug, Default)]
+struct Swipe {
+    travel: f32,
+    /// Whether the swipe has turned its page.
+    spent: bool,
+    /// When the last scroll came in.
+    last: f32,
 }
 
 #[cfg(test)]
