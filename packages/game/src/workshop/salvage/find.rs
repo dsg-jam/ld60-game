@@ -48,8 +48,8 @@ impl Find {
     pub(crate) const fn price(self) -> u32 {
         match self {
             Self::Device(DeviceKind::Tally2) => 12,
-            Self::Device(DeviceKind::Summa6) => 30,
-            Self::Device(DeviceKind::Lock4) => 45,
+            Self::Device(DeviceKind::Summa6) => 20,
+            Self::Device(DeviceKind::Lock4) => 36,
             Self::Tool(ComputerTool::TestBench) => 14,
             Self::Tool(ComputerTool::Debugger) => 22,
             Self::Tool(ComputerTool::Trace) => 16,

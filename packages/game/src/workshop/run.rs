@@ -24,7 +24,7 @@ use super::tutorial::TutorialNote;
 use crate::player::focus::{Focus, Focused};
 
 /// What the landlord takes the first time the planet sets.
-const RENT: u32 = 10;
+const RENT: u32 = 6;
 /// How much more the landlord takes each time after that.
 const RENT_RISE: u32 = 6;
 /// A special job that can come takes one in this many jobs.

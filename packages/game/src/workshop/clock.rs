@@ -104,7 +104,7 @@ impl Chore {
         match self {
             Self::Flash => 2,
             Self::HandIn => 4,
-            Self::Return => 6,
+            Self::Return => 4,
         }
     }
 }
