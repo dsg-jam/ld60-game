@@ -1,5 +1,6 @@
 use ld60_devices::DeviceKind;
 use rand::{Rng, RngExt};
+use serde::{Deserialize, Serialize};
 
 /// Each recent repair of a device takes this many percent off what the next
 /// one pays.
@@ -12,7 +13,7 @@ const FLOOR: u32 = 40;
 /// Every repair of a device makes the next one of its kind rarer and worth
 /// less. Each time the planet sets, the locals forget half of the recent
 /// repairs.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Demand {
     /// Recent repairs of each device, in the order of [`DeviceKind::ALL`].
     recent: [u32; DeviceKind::ALL.len()],

@@ -1,11 +1,12 @@
 use ld60_calco::{Erratum, Revision};
 use ld60_devices::DeviceKind;
+use serde::{Deserialize, Serialize};
 
 use crate::locale::Message;
 use crate::workshop::run::ComputerTool;
 
 /// Something the scrap trader found, for sale in the salvage crate.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) enum Find {
     /// A dead unit with its human manual. Buying it hangs its sign in the
     /// window and files the manual in the binder.

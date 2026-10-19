@@ -7,6 +7,7 @@ use bevy::{
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
+use serde::{Deserialize, Serialize};
 
 pub(crate) use self::find::Find;
 use super::counter::CounterLayout;
@@ -59,7 +60,7 @@ impl Plugin for SalvagePlugin {
 ///
 /// It holds a few finds, each with a paper tag that says what the trader
 /// thinks it is and what it costs. Click a find to buy it.
-#[derive(Component, Clone, Debug, PartialEq, Eq)]
+#[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[require(Transform, Visibility)]
 pub(crate) struct SalvageCrate {
     finds: Vec<Find>,
@@ -112,19 +113,23 @@ impl SalvageCrate {
         for old in &crates {
             commands.entity(old).despawn();
         }
-        let Some(salvage) = Self::pack(&run) else {
-            return;
-        };
-        commands.spawn((
+        if let Some(salvage) = Self::pack(&run) {
+            commands.spawn(salvage.on_counter());
+        }
+    }
+
+    /// The crate in its place on the counter.
+    pub(crate) fn on_counter(self) -> impl Bundle {
+        (
             Name::new("salvage crate"),
-            salvage,
+            self,
             CounterLayout::new().place(SPOT, YAW),
             FocusTarget {
                 prompt: "click-crate",
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(Vec3::Y * CRATE_SIZE.y)),
             },
-        ));
+        )
     }
 
     fn on_add(
@@ -312,6 +317,13 @@ impl Buy {
             }
             commands.entity(salvage).despawn();
         }
+    }
+}
+
+#[cfg(test)]
+impl SalvageCrate {
+    pub(crate) fn with_finds(finds: Vec<Find>) -> Self {
+        Self { finds }
     }
 }
 

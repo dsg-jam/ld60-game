@@ -1,7 +1,8 @@
 use bevy::pbr::ScreenSpaceAmbientOcclusionQualityLevel;
+use serde::{Deserialize, Serialize};
 
 /// How much the graphics card has to do for each frame.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum Quality {
     Low,
     Medium,

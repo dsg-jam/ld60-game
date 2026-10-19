@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use super::job::Job;
 use super::run::Origin;
@@ -36,7 +37,8 @@ impl Plugin for ClockPlugin {
 ///
 /// The ringed planet crosses the sky once in each [`CYCLE`]. The landlord
 /// comes for the rent each time it sets.
-#[derive(Resource, Clone, Debug, PartialEq)]
+#[derive(Resource, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(from = "u32", into = "u32")]
 pub(crate) struct Clock {
     /// Ticks since the planet first rose.
     ticks: u32,
@@ -72,6 +74,22 @@ impl Default for Clock {
     }
 }
 
+impl From<u32> for Clock {
+    /// The clock at `ticks`, with the planet shown there.
+    fn from(ticks: u32) -> Self {
+        Self {
+            ticks,
+            shown: ticks as f32,
+        }
+    }
+}
+
+impl From<Clock> for u32 {
+    fn from(clock: Clock) -> Self {
+        clock.ticks
+    }
+}
+
 impl Chore {
     pub(crate) const fn ticks(self) -> u32 {
         match self {
@@ -85,9 +103,14 @@ impl Chore {
 impl Clock {
     /// Moves the clock on by `ticks` and returns how often the planet set.
     pub(crate) fn advance(&mut self, ticks: u32) -> u32 {
-        let before = self.ticks / CYCLE;
+        let before = self.sets();
         self.ticks += ticks;
-        self.ticks / CYCLE - before
+        self.sets() - before
+    }
+
+    /// How often the planet has set since it first rose.
+    pub(crate) fn sets(&self) -> u32 {
+        self.ticks / CYCLE
     }
 
     /// Towards the planet as it is shown. It rises to the right of the shop

@@ -1,10 +1,12 @@
 mod quality;
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use super::list::{Action, Entries, Entry};
 use crate::audio::Mixer;
 use crate::locale::{Localized, Message};
+use crate::store::{Slot, Store};
 
 use self::quality::Quality;
 
@@ -18,7 +20,14 @@ pub(super) struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Settings>()
+        app.init_resource::<Store>();
+        let settings = app
+            .world()
+            .resource::<Store>()
+            .load::<Settings>(Slot::Settings)
+            .map(Settings::checked)
+            .unwrap_or_default();
+        app.insert_resource(settings)
             .add_systems(
                 Update,
                 (
@@ -26,12 +35,13 @@ impl Plugin for SettingsPlugin {
                     SettingValue::show,
                 ),
             )
+            .add_systems(Last, Settings::save.run_if(resource_changed::<Settings>))
             .add_observer(Adjust::apply);
     }
 }
 
 /// What the player set in the settings menu.
-#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Settings {
     /// In tenths of full volume.
     volume: u8,
@@ -99,6 +109,20 @@ impl Settings {
 
     fn apply(settings: Res<Settings>, mut mixer: ResMut<Mixer>) {
         mixer.volume = settings.volume();
+    }
+
+    /// The settings with each value moved into its range, in case the save
+    /// was edited by hand.
+    fn checked(self) -> Self {
+        Self {
+            volume: self.volume.min(VOLUME_STEPS),
+            sensitivity: self.sensitivity.clamp(1, SENSITIVITY_STEPS),
+            ..self
+        }
+    }
+
+    fn save(settings: Res<Settings>, store: Res<Store>) {
+        store.save(Slot::Settings, &*settings);
     }
 
     /// The default settings with the key hints off, for tests.
@@ -216,5 +240,39 @@ impl SettingValue {
         for (value, mut text) in &mut values {
             text.set_if_neq(settings.value(value.0).into());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_change_saves_the_settings() {
+        let mut world = World::new();
+        world.insert_resource(Store::in_temp("settings"));
+        world.init_resource::<Settings>();
+        world.add_observer(Adjust::apply);
+        world.trigger(Adjust {
+            setting: Setting::Quality,
+            step: 1,
+            wrap: true,
+        });
+        world.run_system_cached(Settings::save).unwrap();
+        let saved = world.resource::<Store>().load::<Settings>(Slot::Settings);
+        assert_eq!(saved, Some(*world.resource::<Settings>()));
+        assert_ne!(saved, Some(Settings::default()));
+    }
+
+    #[test]
+    fn out_of_range_settings_are_moved_back() {
+        let settings = Settings {
+            volume: 200,
+            sensitivity: 0,
+            ..Settings::default()
+        }
+        .checked();
+        assert_eq!((settings.volume, settings.sensitivity), (VOLUME_STEPS, 1));
+        assert_eq!(Settings::default().checked(), Settings::default());
     }
 }

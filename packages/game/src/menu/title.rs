@@ -25,7 +25,8 @@ pub(super) const START_ENTRIES: &[(Action, &str)] = &[
     #[cfg(not(target_arch = "wasm32"))]
     (Action::Quit, "menu-quit"),
 ];
-/// The entries of the title screen once the player has started.
+/// The entries of the title screen once the player has started, or when a
+/// saved run waits.
 pub(super) const CONTINUE_ENTRIES: &[(Action, &str)] = &[
     (Action::Start, "menu-continue"),
     (Action::Settings, "menu-settings"),

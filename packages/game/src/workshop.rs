@@ -15,6 +15,7 @@ mod rent;
 mod rug;
 pub(crate) mod run;
 mod salvage;
+mod save;
 mod service;
 pub(crate) mod shop;
 mod ticket;
@@ -73,6 +74,7 @@ impl Plugin for WorkshopPlugin {
             rent::RentPlugin,
             run::RunPlugin,
             salvage::SalvagePlugin,
+            save::SavePlugin,
             tutorial::TutorialPlugin,
         ))
         .add_systems(Startup, spawn_stage);

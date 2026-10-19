@@ -159,7 +159,7 @@ impl Column {
             (_, Page::Entries) => {
                 column.with_child((
                     DespawnOnExit(Page::Entries),
-                    Entries::bundle(if started.0 {
+                    Entries::bundle(if started.0 || run.underway() {
                         title::CONTINUE_ENTRIES
                     } else {
                         title::START_ENTRIES

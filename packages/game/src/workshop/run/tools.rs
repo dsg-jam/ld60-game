@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 /// A program for the shop computer that helps find bugs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) enum ComputerTool {
     /// Runs the complaint of the job against the firmware.
     TestBench,

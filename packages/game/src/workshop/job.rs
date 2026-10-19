@@ -1,3 +1,4 @@
+mod bench;
 mod error;
 
 use std::error::Error;
@@ -7,6 +8,7 @@ use bevy::prelude::*;
 use ld60_levels::{Difficulty, Generated, Level, LevelSource, Variant};
 use ld60_machine::Isa;
 
+pub(crate) use self::bench::Bench;
 pub(crate) use self::error::JobError;
 use super::clock::{Busy, Chore};
 use super::counter::CounterLayout;
@@ -53,6 +55,8 @@ pub(crate) struct Job {
     pub(crate) stamped: bool,
     /// How often the customer handed the device back.
     pub(crate) returns: u32,
+    /// The run as it was when the customer brought the device.
+    brought: Run,
 }
 
 /// Tells one job on the bench from the next, even when both are built from
@@ -114,7 +118,13 @@ impl Job {
             flashed: false,
             stamped: false,
             returns: 0,
+            brought: run.clone(),
         })
+    }
+
+    /// The current job of `run`.
+    pub(crate) fn for_run(run: &Run, levels: &Levels) -> Result<Self, JobError> {
+        Self::new(run.pick(levels), run, levels)
     }
 
     /// The instruction set the firmware of this job is written in.
@@ -138,7 +148,7 @@ impl Job {
         let Some(levels) = levels else {
             return;
         };
-        match Job::new(run.pick(&levels), &run, &levels) {
+        match Job::for_run(&run, &levels) {
             Ok(job) => {
                 commands.insert_resource(job);
                 commands.run_system_cached(Job::spawn_items);
@@ -168,12 +178,14 @@ impl Job {
         }
     }
 
-    /// Puts the first job on the bench once the levels are loaded. Rebuilds
-    /// the current job when the files of its level change.
+    /// Puts the first job on the bench once the levels are loaded, or the
+    /// [`Bench`] of a save. Rebuilds the current job when the files of its
+    /// level change.
     fn follow_levels(
         levels: Res<Levels>,
         run: Res<Run>,
         job: Option<Res<Job>>,
+        bench: Option<Res<Bench>>,
         items: Query<Entity, With<JobItem>>,
         mut started: Local<bool>,
         mut commands: Commands,
@@ -187,7 +199,15 @@ impl Job {
                 _ => return,
             },
         }
-        match Job::new(run.pick(&levels), &run, &levels) {
+        let built = match (&job, bench) {
+            (Some(job), _) => Job::for_run(&job.brought, &levels),
+            (None, Some(bench)) => {
+                commands.remove_resource::<Bench>();
+                bench.reopen(&levels)
+            }
+            (None, None) => Job::for_run(&run, &levels),
+        };
+        match built {
             Ok(job) => {
                 *started = true;
                 for item in &items {
@@ -474,6 +494,19 @@ mod tests {
             assert!(job.level.reward >= 1);
             run.settle(&job, &Pickup::Paid(job.level.reward));
         }
+    }
+
+    #[test]
+    fn a_saved_bench_comes_back_first() {
+        let levels = Levels::on_disk();
+        let mut job = Job::for_run(&Run::default(), &levels).unwrap();
+        job.returns = 2;
+        let mut world = World::new();
+        world.init_resource::<Run>();
+        world.insert_resource(Bench::from(&job));
+        follow(&mut world, levels);
+        assert_eq!(world.resource::<Job>().returns, 2);
+        assert!(!world.contains_resource::<Bench>());
     }
 
     #[test]

@@ -8,6 +8,7 @@ use ld60_devices::{ChipSpec, DeviceKind};
 use ld60_levels::{Catalog, GAME_SEED, LevelSource, Reference};
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
+use serde::{Deserialize, Serialize};
 
 pub(crate) use self::demand::Demand;
 use self::served::Served;
@@ -46,7 +47,7 @@ impl Plugin for RunPlugin {
 }
 
 /// One run of the shop, from opening until the landlord closes it.
-#[derive(Resource, Clone, Debug, PartialEq, Eq)]
+#[derive(Resource, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Run {
     /// Counts the runs since the game started, from 0.
     number: u32,
@@ -70,7 +71,7 @@ pub(crate) struct Run {
 }
 
 /// What the shop did in a run.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Stats {
     /// Jobs the customer paid for.
     pub(crate) fixed: u32,
@@ -139,6 +140,12 @@ impl Run {
             tutorial: false,
             ..Self::default()
         }
+    }
+
+    /// Whether the shop has served anyone yet, so the title screen offers
+    /// to continue.
+    pub(crate) fn underway(&self) -> bool {
+        self.job > 0 || self.number > 0
     }
 
     pub(crate) fn till(&self) -> u32 {
@@ -402,6 +409,15 @@ mod tests {
                 number: 0
             }
         );
+    }
+
+    #[test]
+    fn a_run_is_underway_after_the_first_job() {
+        let mut run = Run::default();
+        assert!(!run.underway());
+        run.settle(&job(&run), &Pickup::Paid(4));
+        assert!(run.underway());
+        assert!(Run::default().next().underway());
     }
 
     #[test]
