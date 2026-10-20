@@ -62,6 +62,12 @@ pub(crate) enum Icon {
     MouseRight,
     Escape,
     Wheel,
+    /// Moving the mouse.
+    Move,
+    /// The left and right arrow keys.
+    ArrowsSideways,
+    /// The up and down arrow keys.
+    ArrowsUpDown,
 }
 
 #[derive(Resource, Debug)]
@@ -113,6 +119,8 @@ pub(crate) enum Input {
     Chord(&'static str, Icon),
     /// A key held while pressing another.
     Shortcut(&'static str, &'static str),
+    /// Moving the mouse with the left button held.
+    Drag,
 }
 
 /// Holds the rows of the [`Hints`].
@@ -148,15 +156,19 @@ impl Icon {
             Self::MouseRight => "\u{e0f0}",
             Self::Escape => "\u{e063}",
             Self::Wheel => "\u{e0f8}",
+            Self::Move => "\u{e0ed}",
+            Self::ArrowsSideways => "\u{e02a}",
+            Self::ArrowsUpDown => "\u{e033}",
         }
     }
 
     /// The outline alone. Drawn over [`Icon::glyph`], it leaves only the
-    /// button or the wheel in the accent color.
+    /// button, the wheel or the arrow keys in the accent color.
     const fn outline(self) -> Option<&'static str> {
         match self {
             Self::MouseLeft | Self::MouseRight | Self::Wheel => Some("\u{e0ee}"),
-            Self::Escape => None,
+            Self::ArrowsSideways | Self::ArrowsUpDown => Some("\u{e02d}"),
+            Self::Escape | Self::Move => None,
         }
     }
 
@@ -208,6 +220,7 @@ impl BackHint {
                 Node {
                     position_type: PositionType::Absolute,
                     left: px(CORNER),
+                    right: px(CORNER),
                     bottom: px(CORNER),
                     align_items: AlignItems::Center,
                     column_gap: px(GAP),
@@ -250,10 +263,14 @@ impl BackHint {
                         (KeyHintPart::Action, Caption, Localized::verbatim("")),
                     ],
                 ));
+                // Wraps onto more lines when the window is too narrow.
                 hint.spawn((
                     HintList,
                     Node {
                         align_items: AlignItems::Center,
+                        flex_wrap: FlexWrap::Wrap,
+                        min_width: px(0),
+                        row_gap: px(GAP),
                         ..default()
                     },
                     Pickable::IGNORE,
@@ -375,6 +392,11 @@ impl Hint {
                             row.spawn(key_cap(Localized::verbatim(held)));
                             row.spawn((Caption, Localized::verbatim("+")));
                             row.spawn(key_cap(Localized::verbatim(key)));
+                        }
+                        Input::Drag => {
+                            Icon::MouseLeft.spawn(row, font);
+                            row.spawn((Caption, Localized::verbatim("+")));
+                            Icon::Move.spawn(row, font);
                         }
                     }
                 }

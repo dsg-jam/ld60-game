@@ -1,3 +1,4 @@
+mod hints;
 mod leaf;
 mod press;
 mod sheet;
@@ -73,6 +74,7 @@ impl Plugin for PaperPlugin {
                     Paper::flip_on_scroll,
                     Paper::show_current,
                     Paper::show_turn_hint,
+                    Paper::show_page_hints,
                     Leaf::animate,
                 )
                     .chain(),

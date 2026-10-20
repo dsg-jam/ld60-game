@@ -14,9 +14,11 @@ pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::name::{BoardLetter, DeviceName};
 pub(crate) use self::silhouette::Silhouette;
+use crate::locale::Message;
 use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
+use crate::player::hints::{Hint, Hints, Icon, Input};
 use crate::player::zoom::Zoom;
 
 /// How far a held device lifts off the counter.
@@ -108,6 +110,16 @@ impl Holdable {
                 view: View::World(Transform::IDENTITY),
             },
             Zoom::ahead(ZOOM, ZOOM_STEPS),
+            Hints(vec![
+                Hint {
+                    inputs: vec![Input::Icon(Icon::MouseLeft)],
+                    action: Message::new("hint-press-keys"),
+                },
+                Hint {
+                    inputs: vec![Input::Drag],
+                    action: Message::new("hint-turn-device"),
+                },
+            ]),
         ));
     }
 

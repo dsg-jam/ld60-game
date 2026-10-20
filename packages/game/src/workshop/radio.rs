@@ -8,12 +8,14 @@ use self::front::Front;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
+use crate::locale::Message;
 use crate::parts::dot_matrix::DotMatrix;
 use crate::parts::gauge::Gauge;
 use crate::parts::knob::Knob;
 use crate::parts::latch_button::LatchButton;
-use crate::player::focus::{Focus, FocusTarget, Focused, View};
+use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 use crate::player::free_look::MODIFIERS;
+use crate::player::hints::{Hint, Hints, Icon, Input};
 use crate::player::zoom::Zoom;
 
 pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
@@ -46,7 +48,10 @@ pub(crate) struct RadioPlugin;
 impl Plugin for RadioPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(broadcast::BroadcastPlugin)
-            .add_systems(Update, (Radio::follow_controls, Radio::show).chain())
+            .add_systems(
+                Update,
+                (Radio::follow_controls, Radio::show, Radio::arm_controls).chain(),
+            )
             .add_observer(Radio::on_add)
             .add_observer(Radio::scroll_volume);
     }
@@ -129,7 +134,13 @@ impl Radio {
                     Transform::from_translation(VIEW).looking_at(Vec3::Y * CASE.y / 2.0, Vec3::Y),
                 ),
             })
-            .insert(Zoom::ahead(ZOOM, ZOOM_STEPS))
+            .insert((
+                Zoom::ahead(ZOOM, ZOOM_STEPS),
+                Hints(vec![Hint {
+                    inputs: vec![Input::Icon(Icon::Wheel)],
+                    action: Message::new("hint-volume"),
+                }]),
+            ))
             .with_children(|parent| {
                 parent.spawn((Shape::cuboid(&case, WOOD), Finish::Wood));
                 front.spawn_panel(parent, &mut meshes, &mut surfaces);
@@ -181,6 +192,36 @@ impl Radio {
         for &child in children {
             if let Ok((Control::Volume, mut knob)) = knobs.get_mut(child) {
                 knob.wheel(scroll.unit, scroll.y, &mut commands);
+            }
+        }
+    }
+
+    /// The controls of the focused radio say what a click does.
+    fn arm_controls(
+        focused: Res<Focused>,
+        radios: Query<(Entity, &Radio, &Children)>,
+        controls: Query<(&Control, Option<&Clickable>)>,
+        mut commands: Commands,
+    ) {
+        for (entity, radio, children) in &radios {
+            let near = focused.get() == Some(entity);
+            for &child in children {
+                let Ok((control, clickable)) = controls.get(child) else {
+                    continue;
+                };
+                let prompt = near.then_some(match control {
+                    Control::Power if radio.on => "click-radio-off",
+                    Control::Power => "click-radio-on",
+                    Control::Volume => "click-volume",
+                    Control::Tuning => "click-tune",
+                });
+                if clickable.map(|clickable| clickable.prompt) == prompt {
+                    continue;
+                }
+                match prompt {
+                    Some(prompt) => commands.entity(child).insert(Clickable { prompt }),
+                    None => commands.entity(child).remove::<Clickable>(),
+                };
             }
         }
     }
@@ -246,3 +287,22 @@ impl Radio {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locale::Locale;
+
+    #[test]
+    fn every_hint_formats() {
+        Locale::on_disk().assert_formats(
+            [
+                "hint-volume",
+                "click-radio-off",
+                "click-radio-on",
+                "click-volume",
+                "click-tune",
+            ]
+            .map(Message::new),
+        );
+    }
+}

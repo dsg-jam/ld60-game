@@ -161,8 +161,12 @@ impl ShopManuals {
             Lying(lying),
             Hints(vec![
                 Hint {
-                    inputs: vec![Input::Icon(Icon::Wheel)],
+                    inputs: vec![Input::Icon(Icon::Wheel), Input::Icon(Icon::ArrowsSideways)],
                     action: Message::new("hint-turn-pages"),
+                },
+                Hint {
+                    inputs: vec![Input::Icon(Icon::ArrowsUpDown)],
+                    action: Message::new("hint-next-entry"),
                 },
                 Hint {
                     inputs: vec![Input::Key("Home")],
