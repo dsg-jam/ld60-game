@@ -94,6 +94,7 @@ impl Entries {
     fn node() -> Node {
         Node {
             flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Start,
             row_gap: px(ENTRY_GAP),
             ..default()
         }
