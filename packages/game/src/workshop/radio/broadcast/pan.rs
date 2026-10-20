@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::f32::consts::{FRAC_PI_4, TAU};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -39,6 +40,8 @@ impl Plugin for PanPlugin {
 pub(super) struct Panned {
     source: AudioSource,
     pan: Pan,
+    /// Where in the source it starts.
+    start: Duration,
 }
 
 /// What each ear hears of a [`Panned`] sound, on the entity it comes from.
@@ -60,7 +63,16 @@ struct Listener;
 impl Panned {
     /// `source` coming from where the entity with `pan` is.
     pub(super) fn new(source: AudioSource, pan: Pan) -> Self {
-        Self { source, pan }
+        Self {
+            source,
+            pan,
+            start: Duration::ZERO,
+        }
+    }
+
+    /// Starts `start` into the source.
+    pub(super) fn from(self, start: Duration) -> Self {
+        Self { start, ..self }
     }
 }
 
@@ -121,7 +133,12 @@ impl Decodable for Panned {
     type Decoder = Stereo;
 
     fn decoder(&self) -> Self::Decoder {
-        let inner = self.source.decoder();
+        let mut inner = self.source.decoder();
+        if !self.start.is_zero()
+            && let Err(err) = inner.try_seek(self.start)
+        {
+            warn!(error = &err as &dyn Error, "radio music does not seek");
+        }
         let rate = inner.sample_rate().get() as f32;
         let pan = &self.pan;
         Stereo {

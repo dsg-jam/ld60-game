@@ -1,26 +1,39 @@
 mod pan;
+mod program;
 
 use std::error::Error;
+use std::time::Duration;
 
 use bevy::{asset::LoadState, audio::Volume, prelude::*};
 
 use self::pan::{Pan, Panned};
+use self::program::OnAir;
 use super::{Front, Radio};
 use crate::audio::{Mixer, Sound, Takes};
 
 /// Station n starts with track n and plays on through the ones after it.
 pub(super) const TRACKS: [Track; 11] = [
-    Track::new("stargazer-01-synthetic", ESCP, "Synthetic"),
-    Track::new("nostalgia", "GLORYTOTHEMACHINE", "NOSTALGIA"),
-    Track::new("stargazer-02-open-space", ESCP, "Open Space"),
-    Track::new("stargazer-03-flying-home", ESCP, "Flying Home"),
-    Track::new("exploration-theme", "Cleyton Kauffman", "Exploration Theme"),
-    Track::new("stargazer-04-sunset", ESCP, "Sunset"),
-    Track::new("popi", ZENTAZY, "Popi"),
-    Track::new("stargazer-05-stargazer", ESCP, "Stargazer"),
-    Track::new("stargazer-06-above-the-clouds", ESCP, "Above The Clouds"),
-    Track::new("bobi-bob", ZENTAZY, "Bobi Bob"),
-    Track::new("stargazer-07-in-love", ESCP, "In Love"),
+    Track::new("stargazer-01-synthetic", ESCP, "Synthetic", 240.6),
+    Track::new("nostalgia", "GLORYTOTHEMACHINE", "NOSTALGIA", 183.0),
+    Track::new("stargazer-02-open-space", ESCP, "Open Space", 238.6),
+    Track::new("stargazer-03-flying-home", ESCP, "Flying Home", 273.6),
+    Track::new(
+        "exploration-theme",
+        "Cleyton Kauffman",
+        "Exploration Theme",
+        134.4,
+    ),
+    Track::new("stargazer-04-sunset", ESCP, "Sunset", 270.1),
+    Track::new("popi", ZENTAZY, "Popi", 214.0),
+    Track::new("stargazer-05-stargazer", ESCP, "Stargazer", 343.3),
+    Track::new(
+        "stargazer-06-above-the-clouds",
+        ESCP,
+        "Above The Clouds",
+        373.0,
+    ),
+    Track::new("bobi-bob", ZENTAZY, "Bobi Bob", 152.1),
+    Track::new("stargazer-07-in-love", ESCP, "In Love", 275.0),
 ];
 const ESCP: &str = "e s c p";
 const ZENTAZY: &str = "Zentazy";
@@ -33,6 +46,8 @@ pub(super) struct Track {
     file: &'static str,
     pub(super) artist: &'static str,
     pub(super) title: &'static str,
+    /// In seconds.
+    length: f32,
 }
 
 pub(super) struct BroadcastPlugin;
@@ -60,16 +75,19 @@ pub(super) enum Tuner {
     Pause {
         station: usize,
         track: usize,
-        until: f32,
+        /// On the broadcast clock.
+        until: f64,
     },
 }
 
 /// The music coming out of a [`Radio`]'s speaker. It starts once the
-/// track has loaded.
+/// track has loaded, at the point the station has reached by then.
 #[derive(Component, Debug)]
 #[require(Pan)]
 struct Broadcast {
     music: Handle<AudioSource>,
+    station: usize,
+    track: usize,
 }
 
 /// The sound of a radio between two stations, while tuning.
@@ -90,20 +108,13 @@ impl Tuner {
         }
     }
 
-    fn station(&self) -> Option<usize> {
-        match *self {
-            Self::Idle => None,
-            Self::Playing { station, .. } | Self::Pause { station, .. } => Some(station),
-        }
-    }
-
-    /// Starts the first track, pauses and moves on when one ends, and
-    /// switches over with some static when the player tunes in to another
-    /// station.
+    /// Tunes in to what the station has on air, and follows its program
+    /// when a track ends. A turn to another station comes with some
+    /// static.
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn tune(
         mut commands: Commands,
-        time: Res<Time>,
+        time: Res<Time<Real>>,
         mixer: Res<Mixer>,
         assets: Res<AssetServer>,
         mut statics: ResMut<StaticTakes>,
@@ -112,68 +123,87 @@ impl Tuner {
         broadcasts: Query<(), With<Broadcast>>,
         playing_static: Query<(), With<Static>>,
     ) {
-        let now = time.elapsed_secs();
+        let clock = time.elapsed_secs_f64();
         for (entity, radio, mut tuner, children) in &mut radios {
+            let station = radio.station;
             let playing = children
                 .into_iter()
                 .flatten()
                 .copied()
                 .find(|&child| broadcasts.contains(child));
-            let track = if tuner
-                .station()
-                .is_some_and(|station| station != radio.station)
-            {
-                // Quick turns of the knob don't pile up the static.
-                let old = children.into_iter().flatten().copied();
-                for child in old
-                    .filter(|&child| playing_static.contains(child))
-                    .chain(playing)
+            let next = match *tuner {
+                Self::Idle => Self::on_air(station, clock),
+                Self::Playing { station: was, .. } | Self::Pause { station: was, .. }
+                    if was != station =>
                 {
-                    commands.entity(child).despawn();
+                    // Quick turns of the knob don't pile up the static.
+                    let old = children.into_iter().flatten().copied();
+                    for child in old
+                        .filter(|&child| playing_static.contains(child))
+                        .chain(playing)
+                    {
+                        commands.entity(child).despawn();
+                    }
+                    if radio.on {
+                        let pan = Pan::default();
+                        commands.entity(entity).with_child((
+                            Static,
+                            AudioPlayer(
+                                panned.add(Panned::new(statics.0.next().clone(), pan.clone())),
+                            ),
+                            PlaybackSettings::DESPAWN
+                                .with_volume(Volume::Linear(Static::gain(radio) * mixer.gain())),
+                            pan,
+                            Radio::speaker(),
+                        ));
+                    }
+                    Self::on_air(station, clock)
                 }
-                if radio.on {
-                    let pan = Pan::default();
-                    commands.entity(entity).with_child((
-                        Static,
-                        AudioPlayer(panned.add(Panned::new(statics.0.next().clone(), pan.clone()))),
-                        PlaybackSettings::DESPAWN
-                            .with_volume(Volume::Linear(Static::gain(radio) * mixer.gain())),
-                        pan,
-                        Radio::speaker(),
-                    ));
-                }
-                radio.station
-            } else {
-                match *tuner {
-                    Self::Idle => radio.station,
-                    Self::Playing { track, .. } => {
-                        if playing.is_none() {
-                            *tuner = Self::Pause {
-                                station: radio.station,
-                                track: (track + 1) % TRACKS.len(),
-                                until: now + PAUSE,
-                            };
-                        }
+                Self::Playing { track, .. } => {
+                    if playing.is_some() {
                         continue;
                     }
-                    Self::Pause { track, until, .. } => {
-                        if now < until {
-                            continue;
-                        }
-                        track
+                    match OnAir::at(station, clock) {
+                        // Ended a little early, so the rest of its slot is
+                        // part of the pause.
+                        OnAir::Track { track: on, at } if on == track => Self::Pause {
+                            station,
+                            track: (track + 1) % TRACKS.len(),
+                            until: clock + f64::from(TRACKS[track].length - at + PAUSE),
+                        },
+                        _ => Self::on_air(station, clock),
                     }
                 }
+                Self::Pause { track, until, .. } => {
+                    if clock < until {
+                        continue;
+                    }
+                    Self::Playing { station, track }
+                }
             };
-            *tuner = Self::Playing {
-                station: radio.station,
-                track,
-            };
-            commands.entity(entity).with_child((
-                Broadcast {
-                    music: assets.load(TRACKS[track].path()),
-                },
-                Radio::speaker(),
-            ));
+            if let Self::Playing { track, .. } = next {
+                commands.entity(entity).with_child((
+                    Broadcast {
+                        music: assets.load(TRACKS[track].path()),
+                        station,
+                        track,
+                    },
+                    Radio::speaker(),
+                ));
+            }
+            *tuner = next;
+        }
+    }
+
+    /// What `station` has on air at `clock`.
+    fn on_air(station: usize, clock: f64) -> Self {
+        match OnAir::at(station, clock) {
+            OnAir::Track { track, .. } => Self::Playing { station, track },
+            OnAir::Pause { next, left } => Self::Pause {
+                station,
+                track: next,
+                until: clock + f64::from(left),
+            },
         }
     }
 }
@@ -181,8 +211,10 @@ impl Tuner {
 impl Broadcast {
     /// Plays the music once it has loaded. Music that doesn't load ends
     /// right away.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn start(
         mut commands: Commands,
+        time: Res<Time<Real>>,
         assets: Res<AssetServer>,
         mixer: Res<Mixer>,
         sources: Res<Assets<AudioSource>>,
@@ -201,8 +233,14 @@ impl Broadcast {
             else {
                 continue;
             };
+            let start = match OnAir::at(broadcast.station, time.elapsed_secs_f64()) {
+                OnAir::Track { track, at } if track == broadcast.track => at,
+                _ => 0.0,
+            };
+            let music =
+                Panned::new(music.clone(), pan.clone()).from(Duration::from_secs_f32(start));
             commands.entity(entity).insert((
-                AudioPlayer(panned.add(Panned::new(music.clone(), pan.clone()))),
+                AudioPlayer(panned.add(music)),
                 PlaybackSettings::DESPAWN.with_volume(Volume::Linear(radio.gain() * mixer.gain())),
             ));
         }
@@ -235,11 +273,17 @@ impl Static {
 }
 
 impl Track {
-    const fn new(file: &'static str, artist: &'static str, title: &'static str) -> Self {
+    const fn new(
+        file: &'static str,
+        artist: &'static str,
+        title: &'static str,
+        length: f32,
+    ) -> Self {
         Self {
             file,
             artist,
             title,
+            length,
         }
     }
 
