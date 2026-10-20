@@ -329,7 +329,7 @@ impl SheetMoves {
                         Pickable::IGNORE,
                     ))
                     .id();
-                commands.trigger(PlayAt(Sound::PageTurn, from.translation));
+                commands.trigger(PlayAt(Sound::PageSlide, from.translation));
                 flight.flyer = Some(Flyer {
                     entity,
                     mesh,
@@ -380,7 +380,7 @@ impl SheetMoves {
                     .entity(flyer.entity)
                     .insert(MeshMaterial3d(flyer.paper[side].clone()));
                 if !flight.pin {
-                    commands.trigger(PlayAt(Sound::PageTurn, pose_at.translation));
+                    commands.trigger(PlayAt(Sound::PageSlide, pose_at.translation));
                 }
             }
             if !flight.arrived && flight.elapsed >= flight.arrive() {

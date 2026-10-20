@@ -72,6 +72,9 @@ pub(crate) enum Sound {
     PageTurn,
     /// A divider of card turning over, stiffer and slower than a page.
     DividerTurn,
+    /// A page of the manuals file sliding off or onto its rings, quieter
+    /// than a turn.
+    PageSlide,
     /// The lever of the manuals file opening its rings.
     RingsOpen,
     /// The rings of the manuals file snapping shut.
@@ -95,7 +98,7 @@ pub(crate) enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 15] = [
+    const ALL: [Self; 16] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
@@ -109,6 +112,7 @@ impl Sound {
         Self::KeyUp,
         Self::PageTurn,
         Self::DividerTurn,
+        Self::PageSlide,
         Self::RingsOpen,
         Self::RingsShut,
     ];
@@ -134,6 +138,7 @@ impl Sound {
             | Self::Static
             | Self::PageTurn
             | Self::DividerTurn
+            | Self::PageSlide
             | Self::RingsOpen
             | Self::RingsShut
             | Self::Drip
@@ -164,6 +169,7 @@ impl Sound {
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
             Self::DividerTurn => Samples::divider_turn(take),
+            Self::PageSlide => Samples::page_turn(take + TAKES),
             Self::RingsOpen => Samples::rings_open(take),
             Self::RingsShut => Samples::rings_shut(take),
             Self::AsphaltRain => Samples::asphalt_rain(take),
@@ -190,7 +196,8 @@ impl Sound {
             Self::KeyUp => 0.1,
             Self::PageTurn => 0.29,
             Self::DividerTurn => 0.35,
-            Self::RingsOpen | Self::RingsShut => 0.35,
+            Self::PageSlide => 0.18,
+            Self::RingsOpen | Self::RingsShut => 0.24,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,
