@@ -28,7 +28,7 @@ const RENT: u32 = 6;
 /// How much more the landlord takes each time after that.
 const RENT_RISE: u32 = 6;
 /// A special job that can come takes one in this many jobs.
-const SPECIAL_ODDS: u32 = 3;
+const SPECIAL_ODDS: u32 = 2;
 /// Keeps the seeds of one run away from those of the next.
 const RUN_SEEDS: u64 = 1 << 32;
 /// The same board comes at most this many jobs in a row.
