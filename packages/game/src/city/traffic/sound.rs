@@ -32,7 +32,7 @@ const KEEP: f32 = 1.1;
 /// Flying cars fade in over this many meters at the edge of their range.
 const SKY_EDGE: f32 = 60.0;
 const CAR_VOLUME: f32 = 0.019;
-const SKY_VOLUME: f32 = 0.009;
+const SKY_VOLUME: f32 = 0.016;
 /// Millimeters of water on a soaked road.
 const FILM: f32 = 1.0;
 /// Millimeters of water in a puddle per unit [`Wet::puddle`] is above its
