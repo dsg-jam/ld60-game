@@ -15,6 +15,8 @@ use crate::player::camera::PlayerCamera;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
+/// Seconds for the sound to fade into the duck of a menu, and back out.
+const DUCK_TIME: f32 = 0.7;
 /// Seconds for the sounds of the world to fade out when its time stops, and
 /// back in when it goes on.
 pub(crate) const HUSH: f32 = 0.08;
@@ -205,6 +207,8 @@ pub(crate) struct Mixer {
     pub(crate) volume: f32,
     /// Quieter while a menu is open.
     ducked: bool,
+    /// How far the sound has faded into the duck, from 0 to 1.
+    duck: f32,
     /// How much of the world is heard, from 0 while its time stands still
     /// to 1.
     world: f32,
@@ -225,6 +229,7 @@ impl Default for Mixer {
             volume: 1.0,
             // The game starts on the title screen.
             ducked: true,
+            duck: 1.0,
             world: 1.0,
         }
     }
@@ -233,11 +238,13 @@ impl Default for Mixer {
 impl Mixer {
     /// What every sound is multiplied by.
     pub(crate) fn gain(&self) -> f32 {
-        if self.ducked {
-            self.volume * DUCKED
-        } else {
-            self.volume
-        }
+        self.volume * Self::ducking(self.duck)
+    }
+
+    /// The factor of a duck `duck` of the way in. It fades evenly in
+    /// decibels.
+    fn ducking(duck: f32) -> f32 {
+        DUCKED.powf(EaseFunction::SmoothStep.sample_clamped(duck))
     }
 
     pub(crate) fn duck<const ON: bool>(mut mixer: ResMut<Mixer>) {
@@ -263,13 +270,21 @@ impl Mixer {
             mixer.world += (target - mixer.world).clamp(-step, step);
         }
     }
+
+    fn follow_duck(time: Res<Time<Real>>, mut mixer: ResMut<Mixer>) {
+        let target = if mixer.ducked { 1.0 } else { 0.0 };
+        if mixer.duck != target {
+            let step = time.delta_secs() / DUCK_TIME;
+            mixer.duck += (target - mixer.duck).clamp(-step, step);
+        }
+    }
 }
 
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
-            .add_systems(PreUpdate, Mixer::follow_time)
+            .add_systems(PreUpdate, (Mixer::follow_time, Mixer::follow_duck))
             .add_systems(
                 Update,
                 (
@@ -485,4 +500,17 @@ fn listen(add: On<Add<PlayerCamera>>, mut commands: Commands) {
         left_ear_offset: right_ear_offset,
         right_ear_offset: left_ear_offset,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_duck_fades_evenly_between_full_and_ducked() {
+        assert_eq!(Mixer::ducking(0.0), 1.0);
+        assert!((Mixer::ducking(1.0) - DUCKED).abs() < 1e-6);
+        let steps: Vec<f32> = (0..=10).map(|i| Mixer::ducking(i as f32 / 10.0)).collect();
+        assert!(steps.windows(2).all(|pair| pair[1] < pair[0]), "{steps:?}");
+    }
 }
