@@ -278,7 +278,7 @@ impl Radio {
                 }
                 if let Ok(mut screen) = screens.get_mut(child) {
                     if let Some(track) = tuner.track().map(|track| &TRACKS[track]) {
-                        screen.set_pages(&[track.artist, track.title]);
+                        screen.set_pages(&[track.title, track.artist]);
                     }
                     screen.lit = radio.on;
                 }
