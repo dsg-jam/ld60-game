@@ -63,8 +63,9 @@ impl Shop {
             cabinet,
             rug,
         } = ShopLayout::new();
-        let (min, max) = (room.min(), room.max());
-        let floor = Block::between(min.with_z(FRONT + PILLAR.y), max.with_y(PLATFORM));
+        // Behind the pillars and the shutter, so no face shares their front.
+        let (min, max) = (room.min().with_z(FRONT + PILLAR.y), room.max());
+        let floor = Block::between(min, max.with_y(PLATFORM));
         let ceiling = Block::between(min.with_y(max.y - WALL), max);
         let left = Block::between(min, max.with_x(min.x + WALL));
         let right = Block::between(min.with_x(max.x - WALL), max);
