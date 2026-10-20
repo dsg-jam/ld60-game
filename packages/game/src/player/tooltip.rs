@@ -66,7 +66,7 @@ impl Tooltip {
         mut caption: Single<&mut Localized, With<TooltipCaption>>,
     ) {
         let (mut node, mut visibility) = tooltip.into_inner();
-        let message = (gaze.focused() && settings.hints())
+        let message = (gaze.focused() && !gaze.free_looking() && settings.hints())
             .then(|| {
                 click.0.clone().or_else(|| {
                     focus::under_mouse(&hovers, &parents)

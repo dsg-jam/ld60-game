@@ -11,8 +11,10 @@ use bevy::{
     prelude::*,
 };
 
-use super::focus::{Aside, CloseUp, FocusTarget, Focused, View};
+use super::focus::{Aside, FocusTarget, Focused};
+use super::free_look::FreeLook;
 use super::look::LookAngles;
+use super::zoom::Zoom;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::menu::{AppState, Settings};
@@ -55,6 +57,7 @@ impl Plugin for CameraPlugin {
                     PlayerCamera::follow
                         .after(Focused::leave_on_input)
                         .after(LookAngles::update)
+                        .after(FreeLook::update)
                         .run_if(not(in_state(AppState::Title))),
                     PlayerCamera::match_quality.run_if(
                         resource_changed::<Settings>
@@ -155,10 +158,11 @@ impl PlayerCamera {
         time: Res<Time>,
         focused: Res<Focused>,
         angles: Res<LookAngles>,
+        free_look: Res<FreeLook>,
         targets: Query<(
             &FocusTarget,
             Option<&Aside>,
-            Option<&CloseUp>,
+            Option<&Zoom>,
             &GlobalTransform,
         )>,
         camera: Single<(&mut PlayerCamera, &mut Transform)>,
@@ -167,16 +171,15 @@ impl PlayerCamera {
         let focus_view = focused
             .get()
             .and_then(|entity| targets.get(entity).ok())
-            .map(|(target, aside, close_up, global)| {
-                let aside = aside.filter(|aside| aside.open).map(|aside| aside.view);
-                let close_up = close_up
-                    .filter(|close_up| close_up.open)
-                    .map(|close_up| close_up.view);
-                let view = aside.or(close_up).map_or(target.view, View::Local);
-                match view {
-                    View::Local(view) => global.mul_transform(view).compute_transform(),
-                    View::World(view) => view,
-                }
+            .map(|(target, aside, zoom, global)| {
+                let view = match aside.filter(|aside| aside.open) {
+                    Some(aside) => global.mul_transform(aside.view).compute_transform(),
+                    None => {
+                        let view = target.view.resolve(global);
+                        zoom.map_or(view, |zoom| zoom.apply(view, global))
+                    }
+                };
+                free_look.turn(view)
             });
         let (goal, decay_rate) = match focus_view {
             Some(view) => (view, DECAY_RATE),
@@ -209,9 +212,14 @@ impl PlayerCamera {
         transform
             .translation
             .smooth_nudge(&goal.translation, decay_rate, dt);
+        let turn_rate = if free_look.looking() {
+            LOOK_DECAY_RATE
+        } else {
+            decay_rate
+        };
         transform
             .rotation
-            .smooth_nudge(&goal.rotation, decay_rate, dt);
+            .smooth_nudge(&goal.rotation, turn_rate, dt);
     }
 }
 

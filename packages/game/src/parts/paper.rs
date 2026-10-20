@@ -27,7 +27,9 @@ use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{self, Focus, Focused};
+use crate::player::free_look::MODIFIERS;
 use crate::player::hints::ClickHint;
+use crate::player::zoom::Zoom;
 
 pub(crate) const PAPER: Color = Color::srgb_u8(0xf2, 0xec, 0xdc);
 pub(crate) const INK: Color = Color::srgb_u8(0x2a, 0x26, 0x22);
@@ -50,6 +52,8 @@ const SCROLL_PIXELS: f32 = 40.0;
 const SCROLL_PAUSE: f32 = 0.15;
 /// Camera height above a sheet while reading it.
 const READING_HEIGHT: f32 = 0.3;
+/// How far the player leans in on a sheet in the reading view, in meters.
+pub(crate) const READING_ZOOM: Zoom = Zoom::ahead(0.14, 2);
 /// Matte paper reflects little light off its surface, so the print stays
 /// dark under the lamp.
 pub(crate) const PAPER_REFLECTANCE: f32 = 0.1;
@@ -362,9 +366,11 @@ impl Paper {
     }
 
     /// Each notch of a wheel turns one page. A trackpad swipe turns one page
-    /// once it has gone [`SCROLL_PIXELS`], however long it goes on.
+    /// once it has gone [`SCROLL_PIXELS`], however long it goes on. The wheel
+    /// with Ctrl zooms instead.
     fn flip_on_scroll(
         mut wheel: MessageReader<MouseWheel>,
+        keys: Res<ButtonInput<KeyCode>>,
         time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
@@ -373,7 +379,11 @@ impl Paper {
     ) {
         let now = time.elapsed_secs();
         let mut turns = 0;
+        let zooming = keys.any_pressed(MODIFIERS);
         for event in wheel.read() {
+            if zooming {
+                continue;
+            }
             match event.unit {
                 MouseScrollUnit::Line => turns -= event.y.signum() as i32,
                 MouseScrollUnit::Pixel => {

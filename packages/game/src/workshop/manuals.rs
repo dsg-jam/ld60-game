@@ -25,7 +25,9 @@ use super::job::{Job, JobId};
 use super::run::Run;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
-use crate::parts::paper::{Binding, Leaf, LeafShape, PAPER, Paper, ShowsOwnPages, Wrinkles};
+use crate::parts::paper::{
+    Binding, Leaf, LeafShape, PAPER, Paper, READING_ZOOM, ShowsOwnPages, Wrinkles,
+};
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use crate::player::hints::{Hint, Hints, Icon, Input, KeyHint};
@@ -155,6 +157,7 @@ impl ShopManuals {
                 focus: Focus::Paper,
                 view: View::Local(lying.mul_transform(Parts::reading_view())),
             },
+            READING_ZOOM,
             Lying(lying),
             Hints(vec![
                 Hint {

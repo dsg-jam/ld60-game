@@ -60,14 +60,14 @@ impl Monitor {
         }
     }
 
-    /// Spawns the monitor. `glass` is the screen surface, placed onto the
-    /// glass bounds.
+    /// Spawns the monitor and returns it. `glass` is the screen surface,
+    /// placed onto the glass bounds.
     pub(super) fn spawn(
         &self,
         parent: &mut ChildSpawnerCommands,
         transform: Transform,
         glass: impl Bundle,
-    ) {
+    ) -> Entity {
         parent
             .spawn((Name::new("monitor"), transform, Visibility::default()))
             .with_children(|monitor| {
@@ -78,6 +78,7 @@ impl Monitor {
                     monitor.spawn((Shape::cuboid(bar, CASE_DARK), Finish::Plastic));
                 }
                 monitor.spawn((glass, self.glass.transform()));
-            });
+            })
+            .id()
     }
 }

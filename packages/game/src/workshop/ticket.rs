@@ -10,7 +10,7 @@ use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{Binding, Paper};
+use crate::parts::paper::{Binding, Paper, READING_ZOOM};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
 
@@ -126,6 +126,7 @@ impl JobTicket {
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(sheet_center)),
             },
+            READING_ZOOM,
         ));
     }
 

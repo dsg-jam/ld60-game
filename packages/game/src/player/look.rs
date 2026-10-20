@@ -13,10 +13,10 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use super::{camera::PlayerCamera, focus::Focus};
+use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook};
 use crate::menu::{AppState, Settings};
 
-const SENSITIVITY: f32 = 0.0025;
+pub(super) const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.
 const MAX_PITCH: f32 = 1.5;
 
@@ -26,7 +26,12 @@ impl Plugin for LookPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LookAngles>()
             .init_resource::<CursorLock>()
-            .add_systems(Update, (LookAngles::update, update_cursor).chain())
+            .add_systems(
+                Update,
+                (LookAngles::update, update_cursor)
+                    .chain()
+                    .after(FreeLook::update),
+            )
             .add_systems(
                 First,
                 (
@@ -139,6 +144,7 @@ pub(super) struct Gaze<'w> {
     app_state: Res<'w, State<AppState>>,
     focus: Res<'w, State<Focus>>,
     lock: Res<'w, CursorLock>,
+    free_look: Res<'w, FreeLook>,
 }
 
 impl Gaze<'_> {
@@ -147,9 +153,21 @@ impl Gaze<'_> {
         self.playing() && *self.focus.get() == Focus::Desk && self.lock.locked
     }
 
-    /// Focused on something, with the cursor free.
+    /// Focused on something, with the cursor free unless
+    /// [`Gaze::free_looking`].
     pub(super) fn focused(&self) -> bool {
         self.playing() && *self.focus.get() != Focus::Desk
+    }
+
+    /// Turning the head with the mouse while focused.
+    pub(super) fn free_looking(&self) -> bool {
+        self.focused() && self.free_look.looking() && self.lock.locked
+    }
+
+    /// Looking around in the desk view or while focused, with the crosshair
+    /// in the middle.
+    pub(super) fn steering(&self) -> bool {
+        self.looking_around() || self.free_looking()
     }
 
     fn playing(&self) -> bool {
@@ -157,7 +175,8 @@ impl Gaze<'_> {
     }
 }
 
-/// Locks the cursor while looking around and frees it otherwise.
+/// Locks the cursor while looking around, in the desk view or with
+/// [`FreeLook`], and frees it otherwise.
 ///
 /// Browsers only allow the lock after a click, so a click in the desk view
 /// locks it again. Until a browser grants the lock, the pointer stays
@@ -165,15 +184,20 @@ impl Gaze<'_> {
 fn update_cursor(
     app_state: Res<State<AppState>>,
     focus: Res<State<Focus>>,
+    free_look: Res<FreeLook>,
     mouse: Res<ButtonInput<MouseButton>>,
     held: Res<CursorLock>,
     mut cursor: Single<&mut CursorOptions, With<PrimaryWindow>>,
+    mut was_looking: Local<bool>,
 ) {
     let playing = *app_state.get() == AppState::Playing;
     let desk = playing && *focus.get() == Focus::Desk;
-    let changed = app_state.is_changed() || focus.is_changed();
-    let free = !desk && changed;
-    let lock = desk && (changed || mouse.just_pressed(MouseButton::Left));
+    let looking = playing && free_look.looking();
+    let changed = app_state.is_changed() || focus.is_changed() || looking != *was_looking;
+    *was_looking = looking;
+    let wanted = desk || looking;
+    let free = !wanted && changed;
+    let lock = wanted && (changed || (desk && mouse.just_pressed(MouseButton::Left)));
     if free {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
@@ -193,7 +217,7 @@ fn center_pointer(
     mut inputs: MessageWriter<PointerInput>,
 ) {
     let (entity, window) = *window;
-    if !gaze.looking_around() {
+    if !gaze.steering() {
         return;
     }
     let Some(target) = RenderTarget::Window(WindowRef::Entity(entity)).normalize(Some(entity))

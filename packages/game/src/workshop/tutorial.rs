@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::run::Run;
 use crate::locale::Message;
 use crate::menu::AppState;
-use crate::parts::paper::{Paper, Press, Print};
+use crate::parts::paper::{Paper, Press, Print, READING_ZOOM};
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
@@ -74,6 +74,7 @@ impl TutorialNote {
                     focus: Focus::Paper,
                     view: View::Local(Paper::reading_view(Self::sheet_center())),
                 },
+                READING_ZOOM,
             )
         })
     }

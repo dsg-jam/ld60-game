@@ -42,11 +42,11 @@ use self::shades::Shades;
 use self::trace::TraceView;
 use self::undo::Undo;
 use self::versions::VersionsPage;
-use super::views::ZOOM_MODIFIERS;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::locale::{Localized, Message};
 use crate::parts::screen::UiCanvas;
+use crate::player::free_look::MODIFIERS;
 use crate::workshop::job::{Job, JobId};
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
@@ -284,7 +284,7 @@ impl Editor {
         let Ok(mut text) = editors.get_mut(scroll.entity) else {
             return;
         };
-        if keys.any_pressed(ZOOM_MODIFIERS) {
+        if keys.any_pressed(MODIFIERS) {
             return;
         }
         scroll.propagate(false);

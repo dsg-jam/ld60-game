@@ -1,15 +1,18 @@
+use std::iter;
+
 use bevy::{
-    input::mouse::{MouseScrollUnit, MouseWheel},
+    picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
-    window::PrimaryWindow,
 };
 
 use super::pinboard::PinBoard;
 use crate::locale::Message;
 use crate::menu::AppState;
 use crate::player::camera::{PlayerCamera, framing};
-use crate::player::focus::{Aside, CloseUp, Focus, FocusTarget, View};
+use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
+use crate::player::free_look::MODIFIERS;
 use crate::player::hints::{Hint, Hints, Icon, Input};
+use crate::player::zoom::{Closer, Zoom};
 use crate::workshop::run::Run;
 
 /// How far the wide view looks down at the keyboard, in radians.
@@ -20,53 +23,41 @@ const WIDE_MARGIN: f32 = 0.03;
 /// Free space around the glass in the close view, as a fraction of the
 /// window.
 const CLOSE_MARGIN: f32 = 0.05;
-const ZOOM_KEY: KeyCode = KeyCode::F1;
-/// Held with the wheel to zoom, like in most programs.
-pub(super) const ZOOM_MODIFIERS: [KeyCode; 2] = [KeyCode::ControlLeft, KeyCode::ControlRight];
-/// How far a trackpad has to scroll to zoom.
-const ZOOM_PIXELS: f32 = 40.0;
-/// Also the footer command of the pinned sheets.
-const GLANCE_KEY: KeyCode = KeyCode::F12;
-/// Holding the glance key longer than this, in seconds, looks back on
-/// release.
-const HOLD_TIME: f32 = 0.3;
-/// How close to the left edge of the window the pointer pushes, in logical
-/// pixels.
-const EDGE: f32 = 4.0;
-/// How long the pointer has to rest against the edge to glance, in seconds,
-/// so a quick pass doesn't.
-const DWELL_TIME: f32 = 0.2;
-/// The pointer moving this far into the window, as a fraction of its width,
-/// looks back from a glance with the pointer.
-const RETURN: f32 = 0.1;
+/// Steps of the [`Zoom`] from the wide view to the close one.
+const ZOOM_STEPS: u8 = 2;
+/// With Ctrl, turns to the pinned sheets and back. The editor has no use
+/// for Ctrl+P, and P also pins pages in the manuals file.
+const PINS_KEY: KeyCode = KeyCode::KeyP;
 
 pub(super) struct ViewsPlugin;
 
 impl Plugin for ViewsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(Focus::Computer), Views::restore_zoom)
-            .add_systems(
-                Update,
-                (
-                    Views::frame,
-                    (Views::zoom_on_input, Glance::update).run_if(in_state(AppState::Playing)),
-                    Views::show_hints,
-                )
-                    .chain(),
-            );
+        app.add_systems(
+            Update,
+            (
+                Views::frame,
+                Views::look_aside_on_key.run_if(in_state(AppState::Playing)),
+                (Views::show_hints, BackToScreen::arm),
+            )
+                .chain(),
+        )
+        .add_observer(BackToScreen::look_back_on_press);
     }
 }
 
 /// The views of the computer. Its [`FocusTarget`] looks at the screen and
-/// the keyboard, its [`CloseUp`] at the screen alone and its [`Aside`] at
-/// the pinned sheets. Each frames its subject in the window.
+/// the keyboard, the end of its [`Zoom`] at the screen alone and its
+/// [`Aside`] at the pinned sheets. Each frames its subject in the window.
 #[derive(Component, Debug)]
 pub(super) struct Views {
     screen: [Vec3; 4],
     desk: Vec<Vec3>,
-    /// The zoom the player picked last, for the next time at the computer.
-    close: bool,
 }
+
+/// The monitor, which a click looks back at from the pinned sheets.
+#[derive(Component, Debug)]
+pub(super) struct BackToScreen;
 
 impl Views {
     /// `screen` are the corners of the glass and `desk` what the wide view
@@ -75,7 +66,6 @@ impl Views {
         Self {
             screen,
             desk: screen.into_iter().chain(desk).collect(),
-            close: false,
         }
     }
 
@@ -93,12 +83,16 @@ impl Views {
     }
 
     /// The views for a window of the default shape, until the camera has
-    /// one.
-    pub(super) fn initial(&self, board: &PinBoard) -> (View, CloseUp, Aside) {
+    /// one. The zoom stays for the next time at the computer.
+    pub(super) fn initial(&self, board: &PinBoard) -> (View, Zoom, Aside) {
         let perspective = PerspectiveProjection::default();
         (
             View::Local(self.wide(&perspective)),
-            CloseUp::new(self.close(&perspective)),
+            Zoom::to(
+                Closer::View(View::Local(self.close(&perspective))),
+                ZOOM_STEPS,
+            )
+            .kept(),
             Aside::new(board.view(0, &perspective)),
         )
     }
@@ -107,25 +101,19 @@ impl Views {
     fn frame(
         camera: Single<&Projection, With<PlayerCamera>>,
         run: Res<Run>,
-        mut computers: Query<(
-            &Views,
-            &PinBoard,
-            &mut FocusTarget,
-            &mut CloseUp,
-            &mut Aside,
-        )>,
+        mut computers: Query<(&Views, &PinBoard, &mut FocusTarget, &mut Zoom, &mut Aside)>,
     ) {
         let Projection::Perspective(perspective) = *camera else {
             return;
         };
-        for (views, board, mut target, mut close_up, mut aside) in &mut computers {
+        for (views, board, mut target, mut zoom, mut aside) in &mut computers {
             let wide = views.wide(perspective);
             if !matches!(target.view, View::Local(view) if view == wide) {
                 target.view = View::Local(wide);
             }
-            let close = views.close(perspective);
-            if close_up.view != close {
-                close_up.view = close;
+            let close = Closer::View(View::Local(views.close(perspective)));
+            if zoom.close != close {
+                zoom.close = close;
             }
             let pins = board.view(run.pins().sheets().len(), perspective);
             if aside.view != pins {
@@ -134,62 +122,23 @@ impl Views {
         }
     }
 
-    fn restore_zoom(mut computers: Query<(&Views, &mut CloseUp)>) {
-        for (views, mut close_up) in &mut computers {
-            close_up.open = views.close;
-        }
-    }
-
-    /// The zoom key switches between the wide and the close view. The wheel
-    /// with Ctrl held zooms in and out, since the wheel alone scrolls the
-    /// editor.
-    fn zoom_on_input(
+    /// Ctrl+P turns to the pinned sheets and back. It works whether the
+    /// editor has the keyboard or not.
+    fn look_aside_on_key(
         keys: Res<ButtonInput<KeyCode>>,
-        mut wheel: MessageReader<MouseWheel>,
         state: Res<State<Focus>>,
-        mut computers: Query<(&mut Views, &mut CloseUp, &Aside)>,
-        mut swipe: Local<f32>,
+        run: Res<Run>,
+        mut computers: Query<&mut Aside, With<Views>>,
     ) {
-        let held = keys.any_pressed(ZOOM_MODIFIERS);
-        let mut zoom = None;
-        for event in wheel.read() {
-            if !held {
-                continue;
-            }
-            match event.unit {
-                MouseScrollUnit::Line => zoom = Some(event.y > 0.0),
-                MouseScrollUnit::Pixel => {
-                    if *swipe * event.y < 0.0 {
-                        *swipe = 0.0;
-                    }
-                    *swipe += event.y;
-                    if swipe.abs() >= ZOOM_PIXELS {
-                        zoom = Some(*swipe > 0.0);
-                        *swipe = 0.0;
-                    }
-                }
-            }
-        }
-        if !held {
-            *swipe = 0.0;
-        }
-        if *state.get() != Focus::Computer {
+        if *state.get() != Focus::Computer
+            || !keys.any_pressed(MODIFIERS)
+            || !keys.just_pressed(PINS_KEY)
+        {
             return;
         }
-        for (mut views, mut close_up, aside) in &mut computers {
-            if aside.open {
-                continue;
-            }
-            let close = if keys.just_pressed(ZOOM_KEY) {
-                !close_up.open
-            } else if let Some(close) = zoom {
-                close
-            } else {
-                continue;
-            };
-            views.close = close;
-            if close_up.open != close {
-                close_up.open = close;
+        for mut aside in &mut computers {
+            if aside.open || !run.pins().is_empty() {
+                aside.open = !aside.open;
             }
         }
     }
@@ -197,158 +146,82 @@ impl Views {
     fn show_hints(
         state: Res<State<Focus>>,
         run: Res<Run>,
-        mut computers: Query<(&Aside, &CloseUp, &Glance, &mut Hints)>,
+        mut computers: Query<(&Aside, &mut Hints), With<Views>>,
     ) {
         if *state.get() != Focus::Computer {
             return;
         }
-        for (aside, close_up, glance, mut hints) in &mut computers {
-            let mut shown = Vec::new();
-            if aside.open {
-                let mut inputs = vec![Input::Key("F12")];
-                if glance.gesture == Some(Gesture::Edge) {
-                    inputs.push(Input::Icon(Icon::Sideways));
-                }
-                shown.push(Hint {
-                    inputs,
-                    action: Message::new("hint-look-screen"),
-                });
+        for (aside, mut hints) in &mut computers {
+            let look = |action| Hint {
+                inputs: vec![Input::Shortcut("Ctrl", "P")],
+                action: Message::new(action),
+            };
+            let shown = if aside.open {
+                vec![look("hint-look-screen")]
             } else {
-                shown.push(Hint {
-                    inputs: vec![Input::Key("F1"), Input::Chord("Ctrl", Icon::Wheel)],
-                    action: Message::new(if close_up.open {
-                        "hint-zoom-out"
-                    } else {
-                        "hint-zoom-in"
-                    }),
-                });
+                let mut shown = vec![Hint {
+                    inputs: vec![Input::Icon(Icon::Wheel)],
+                    action: Message::new("hint-scroll"),
+                }];
                 if !run.pins().is_empty() {
-                    shown.push(Hint {
-                        inputs: vec![Input::Key("F12"), Input::Icon(Icon::Sideways)],
-                        action: Message::new("hint-look-pins"),
-                    });
+                    shown.push(look("hint-look-pins"));
                 }
-            }
+                shown
+            };
             hints.set_if_neq(Hints(shown));
         }
     }
 }
 
-/// Turns the head to the pinned sheets while at the computer, with the
-/// glance key or by pushing the pointer against the left edge of the window.
-///
-/// A tap of the key keeps looking until the next press, holding it looks
-/// back on release. A glance with the pointer looks back once the pointer
-/// moves away from the edge.
-#[derive(Component, Debug, Default, PartialEq)]
-pub(super) struct Glance {
-    /// How the open glance started, so the same gesture ends it.
-    gesture: Option<Gesture>,
-    /// Seconds the pointer has rested against the edge.
-    dwell: f32,
-    /// Whether the pointer left the edge since the last glance, so resting
-    /// there again glances again.
-    armed: bool,
-    /// The last place of the pointer across the window, to tell where it
-    /// left the window.
-    last_x: Option<f32>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Gesture {
-    Key { since: f32 },
-    Edge,
-}
-
-/// Where the pointer is, from the left edge of the window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Pointer {
-    /// Against the edge, or gone from the window over it.
-    AtEdge,
-    Near,
-    Away,
-}
-
-impl Glance {
-    fn update(
-        time: Res<Time>,
-        keys: Res<ButtonInput<KeyCode>>,
+impl BackToScreen {
+    /// The monitor says what a click does while the player looks at the
+    /// pinned sheets.
+    fn arm(
         state: Res<State<Focus>>,
-        run: Res<Run>,
-        window: Single<&Window, With<PrimaryWindow>>,
-        mut computers: Query<(&mut Glance, &mut Aside)>,
+        computers: Query<&Aside, With<Views>>,
+        monitors: Query<(Entity, Has<Clickable>), With<BackToScreen>>,
+        mut commands: Commands,
     ) {
-        let usable = *state.get() == Focus::Computer && !run.pins().is_empty();
-        for (mut glance, mut aside) in &mut computers {
-            if !usable {
-                glance.set_if_neq(Glance::default());
-                continue;
-            }
-            let pointer = glance.locate(&window);
-            let mut open = aside.open;
-            glance.step(
-                &mut open,
-                pointer,
-                (
-                    keys.just_pressed(GLANCE_KEY),
-                    keys.just_released(GLANCE_KEY),
-                ),
-                time.elapsed_secs(),
-                time.delta_secs(),
-            );
-            if aside.open != open {
-                aside.open = open;
-            }
-        }
-    }
-
-    fn locate(&mut self, window: &Window) -> Pointer {
-        let width = window.width();
-        match window.cursor_position() {
-            Some(position) => {
-                self.last_x = Some(position.x);
-                if position.x <= EDGE {
-                    Pointer::AtEdge
-                } else if position.x < width * RETURN {
-                    Pointer::Near
-                } else {
-                    Pointer::Away
+        let aside = *state.get() == Focus::Computer && computers.iter().any(|aside| aside.open);
+        for (monitor, clickable) in &monitors {
+            match (aside, clickable) {
+                (true, false) => {
+                    commands.entity(monitor).insert(Clickable {
+                        prompt: "click-look-screen",
+                    });
                 }
+                (false, true) => {
+                    commands.entity(monitor).remove::<Clickable>();
+                }
+                _ => {}
             }
-            None if self.last_x.is_some_and(|x| x < width * RETURN) => Pointer::AtEdge,
-            None => Pointer::Near,
         }
     }
 
-    /// Opens or closes the glance in `open`, with the glance key just
-    /// `(pressed, released)`, at `now` seconds, `dt` after the last step.
-    fn step(&mut self, open: &mut bool, pointer: Pointer, key: (bool, bool), now: f32, dt: f32) {
-        if !*open {
-            self.gesture = None;
+    /// The press goes on to the screen, so a click there also places the
+    /// caret.
+    fn look_back_on_press(
+        press: On<PointerPress>,
+        state: Res<State<Focus>>,
+        parents: Query<&ChildOf>,
+        monitors: Query<(), With<BackToScreen>>,
+        mut computers: Query<&mut Aside, With<Views>>,
+    ) {
+        if press.button != PointerButton::Primary || *state.get() != Focus::Computer {
+            return;
         }
-        let (pressed, released) = key;
-        if pressed {
-            *open = !*open;
-            self.gesture = open.then_some(Gesture::Key { since: now });
+        let mut path = iter::once(press.entity).chain(parents.iter_ancestors(press.entity));
+        if !path.any(|entity| monitors.contains(entity)) {
+            return;
         }
-        let held = matches!(self.gesture, Some(Gesture::Key { since }) if now - since >= HOLD_TIME);
-        let left_edge = self.gesture == Some(Gesture::Edge) && pointer == Pointer::Away;
-        if (released && held) || left_edge {
-            *open = false;
-            self.gesture = None;
-        }
-        if *open {
-            self.armed = false;
-            self.dwell = 0.0;
-        } else if pointer != Pointer::AtEdge {
-            self.armed = true;
-            self.dwell = 0.0;
-        } else if self.armed {
-            self.dwell += dt;
-            if self.dwell >= DWELL_TIME {
-                *open = true;
-                self.gesture = Some(Gesture::Edge);
-            }
+        let Some(computer) = path.find(|&ancestor| computers.contains(ancestor)) else {
+            return;
+        };
+        let Ok(mut aside) = computers.get_mut(computer) else {
+            return;
+        };
+        if aside.open {
+            aside.open = false;
         }
     }
 }
@@ -357,123 +230,52 @@ impl Glance {
 mod tests {
     use super::*;
     use crate::locale::Locale;
-
-    const DT: f32 = 1.0 / 60.0;
-
-    /// Steps `glance` for `seconds` with the pointer at `pointer`, starting
-    /// at `start`, and returns the time after.
-    fn rest(
-        glance: &mut Glance,
-        open: &mut bool,
-        pointer: Pointer,
-        start: f32,
-        seconds: f32,
-    ) -> f32 {
-        let mut now = start;
-        while now < start + seconds {
-            now += DT;
-            glance.step(open, pointer, (false, false), now, DT);
-        }
-        now
-    }
-
-    #[test]
-    fn resting_at_the_edge_glances_until_the_pointer_leaves() {
-        let mut glance = Glance::default();
-        let mut open = false;
-        let now = rest(&mut glance, &mut open, Pointer::Away, 0.0, 0.1);
-        let now = rest(
-            &mut glance,
-            &mut open,
-            Pointer::AtEdge,
-            now,
-            DWELL_TIME / 2.0,
-        );
-        assert!(!open);
-        let now = rest(&mut glance, &mut open, Pointer::AtEdge, now, DWELL_TIME);
-        assert!(open);
-        let now = rest(&mut glance, &mut open, Pointer::Near, now, 1.0);
-        assert!(open);
-        rest(&mut glance, &mut open, Pointer::Away, now, DT);
-        assert!(!open);
-    }
-
-    #[test]
-    fn going_back_at_the_edge_needs_the_pointer_to_leave_first() {
-        let mut glance = Glance::default();
-        let mut open = false;
-        let now = rest(&mut glance, &mut open, Pointer::AtEdge, 0.0, 1.0);
-        assert!(!open, "the pointer was there before");
-        let now = rest(&mut glance, &mut open, Pointer::Near, now, DT);
-        let now = rest(&mut glance, &mut open, Pointer::AtEdge, now, 1.0);
-        assert!(open);
-        open = false;
-        let now = rest(&mut glance, &mut open, Pointer::AtEdge, now, 1.0);
-        assert!(!open);
-        let now = rest(&mut glance, &mut open, Pointer::Near, now, DT);
-        rest(&mut glance, &mut open, Pointer::AtEdge, now, 1.0);
-        assert!(open);
-    }
-
-    #[test]
-    fn tapping_the_key_toggles_and_holding_it_looks_back_on_release() {
-        let mut glance = Glance::default();
-        let mut open = false;
-        glance.step(&mut open, Pointer::Away, (true, true), 0.0, DT);
-        assert!(open);
-        let now = rest(&mut glance, &mut open, Pointer::Away, 0.0, 2.0);
-        assert!(open);
-        glance.step(&mut open, Pointer::Away, (true, false), now, DT);
-        assert!(!open);
-        glance.step(&mut open, Pointer::Away, (false, true), now + 0.1, DT);
-        assert!(!open);
-
-        glance.step(&mut open, Pointer::Away, (true, false), 10.0, DT);
-        assert!(open);
-        glance.step(
-            &mut open,
-            Pointer::Away,
-            (false, true),
-            10.0 + HOLD_TIME / 2.0,
-            DT,
-        );
-        assert!(open, "a tap");
-        glance.step(&mut open, Pointer::Away, (true, false), 20.0, DT);
-        assert!(!open);
-        glance.step(&mut open, Pointer::Away, (true, false), 30.0, DT);
-        glance.step(
-            &mut open,
-            Pointer::Away,
-            (false, true),
-            30.0 + 2.0 * HOLD_TIME,
-            DT,
-        );
-        assert!(!open, "a hold");
-    }
-
-    #[test]
-    fn the_key_ends_a_glance_with_the_pointer() {
-        let mut glance = Glance::default();
-        let mut open = false;
-        let now = rest(&mut glance, &mut open, Pointer::Near, 0.0, DT);
-        let now = rest(&mut glance, &mut open, Pointer::AtEdge, now, 1.0);
-        assert!(open);
-        glance.step(&mut open, Pointer::AtEdge, (true, true), now, DT);
-        assert!(!open);
-        rest(&mut glance, &mut open, Pointer::AtEdge, now, 1.0);
-        assert!(!open);
-    }
+    use crate::workshop::manuals::Sheet;
 
     #[test]
     fn every_hint_formats() {
         Locale::on_disk().assert_formats(
             [
-                "hint-zoom-in",
-                "hint-zoom-out",
                 "hint-look-pins",
                 "hint-look-screen",
+                "hint-scroll",
+                "click-look-pins",
+                "click-look-screen",
             ]
             .map(Message::new),
         );
+    }
+
+    #[test]
+    fn ctrl_p_turns_to_the_pins_and_back() {
+        let mut world = World::new();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.insert_resource(State::new(Focus::Computer));
+        let mut run = Run::default();
+        run.pins_mut().pin(Sheet::example());
+        world.insert_resource(run);
+        let computer = world
+            .spawn((
+                Views::new([Vec3::ZERO; 4], []),
+                Aside::new(Transform::IDENTITY),
+            ))
+            .id();
+        let press = |world: &mut World, keys: &[KeyCode]| {
+            let mut input = world.resource_mut::<ButtonInput<KeyCode>>();
+            input.reset_all();
+            for &key in keys {
+                input.press(key);
+            }
+            world.run_system_cached(Views::look_aside_on_key).unwrap();
+            world.get::<Aside>(computer).unwrap().open
+        };
+        assert!(!press(&mut world, &[PINS_KEY]), "P alone types");
+        assert!(press(&mut world, &[KeyCode::ControlLeft, PINS_KEY]));
+        assert!(!press(&mut world, &[KeyCode::ControlRight, PINS_KEY]));
+        world
+            .resource_mut::<Run>()
+            .pins_mut()
+            .unpin(Sheet::example());
+        assert!(!press(&mut world, &[KeyCode::ControlLeft, PINS_KEY]));
     }
 }

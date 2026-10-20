@@ -13,6 +13,8 @@ use crate::parts::gauge::Gauge;
 use crate::parts::knob::Knob;
 use crate::parts::latch_button::LatchButton;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
+use crate::player::free_look::MODIFIERS;
+use crate::player::zoom::Zoom;
 
 pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
 /// Twelve characters of five dots.
@@ -30,6 +32,10 @@ const START_VOLUME: f32 = 0.5;
 /// Camera in front of the radio while focused, a little above it to see the
 /// power button on top.
 const VIEW: Vec3 = Vec3::new(0.0, 0.26, 0.38);
+/// How far the camera leans in on the radio, in meters, close enough to read
+/// the display.
+const ZOOM: f32 = 0.14;
+const ZOOM_STEPS: u8 = 2;
 
 const WOOD: Color = Color::srgb_u8(0x6a, 0x44, 0x28);
 const CHROME: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
@@ -123,6 +129,7 @@ impl Radio {
                     Transform::from_translation(VIEW).looking_at(Vec3::Y * CASE.y / 2.0, Vec3::Y),
                 ),
             })
+            .insert(Zoom::ahead(ZOOM, ZOOM_STEPS))
             .with_children(|parent| {
                 parent.spawn((Shape::cuboid(&case, WOOD), Finish::Wood));
                 front.spawn_panel(parent, &mut meshes, &mut surfaces);
@@ -154,15 +161,17 @@ impl Radio {
             });
     }
 
-    /// The mouse wheel anywhere over the radio turns its volume knob.
+    /// The mouse wheel anywhere over the radio turns its volume knob, unless
+    /// Ctrl makes it zoom.
     fn scroll_volume(
         mut scroll: On<PointerScroll>,
         focused: Res<Focused>,
+        keys: Res<ButtonInput<KeyCode>>,
         radios: Query<&Children, With<Radio>>,
         mut knobs: Query<(&Control, &mut Knob)>,
         mut commands: Commands,
     ) {
-        if focused.get() != Some(scroll.entity) {
+        if focused.get() != Some(scroll.entity) || keys.any_pressed(MODIFIERS) {
             return;
         }
         let Ok(children) = radios.get(scroll.entity) else {
@@ -236,3 +245,4 @@ impl Radio {
         }
     }
 }
+

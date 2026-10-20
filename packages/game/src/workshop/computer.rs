@@ -10,7 +10,7 @@ use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use self::pinboard::PinBoard;
-use self::views::{Glance, Views};
+use self::views::{BackToScreen, Views};
 use super::dust::Dust;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
@@ -105,18 +105,17 @@ impl Computer {
             &mut meshes,
         );
         let views = layout.views();
-        let (view, close_up, aside) = views.initial(&pins);
+        let (view, zoom, aside) = views.initial(&pins);
         commands
             .entity(add.entity)
-            .insert((dust, pins, views, close_up, aside))
-            .insert((Glance::default(), Hints::default()))
+            .insert((dust, pins, views, zoom, aside, Hints::default()))
             .insert(FocusTarget {
                 prompt: "click-computer",
                 focus: Focus::Computer,
                 view,
             })
             .with_children(|parent| {
-                layout.monitor.spawn(
+                let monitor = layout.monitor.spawn(
                     parent,
                     Transform::default(),
                     (
@@ -129,6 +128,7 @@ impl Computer {
                         },
                     ),
                 );
+                parent.commands().entity(monitor).insert(BackToScreen);
                 layout.keyboard.spawn(
                     parent,
                     Transform::from_translation(layout.keyboard_placement.bottom()),

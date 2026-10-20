@@ -62,8 +62,9 @@ pub(super) struct PinBoard {
     shown: Option<Pins>,
 }
 
-/// A sheet hanging from the rail. A click on it, from the seat or at the
-/// computer, unpins it and puts it back in the manuals file.
+/// A sheet hanging from the rail. A click on it, from the seat or while
+/// looking at the sheets from the computer, unpins it and puts it back in
+/// the manuals file.
 #[derive(Component, Debug)]
 pub(super) struct Hanging(Sheet);
 
@@ -232,41 +233,65 @@ impl PinBoard {
     /// computer.
     pub(super) fn arm(
         state: Res<State<Focus>>,
+        boards: Query<&Aside, With<PinBoard>>,
         sheets: Query<(Entity, Option<&Clickable>), With<Hanging>>,
         mut commands: Commands,
     ) {
-        let near = Self::within_reach(&state);
+        let prompt = Self::click(&state, &boards).map(|click| match click {
+            SheetClick::Unpin => "click-unpin",
+            SheetClick::LookAt => "click-look-pins",
+        });
         for (sheet, clickable) in &sheets {
-            match (near, clickable.is_some()) {
-                (true, false) => {
-                    commands.entity(sheet).insert(Clickable {
-                        prompt: "click-unpin",
-                    });
-                }
-                (false, true) => {
-                    commands.entity(sheet).remove::<Clickable>();
-                }
-                _ => {}
+            if clickable.map(|clickable| clickable.prompt) == prompt {
+                continue;
             }
+            match prompt {
+                Some(prompt) => commands.entity(sheet).insert(Clickable { prompt }),
+                None => commands.entity(sheet).remove::<Clickable>(),
+            };
         }
     }
 
-    fn within_reach(state: &State<Focus>) -> bool {
-        matches!(state.get(), Focus::Desk | Focus::Computer)
+    /// What a click on a hanging sheet does. In the wide view of the
+    /// computer the sheets only peek in from the side, so a click there
+    /// turns to them first.
+    fn click(state: &State<Focus>, boards: &Query<&Aside, With<PinBoard>>) -> Option<SheetClick> {
+        match state.get() {
+            Focus::Desk => Some(SheetClick::Unpin),
+            Focus::Computer if boards.iter().any(|aside| !aside.open) => Some(SheetClick::LookAt),
+            Focus::Computer => Some(SheetClick::Unpin),
+            _ => None,
+        }
     }
 
     pub(super) fn put_back_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
         sheets: Query<&Hanging>,
+        mut boards: Query<&mut Aside, With<PinBoard>>,
         mut run: ResMut<Run>,
     ) {
-        if press.button != PointerButton::Primary || !Self::within_reach(&state) {
+        if press.button != PointerButton::Primary {
             return;
         }
-        if let Ok(hanging) = sheets.get(press.entity) {
-            press.propagate(false);
-            run.pins_mut().unpin(hanging.0);
+        let Ok(hanging) = sheets.get(press.entity) else {
+            return;
+        };
+        match Self::click(&state, &boards.as_readonly()) {
+            Some(SheetClick::Unpin) => run.pins_mut().unpin(hanging.0),
+            Some(SheetClick::LookAt) => {
+                for mut aside in &mut boards {
+                    aside.open = true;
+                }
+            }
+            None => return,
         }
+        press.propagate(false);
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SheetClick {
+    Unpin,
+    LookAt,
 }

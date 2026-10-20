@@ -2,15 +2,17 @@ pub(crate) mod camera;
 mod crosshair;
 pub(crate) mod cursor;
 pub(crate) mod focus;
+pub(crate) mod free_look;
 pub(crate) mod hints;
 pub(crate) mod look;
 mod shimmer;
 mod tooltip;
+pub(crate) mod zoom;
 
 use bevy::prelude::*;
 
 /// The seated player: camera, crosshair, cursor, focus, key hints, mouse look,
-/// hover shimmer and tooltips.
+/// free look and zoom while focused, hover shimmer and tooltips.
 pub(crate) struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -20,10 +22,12 @@ impl Plugin for PlayerPlugin {
             crosshair::CrosshairPlugin,
             cursor::CursorPlugin,
             focus::FocusPlugin,
+            free_look::FreeLookPlugin,
             hints::HintsPlugin,
             look::LookPlugin,
             shimmer::ShimmerPlugin,
             tooltip::TooltipPlugin,
+            zoom::ZoomPlugin,
         ));
     }
 }

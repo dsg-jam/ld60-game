@@ -1,6 +1,11 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
 
-use super::{cursor, focus::Focused, look::Gaze};
+use super::{
+    cursor,
+    focus::{Aside, Focused},
+    look::Gaze,
+    zoom::Zoom,
+};
 use crate::locale::{Localized, Message};
 use crate::menu::Settings;
 
@@ -54,8 +59,6 @@ pub(crate) enum Icon {
     MouseRight,
     Escape,
     Wheel,
-    /// Moving the mouse to the side.
-    Sideways,
 }
 
 #[derive(Resource, Debug)]
@@ -104,6 +107,8 @@ pub(crate) enum Input {
     Icon(Icon),
     /// A key held while using the mouse.
     Chord(&'static str, Icon),
+    /// A key held while pressing another.
+    Shortcut(&'static str, &'static str),
 }
 
 /// Holds the rows of the [`Hints`].
@@ -139,7 +144,6 @@ impl Icon {
             Self::MouseRight => "\u{e0f0}",
             Self::Escape => "\u{e063}",
             Self::Wheel => "\u{e0f8}",
-            Self::Sideways => "\u{e0ea}",
         }
     }
 
@@ -148,7 +152,7 @@ impl Icon {
     const fn outline(self) -> Option<&'static str> {
         match self {
             Self::MouseLeft | Self::MouseRight | Self::Wheel => Some("\u{e0ee}"),
-            Self::Escape | Self::Sideways => None,
+            Self::Escape => None,
         }
     }
 
@@ -296,9 +300,11 @@ impl KeyHint {
 }
 
 impl Hints {
+    /// The hints of the focused thing, then free look and zoom, which work
+    /// in every view.
     fn update(
         focused: Res<Focused>,
-        hints: Query<&Hints>,
+        hints: Query<(Option<&Hints>, Option<&Zoom>, Option<&Aside>)>,
         list: Single<Entity, With<HintList>>,
         font: Res<IconFont>,
         mut shown: Local<Hints>,
@@ -307,7 +313,20 @@ impl Hints {
         let hints = focused
             .get()
             .and_then(|entity| hints.get(entity).ok())
-            .cloned()
+            .map(|(hints, zoom, aside)| {
+                let mut hints = hints.cloned().unwrap_or_default();
+                hints.0.push(Hint {
+                    inputs: vec![Input::Key("Ctrl")],
+                    action: Message::new("hint-look-around"),
+                });
+                if zoom.is_some() && !aside.is_some_and(|aside| aside.open) {
+                    hints.0.push(Hint {
+                        inputs: vec![Input::Chord("Ctrl", Icon::Wheel)],
+                        action: Message::new("hint-zoom"),
+                    });
+                }
+                hints
+            })
             .unwrap_or_default();
         if *shown == hints {
             return;
@@ -347,6 +366,11 @@ impl Hint {
                             row.spawn(key_cap(Localized::verbatim(key)));
                             row.spawn((Caption, Localized::verbatim("+")));
                             icon.spawn(row, font);
+                        }
+                        Input::Shortcut(held, key) => {
+                            row.spawn(key_cap(Localized::verbatim(held)));
+                            row.spawn((Caption, Localized::verbatim("+")));
+                            row.spawn(key_cap(Localized::verbatim(key)));
                         }
                     }
                 }

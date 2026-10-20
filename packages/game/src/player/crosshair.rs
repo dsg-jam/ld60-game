@@ -2,7 +2,7 @@ use bevy::{picking::hover::HoverMap, prelude::*};
 
 use super::{
     cursor,
-    focus::{self, Clickable},
+    focus::{self, Clickable, Focused},
     hints::{Caption, Icon, IconFont},
     look::Gaze,
 };
@@ -19,6 +19,7 @@ impl Plugin for CrosshairPlugin {
 }
 
 /// Marks what a click hits, in the middle of the view while looking around.
+/// While focused it skips the focused thing, like the tooltip does.
 ///
 /// On a [`Clickable`] the dot turns into the left mouse button, with what a
 /// click does below it.
@@ -100,6 +101,7 @@ impl Crosshair {
     fn update(
         gaze: Gaze,
         settings: Res<Settings>,
+        focused: Res<Focused>,
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
         clickables: Query<&Clickable>,
@@ -108,7 +110,7 @@ impl Crosshair {
         caption: Single<(Entity, Option<&Localized>), With<PromptCaption>>,
         mut commands: Commands,
     ) {
-        crosshair.set_if_neq(if gaze.looking_around() {
+        crosshair.set_if_neq(if gaze.steering() {
             Visibility::Inherited
         } else {
             Visibility::Hidden
@@ -116,7 +118,9 @@ impl Crosshair {
         let hovered = settings
             .hints()
             .then(|| {
-                focus::under_mouse(&hovers, &parents).find_map(|entity| clickables.get(entity).ok())
+                focus::under_mouse(&hovers, &parents)
+                    .take_while(|&entity| Some(entity) != focused.get())
+                    .find_map(|entity| clickables.get(entity).ok())
             })
             .flatten();
         for (shape, mut node) in &mut shapes {

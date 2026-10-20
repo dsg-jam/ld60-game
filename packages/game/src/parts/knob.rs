@@ -16,6 +16,7 @@ use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::player::focus::Focused;
+use crate::player::free_look::MODIFIERS;
 
 const RADIUS: f32 = 0.016;
 const DEPTH: f32 = 0.018;
@@ -236,11 +237,12 @@ impl Knob {
     fn scroll(
         mut scroll: On<PointerScroll>,
         focused: Res<Focused>,
+        keys: Res<ButtonInput<KeyCode>>,
         parents: Query<&ChildOf>,
         mut knobs: Query<&mut Knob>,
         mut commands: Commands,
     ) {
-        if !focused.holds(scroll.entity, &parents) {
+        if !focused.holds(scroll.entity, &parents) || keys.any_pressed(MODIFIERS) {
             return;
         }
         let Ok(mut knob) = knobs.get_mut(scroll.entity) else {

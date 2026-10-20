@@ -19,7 +19,8 @@ use serde_json::Value;
 /// pixels and also moves the system cursor. `click` is `left` or `right`.
 /// `scroll` turns the wheel by that many lines, negative is down. A list of
 /// numbers scrolls by that many pixels each, like a trackpad.
-/// `key` is a `KeyCode` name. `text` types each character. Each click and
+/// `key` is a `KeyCode` name, like `ControlLeft` to hold a modifier. `text`
+/// types each character. Each click and
 /// key presses and releases, or only presses with `"hold": "down"` and only
 /// releases with `"hold": "up"`. Send `pointer` in an earlier call than
 /// `click`, so the click sees what is under it.
@@ -108,8 +109,12 @@ pub(super) fn input(
     if let Some(key) = params.get("key") {
         let key_code = serde_json::from_value::<KeyCode>(key.clone())
             .map_err(|_| invalid("`key` must be a KeyCode name like \"ArrowRight\""))?;
-        let logical_key = serde_json::from_value::<Key>(key.clone())
-            .unwrap_or(Key::Unidentified(NativeKey::Unidentified));
+        let logical_key = serde_json::from_value::<Key>(key.clone()).unwrap_or(match key_code {
+            KeyCode::ControlLeft | KeyCode::ControlRight => Key::Control,
+            KeyCode::ShiftLeft | KeyCode::ShiftRight => Key::Shift,
+            KeyCode::AltLeft | KeyCode::AltRight => Key::Alt,
+            _ => Key::Unidentified(NativeKey::Unidentified),
+        });
         typed.push((key_code, logical_key, None));
     }
     if let Some(text) = params.get("text") {
