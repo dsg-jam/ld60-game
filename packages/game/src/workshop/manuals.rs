@@ -30,6 +30,7 @@ use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
 use super::tutorial::{FirstNote, TutorialNote};
+use crate::audio::{Play, Sound};
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
 use crate::menu::AppState;
@@ -437,12 +438,17 @@ impl ShopManuals {
         state: Res<State<Focus>>,
         focused: Res<Focused>,
         files: Query<(&Paper, &Filed)>,
+        run: Res<Run>,
         mut commands: Commands,
     ) {
         if keys.just_pressed(PIN_KEY)
             && let Some(sheet) = Self::open_sheet(&state, &focused, &files)
         {
-            commands.trigger(MoveSheet::Pin(sheet));
+            if run.pins().is_full() {
+                commands.trigger(Play(Sound::Refuse));
+            } else {
+                commands.trigger(MoveSheet::Pin(sheet));
+            }
         }
     }
 

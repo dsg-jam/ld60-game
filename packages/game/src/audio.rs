@@ -81,6 +81,8 @@ pub(crate) enum Sound {
     RingsShut,
     /// The hinge of the pin rail on the monitor turning.
     Hinge,
+    /// Something the player asked for can't be done.
+    Refuse,
     /// Rain on the road, a loop.
     AsphaltRain,
     /// Rain on the sidewalk, a loop.
@@ -100,7 +102,7 @@ pub(crate) enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 17] = [
+    const ALL: [Self; 18] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
@@ -118,6 +120,7 @@ impl Sound {
         Self::RingsOpen,
         Self::RingsShut,
         Self::Hinge,
+        Self::Refuse,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -153,7 +156,7 @@ impl Sound {
             | Self::PuddleRain
             | Self::AwningRain
             | Self::RoofRain => 2,
-            Self::Chime | Self::Thunk | Self::Ding => 1,
+            Self::Chime | Self::Thunk | Self::Ding | Self::Refuse => 1,
         }
     }
 
@@ -177,6 +180,7 @@ impl Sound {
             Self::RingsOpen => Samples::rings_open(take),
             Self::RingsShut => Samples::rings_shut(take),
             Self::Hinge => Samples::hinge(take),
+            Self::Refuse => Samples::refuse(),
             Self::AsphaltRain => Samples::asphalt_rain(take),
             Self::ConcreteRain => Samples::concrete_rain(take),
             Self::PuddleRain => Samples::puddle_rain(take),
@@ -204,6 +208,7 @@ impl Sound {
             Self::PageSlide => 0.18,
             Self::RingsOpen | Self::RingsShut => 0.24,
             Self::Hinge => 0.12,
+            Self::Refuse => 0.12,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,

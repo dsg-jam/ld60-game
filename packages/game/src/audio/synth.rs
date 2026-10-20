@@ -1,3 +1,4 @@
+mod beep;
 mod city;
 mod drops;
 mod hinge;
