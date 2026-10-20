@@ -327,10 +327,10 @@ impl Stack {
                 .with_rotation(Quat::from_rotation_x(-FRAC_PI_2))
     }
 
-    /// How a sheet like in [`Stack::sheet_in`] hangs that goes back on the
-    /// rings in front of item `index`, or behind the last item, with the
-    /// cover `open` from 0 shut to 1. Its edges `stray`.
-    pub(super) fn sheet_before(&self, index: usize, open: f32, stray: Vec2) -> Transform {
+    /// Where a page hangs that goes back on the rings in front of item
+    /// `index`, or behind the last item, with the cover `open` from 0 shut
+    /// to 1.
+    pub(super) fn before(&self, index: usize, open: f32) -> OnRings {
         let last = self.items.len().saturating_sub(1);
         let (anchor, step) = if index <= last {
             (index, 1.0)
@@ -339,9 +339,7 @@ impl Stack {
         };
         let mut on = self.on_rings(anchor, open, 0.0);
         on.offset += step * PAGE * self.spread.lerp(1.0, open);
-        on.frame()
-            * Transform::from_translation(middle(stray))
-                .with_rotation(Quat::from_rotation_x(-FRAC_PI_2))
+        on
     }
 
     /// The holes of item `index`, from its middle.

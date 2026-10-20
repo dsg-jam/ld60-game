@@ -5,16 +5,17 @@
 //! time, and the others wait their turn.
 
 use std::collections::VecDeque;
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 
 use super::Filed;
 use super::index::Links;
+use super::mechanism::sliding_off;
 use super::model::{COVER, HOLE_RADIUS, Parts, SHEET_SIZE};
 use super::pins::{Pins, Sheet};
 use super::pose::Pose;
-use super::stack::{Stack, holes, stray};
+use super::stack::{Stack, holes, middle, stray};
 use super::top_sheet::TopSheet;
 use crate::audio::{PlayAt, Sound};
 use crate::parts::paper::{
@@ -25,21 +26,17 @@ use crate::workshop::run::Run;
 
 /// Seconds the lever takes to open the rings.
 const OPEN_TIME: f32 = 0.15;
-/// Seconds a pinned page takes to slide off the rings.
-const LIFT_TIME: f32 = 0.2;
+/// Seconds a page takes to slide off the open rings, or back onto them.
+const SLIDE_TIME: f32 = 0.22;
 /// Seconds a page flies between the file and the rail.
-const FLY_TIME: f32 = 0.5;
-/// Seconds a page that goes back takes to drop onto the rings.
-const DROP_TIME: f32 = 0.2;
+const FLY_TIME: f32 = 0.45;
+/// Seconds a page that goes back takes to drop into the file.
+const DROP_TIME: f32 = 0.18;
 /// Seconds the rings take to shut.
 const SHUT_TIME: f32 = 0.15;
 /// Seconds a page stays after it arrives, until the sheet that takes its
 /// place shows.
 const LINGER: f32 = 0.1;
-/// How far a pinned page lifts off the rings, in meters.
-const LIFT: f32 = 0.03;
-/// How far a pinned page slides away from the rings as it lifts.
-const SLIDE: f32 = 0.015;
 /// How far a flying page rises above the straight way.
 const ARC: f32 = 0.12;
 /// How far a flying page rolls about the way it flies, in radians.
@@ -75,6 +72,9 @@ struct Flight {
     slot: usize,
     elapsed: f32,
     seed: u64,
+    /// Where the page hangs on the rings, in the space of the spine hinge:
+    /// where a pinned page hung, or where a page that goes back will hang.
+    hole: Vec2,
     wrinkles: Wrinkles,
     shape: LeafShape,
     /// The page once it has left the rings or the rail.
@@ -196,6 +196,7 @@ impl SheetMoves {
                 slot,
                 elapsed: 0.0,
                 seed,
+                hole: Vec2::ZERO,
                 wrinkles,
                 shape: LeafShape::new(&wrinkles),
                 flyer: None,
@@ -313,6 +314,12 @@ impl SheetMoves {
                     let Ok((open, top, _)) = sheets.get(parts.sheet) else {
                         continue;
                     };
+                    let (_, right) = stack.sides();
+                    flight.hole = stack
+                        .on_rings(right.start, pose.cover(), 0.0)
+                        .frame()
+                        .translation
+                        .xy();
                     (open.compute_transform(), top.map_or(0.0, TopSheet::share))
                 } else {
                     commands.entity(slot).insert(Visibility::Hidden);
@@ -341,23 +348,28 @@ impl SheetMoves {
             let Some(flyer) = &flight.flyer else {
                 continue;
             };
+            let Ok((spine, ..)) = sheets.get(parts.spine) else {
+                continue;
+            };
+            let spine = spine.compute_transform();
             let (pose_at, share, along) = if flight.pin {
                 let to = target
                     .with_translation(target.translation + target.rotation * Vec3::Z * IN_FRONT);
-                flight.pinning(flyer, to)
+                flight.pinning(flyer, to, spine.rotation)
             } else {
-                let Ok((spine, ..)) = sheets.get(parts.spine) else {
-                    continue;
-                };
-                let spine = spine.compute_transform();
                 let index = flight
                     .sheet
                     .number(&filed.contents)
                     .and_then(|number| filed.in_file.from(number))
                     .and_then(|page| stack.index_of(page))
                     .unwrap_or(usize::MAX);
-                let hung = spine * stack.sheet_before(index, pose.cover(), stray(flight.seed));
-                flight.unpinning(flyer, hung, spine.rotation * Vec3::NEG_Z)
+                let frame = stack.before(index, pose.cover()).frame();
+                flight.hole = frame.translation.xy();
+                let hung = spine
+                    * frame
+                    * Transform::from_translation(middle(stray(flight.seed)))
+                        .with_rotation(Quat::from_rotation_x(-FRAC_PI_2));
+                flight.unpinning(flyer, hung, spine.rotation)
             };
             if let Ok(mut transform) = transforms.get_mut(flyer.entity) {
                 *transform = pose_at;
@@ -412,9 +424,9 @@ impl Flight {
     /// When the page arrives at the rail or on the rings.
     fn arrive(&self) -> f32 {
         if self.pin {
-            OPEN_TIME + LIFT_TIME + FLY_TIME
+            OPEN_TIME + SLIDE_TIME + FLY_TIME
         } else {
-            OPEN_TIME + FLY_TIME + DROP_TIME
+            OPEN_TIME + FLY_TIME + DROP_TIME + SLIDE_TIME
         }
     }
 
@@ -422,7 +434,7 @@ impl Flight {
     /// it flies.
     fn shut_start(&self) -> f32 {
         if self.pin {
-            OPEN_TIME + LIFT_TIME + FLY_TIME / 2.0
+            OPEN_TIME + SLIDE_TIME + FLY_TIME / 2.0
         } else {
             self.arrive()
         }
@@ -442,41 +454,51 @@ impl Flight {
         }
     }
 
+    /// How far the page has moved from where it hangs on the rings as it
+    /// slides `along` from 0 to 1 off the open rings, turned by `spine`,
+    /// the rotation of the spine hinge.
+    fn slid(&self, along: f32, spine: Quat) -> Vec3 {
+        spine * (sliding_off(self.hole, smoothstep(along)) - self.hole).extend(0.0)
+    }
+
     /// Where a pinned page is on its way to `to` on the rail, the share of
-    /// its wrinkles and how far it has flown, from 0 to 1. It lifts off the
-    /// rings and slides away from them, then flies over, flattening on the
-    /// way.
-    fn pinning(&self, flyer: &Flyer, to: Transform) -> (Transform, f32, f32) {
-        let lifting = (self.elapsed - OPEN_TIME) / LIFT_TIME;
-        let off = flyer.from.rotation * Vec3::new(SLIDE, 0.0, LIFT);
+    /// its wrinkles and how far it has flown, from 0 to 1. Its holes follow
+    /// the open rings up and off their tips, then it flies over, flattening
+    /// on the way. `spine` turns the space of the spine hinge.
+    fn pinning(&self, flyer: &Flyer, to: Transform, spine: Quat) -> (Transform, f32, f32) {
+        let sliding = (self.elapsed - OPEN_TIME) / SLIDE_TIME;
         let mut lifted = flyer.from;
-        lifted.translation += off * smoothstep(lifting);
-        if lifting < 1.0 {
+        lifted.translation += self.slid(sliding, spine);
+        if sliding < 1.0 {
             return (lifted, flyer.share, 0.0);
         }
-        let along = ((self.elapsed - OPEN_TIME - LIFT_TIME) / FLY_TIME).min(1.0);
+        let along = ((self.elapsed - OPEN_TIME - SLIDE_TIME) / FLY_TIME).min(1.0);
         let share = flyer.share * (1.0 - smoothstep(along / 0.6));
         (arc(lifted, to, along), share, along)
     }
 
     /// Where a page that goes back is on its way to hang at `hung` in the
     /// file, how much of its wrinkles it shows and how far it has flown,
-    /// from 0 to 1. It flies to above the file and drops in against `up`,
-    /// which runs along the rings to the top of the file.
-    fn unpinning(&self, flyer: &Flyer, hung: Transform, up: Vec3) -> (Transform, f32, f32) {
-        let mut above = hung;
-        above.translation += up * (COVER.y + ABOVE);
+    /// from 0 to 1. It flies to above the file, drops in along the rings
+    /// with its holes clear of their tips, and slides down the open rings
+    /// into its place. `spine` turns the space of the spine hinge, whose -Z
+    /// runs to the tops of the pages.
+    fn unpinning(&self, flyer: &Flyer, hung: Transform, spine: Quat) -> (Transform, f32, f32) {
+        let clear = hung.translation + self.slid(1.0, spine);
+        let above = hung.with_translation(clear + spine * Vec3::NEG_Z * (COVER.y + ABOVE));
         let along = ((self.elapsed - OPEN_TIME) / FLY_TIME).min(1.0);
         if along < 1.0 {
             return (arc(flyer.from, above, along), 0.0, along);
         }
-        let dropping = ((self.elapsed - OPEN_TIME - FLY_TIME) / DROP_TIME).min(1.0);
-        let fall = dropping * dropping;
-        (
-            above.with_translation(above.translation.lerp(hung.translation, fall)),
-            0.0,
-            1.0,
-        )
+        let dropping = (self.elapsed - OPEN_TIME - FLY_TIME) / DROP_TIME;
+        if dropping < 1.0 {
+            let fall = dropping * dropping;
+            let at = above.translation.lerp(clear, fall);
+            return (hung.with_translation(at), 0.0, 1.0);
+        }
+        let sliding = (self.elapsed - OPEN_TIME - FLY_TIME - DROP_TIME) / SLIDE_TIME;
+        let at = hung.translation + self.slid(1.0 - sliding.min(1.0), spine);
+        (hung.with_translation(at), 0.0, 1.0)
     }
 }
 

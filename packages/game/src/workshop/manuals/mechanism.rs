@@ -7,7 +7,8 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::prelude::*;
 
 use super::model::{
-    BOARD, MECHANISM_TOP, METAL, Parts, RING_RADIUS, RING_WIRE, ring_center, ring_holes,
+    BOARD, HOLE_RADIUS, MECHANISM_TOP, METAL, Parts, RING_RADIUS, RING_WIRE, ring_center,
+    ring_holes,
 };
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -22,6 +23,8 @@ const RING_DIP: f32 = 0.0006;
 const MECHANISM_PAINT: Color = Color::srgb_u8(0x5c, 0x60, 0x66);
 /// How far each half of a ring swings out when the rings open, in radians.
 const RING_SWING: f32 = 0.55;
+/// How far a hole slides past the tip of an open ring to be clear of it.
+const CLEAR: f32 = HOLE_RADIUS + RING_WIRE + 0.002;
 /// Width, thickness and length of the lever.
 const LEVER: Vec3 = Vec3::new(0.012, 0.0012, 0.02);
 /// How far the lever stands up from the mechanism with the rings shut, and
@@ -45,8 +48,7 @@ impl Mechanism {
         materials: &mut Assets<StandardMaterial>,
     ) -> Self {
         let center = ring_center();
-        let low = (MECHANISM_TOP - RING_DIP - center.y) / RING_RADIUS;
-        let foot = low.asin();
+        let foot = foot();
         let width = 2.0 * (RING_RADIUS * foot.cos() + RING_WIRE + MECHANISM_LIP);
         let mechanism = Block::between(
             Vec3::new(
@@ -157,5 +159,66 @@ impl Parts {
     /// from there.
     pub(super) fn lever_spot() -> Vec3 {
         Vec3::new(ring_center().x, MECHANISM_TOP, -MECHANISM_LENGTH / 2.0)
+    }
+}
+
+/// The angle on a ring where its right half comes out of the mechanism.
+fn foot() -> f32 {
+    ((MECHANISM_TOP - RING_DIP - ring_center().y) / RING_RADIUS).asin()
+}
+
+/// Where a hole that hangs on a ring at `hole`, in the space of the spine
+/// hinge, is as its page slides `along` from 0 there to 1 off the open
+/// rings. The hole follows the half of the ring it hangs on up to its tip
+/// and on until it is clear of the wire.
+pub(super) fn sliding_off(hole: Vec2, along: f32) -> Vec2 {
+    let center = ring_center();
+    // Works on the right half, and mirrors holes on the left half.
+    let side = Vec2::new(if hole.x < center.x { -1.0 } else { 1.0 }, 1.0);
+    let local = (hole - center) * side;
+    let pivot = Vec2::from_angle(foot()) * RING_RADIUS;
+    let swing = Vec2::from_angle(-RING_SWING);
+    let wire = |angle: f32| pivot + swing.rotate(Vec2::from_angle(angle) * RING_RADIUS - pivot);
+    let start = local.to_angle().clamp(foot(), FRAC_PI_2);
+    let arc = RING_RADIUS * (FRAC_PI_2 - start);
+    let travel = along.clamp(0.0, 1.0) * (arc + CLEAR);
+    let on_wire = if travel < arc {
+        wire(start + travel / RING_RADIUS)
+    } else {
+        wire(FRAC_PI_2) + swing.rotate(Vec2::NEG_X) * (travel - arc)
+    };
+    // The hole is a little off the open wire where it started.
+    let off = (local - wire(start)) * (1.0 - along.clamp(0.0, 1.0));
+    center + (on_wire + off) * side
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_hole_slides_off_the_open_ring_and_clears_it() {
+        let center = ring_center();
+        let pivot = Vec2::from_angle(foot()) * RING_RADIUS;
+        let swing = Vec2::from_angle(-RING_SWING);
+        for side in [-1.0, 1.0] {
+            for angle in [0.1, 0.8, 1.4] {
+                let hole = center + Vec2::from_angle(angle) * RING_RADIUS * Vec2::new(side, 1.0);
+                assert!(sliding_off(hole, 0.0).abs_diff_eq(hole, 1e-6));
+                let off = (sliding_off(hole, 1.0) - center) * Vec2::new(side, 1.0);
+                let nearest = (0..=50)
+                    .map(|step| {
+                        let angle = foot() + (FRAC_PI_2 - foot()) * step as f32 / 50.0;
+                        let wire =
+                            pivot + swing.rotate(Vec2::from_angle(angle) * RING_RADIUS - pivot);
+                        off.distance(wire)
+                    })
+                    .fold(f32::INFINITY, f32::min);
+                assert!(
+                    nearest > HOLE_RADIUS + RING_WIRE,
+                    "{side} {angle} {nearest}"
+                );
+            }
+        }
     }
 }
