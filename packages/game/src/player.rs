@@ -6,6 +6,7 @@ pub(crate) mod focus;
 pub(crate) mod free_look;
 pub(crate) mod hints;
 pub(crate) mod lens;
+mod logical_keys;
 pub(crate) mod look;
 mod refocus;
 mod shimmer;
@@ -28,6 +29,7 @@ impl Plugin for PlayerPlugin {
             free_look::FreeLookPlugin,
             hints::HintsPlugin,
             lens::LensPlugin,
+            logical_keys::LogicalKeysPlugin,
             look::LookPlugin,
             refocus::RefocusPlugin,
             shimmer::ShimmerPlugin,
