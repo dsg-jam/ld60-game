@@ -152,7 +152,6 @@ impl TutorialNote {
         for &paragraph in LESSONS[self.0] {
             page.spawn(Paper::text(message.clone().attribute(paragraph)));
         }
-        page.spawn(Paper::faded(Message::new("tutorial-signed")));
     }
 
     /// Waits until the player sits at the bench, so the camera does not

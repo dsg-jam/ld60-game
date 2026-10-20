@@ -1,7 +1,6 @@
 # Notes from the human who ran the shop before, one for each tutorial job.
 
 tutorial-footer = NOTES FROM MARTA
-tutorial-signed = - Marta, who ran this bench before you
 
 tutorial-1 =
     .title = To whoever sits at this bench next
