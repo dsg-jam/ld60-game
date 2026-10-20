@@ -334,9 +334,11 @@ impl Bay {
         if rng.random_bool(STOOL_CHANCE) {
             // A couple of stools on the sidewalk, for customers who stay.
             for x in [-inner * 0.5, inner * 0.5] {
-                let leg = Block::new(Vec3::new(0.05, STOOL_HEIGHT - 0.05, 0.05))
-                    .translated(Vec3::new(x, 0.0, STOOL_OUT));
-                let seat = Block::new(Vec3::new(0.32, 0.05, 0.32)).on_top_of(&leg);
+                let at = Vec3::new(x, 0.0, STOOL_OUT);
+                let leg = Block::new(Vec3::new(0.05, STOOL_HEIGHT - 0.05, 0.05)).translated(at);
+                let seat = Block::new(Vec3::new(0.32, 0.05, 0.32))
+                    .translated(at)
+                    .on_top_of(&leg);
                 stall.spawn(kit.cuboid(&leg, stock.metal.clone()));
                 stall.spawn(kit.cuboid(&seat, stock.awnings.pick(rng).clone()));
             }
