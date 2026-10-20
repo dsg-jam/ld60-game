@@ -1,3 +1,5 @@
+pub(super) mod arm;
+
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
@@ -5,6 +7,7 @@ use bevy::{
     prelude::*,
 };
 
+use self::arm::Arm;
 use super::monitor::Monitor;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -49,7 +52,7 @@ const CLIP_GRIP: f32 = 0.003;
 const SHEET_SPACE: f32 = 0.0005;
 /// Free space around the sheets while looking at them, as a fraction of the
 /// window.
-const VIEW_MARGIN: f32 = 0.04;
+const VIEW_MARGIN: f32 = 0.06;
 
 /// The monitor shades the sheets, so they give off a little warm light of
 /// their own to stay readable and look like the pages in the file.
@@ -60,13 +63,11 @@ const CLIP_COLOR: Color = Color::srgb_u8(0x30, 0x30, 0x34);
 
 /// Sheets of the manuals file hanging from a rail on the left side of the
 /// monitor, see [`Pins`]. The [`Aside`] of the computer looks at them. The
-/// rail only shows while a sheet is pinned.
+/// rail folds back while no sheet is pinned, see [`Arm`].
 #[derive(Component)]
 pub(super) struct PinBoard {
-    /// Where the rail is fixed to the monitor, swung forward.
+    /// Where the rail is fixed to the monitor, swung out.
     rail_space: Transform,
-    /// The mount and the rail with its clips.
-    parts: [Entity; 2],
     slots: Vec<Slot>,
     /// The pins the slots show.
     shown: Option<Pins>,
@@ -138,20 +139,23 @@ impl PinBoard {
             .map(|_| UiCanvas::spawn_print(commands, images, CANVAS_SIZE, parent))
             .collect();
         let mut slots = Vec::new();
-        let mut parts = [Entity::PLACEHOLDER; 2];
         commands.entity(parent).with_children(|computer| {
-            parts[0] = computer
+            computer.spawn((
+                Transform::default(),
+                Visibility::default(),
+                children![
+                    (Shape::cuboid(&mount, METAL), Finish::Metal),
+                    (Shape::cylinder(&knuckle, METAL), Finish::Metal),
+                ],
+            ));
+            let arm = Arm::new(SWING);
+            computer
                 .spawn((
-                    Visibility::Hidden,
-                    Transform::default(),
-                    children![
-                        (Shape::cuboid(&mount, METAL), Finish::Metal),
-                        (Shape::cylinder(&knuckle, METAL), Finish::Metal),
-                    ],
+                    Name::new("pin rail"),
+                    rail_space.with_rotation(arm.rotation()),
+                    arm,
+                    Visibility::default(),
                 ))
-                .id();
-            parts[1] = computer
-                .spawn((Name::new("pin rail"), rail_space, Visibility::Hidden))
                 .with_children(|board| {
                     board.spawn(rod);
                     for (index, canvas) in canvases.into_iter().enumerate() {
@@ -191,12 +195,10 @@ impl PinBoard {
                             page: None,
                         });
                     }
-                })
-                .id();
+                });
         });
         Self {
             rail_space,
-            parts,
             slots,
             shown: None,
         }
@@ -234,11 +236,6 @@ impl PinBoard {
                     Visibility::Hidden
                 }
             };
-            for part in board.parts {
-                if let Ok(mut visibility) = visibilities.get_mut(part) {
-                    visibility.set_if_neq(shown(!run.pins().is_empty()));
-                }
-            }
             for (index, slot) in board.slots.iter_mut().enumerate() {
                 if let Some(page) = slot.page.take() {
                     commands.entity(page).despawn();

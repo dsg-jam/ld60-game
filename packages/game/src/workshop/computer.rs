@@ -11,6 +11,7 @@ use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use self::pinboard::PinBoard;
+use self::pinboard::arm::Arm;
 use self::typing::MouseTyping;
 use self::views::{BackToScreen, Views};
 use super::dust::Dust;
@@ -49,9 +50,15 @@ impl Plugin for ComputerPlugin {
             .init_resource::<MouseTyping>()
             .add_systems(
                 Update,
-                (PinBoard::follow_pins, PinBoard::arm, MouseTyping::release),
+                (
+                    PinBoard::follow_pins,
+                    PinBoard::arm,
+                    Arm::swing,
+                    MouseTyping::release,
+                ),
             )
             .add_observer(PinBoard::put_back_on_press)
+            .add_observer(Arm::expect_pages)
             .add_observer(MouseTyping::press_on_click)
             .add_observer(Computer::on_add);
     }

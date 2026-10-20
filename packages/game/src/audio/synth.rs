@@ -1,5 +1,6 @@
 mod city;
 mod drops;
+mod hinge;
 mod keys;
 mod lamp;
 mod paper;
