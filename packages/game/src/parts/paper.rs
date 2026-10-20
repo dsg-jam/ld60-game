@@ -20,11 +20,11 @@ use bevy::{
 };
 
 pub(crate) use self::leaf::{
-    Binding, Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Stiffness, blank_print, clearance,
-    relaxing, reprinted,
+    Binding, Bulge, Leaf, LeafShape, LeafSide, LeafSpec, RELAX_TIME, Stiffness, blank_print,
+    clearance, relaxing, reprinted,
 };
 pub(crate) use self::press::{Press, Print};
-pub(crate) use self::sheet::{PaperMaterial, Wrinkles};
+pub(crate) use self::sheet::{PaperMaterial, Pressed, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};

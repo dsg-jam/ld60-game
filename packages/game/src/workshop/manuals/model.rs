@@ -12,6 +12,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::prelude::*;
 
 use super::cloth;
+use super::mechanism::Mechanism;
 use super::top_sheet::TopSheet;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -41,11 +42,6 @@ pub(super) const RING_HEIGHT: f32 = 0.004;
 pub(super) const RING_SPREAD: f32 = 0.045;
 /// Height of the top of the mechanism above the spine. The pages lie on it.
 pub(super) const MECHANISM_TOP: f32 = 0.001;
-/// How far the mechanism reaches past the rings on either side.
-const MECHANISM_LIP: f32 = 0.002;
-const MECHANISM_LENGTH: f32 = 0.19;
-/// How deep the rings reach into the mechanism.
-const RING_DIP: f32 = 0.0006;
 /// Distance of the punched holes from the bound edge of the page.
 pub(super) const HOLE_INSET: f32 = 0.006;
 pub(super) const HOLE_RADIUS: f32 = 0.0026;
@@ -63,8 +59,6 @@ const FINGER_HOLE_Y: f32 = 0.045;
 
 const CLOTH: Color = Color::srgb_u8(0x2a, 0x3c, 0x5e);
 pub(super) const METAL: Color = Color::srgb_u8(0xa0, 0xa4, 0xa8);
-/// The mechanism is painted, so the lamp above does not glare on it.
-const MECHANISM_PAINT: Color = Color::srgb_u8(0x5c, 0x60, 0x66);
 const HOLE: Color = Color::srgb_u8(0x0c, 0x0c, 0x0e);
 
 /// The parts of the file that move as it opens and as its pages turn.
@@ -86,6 +80,7 @@ pub(super) struct Parts {
     /// The cloth bent round the edges of the spine, at the back cover and
     /// at the front cover.
     pub(super) bends: [Handle<Mesh>; 2],
+    pub(super) mechanism: Mechanism,
 }
 
 impl Parts {
@@ -106,6 +101,7 @@ impl Parts {
             front: Entity::PLACEHOLDER,
             stack: Entity::PLACEHOLDER,
             bends: [(); 2].map(|_| meshes.add(cloth::hinge(0.0, 0.0, BOARD, COVER.y))),
+            mechanism: Mechanism::default(),
         };
         let cloth = surfaces.add(Finish::Fabric.material(CLOTH, Form::Freeform, 0.0));
         let cover = meshes.add(cloth::board(COVER.extend(BOARD).xzy(), COVER_CORNER));
@@ -134,7 +130,7 @@ impl Parts {
                                 Transform::from_xyz(at, 0.0, 0.0),
                             ));
                         }
-                        spawn_rings(hinge, meshes, materials);
+                        parts.mechanism = Mechanism::spawn(hinge, meshes, materials);
                         spawn_spine_outside(hinge, spine, meshes, materials);
                         parts.stack = hinge
                             .spawn((MeshMaterial3d(edges), Transform::default()))
@@ -200,55 +196,6 @@ pub(super) fn ring_center() -> Vec2 {
 /// sheet. Each sits on a ring.
 pub(super) fn ring_holes() -> [f32; 2] {
     [-RING_SPREAD, RING_SPREAD]
-}
-
-/// The ring mechanism on the spine. Its rings come out of the top of the
-/// mechanism and go through the punched holes of the pages.
-fn spawn_rings(
-    hinge: &mut ChildSpawnerCommands,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
-) {
-    let center = ring_center();
-    let low = (MECHANISM_TOP - RING_DIP - center.y) / RING_RADIUS;
-    let foot = low.asin();
-    let width = 2.0 * (RING_RADIUS * foot.cos() + RING_WIRE + MECHANISM_LIP);
-    let mechanism = Block::between(
-        Vec3::new(
-            center.x - width / 2.0,
-            -BOARD / 2.0,
-            -MECHANISM_LENGTH / 2.0,
-        ),
-        Vec3::new(
-            center.x + width / 2.0,
-            MECHANISM_TOP,
-            MECHANISM_LENGTH / 2.0,
-        ),
-    );
-    hinge.spawn((Shape::cuboid(&mechanism, MECHANISM_PAINT), Finish::Paint));
-    let ring = meshes.add(
-        Torus {
-            minor_radius: RING_WIRE,
-            major_radius: RING_RADIUS,
-        }
-        .mesh()
-        .angle_range(foot..=PI - foot)
-        .build(),
-    );
-    let metal = materials.add(StandardMaterial {
-        base_color: METAL,
-        metallic: 1.0,
-        perceptual_roughness: 0.35,
-        ..default()
-    });
-    for z in ring_holes() {
-        hinge.spawn((
-            Mesh3d(ring.clone()),
-            MeshMaterial3d(metal.clone()),
-            Transform::from_translation(center.extend(z))
-                .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
-        ));
-    }
 }
 
 /// The label and the finger hole on the outside of the spine. They are

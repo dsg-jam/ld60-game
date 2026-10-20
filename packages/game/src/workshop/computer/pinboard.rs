@@ -11,7 +11,7 @@ use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::framing;
 use crate::player::focus::{Aside, Clickable, Focus};
-use crate::workshop::manuals::{Pins, Sheet};
+use crate::workshop::manuals::{MoveSheet, Pins, RailSlot, Sheet};
 use crate::workshop::run::Run;
 
 /// A page of the manuals file at five eighths of its size, so the sheets
@@ -147,6 +147,7 @@ impl PinBoard {
                                     SHEET_GLOW,
                                     meshes,
                                 ),
+                                RailSlot(index),
                                 Visibility::Hidden,
                             ))
                             .id();
@@ -269,7 +270,7 @@ impl PinBoard {
         state: Res<State<Focus>>,
         sheets: Query<&Hanging>,
         mut boards: Query<&mut Aside, With<PinBoard>>,
-        mut run: ResMut<Run>,
+        mut commands: Commands,
     ) {
         if press.button != PointerButton::Primary {
             return;
@@ -278,7 +279,7 @@ impl PinBoard {
             return;
         };
         match Self::click(&state, &boards.as_readonly()) {
-            Some(SheetClick::Unpin) => run.pins_mut().unpin(hanging.0),
+            Some(SheetClick::Unpin) => commands.trigger(MoveSheet::Unpin(hanging.0)),
             Some(SheetClick::LookAt) => {
                 for mut aside in &mut boards {
                     aside.open = true;

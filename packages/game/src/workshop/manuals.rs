@@ -4,7 +4,9 @@ mod datasheet;
 mod dividers;
 mod in_file;
 mod index;
+mod mechanism;
 mod model;
+mod moves;
 mod pins;
 mod pose;
 mod punched;
@@ -19,6 +21,8 @@ use self::dividers::{DividerTab, Tab};
 use self::in_file::InFile;
 use self::index::{Hover, Links, PageLink, PinButton};
 use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
+use self::moves::SheetMoves;
+pub(crate) use self::moves::{MoveSheet, RailSlot};
 pub(crate) use self::pins::{Pins, Sheet};
 use self::pose::Pose;
 use self::stack::Stack;
@@ -51,12 +55,14 @@ impl Plugin for ManualsPlugin {
             .add_observer(PageLink::open_on_click)
             .add_observer(DividerTab::open_on_click)
             .add_observer(PinButton::pin_on_click)
+            .add_observer(SheetMoves::wait)
             .add_observer(Hover::show_enter)
             .add_observer(Hover::show_leave)
             .add_systems(
                 Update,
                 (
-                    ShopManuals::file.run_if(resource_exists_and_changed::<Run>),
+                    SheetMoves::fly,
+                    ShopManuals::file,
                     ShopManuals::switch_on_keys,
                     ShopManuals::pin_on_key,
                     LeafKit::make,
@@ -95,6 +101,8 @@ struct Filed {
     pages: UiCanvas,
     /// Draws the page on a turning leaf.
     leaf_pages: UiCanvas,
+    /// Draws the page on its way to or from the rail.
+    flight: UiCanvas,
     labels: UiCanvas,
     contents: Contents,
     /// The pins the file was filed for. Pinned pages are not in it.
@@ -123,6 +131,7 @@ impl ShopManuals {
             GlobalTransform::from(file.open_at).reparented_to(&GlobalTransform::from(*stand));
         let pages = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let leaf_pages = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
+        let flight = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let spine = UiCanvas::spawn_smooth(&mut commands, &mut images, SPINE_CANVAS, add.entity);
         let labels = UiCanvas::spawn_smooth(
             &mut commands,
@@ -155,6 +164,7 @@ impl ShopManuals {
             Binding::rings(),
             Pose::default(),
             Stack::default(),
+            SheetMoves::default(),
             FocusTarget {
                 prompt: "click-manuals",
                 focus: Focus::Paper,
@@ -180,6 +190,7 @@ impl ShopManuals {
             Filed {
                 pages,
                 leaf_pages,
+                flight,
                 labels,
                 contents: Contents::default(),
                 pins: Pins::default(),
@@ -192,30 +203,42 @@ impl ShopManuals {
 
     /// Files the manuals, errata and notes the shop owns, and takes out
     /// those of an earlier run. Pinned pages stay out until they are
-    /// unpinned. The file stays at the page it is open at, or the one after
-    /// it if that page is pinned.
+    /// unpinned, and so does a page on its way to the rail. The file stays
+    /// at the page it is open at, or the one after it if that page is out.
     fn file(
         run: Res<Run>,
-        mut files: Query<(Entity, &mut Paper, &mut Filed, &mut Stack, &Parts)>,
+        mut files: Query<(
+            Entity,
+            &mut Paper,
+            &mut Filed,
+            &mut Stack,
+            &Parts,
+            &SheetMoves,
+        )>,
         tabs: Query<(Entity, &DividerTab)>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
         mut commands: Commands,
     ) {
-        let contents = Contents::of(&run);
-        for (file, mut paper, mut filed, mut stack, parts) in &mut files {
-            if filed.contents == contents && filed.pins == *run.pins() {
+        let mut shop = None;
+        for (file, mut paper, mut filed, mut stack, parts, moves) in &mut files {
+            let pins = moves.filed_pins(run.pins());
+            if !run.is_changed() && filed.pins == pins {
                 continue;
             }
-            let refiled = filed.contents != contents;
+            let contents: &Contents = shop.get_or_insert_with(|| Contents::of(&run));
+            if filed.contents == *contents && filed.pins == pins {
+                continue;
+            }
+            let refiled = filed.contents != *contents;
             let open = filed.in_file.number(paper.current_page());
-            let in_file = InFile::new(&contents, run.pins());
+            let in_file = InFile::new(contents, &pins);
             let all = contents.pages();
             let count = all.len();
             let links = Links {
                 file,
                 in_file: &in_file,
-                rail_full: run.pins().is_full(),
+                rail_full: pins.is_full(),
             };
             let mut seeds = Vec::new();
             let mut pages = Vec::new();
@@ -259,7 +282,7 @@ impl ShopManuals {
             commands.entity(parts.spine).with_children(|spine| {
                 let starts = Tab::ALL
                     .into_iter()
-                    .filter_map(|tab| Some((tab, tab.start(&contents)?)));
+                    .filter_map(|tab| Some((tab, tab.start(contents)?)));
                 for (position, (tab, start)) in starts.enumerate() {
                     // A divider stays in front of the first page after it
                     // that is in the file.
@@ -277,7 +300,7 @@ impl ShopManuals {
             *stack = Stack::new(&seeds, &cards);
             stack.jump_to(paper.current_page());
             filed.contents = contents.clone();
-            filed.pins = run.pins().clone();
+            filed.pins = pins;
             filed.in_file = in_file;
             if refiled {
                 filed.job = None;
@@ -373,12 +396,12 @@ impl ShopManuals {
         state: Res<State<Focus>>,
         focused: Res<Focused>,
         files: Query<(&Paper, &Filed)>,
-        mut run: ResMut<Run>,
+        mut commands: Commands,
     ) {
         if keys.just_pressed(PIN_KEY)
             && let Some(sheet) = Self::open_sheet(&state, &focused, &files)
         {
-            run.pins_mut().pin(sheet);
+            commands.trigger(MoveSheet::Pin(sheet));
         }
     }
 
@@ -576,13 +599,14 @@ mod tests {
     }
 
     #[test]
-    fn the_pin_key_pins_the_open_page() {
+    fn the_pin_key_asks_to_pin_the_open_page() {
         let (mut world, file) = world_with_file();
         world.init_resource::<ButtonInput<KeyCode>>();
         world.insert_resource(State::new(Focus::Paper));
         world.init_resource::<Focused>();
         world.init_resource::<NextState<Focus>>();
         world.add_observer(FocusOn::apply);
+        world.add_observer(SheetMoves::wait);
         world.trigger(FocusOn { entity: file });
         world.flush();
         let press = |world: &mut World| {
@@ -593,11 +617,18 @@ mod tests {
             world.run_system_cached(ShopManuals::pin_on_key).unwrap();
         };
         press(&mut world);
-        assert!(world.resource::<Run>().pins().is_empty());
+        world.flush();
+        assert!(world.get::<SheetMoves>(file).unwrap().waiting().is_empty());
         world.get_mut::<Paper>(file).unwrap().open_page(2);
         press(&mut world);
+        press(&mut world);
+        world.flush();
         let pinned = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
-        assert_eq!(world.resource::<Run>().pins().slots(), [Some(pinned), None]);
+        assert_eq!(
+            world.get::<SheetMoves>(file).unwrap().waiting(),
+            [MoveSheet::Pin(pinned)]
+        );
+        world.resource_mut::<Run>().pins_mut().pin(pinned);
         world.run_system_cached(ShopManuals::file).unwrap();
         world.flush();
         let paper = world.get::<Paper>(file).unwrap();

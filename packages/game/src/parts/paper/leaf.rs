@@ -16,7 +16,7 @@ use crate::audio::{PlayAt, Sound};
 /// How far a turning page bends at most, in radians over its free width.
 const CURL: f32 = 0.9;
 /// Seconds a sheet takes to show its wrinkles once nothing presses it flat.
-const RELAX_TIME: f32 = 0.45;
+pub(crate) const RELAX_TIME: f32 = 0.45;
 /// A turning leaf presses the sheet it comes down on flat once it is closer
 /// than this many radians.
 const CLEAR: f32 = FRAC_PI_2;
@@ -441,7 +441,7 @@ fn reversed(mesh: &Mesh) -> Mesh {
 
 /// `mesh` of a sheet with its wrinkles scaled by `relax`, see
 /// [`Bulge::relax`].
-fn relaxed(mesh: &Mesh, relax: f32) -> Mesh {
+pub(super) fn relaxed(mesh: &Mesh, relax: f32) -> Mesh {
     let mut relaxed = mesh.clone();
     if let Some(VertexAttributeValues::Float32x3(positions)) =
         relaxed.attribute_mut(Mesh::ATTRIBUTE_POSITION)

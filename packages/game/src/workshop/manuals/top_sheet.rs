@@ -35,6 +35,11 @@ impl TopSheet {
         }
     }
 
+    /// The share of its wrinkles it shows.
+    pub(super) fn share(&self) -> f32 {
+        self.shown.unwrap_or(0.0)
+    }
+
     /// Shows `page`, which comes to the top pressed flat.
     pub(super) fn show(&mut self, page: usize) {
         if self.page != Some(page) {

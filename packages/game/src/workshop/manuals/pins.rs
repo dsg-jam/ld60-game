@@ -40,6 +40,11 @@ impl Sheet {
         self.entry
     }
 
+    /// Where the sheet is among all pages of `contents`.
+    pub(super) fn number(self, contents: &Contents) -> Option<usize> {
+        Some(contents.start_of(self.entry)? + self.page)
+    }
+
     /// The page, if the entry has it.
     pub(super) fn page(self) -> Option<Page> {
         if let Entry::Note(note) = self.entry {

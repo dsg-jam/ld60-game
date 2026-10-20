@@ -8,10 +8,10 @@ use bevy::{
 
 use super::contents::{Contents, Entry, Page, Section};
 use super::in_file::InFile;
+use super::moves::MoveSheet;
 use super::pins::Sheet;
 use crate::locale::{Localized, Message};
 use crate::parts::paper::{INK, PAPER, Paper, PaperButton};
-use crate::workshop::run::Run;
 
 /// Under the pointer, buttons and index lines take this color.
 const HOVER: Color = Color::srgba_u8(0x2a, 0x26, 0x22, 0x30);
@@ -113,13 +113,13 @@ impl PinButton {
     pub(super) fn pin_on_click(
         click: On<PointerClick>,
         buttons: Query<&PinButton>,
-        mut run: ResMut<Run>,
+        mut commands: Commands,
     ) {
         if click.button != PointerButton::Primary {
             return;
         }
         if let Ok(button) = buttons.get(click.entity) {
-            run.pins_mut().pin(button.0);
+            commands.trigger(MoveSheet::Pin(button.0));
         }
     }
 }

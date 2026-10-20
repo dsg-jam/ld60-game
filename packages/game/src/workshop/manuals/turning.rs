@@ -11,6 +11,7 @@ use bevy::prelude::*;
 
 use super::Filed;
 use super::model::{HOLE_INSET, Parts};
+use super::moves::SheetMoves;
 use super::pose::Pose;
 use super::stack::{Stack, Turning};
 use super::top_sheet::TopSheet;
@@ -74,13 +75,21 @@ impl Stack {
     /// Turns towards the open page of the paper one leaf at a time while
     /// the file lies open, and jumps there while it is shut.
     pub(super) fn turn(
-        mut files: Query<(&Paper, &mut Stack, &Pose, &Parts, &Filed, &LeafKit)>,
+        mut files: Query<(
+            &Paper,
+            &mut Stack,
+            &Pose,
+            &Parts,
+            &Filed,
+            &LeafKit,
+            &SheetMoves,
+        )>,
         leaves: Query<(), With<Leaf>>,
         tops: Query<&TopSheet>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut commands: Commands,
     ) {
-        for (paper, mut stack, pose, parts, filed, kit) in &mut files {
+        for (paper, mut stack, pose, parts, filed, kit, moves) in &mut files {
             if let Some(turning) = &stack.turning {
                 let flying = leaves.contains(turning.leaf);
                 if flying && pose.is_open() {
@@ -96,6 +105,9 @@ impl Stack {
                 if !stack.is_at(page) {
                     stack.jump_to(page);
                 }
+                continue;
+            }
+            if moves.holds_open_page() {
                 continue;
             }
             let Some((items, forward)) = stack.next_turn(page) else {

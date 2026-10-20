@@ -12,6 +12,7 @@ use bevy::{
 };
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
+use super::leaf::{relaxed, relaxing};
 use super::press::Print;
 use super::{Binding, PAPER_REFLECTANCE, PAPER_SHADE, Paper};
 
@@ -36,7 +37,7 @@ impl Plugin for SheetPlugin {
         load_shader_library!(app, "press.wesl");
         embedded_asset!(app, "sheet.wesl");
         app.add_plugins(MaterialPlugin::<PaperMaterial>::default())
-            .add_systems(Update, Sheet::follow_print)
+            .add_systems(Update, (Sheet::follow_print, Pressed::press))
             .add_observer(Sheet::add_material)
             .add_observer(Self::hold_bound_edge);
     }
@@ -103,6 +104,37 @@ pub(super) struct SheetPrint(pub(super) Handle<Image>);
 /// Light a sheet gives off where the paper is bare.
 #[derive(Component, Debug)]
 pub(super) struct SheetGlow(pub(super) LinearRgba);
+
+/// Presses a sheet with [`Wrinkles`] flat, or lets it relax again.
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Pressed {
+    /// Seconds of relaxing it has had since it was pressed flat, see
+    /// [`relaxing`].
+    pub(crate) relaxed: f32,
+    /// Whether it relaxes on its own as time goes on.
+    pub(crate) relaxing: bool,
+}
+
+impl Pressed {
+    /// Shows the share of the wrinkles each pressed sheet has relaxed to.
+    fn press(
+        time: Res<Time>,
+        mut sheets: Query<(&mut Pressed, &Wrinkles, &Mesh3d)>,
+        mut meshes: ResMut<Assets<Mesh>>,
+    ) {
+        for (mut pressed, wrinkles, mesh) in &mut sheets {
+            let share = relaxing(pressed.relaxed);
+            if pressed.relaxing && share < 1.0 {
+                pressed.relaxed += time.delta_secs();
+            } else if !pressed.is_changed() {
+                continue;
+            }
+            if let Some(mut mesh) = meshes.get_mut(mesh) {
+                *mesh = relaxed(&wrinkles.mesh(), relaxing(pressed.relaxed));
+            }
+        }
+    }
+}
 
 /// The shape of a crumpled sheet that was flattened again.
 #[derive(Component, Debug, Clone, Copy)]
@@ -244,7 +276,7 @@ impl Wrinkles {
         wrinkles
     }
 
-    pub(super) fn size(&self) -> Vec2 {
+    pub(crate) fn size(&self) -> Vec2 {
         self.size
     }
 
