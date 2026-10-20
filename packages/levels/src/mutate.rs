@@ -16,6 +16,11 @@ pub enum Operator {
     DroppedInstruction,
     /// An instruction moved below the next one, which depends on it.
     SwappedInstructions,
+    /// A jump to another label, like `JZ store` for `JZ main`.
+    WrongTarget,
+    /// A key check with the code of another key of the board, like
+    /// `CPI 0x0B` for `CPI 0x0C`.
+    WrongKey,
 }
 
 /// One operator applied at one place in the firmware.
@@ -29,16 +34,19 @@ pub(crate) struct Mutation {
 }
 
 impl Operator {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::OffByOne,
         Self::FlippedJump,
         Self::WrongCell,
         Self::DroppedInstruction,
         Self::SwappedInstructions,
+        Self::WrongTarget,
+        Self::WrongKey,
     ];
 
-    /// The mutations this operator can make at line `at`.
-    fn at(self, lines: &[String], at: usize) -> Vec<Mutation> {
+    /// The mutations this operator can make at line `at`. `keys` are the
+    /// codes of the keys that are not digits.
+    fn at(self, lines: &[String], at: usize, keys: &[u8]) -> Vec<Mutation> {
         let text = &lines[at];
         let line = Line::new(text);
         let Some(mnemonic) = line.mnemonic() else {
@@ -88,16 +96,33 @@ impl Operator {
                 vec![replace(label.into_iter().collect())]
             }
             (Self::SwappedInstructions, ..) => Mutation::swap(lines, at).into_iter().collect(),
+            (Self::WrongTarget, "JMP" | "JZ" | "JNZ" | "JC" | "JNC", [target]) => {
+                let labels = lines
+                    .iter()
+                    .filter_map(|line| Line::new(line).label())
+                    .filter(|label| label != target && !returns(lines, label))
+                    .map(String::from)
+                    .collect();
+                replace_operand(target, labels)
+            }
+            (Self::WrongKey, "CPI", [value]) if checks_equal(lines, at) => {
+                let Some(old) = number(value).filter(|code| keys.contains(code)) else {
+                    return Vec::new();
+                };
+                let others = keys.iter().filter(|&&code| code != old);
+                replace_operand(value, others.map(|&n| immediate(value, n)).collect())
+            }
             _ => Vec::new(),
         }
     }
 }
 
 impl Mutation {
-    /// Every mutation `operator` can make in `lines`.
-    pub(crate) fn candidates(lines: &[String], operator: Operator) -> Vec<Self> {
+    /// Every mutation `operator` can make in `lines`. `keys` are the codes
+    /// of the keys that are not digits.
+    pub(crate) fn candidates(lines: &[String], operator: Operator, keys: &[u8]) -> Vec<Self> {
         (0..lines.len())
-            .flat_map(|at| operator.at(lines, at))
+            .flat_map(|at| operator.at(lines, at, keys))
             .collect()
     }
 
@@ -143,6 +168,45 @@ impl Mutation {
     }
 }
 
+/// Whether the code at `label` can reach a `RET` without a `CALL` first. A
+/// jump there would return to whatever the stack held.
+fn returns(lines: &[String], label: &str) -> bool {
+    let find = |name: &str| {
+        lines
+            .iter()
+            .position(|line| Line::new(line).label() == Some(name))
+    };
+    let mut todo: Vec<usize> = find(label).into_iter().collect();
+    let mut seen = vec![false; lines.len()];
+    while let Some(at) = todo.pop() {
+        if at >= lines.len() || seen[at] {
+            continue;
+        }
+        seen[at] = true;
+        let line = Line::new(&lines[at]);
+        let mnemonic = line.mnemonic().unwrap_or_default();
+        match mnemonic.as_str() {
+            "RET" => return true,
+            "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "DJNZ" => {
+                todo.extend(line.operands().last().and_then(|target| find(target)));
+            }
+            _ => {}
+        }
+        if mnemonic != "JMP" {
+            todo.push(at + 1);
+        }
+    }
+    false
+}
+
+/// Whether the line after `at` jumps on an equal or unequal compare.
+fn checks_equal(lines: &[String], at: usize) -> bool {
+    lines
+        .get(at + 1)
+        .and_then(|line| Line::new(line).mnemonic())
+        .is_some_and(|mnemonic| mnemonic == "JZ" || mnemonic == "JNZ")
+}
+
 /// The cells next to a direct `Mn` or indexed `[B+n]` operand.
 fn neighbour_cells(operand: &str) -> Vec<String> {
     if let Some(n) = cell(operand) {
@@ -182,7 +246,7 @@ mod tests {
 
     fn mutate(source: &str, operator: Operator) -> Vec<String> {
         let lines: Vec<String> = source.lines().map(String::from).collect();
-        Mutation::candidates(&lines, operator)
+        Mutation::candidates(&lines, operator, &[0x0A, 0x0C])
             .iter()
             .map(|m| Mutation::apply(&lines, &[m]))
             .collect()
@@ -252,6 +316,44 @@ mod tests {
                 Operator::DroppedInstruction
             ),
             ["main: HLT\nloop:\n  ST M1\n", "main: HLT\nloop: INC\n"]
+        );
+    }
+
+    #[test]
+    fn jumps_to_other_labels() {
+        assert_eq!(
+            mutate("a:  JZ  b\nbb: JMP a\nb:  HLT\n", Operator::WrongTarget),
+            [
+                "a:  JZ  a\nbb: JMP a\nb:  HLT\n",
+                "a:  JZ  bb\nbb: JMP a\nb:  HLT\n",
+                "a:  JZ  b\nbb: JMP bb\nb:  HLT\n",
+                "a:  JZ  b\nbb: JMP b\nb:  HLT\n",
+            ]
+        );
+    }
+
+    #[test]
+    fn never_jumps_into_a_routine() {
+        assert_eq!(
+            mutate(
+                "main: JZ  a\n      CALL r\na:    JMP main\nr:    INC\n      RET\n",
+                Operator::WrongTarget
+            ),
+            [
+                "main: JZ  main\n      CALL r\na:    JMP main\nr:    INC\n      RET\n",
+                "main: JZ  a\n      CALL r\na:    JMP a\nr:    INC\n      RET\n",
+            ]
+        );
+    }
+
+    #[test]
+    fn checks_for_other_keys_only_before_equal_jumps() {
+        assert_eq!(
+            mutate(
+                "  CPI 0x0C\n  JZ  a\n  CPI 0x0A\n  JC  b\n  CPI 3\n  JZ  c\n",
+                Operator::WrongKey
+            ),
+            ["  CPI 0x0A\n  JZ  a\n  CPI 0x0A\n  JC  b\n  CPI 3\n  JZ  c\n"]
         );
     }
 

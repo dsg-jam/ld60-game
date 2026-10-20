@@ -128,7 +128,11 @@ fn misaligned(job: &Generated) -> Vec<String> {
     for bug in bugs {
         let at = bug.line - shift;
         match bug.operator {
-            Operator::OffByOne | Operator::FlippedJump | Operator::WrongCell => {
+            Operator::OffByOne
+            | Operator::FlippedJump
+            | Operator::WrongCell
+            | Operator::WrongTarget
+            | Operator::WrongKey => {
                 pairs.push((fixed[bug.line], buggy[at]));
             }
             Operator::SwappedInstructions => {

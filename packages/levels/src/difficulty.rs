@@ -82,6 +82,8 @@ impl Difficulty {
                 job.min(4),
                 (job / 2).min(4),
                 (job.saturating_sub(4) / 2).min(4),
+                (job.saturating_sub(6) / 2).min(3),
+                (job.saturating_sub(2) / 2).min(3),
             ],
             chip: Self::pick_chip(job, device, datasheets, errata),
             fault_chance: (job.saturating_sub(4) * 5).min(30),

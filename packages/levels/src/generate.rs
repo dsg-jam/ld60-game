@@ -244,13 +244,20 @@ impl Generated {
         let level = &working.level;
         let lines: Vec<String> = working.fixed.lines().map(String::from).collect();
         let fixed = initial_rom(level, &working.fixed).ok()?;
+        let key_codes: Vec<u8> = level
+            .board()
+            .keys
+            .iter()
+            .filter(|(key, _)| !key.is_ascii_digit())
+            .map(|&(_, code)| code)
+            .collect();
         let mut chosen: Vec<(Mutation, TestCase)> = Vec::new();
         for _ in 0..PICKS {
             if chosen.len() == bugs {
                 break;
             }
             let operator = difficulty.operator(rng);
-            let candidates: Vec<Mutation> = Mutation::candidates(&lines, operator)
+            let candidates: Vec<Mutation> = Mutation::candidates(&lines, operator, &key_codes)
                 .into_iter()
                 .filter(|m| chosen.iter().all(|(other, ..)| other.apart(m)))
                 .collect();
