@@ -12,6 +12,7 @@ use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use self::pinboard::PinBoard;
 use self::pinboard::arm::Arm;
+use self::pinboard::sway::Sway;
 use self::typing::MouseTyping;
 use self::views::{BackToScreen, Views};
 use super::dust::Dust;
@@ -54,6 +55,7 @@ impl Plugin for ComputerPlugin {
                     PinBoard::follow_pins,
                     PinBoard::arm,
                     Arm::swing,
+                    (Sway::tilt_new_pages, Sway::swing).chain(),
                     MouseTyping::release,
                 ),
             )

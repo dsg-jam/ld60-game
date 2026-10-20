@@ -1,4 +1,5 @@
 pub(super) mod arm;
+pub(super) mod sway;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -8,6 +9,7 @@ use bevy::{
 };
 
 use self::arm::Arm;
+use self::sway::Sway;
 use super::monitor::Monitor;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
@@ -185,6 +187,7 @@ impl PinBoard {
                                     meshes,
                                 ),
                                 RailSlot(index),
+                                Sway::new(center.with_y(clip.min().y + CLIP_GRIP), center, index),
                                 Visibility::Hidden,
                             ))
                             .id();

@@ -1,3 +1,4 @@
+mod draft;
 mod flying;
 mod models;
 mod sound;
@@ -8,6 +9,7 @@ use std::error::Error;
 use bevy::prelude::*;
 use rand::RngExt;
 
+pub(crate) use self::draft::Draft;
 use self::flying::SkyCar;
 use self::models::{Body, Fleet};
 use self::spray::Spray;
@@ -48,8 +50,9 @@ impl Plugin for TrafficPlugin {
             flying::FlyingPlugin,
             sound::TrafficSoundPlugin,
         ))
+        .init_resource::<Draft>()
         .add_systems(Startup, Vehicle::spawn_all)
-        .add_systems(Update, (Vehicle::drive, Vehicle::rumble));
+        .add_systems(Update, (Vehicle::drive, Vehicle::rumble, Vehicle::push_air));
     }
 }
 
@@ -116,6 +119,17 @@ impl Vehicle {
             let distance = transform.translation.length_squared() + RUMBLE_NEAR;
             shake.0 += RUMBLE * vehicle.velocity.abs() / distance;
         }
+    }
+
+    /// Passing vehicles push air into the shop.
+    fn push_air(vehicles: Query<(&Vehicle, &Transform)>, mut draft: ResMut<Draft>) {
+        let air = vehicles
+            .iter()
+            .map(|(vehicle, transform)| {
+                Draft::from_vehicle(transform.translation, Vec3::X * vehicle.velocity)
+            })
+            .sum();
+        draft.set_if_neq(Draft(air));
     }
 
     fn drive(time: Res<Time>, mut vehicles: Query<(&Vehicle, &mut Transform)>) {

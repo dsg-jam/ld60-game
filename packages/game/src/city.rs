@@ -13,6 +13,8 @@ mod traffic;
 mod weather;
 mod wet;
 
+pub(crate) use self::traffic::Draft;
+
 use std::f32::consts::PI;
 
 use bevy::{
