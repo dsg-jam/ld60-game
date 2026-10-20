@@ -1,8 +1,11 @@
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
+use bevy::{
+    ecs::relationship::RelatedSpawnerCommands, picking::hover::HoverMap, prelude::*,
+    text::LineHeight,
+};
 
 use super::{
     cursor,
-    focus::{Aside, Focused},
+    focus::{self, Aside, Clickable, Focused},
     look::Gaze,
     zoom::Zoom,
 };
@@ -86,7 +89,8 @@ struct BackHint;
 pub(crate) struct KeyHint(pub(crate) Option<(&'static str, Message)>);
 
 /// What a left click does where the mouse is, shown after the hint for
-/// going back.
+/// going back. Without one, the line says what a click on a [`Clickable`]
+/// does.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub(crate) struct ClickHint(pub(crate) Option<Message>);
 
@@ -382,13 +386,22 @@ impl Hint {
 impl ClickHint {
     fn update(
         hint: Res<ClickHint>,
+        focused: Res<Focused>,
+        hovers: Res<HoverMap>,
+        parents: Query<&ChildOf>,
+        clickables: Query<&Clickable>,
         mut parts: Query<(&ClickHintPart, &mut Node, Option<&mut Localized>)>,
+        mut shown: Local<Option<Message>>,
     ) {
-        if !hint.is_changed() {
+        let action = hint.0.clone().or_else(|| {
+            focused.get()?;
+            focus::hovered_prompt(&hovers, &parents, &clickables, &focused).map(Message::new)
+        });
+        if *shown == action {
             return;
         }
         for (part, mut node, text) in &mut parts {
-            match (part, &hint.0, text) {
+            match (part, &action, text) {
                 (ClickHintPart::Row, action, _) => {
                     node.display = if action.is_some() {
                         Display::Flex
@@ -402,6 +415,7 @@ impl ClickHint {
                 _ => {}
             }
         }
+        *shown = action;
     }
 }
 

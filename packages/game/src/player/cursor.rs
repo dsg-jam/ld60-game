@@ -8,6 +8,7 @@ use bevy::{
 };
 
 use self::sprite::Sprite;
+use super::crosshair::Prompt;
 use super::focus::{self, Clickable, Focus};
 use crate::menu::AppState;
 use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
@@ -78,8 +79,12 @@ pub(super) struct CursorPlugin;
 
 impl Plugin for CursorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, Cursors::load)
-            .add_systems(Update, Cursors::update.run_if(resource_exists::<Cursors>));
+        app.add_systems(Startup, Cursors::load).add_systems(
+            Update,
+            Cursors::update
+                .after(Prompt::update)
+                .run_if(resource_exists::<Cursors>),
+        );
     }
 }
 
@@ -89,10 +94,18 @@ enum Kind {
     Finger,
     Dot,
     HoverDot,
+    /// While the crosshair shows a [`Prompt`] in place of the cursor.
+    Hidden,
 }
 
 impl Kind {
-    const ALL: [Self; 4] = [Self::Arrow, Self::Finger, Self::Dot, Self::HoverDot];
+    const ALL: [Self; 5] = [
+        Self::Arrow,
+        Self::Finger,
+        Self::Dot,
+        Self::HoverDot,
+        Self::Hidden,
+    ];
 
     fn sprite(self) -> Sprite {
         match self {
@@ -100,6 +113,7 @@ impl Kind {
             Self::Finger => Sprite::pixel_art(FINGER, SCALE, IVec2::new(5, 0), ART_FILL, DOT_INK),
             Self::Dot => Self::dot(DOT_SIZE),
             Self::HoverDot => Self::dot(DOT_HOVER_SIZE),
+            Self::Hidden => Sprite::pixel_art(&[" "], 1, IVec2::ZERO, ART_FILL, DOT_INK),
         }
     }
 
@@ -116,9 +130,13 @@ impl Kind {
     }
 
     /// The web skips crossfades, since Firefox miscolors their translucent
-    /// frames.
+    /// frames. The prompt of the crosshair comes at once, so the cursor goes
+    /// at once too.
     fn animates_to(self, to: Self) -> bool {
-        cfg!(not(target_family = "wasm")) || (self.diameter().is_some() && to.diameter().is_some())
+        self != Self::Hidden
+            && to != Self::Hidden
+            && (cfg!(not(target_family = "wasm"))
+                || (self.diameter().is_some() && to.diameter().is_some()))
     }
 
     /// The image `t` of the way from `self` to `to`.
@@ -188,10 +206,13 @@ impl Cursors {
         surfaces: Query<&ScreenSurface>,
         keys: Query<&PressableKey>,
         targets: Query<(), With<Clickable>>,
+        prompt: Res<Prompt>,
         mut icon: Single<&mut CursorIcon, With<PrimaryWindow>>,
     ) {
         let under: Vec<Entity> = focus::under_mouse(&hovers, &parents).collect();
-        let wanted = if *app_state.get() != AppState::Playing
+        let wanted = if *app_state.get() == AppState::Playing && prompt.at_cursor() {
+            Kind::Hidden
+        } else if *app_state.get() != AppState::Playing
             || surfaces.iter().any(ScreenSurface::hovered)
         {
             Kind::Arrow

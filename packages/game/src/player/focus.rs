@@ -248,6 +248,40 @@ impl Focused {
     }
 }
 
+/// The prompt of the [`Clickable`] under the mouse. While focused only the
+/// parts of the focused thing count, since clicks elsewhere do nothing.
+pub(crate) fn hovered_prompt(
+    hovers: &HoverMap,
+    parents: &Query<&ChildOf>,
+    clickables: &Query<&Clickable>,
+    focused: &Focused,
+) -> Option<&'static str> {
+    let Some(focused) = focused.get() else {
+        return under_mouse(hovers, parents)
+            .find_map(|entity| clickables.get(entity).ok())
+            .map(|clickable| clickable.prompt);
+    };
+    hovers
+        .get(&PointerId::Mouse)
+        .into_iter()
+        .flat_map(|hits| hits.keys())
+        .find_map(|&hit| {
+            let path: Vec<Entity> = iter::once(hit)
+                .chain(parents.iter_ancestors(hit))
+                .take_while(|&entity| entity != focused)
+                .collect();
+            let inside = path.last().is_some_and(|&last| {
+                parents
+                    .get(last)
+                    .is_ok_and(|parent| parent.parent() == focused)
+            });
+            path.into_iter()
+                .filter(|_| inside)
+                .find_map(|entity| clickables.get(entity).ok())
+        })
+        .map(|clickable| clickable.prompt)
+}
+
 /// Entities under the mouse, each followed by its ancestors.
 pub(crate) fn under_mouse<'a>(
     hovers: &'a HoverMap,
@@ -262,7 +296,44 @@ pub(crate) fn under_mouse<'a>(
 
 #[cfg(test)]
 mod tests {
+    use bevy::{ecs::system::RunSystemOnce, picking::backend::HitData};
+
     use super::*;
+
+    #[test]
+    fn focused_prompts_come_from_parts_of_the_focused_thing() {
+        let mut world = World::new();
+        let clickable = |prompt| Clickable { prompt };
+        let radio = world.spawn(clickable("click-radio")).id();
+        let knob = world
+            .spawn((clickable("click-volume"), ChildOf(radio)))
+            .id();
+        let cap = world.spawn(ChildOf(knob)).id();
+        let manuals = world.spawn(clickable("click-manuals")).id();
+        let prompt = |world: &mut World, hit: Entity, focused: Option<Entity>| {
+            let mut hits = bevy::ecs::entity::EntityHashMap::default();
+            hits.insert(hit, HitData::new(Entity::PLACEHOLDER, 1.0, None, None));
+            let mut hovers = HoverMap::default();
+            hovers.insert(PointerId::Mouse, hits);
+            world.insert_resource(hovers);
+            world.insert_resource(Focused(focused));
+            world
+                .run_system_once(
+                    |hovers: Res<HoverMap>,
+                     parents: Query<&ChildOf>,
+                     clickables: Query<&Clickable>,
+                     focused: Res<Focused>| {
+                        hovered_prompt(&hovers, &parents, &clickables, &focused)
+                    },
+                )
+                .unwrap()
+        };
+        assert_eq!(prompt(&mut world, cap, None), Some("click-volume"));
+        assert_eq!(prompt(&mut world, manuals, None), Some("click-manuals"));
+        assert_eq!(prompt(&mut world, cap, Some(radio)), Some("click-volume"));
+        assert_eq!(prompt(&mut world, radio, Some(radio)), None);
+        assert_eq!(prompt(&mut world, manuals, Some(radio)), None);
+    }
 
     #[test]
     fn escape_comes_back_from_the_aside_first() {
