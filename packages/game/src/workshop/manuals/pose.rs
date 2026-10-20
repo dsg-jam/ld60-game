@@ -137,10 +137,11 @@ fn closed_center(lean: f32) -> Vec3 {
 }
 
 /// Where the closed file with its covers leaning in by `lean` stands, in
-/// the space of the file: on its bottom edge with the spine towards +Z.
-/// The spine stands in the same place however far the covers lean.
+/// the space of the file: on the bottom edge of its pages with the spine
+/// towards +Z. The spine stands in the same place however far the covers
+/// lean.
 pub(super) fn standing(lean: f32) -> Transform {
-    let upright = Quat::from_mat3(&Mat3::from_cols(Vec3::NEG_Z, Vec3::NEG_X, Vec3::Y));
+    let upright = Quat::from_mat3(&Mat3::from_cols(Vec3::NEG_Z, Vec3::X, Vec3::NEG_Y));
     let rotation = upright * Quat::from_rotation_z(lean);
     Transform::from_rotation(rotation)
         .with_translation(Vec3::Y * CLOSED.y / 2.0 - rotation * closed_center(lean))
