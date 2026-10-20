@@ -42,6 +42,7 @@ use self::shades::Shades;
 use self::trace::TraceView;
 use self::undo::Undo;
 use self::versions::VersionsPage;
+use super::views::ZOOM_MODIFIERS;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
 use crate::locale::{Localized, Message};
@@ -94,7 +95,6 @@ impl Plugin for EditorPlugin {
                 Editor::load_job,
                 Command::show_labels,
                 Command::show_owned,
-                Command::look_aside_on_key,
                 (
                     (Listing::follow_job, Breakpoints::follow_job),
                     Breakpoints::toggle_on_margin,
@@ -275,15 +275,19 @@ impl Editor {
         }
     }
 
-    /// `TextInput` only scrolls to follow the caret, so the wheel is ours.
-    /// Layout clamps the offset to the text.
+    /// `TextInput` only scrolls to follow the caret, so the wheel is ours,
+    /// unless it zooms. Layout clamps the offset to the text.
     fn scroll_on_wheel(
         mut scroll: On<PointerScroll>,
+        keys: Res<ButtonInput<KeyCode>>,
         mut editors: Query<&mut EditableText, With<Page>>,
     ) {
         let Ok(mut text) = editors.get_mut(scroll.entity) else {
             return;
         };
+        if keys.any_pressed(ZOOM_MODIFIERS) {
+            return;
+        }
         scroll.propagate(false);
         let pixels = match scroll.unit {
             MouseScrollUnit::Line => scroll.y * SCROLL_LINES * LINE_HEIGHT,

@@ -2,6 +2,7 @@ mod editor;
 mod keyboard;
 mod monitor;
 mod pinboard;
+mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
 
@@ -9,11 +10,13 @@ use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use self::pinboard::PinBoard;
+use self::views::{Glance, Views};
 use super::dust::Dust;
 use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
 use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
-use crate::player::focus::{Aside, Focus, FocusTarget, View};
+use crate::player::focus::{Focus, FocusTarget};
+use crate::player::hints::Hints;
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);
@@ -27,14 +30,15 @@ const DUST_SEED: u64 = 13;
 
 /// Space between the front of the monitor and the back of the keyboard.
 const KEYBOARD_GAP: f32 = 0.06;
-/// Distance of the camera from the glass while focused on the computer.
-const SCREEN_VIEW_DISTANCE: f32 = 0.32;
+/// How much of the keyboard the wide view shows, from the back. The rest
+/// would leave less of the window to the screen.
+const KEYBOARD_SHOWN: f32 = 0.6;
 
 pub(crate) struct ComputerPlugin;
 
 impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(editor::EditorPlugin)
+        app.add_plugins((editor::EditorPlugin, views::ViewsPlugin))
             .add_systems(OnEnter(Focus::Computer), Computer::activate::<true>)
             .add_systems(
                 OnExit(Focus::Computer),
@@ -99,13 +103,16 @@ impl Computer {
             &mut images,
             &mut meshes,
         );
+        let views = layout.views();
+        let (view, close_up, aside) = views.initial(&pins);
         commands
             .entity(add.entity)
-            .insert((dust, pins, Aside::new(layout.screen_view())))
+            .insert((dust, pins, views, close_up, aside))
+            .insert((Glance::default(), Hints::default()))
             .insert(FocusTarget {
                 prompt: "click-computer",
                 focus: Focus::Computer,
-                view: View::Local(layout.screen_view()),
+                view,
             })
             .with_children(|parent| {
                 layout.monitor.spawn(
@@ -161,10 +168,16 @@ impl ComputerLayout {
         self.monitor.body
     }
 
-    /// Camera pose straight in front of the glass.
-    fn screen_view(&self) -> Transform {
-        let glass = self.monitor.glass.center;
-        Transform::from_translation(glass + Vec3::Z * SCREEN_VIEW_DISTANCE)
-            .looking_at(glass, Vec3::Y)
+    /// The wide view shows the glass and the back of the keyboard. It holds
+    /// on to the middle of the keyboard, so narrow windows cut off its sides
+    /// and not the glass.
+    fn views(&self) -> Views {
+        let glass = self.monitor.glass;
+        let corners = [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)]
+            .map(|(x, y)| glass.center + Vec3::new(x, y, 0.0) * glass.size / 2.0);
+        let keyboard = self.keyboard_placement;
+        let shown = keyboard.min().z + keyboard.size.z * KEYBOARD_SHOWN;
+        let edge = Vec3::new(keyboard.center.x, keyboard.max().y, shown);
+        Views::new(corners, [edge])
     }
 }

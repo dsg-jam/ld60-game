@@ -6,6 +6,7 @@ use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
+use crate::player::camera::framing;
 use crate::player::focus::Aside;
 use crate::workshop::manuals::Pins;
 use crate::workshop::run::Run;
@@ -14,8 +15,7 @@ use crate::workshop::run::Run;
 /// leave the tools behind them in sight.
 const SHEET_SIZE: Vec2 = Vec2::new(0.1, 0.1375);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
-/// Between the monitor and the first sheet. It keeps the sheets out of
-/// sight while the player looks at the screen.
+/// Between the monitor and the first sheet.
 const MONITOR_GAP: f32 = 0.05;
 const SHEET_GAP: f32 = 0.01;
 const RAIL_THICKNESS: f32 = 0.006;
@@ -34,8 +34,9 @@ const CLIP_OVERLAP: f32 = 0.003;
 const CLIP_GRIP: f32 = 0.003;
 /// Between the back of a clip and the sheet it holds.
 const SHEET_SPACE: f32 = 0.0005;
-/// Distance of the camera from the sheets while looking at them.
-const VIEW_DISTANCE: f32 = 0.18;
+/// Free space around the sheets while looking at them, as a fraction of the
+/// window.
+const VIEW_MARGIN: f32 = 0.04;
 
 /// The monitor shades the sheets, so they give off a little warm light of
 /// their own to stay readable and look like the pages in the file.
@@ -159,15 +160,19 @@ impl PinBoard {
     }
 
     /// The camera pose that looks straight at the first `count` sheets.
-    fn view(&self, count: usize) -> Transform {
+    pub(super) fn view(&self, count: usize, perspective: &PerspectiveProjection) -> Transform {
         let shown = &self.slots[..count.clamp(1, self.slots.len())];
-        let center = shown.iter().map(|slot| slot.center).sum::<Vec3>() / shown.len() as f32;
-        let eye = center + Vec3::Z * VIEW_DISTANCE;
-        let at = self.rail_space.transform_point(center);
-        Transform::from_translation(self.rail_space.transform_point(eye)).looking_at(at, Vec3::Y)
+        let corners = shown.iter().flat_map(|slot| {
+            [Vec2::new(-1.0, -1.0), Vec2::new(1.0, 1.0)].map(|corner| {
+                self.rail_space
+                    .transform_point(slot.center + (corner * SHEET_SIZE / 2.0).extend(0.0))
+            })
+        });
+        framing(self.rail_space.rotation, corners, perspective, VIEW_MARGIN)
     }
 
-    /// Hangs the pinned sheets and points the [`Aside`] at them.
+    /// Hangs the pinned sheets. The [`Aside`] goes back to the screen once
+    /// none are left.
     pub(super) fn follow_pins(
         run: Res<Run>,
         mut boards: Query<(&mut PinBoard, &mut Aside)>,
@@ -203,7 +208,6 @@ impl PinBoard {
                     visibility.set_if_neq(shown(slot.page.is_some()));
                 }
             }
-            aside.view = board.view(sheets.len());
             if run.pins().is_empty() {
                 aside.open = false;
             }

@@ -11,7 +11,7 @@ use bevy::{
     prelude::*,
 };
 
-use super::focus::{Aside, FocusTarget, Focused, View};
+use super::focus::{Aside, CloseUp, FocusTarget, Focused, View};
 use super::look::LookAngles;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
@@ -155,18 +155,24 @@ impl PlayerCamera {
         time: Res<Time>,
         focused: Res<Focused>,
         angles: Res<LookAngles>,
-        targets: Query<(&FocusTarget, Option<&Aside>, &GlobalTransform)>,
+        targets: Query<(
+            &FocusTarget,
+            Option<&Aside>,
+            Option<&CloseUp>,
+            &GlobalTransform,
+        )>,
         camera: Single<(&mut PlayerCamera, &mut Transform)>,
     ) {
         let (mut camera, mut transform) = camera.into_inner();
         let focus_view = focused
             .get()
             .and_then(|entity| targets.get(entity).ok())
-            .map(|(target, aside, global)| {
-                let view = match aside.filter(|aside| aside.open) {
-                    Some(aside) => View::Local(aside.view),
-                    None => target.view,
-                };
+            .map(|(target, aside, close_up, global)| {
+                let aside = aside.filter(|aside| aside.open).map(|aside| aside.view);
+                let close_up = close_up
+                    .filter(|close_up| close_up.open)
+                    .map(|close_up| close_up.view);
+                let view = aside.or(close_up).map_or(target.view, View::Local);
                 match view {
                     View::Local(view) => global.mul_transform(view).compute_transform(),
                     View::World(view) => view,
@@ -306,8 +312,45 @@ impl CameraOverride {
     }
 }
 
+/// The pose turned to `rotation` that shows all of `points` as large as
+/// `perspective` allows, with `margin` of the view's height and width left
+/// free on each side.
+pub(crate) fn framing(
+    rotation: Quat,
+    points: impl IntoIterator<Item = Vec3>,
+    perspective: &PerspectiveProjection,
+    margin: f32,
+) -> Transform {
+    let slope_y = (perspective.fov / 2.0).tan() * (1.0 - 2.0 * margin);
+    let slope_x = slope_y * perspective.aspect_ratio;
+    // How far the camera has to move along its own axes so each point lies
+    // inside the top, bottom, right and left planes of the frustum.
+    let mut reach = [f32::NEG_INFINITY; 4];
+    for point in points {
+        let point = rotation.inverse() * point;
+        let needed = [
+            point.y + slope_y * point.z,
+            -point.y + slope_y * point.z,
+            point.x + slope_x * point.z,
+            -point.x + slope_x * point.z,
+        ];
+        for (reach, needed) in reach.iter_mut().zip(needed) {
+            *reach = reach.max(needed);
+        }
+    }
+    let [top, bottom, right, left] = reach;
+    let eye = Vec3::new(
+        (right - left) / 2.0,
+        (top - bottom) / 2.0,
+        ((top + bottom) / (2.0 * slope_y)).max((right + left) / (2.0 * slope_x)),
+    );
+    Transform::from_translation(rotation * eye).with_rotation(rotation)
+}
+
 #[cfg(test)]
 mod tests {
+    use bevy::camera::CameraProjection;
+
     use super::*;
 
     const DT: f32 = 1.0 / 60.0;
@@ -333,6 +376,30 @@ mod tests {
             assert!(seconds < TRAVEL_TIME + TURN_TIME);
         }
         assert_eq!(transform, seat());
+    }
+
+    #[test]
+    fn framing_fits_the_points_tightly() {
+        let points = [
+            Vec3::new(-0.15, 0.08, 0.18),
+            Vec3::new(0.15, 0.3, 0.18),
+            Vec3::new(0.0, 0.0, 0.37),
+        ];
+        let rotation = Quat::from_rotation_x(-0.3) * Quat::from_rotation_y(0.2);
+        for aspect_ratio in [0.8, 4.0 / 3.0, 16.0 / 9.0, 3.0] {
+            let perspective = PerspectiveProjection {
+                aspect_ratio,
+                ..default()
+            };
+            let pose = framing(rotation, points, &perspective, 0.05);
+            let clip = perspective.get_clip_from_view() * pose.to_matrix().inverse();
+            let ndc = points.map(|point| clip.project_point3(point).truncate());
+            let reach = ndc
+                .iter()
+                .fold(Vec2::ZERO, |reach, ndc| reach.max(ndc.abs()));
+            assert!(reach.max_element() < 0.9 + 1e-4, "{aspect_ratio} {ndc:?}");
+            assert!(reach.max_element() > 0.9 - 1e-4, "{aspect_ratio} {ndc:?}");
+        }
     }
 
     #[test]

@@ -4,6 +4,10 @@ hint-unpin = Unpin
 hint-next-page = Next page
 hint-previous-page = Previous page
 hint-tab = Turn to { $tab }
+hint-zoom-in = Zoom in
+hint-zoom-out = Zoom out
+hint-look-pins = Look at pins
+hint-look-screen = Look at screen
 
 click-bell = Ring bell
 click-manuals = Open shop manuals

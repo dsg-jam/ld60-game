@@ -13,7 +13,7 @@ use super::trace::TraceView;
 use crate::audio::KeyClicks;
 use crate::device::Emulator;
 use crate::locale::{Localized, Message};
-use crate::player::focus::{Aside, Focus, Focused};
+use crate::player::focus::{Aside, Focused};
 use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
@@ -158,7 +158,8 @@ impl Command {
         }
     }
 
-    /// [`Command::Pinned`] is left to [`Command::look_aside_on_key`].
+    /// The key of [`Command::Pinned`] glances at the sheets, which also works
+    /// while the editor has no focus.
     pub(super) fn run_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         pages: Query<(), With<Page>>,
@@ -178,22 +179,6 @@ impl Command {
         input.propagate(false);
         if input.input.state.is_pressed() && !input.input.repeat {
             commands.trigger(Run(command));
-        }
-    }
-
-    /// The key of [`Command::Pinned`] also works while the editor has no
-    /// focus, which it loses while the player looks at the pinned sheets.
-    pub(super) fn look_aside_on_key(
-        keys: Res<ButtonInput<KeyCode>>,
-        state: Res<State<Focus>>,
-        shop: Res<ShopRun>,
-        mut commands: Commands,
-    ) {
-        if *state.get() == Focus::Computer
-            && keys.just_pressed(Self::Pinned.key())
-            && Self::Pinned.available(&shop)
-        {
-            commands.trigger(Run(Self::Pinned));
         }
     }
 

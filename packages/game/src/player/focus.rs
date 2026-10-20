@@ -22,7 +22,8 @@ impl Plugin for FocusPlugin {
                 Update,
                 (
                     Focused::leave_on_input,
-                    Aside::close_unfocused.run_if(resource_changed::<Focused>),
+                    (Aside::close_unfocused, CloseUp::close_unfocused)
+                        .run_if(resource_changed::<Focused>),
                 ),
             )
             .add_observer(FocusOn::apply)
@@ -82,6 +83,16 @@ pub(crate) struct Aside {
     pub(crate) open: bool,
 }
 
+/// A closer camera pose of a [`FocusTarget`], to look at a detail while
+/// focused on it. Going back with right click or Escape comes back from the
+/// close-up after the [`Aside`].
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct CloseUp {
+    /// Relative to the target.
+    pub(crate) view: Transform,
+    pub(crate) open: bool,
+}
+
 impl Aside {
     pub(crate) fn new(view: Transform) -> Self {
         Self { view, open: false }
@@ -91,6 +102,20 @@ impl Aside {
         for (entity, mut aside) in &mut asides {
             if aside.open && focused.get() != Some(entity) {
                 aside.open = false;
+            }
+        }
+    }
+}
+
+impl CloseUp {
+    pub(crate) fn new(view: Transform) -> Self {
+        Self { view, open: false }
+    }
+
+    fn close_unfocused(focused: Res<Focused>, mut close_ups: Query<(Entity, &mut CloseUp)>) {
+        for (entity, mut close_up) in &mut close_ups {
+            if close_up.open && focused.get() != Some(entity) {
+                close_up.open = false;
             }
         }
     }
@@ -172,22 +197,29 @@ impl Focused {
         next.set(Focus::Desk);
     }
 
-    /// Right click or Escape goes back to the desk, or from an open
-    /// [`Aside`] back to the focused view.
+    /// Right click or Escape goes back to the desk, or first from an open
+    /// [`Aside`] and then from an open [`CloseUp`] back to the focused view.
     pub(super) fn leave_on_input(
         mouse: Res<ButtonInput<MouseButton>>,
         keys: Res<ButtonInput<KeyCode>>,
         mut focused: ResMut<Focused>,
         mut next: ResMut<NextState<Focus>>,
-        mut asides: Query<&mut Aside>,
+        mut views: Query<(Option<&mut Aside>, Option<&mut CloseUp>)>,
     ) {
         let leave = mouse.just_pressed(MouseButton::Right) || keys.just_pressed(KeyCode::Escape);
         let Some(entity) = focused.0.filter(|_| leave) else {
             return;
         };
-        match asides.get_mut(entity) {
-            Ok(mut aside) if aside.open => aside.open = false,
-            _ => focused.leave(&mut next),
+        let Ok((aside, close_up)) = views.get_mut(entity) else {
+            focused.leave(&mut next);
+            return;
+        };
+        if let Some(mut aside) = aside.filter(|aside| aside.open) {
+            aside.open = false;
+        } else if let Some(mut close_up) = close_up.filter(|close_up| close_up.open) {
+            close_up.open = false;
+        } else {
+            focused.leave(&mut next);
         }
     }
 
@@ -267,6 +299,35 @@ mod tests {
         assert!(!world.get::<Aside>(target).unwrap().open);
         assert_eq!(world.resource::<Focused>().get(), Some(target));
         escape(&mut world);
+        assert_eq!(world.resource::<Focused>().get(), None);
+    }
+
+    #[test]
+    fn escape_comes_back_from_the_aside_then_the_close_up() {
+        let mut world = World::new();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<NextState<Focus>>();
+        let mut aside = Aside::new(Transform::IDENTITY);
+        aside.open = true;
+        let mut close_up = CloseUp::new(Transform::IDENTITY);
+        close_up.open = true;
+        let target = world.spawn((aside, close_up)).id();
+        world.insert_resource(Focused(Some(target)));
+        let right_click = |world: &mut World| {
+            let mut mouse = world.resource_mut::<ButtonInput<MouseButton>>();
+            mouse.release(MouseButton::Right);
+            mouse.clear();
+            mouse.press(MouseButton::Right);
+            world.run_system_cached(Focused::leave_on_input).unwrap();
+        };
+        right_click(&mut world);
+        assert!(!world.get::<Aside>(target).unwrap().open);
+        assert!(world.get::<CloseUp>(target).unwrap().open);
+        right_click(&mut world);
+        assert!(!world.get::<CloseUp>(target).unwrap().open);
+        assert_eq!(world.resource::<Focused>().get(), Some(target));
+        right_click(&mut world);
         assert_eq!(world.resource::<Focused>().get(), None);
     }
 }
