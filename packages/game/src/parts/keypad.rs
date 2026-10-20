@@ -123,6 +123,16 @@ pub(crate) struct Keypad<K: 'static> {
     keys: Vec<PlacedKey<K>>,
 }
 
+impl<K> PlacedKey<K> {
+    /// The position on a real keyboard that presses the key, if any.
+    pub(crate) fn code(&self) -> Option<KeyCode> {
+        self.bindings.iter().find_map(|binding| match binding {
+            KeyBinding::Code(code) => Some(*code),
+            _ => None,
+        })
+    }
+}
+
 /// A key of a [`Keypad`], resting on its surface.
 pub(crate) struct PlacedKey<K> {
     pub(crate) block: Block,

@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{input::keyboard::NativeKeyCode, prelude::*};
 
 use super::{CASE, CASE_DARK};
 use crate::geometry::block::Block;
@@ -129,12 +129,16 @@ impl Keyboard {
             .spawn((Name::new("keyboard"), transform, Visibility::default()))
             .with_children(|keyboard| {
                 keyboard.spawn((Shape::cuboid(&self.base, CASE_DARK), Finish::Plastic));
-                self.keypad
-                    .spawn_keys(keyboard, &labels, false, |_| KeyboardKey);
+                self.keypad.spawn_keys(keyboard, &labels, false, |key| {
+                    KeyboardKey(
+                        key.code()
+                            .unwrap_or(KeyCode::Unidentified(NativeKeyCode::Unidentified)),
+                    )
+                });
             });
     }
 }
 
-/// A key of the computer keyboard.
+/// A key of the computer keyboard, at its position on a real keyboard.
 #[derive(Component)]
-pub(super) struct KeyboardKey;
+pub(super) struct KeyboardKey(pub(super) KeyCode);

@@ -2,6 +2,7 @@ mod editor;
 mod keyboard;
 mod monitor;
 mod pinboard;
+mod typing;
 mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
@@ -10,6 +11,7 @@ use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
 use self::pinboard::PinBoard;
+use self::typing::MouseTyping;
 use self::views::{BackToScreen, Views};
 use super::dust::Dust;
 use crate::geometry::block::Block;
@@ -44,8 +46,13 @@ impl Plugin for ComputerPlugin {
                 OnExit(Focus::Computer),
                 (Computer::activate::<false>, Editor::release_focus),
             )
-            .add_systems(Update, (PinBoard::follow_pins, PinBoard::arm))
+            .init_resource::<MouseTyping>()
+            .add_systems(
+                Update,
+                (PinBoard::follow_pins, PinBoard::arm, MouseTyping::release),
+            )
             .add_observer(PinBoard::put_back_on_press)
+            .add_observer(MouseTyping::press_on_click)
             .add_observer(Computer::on_add);
     }
 }
