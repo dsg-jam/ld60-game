@@ -5,11 +5,12 @@ pub(crate) mod focus;
 pub(crate) mod hints;
 pub(crate) mod look;
 mod shimmer;
+mod tooltip;
 
 use bevy::prelude::*;
 
-/// The seated player: camera, crosshair, cursor, focus, key hints, mouse look
-/// and hover shimmer.
+/// The seated player: camera, crosshair, cursor, focus, key hints, mouse look,
+/// hover shimmer and tooltips.
 pub(crate) struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -22,6 +23,7 @@ impl Plugin for PlayerPlugin {
             hints::HintsPlugin,
             look::LookPlugin,
             shimmer::ShimmerPlugin,
+            tooltip::TooltipPlugin,
         ));
     }
 }
