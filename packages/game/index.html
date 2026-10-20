@@ -49,6 +49,8 @@
       justify-content: center;
       gap: 1em;
       padding: 2em;
+      z-index: 1;
+      background: #2a2624;
       color: #e8dfd0;
       font: 16px monospace;
       text-align: center;
@@ -59,6 +61,20 @@
     #loader-progress {
       width: min(24em, 80vw);
       accent-color: #f0b860;
+    }
+    #loader-play {
+      padding: 0.5em 2em;
+      border: 2px solid #f0b860;
+      background: none;
+      color: #f0b860;
+      font: inherit;
+      font-size: 1.5em;
+      cursor: pointer;
+    }
+    #loader-play:hover,
+    #loader-play:focus-visible {
+      background: #f0b860;
+      color: #2a2624;
     }
     </style>
     <noscript>
@@ -78,6 +94,7 @@
       <p id="loader-status">Loading</p>
       <noscript><p>This game needs JavaScript and WebGPU.</p></noscript>
       <progress id="loader-progress"></progress>
+      <button id="loader-play" type="button" hidden>Play</button>
       <p id="loader-releases" hidden>
         You can download the game for Windows, macOS and Linux from the
         <a href="https://github.com/dsg-jam/ld60-game/releases">releases page</a>.

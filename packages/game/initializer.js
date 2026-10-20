@@ -1,6 +1,7 @@
 const loader = document.getElementById("loader");
 const status = document.getElementById("loader-status");
 const progress = document.getElementById("loader-progress");
+const play = document.getElementById("loader-play");
 
 function fail(reason) {
   status.textContent = reason;
@@ -37,7 +38,17 @@ export default function initializer() {
         ? `Loading (${megabytes(current)} / ${megabytes(total)} MB)`
         : "Starting";
     },
-    onSuccess: () => loader.remove(),
+    // The click on Play is the user gesture that browsers need to start audio.
+    onSuccess: () => {
+      status.hidden = true;
+      progress.hidden = true;
+      play.hidden = false;
+      play.focus();
+      play.addEventListener("click", () => {
+        loader.remove();
+        document.querySelector("canvas")?.focus();
+      });
+    },
     onFailure: (error) => {
       console.error(error);
       fail("The game failed to load.");
