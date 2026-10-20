@@ -19,7 +19,7 @@ use bevy::{platform::hash::fixed_hash_one, prelude::*};
 use self::contents::Contents;
 use self::dividers::{DividerTab, Tab};
 use self::in_file::InFile;
-use self::index::{Hover, Links, PageLink, PinButton};
+use self::index::{Hover, Links, PageLink};
 use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
 use self::moves::SheetMoves;
 pub(crate) use self::moves::{MoveSheet, RailSlot};
@@ -54,7 +54,6 @@ impl Plugin for ManualsPlugin {
             .add_observer(ShopManuals::open_at_job)
             .add_observer(PageLink::open_on_click)
             .add_observer(DividerTab::open_on_click)
-            .add_observer(PinButton::pin_on_click)
             .add_observer(SheetMoves::wait)
             .add_observer(Hover::show_enter)
             .add_observer(Hover::show_leave)
@@ -238,7 +237,6 @@ impl ShopManuals {
             let links = Links {
                 file,
                 in_file: &in_file,
-                rail_full: pins.is_full(),
             };
             let mut seeds = Vec::new();
             let mut pages = Vec::new();
@@ -567,7 +565,6 @@ mod tests {
                 let links = Links {
                     file: Entity::PLACEHOLDER,
                     in_file: &in_file,
-                    rail_full: false,
                 };
                 locale.assert_formats(Localized::spawned_by(|content| {
                     contents.write(page, &links, content);
@@ -576,7 +573,6 @@ mod tests {
         }
         locale.assert_formats(Section::ALL.map(Section::label));
         locale.assert_formats([Message::new("click-manuals"), Message::new("manuals-spine")]);
-        locale.assert_formats([Message::new("manuals-pin")]);
         locale.assert_formats(
             [
                 "hint-pin",

@@ -8,10 +8,9 @@ use bevy::{
 
 use super::contents::{Contents, Entry, Page, Section};
 use super::in_file::InFile;
-use super::moves::MoveSheet;
 use super::pins::Sheet;
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{INK, PAPER, Paper, PaperButton};
+use crate::parts::paper::{Paper, PaperButton};
 
 /// Under the pointer, buttons and index lines take this color.
 const HOVER: Color = Color::srgba_u8(0x2a, 0x26, 0x22, 0x30);
@@ -40,17 +39,10 @@ pub(super) struct PageLink {
     pub(super) page: Option<usize>,
 }
 
-/// The button at the top of a page that pins the page to the monitor of
-/// the shop computer.
-#[derive(Component, Debug)]
-pub(super) struct PinButton(pub(super) Sheet);
-
 /// Where the links on the pages of `file` go.
 pub(super) struct Links<'a> {
     pub(super) file: Entity,
     pub(super) in_file: &'a InFile,
-    /// Whether the monitor has no room for another pinned page.
-    pub(super) rail_full: bool,
 }
 
 /// Something to click on a page that shows when the pointer is over it.
@@ -78,22 +70,6 @@ impl Hover {
         }
     }
 
-    /// A button with a frame, filled so it stands out on the band. Hovering
-    /// it shows `hint`.
-    fn button(hint: Message) -> impl Bundle {
-        (
-            Node {
-                padding: UiRect::axes(px(10), px(2)),
-                border: px(2).all(),
-                ..default()
-            },
-            BorderColor::all(INK),
-            BackgroundColor(PAPER),
-            Self { idle: PAPER },
-            PaperButton(Some(hint)),
-        )
-    }
-
     /// A line of the index or a link in it.
     fn line(node: Node, hint: Message) -> impl Bundle {
         (
@@ -102,25 +78,6 @@ impl Hover {
             Self { idle: Color::NONE },
             PaperButton(Some(hint)),
         )
-    }
-}
-
-impl PinButton {
-    pub(super) fn label() -> Message {
-        Message::new("manuals-pin")
-    }
-
-    pub(super) fn pin_on_click(
-        click: On<PointerClick>,
-        buttons: Query<&PinButton>,
-        mut commands: Commands,
-    ) {
-        if click.button != PointerButton::Primary {
-            return;
-        }
-        if let Ok(button) = buttons.get(click.entity) {
-            commands.trigger(MoveSheet::Pin(button.0));
-        }
     }
 }
 
@@ -148,8 +105,7 @@ impl PageLink {
 
 impl Contents {
     /// Writes `page` of the manuals file. Every page but the index starts
-    /// with a band in the color of its section, a button that pins the page
-    /// and a link back to the index.
+    /// with a band in the color of its section.
     pub(super) fn write(
         &self,
         (page, sheet): (Page, Option<Sheet>),
@@ -159,32 +115,7 @@ impl Contents {
         match sheet {
             None => self.write_index(links, content),
             Some(sheet) => {
-                let pin = if links.rail_full {
-                    "hint-pin-full"
-                } else {
-                    "hint-pin"
-                };
-                content.spawn(sheet.band()).with_child((
-                    Node {
-                        column_gap: px(8),
-                        ..default()
-                    },
-                    children![
-                        (
-                            Hover::button(Message::new(pin)),
-                            PinButton(sheet),
-                            children![Paper::text(PinButton::label())]
-                        ),
-                        (
-                            Hover::button(Message::new("hint-open-index")),
-                            PageLink {
-                                file: links.file,
-                                page: Some(0),
-                            },
-                            children![Paper::text(Message::new("manuals-index"))],
-                        ),
-                    ],
-                ));
+                content.spawn(sheet.band());
                 page.write(content);
             }
         }
@@ -198,8 +129,6 @@ impl Contents {
     }
 
     fn write_index(&self, links: &Links, page: &mut ChildSpawnerCommands) {
-        page.spawn(Paper::title(Message::new("manuals-spine")));
-        page.spawn(Paper::faded(Message::new("manuals-index-hint")));
         let link = |target: Option<usize>, name: Localized| {
             let hint = match target {
                 Some(_) => Message::new("hint-open").with("target", name),

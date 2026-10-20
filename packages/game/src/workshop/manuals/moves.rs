@@ -186,7 +186,7 @@ impl SheetMoves {
             let seed = fixed_hash_one(("manuals", Some(sheet)));
             let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
             let print = if pin {
-                write_filed(commands, file, filed, sheet, pins.is_full())
+                write_filed(commands, file, filed, sheet)
             } else {
                 sheet.spawn(commands, &filed.flight)
             };
@@ -373,8 +373,7 @@ impl SheetMoves {
                 flight.print = if flight.pin {
                     flight.sheet.spawn(&mut commands, &filed.flight)
                 } else {
-                    let full = run.pins().is_full();
-                    write_filed(&mut commands, file, filed, flight.sheet, full)
+                    write_filed(&mut commands, file, filed, flight.sheet)
                 };
                 let side = usize::from(flight.pin);
                 commands
@@ -487,7 +486,6 @@ fn write_filed(
     file: Entity,
     filed: &Filed,
     sheet: Sheet,
-    rail_full: bool,
 ) -> Option<Entity> {
     let contents = &filed.contents;
     let pages = contents.pages();
@@ -496,7 +494,6 @@ fn write_filed(
     let links = Links {
         file,
         in_file: &filed.in_file,
-        rail_full,
     };
     Some(Paper::spawn_page(
         commands,
