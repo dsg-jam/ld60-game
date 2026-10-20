@@ -4,7 +4,6 @@
 manuals-spine = SHOP MANUALS
 manuals-index = INDEX
 manuals-pin = PIN
-manuals-unpin = UNPIN
 manuals-index-hint = Click an entry to open it. Click INDEX at the top of a page to come back. Click PIN to hang the page on the computer monitor.
 manuals-footer = SHOP MANUALS
 

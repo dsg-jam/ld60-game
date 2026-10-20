@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    picking::{events::PointerPress, pointer::PointerButton},
+    prelude::*,
+};
 
 use super::monitor::Monitor;
 use crate::geometry::block::Block;
@@ -7,8 +10,8 @@ use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::framing;
-use crate::player::focus::Aside;
-use crate::workshop::manuals::Pins;
+use crate::player::focus::{Aside, Clickable, Focus};
+use crate::workshop::manuals::{Pins, Sheet};
 use crate::workshop::run::Run;
 
 /// A page of the manuals file at five eighths of its size, so the sheets
@@ -58,6 +61,11 @@ pub(super) struct PinBoard {
     /// The pins the slots show.
     shown: Option<Pins>,
 }
+
+/// A sheet hanging from the rail. A click on it, from the seat or at the
+/// computer, unpins it and puts it back in the manuals file.
+#[derive(Component, Debug)]
+pub(super) struct Hanging(Sheet);
 
 /// Where one pinned sheet hangs.
 struct Slot {
@@ -200,10 +208,15 @@ impl PinBoard {
                 if let Some(page) = slot.page.take() {
                     commands.entity(page).despawn();
                 }
-                slot.page = sheets.get(index).and_then(|sheet| {
-                    commands.entity(slot.sheet).insert(sheet.print());
+                slot.page = sheets.get(index).and_then(|&sheet| {
+                    commands
+                        .entity(slot.sheet)
+                        .insert((sheet.print(), Hanging(sheet)));
                     sheet.spawn(&mut commands, &slot.canvas)
                 });
+                if slot.page.is_none() {
+                    commands.entity(slot.sheet).remove::<Hanging>();
+                }
                 if let Ok(mut visibility) = visibilities.get_mut(slot.sheet) {
                     visibility.set_if_neq(shown(slot.page.is_some()));
                 }
@@ -212,6 +225,48 @@ impl PinBoard {
                 aside.open = false;
             }
             board.shown = Some(run.pins().clone());
+        }
+    }
+
+    /// The hanging sheets say what a click does from the seat and at the
+    /// computer.
+    pub(super) fn arm(
+        state: Res<State<Focus>>,
+        sheets: Query<(Entity, Option<&Clickable>), With<Hanging>>,
+        mut commands: Commands,
+    ) {
+        let near = Self::within_reach(&state);
+        for (sheet, clickable) in &sheets {
+            match (near, clickable.is_some()) {
+                (true, false) => {
+                    commands.entity(sheet).insert(Clickable {
+                        prompt: "click-unpin",
+                    });
+                }
+                (false, true) => {
+                    commands.entity(sheet).remove::<Clickable>();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn within_reach(state: &State<Focus>) -> bool {
+        matches!(state.get(), Focus::Desk | Focus::Computer)
+    }
+
+    pub(super) fn put_back_on_press(
+        mut press: On<PointerPress>,
+        state: Res<State<Focus>>,
+        sheets: Query<&Hanging>,
+        mut run: ResMut<Run>,
+    ) {
+        if press.button != PointerButton::Primary || !Self::within_reach(&state) {
+            return;
+        }
+        if let Ok(hanging) = sheets.get(press.entity) {
+            press.propagate(false);
+            run.pins_mut().unpin(hanging.0);
         }
     }
 }

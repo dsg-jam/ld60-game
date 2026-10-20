@@ -44,7 +44,8 @@ impl Plugin for ComputerPlugin {
                 OnExit(Focus::Computer),
                 (Computer::activate::<false>, Editor::release_focus),
             )
-            .add_systems(Update, PinBoard::follow_pins)
+            .add_systems(Update, (PinBoard::follow_pins, PinBoard::arm))
+            .add_observer(PinBoard::put_back_on_press)
             .add_observer(Computer::on_add);
     }
 }

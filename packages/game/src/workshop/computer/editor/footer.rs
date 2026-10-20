@@ -398,7 +398,7 @@ mod tests {
         world.run_system(show).unwrap();
         assert_eq!(shown(&world), Command::ALL[..Command::ALL.len() - 1]);
         let mut shop = ShopRun::with_all_tools();
-        shop.pins_mut().toggle(Sheet::example());
+        shop.pins_mut().pin(Sheet::example());
         world.insert_resource(shop);
         world.run_system(show).unwrap();
         assert_eq!(shown(&world), Command::ALL);

@@ -1,6 +1,7 @@
 mod contents;
 mod datasheet;
 mod dividers;
+mod in_file;
 mod index;
 mod model;
 mod pins;
@@ -13,7 +14,8 @@ use bevy::{platform::hash::fixed_hash_one, prelude::*};
 
 use self::contents::Contents;
 use self::dividers::{DividerTab, Tab};
-use self::index::{Hover, PageLink, PinButton};
+use self::in_file::InFile;
+use self::index::{Hover, Links, PageLink, PinButton};
 use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
 pub(crate) use self::pins::{Pins, Sheet};
 use self::pose::Pose;
@@ -26,7 +28,7 @@ use crate::locale::Message;
 use crate::parts::paper::{Binding, Leaf, LeafShape, PAPER, Paper, ShowsOwnPages, Wrinkles};
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
-use crate::player::hints::KeyHint;
+use crate::player::hints::{Hint, Hints, Icon, Input, KeyHint};
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;
@@ -44,7 +46,7 @@ impl Plugin for ManualsPlugin {
             .add_observer(ShopManuals::open_at_job)
             .add_observer(PageLink::open_on_click)
             .add_observer(DividerTab::open_on_click)
-            .add_observer(PinButton::toggle_on_click)
+            .add_observer(PinButton::pin_on_click)
             .add_observer(Hover::show_enter)
             .add_observer(Hover::show_leave)
             .add_systems(
@@ -58,7 +60,6 @@ impl Plugin for ManualsPlugin {
                     ShopManuals::show_open,
                     Stack::arrange,
                     Stack::show_pages,
-                    PinButton::show_state,
                     ShopManuals::show_pin_hint,
                 )
                     .chain()
@@ -91,7 +92,10 @@ struct Filed {
     leaf_pages: UiCanvas,
     labels: UiCanvas,
     contents: Contents,
-    /// The shape of each page.
+    /// The pins the file was filed for. Pinned pages are not in it.
+    pins: Pins,
+    in_file: InFile,
+    /// The shape of each page in the file.
     shapes: Vec<PageShape>,
     /// The job the file was last opened for.
     job: Option<JobId>,
@@ -152,12 +156,24 @@ impl ShopManuals {
                 view: View::Local(lying.mul_transform(Parts::reading_view())),
             },
             Lying(lying),
+            Hints(vec![
+                Hint {
+                    inputs: vec![Input::Icon(Icon::Wheel)],
+                    action: Message::new("hint-turn-pages"),
+                },
+                Hint {
+                    inputs: vec![Input::Key("Home")],
+                    action: Message::new("hint-open-index"),
+                },
+            ]),
             parts,
             Filed {
                 pages,
                 leaf_pages,
                 labels,
                 contents: Contents::default(),
+                pins: Pins::default(),
+                in_file: InFile::default(),
                 shapes: Vec::new(),
                 job: None,
             },
@@ -165,7 +181,9 @@ impl ShopManuals {
     }
 
     /// Files the manuals, errata and notes the shop owns, and takes out
-    /// those of an earlier run.
+    /// those of an earlier run. Pinned pages stay out until they are
+    /// unpinned. The file stays at the page it is open at, or the one after
+    /// it if that page is pinned.
     fn file(
         run: Res<Run>,
         mut files: Query<(Entity, &mut Paper, &mut Filed, &mut Stack, &Parts)>,
@@ -176,44 +194,48 @@ impl ShopManuals {
     ) {
         let contents = Contents::of(&run);
         for (file, mut paper, mut filed, mut stack, parts) in &mut files {
-            if filed.contents == contents {
+            if filed.contents == contents && filed.pins == *run.pins() {
                 continue;
             }
-            let pages = contents.pages();
-            let count = pages.len();
-            let seeds: Vec<u64> = pages
-                .iter()
-                .map(|(_, sheet)| fixed_hash_one(("manuals", sheet)))
-                .collect();
-            filed.shapes = seeds
-                .iter()
-                .map(|seed| {
-                    let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
-                    PageShape {
-                        leaf: LeafShape::new(&wrinkles, &mut meshes),
-                        wrinkles,
-                    }
-                })
-                .collect();
-            let pages = pages
-                .into_iter()
-                .enumerate()
-                .map(|(index, page)| {
-                    let spawned = Paper::spawn_page(
-                        &mut commands,
-                        &filed.pages,
-                        (index + 1, count),
-                        page.0.footer(),
-                        |content| contents.write(file, page, content),
-                    );
-                    if let Some(sheet) = page.1 {
-                        commands.entity(spawned).insert(sheet.print());
-                    }
-                    spawned
-                })
-                .collect();
+            let refiled = filed.contents != contents;
+            let open = filed.in_file.number(paper.current_page());
+            let in_file = InFile::new(&contents, run.pins());
+            let all = contents.pages();
+            let count = all.len();
+            let links = Links {
+                file,
+                in_file: &in_file,
+                rail_full: run.pins().is_full(),
+            };
+            let mut seeds = Vec::new();
+            let mut pages = Vec::new();
+            filed.shapes.clear();
+            for &number in in_file.numbers() {
+                let page = all[number];
+                let seed = fixed_hash_one(("manuals", page.1));
+                let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
+                filed.shapes.push(PageShape {
+                    leaf: LeafShape::new(&wrinkles, &mut meshes),
+                    wrinkles,
+                });
+                seeds.push(seed);
+                let spawned = Paper::spawn_page(
+                    &mut commands,
+                    &filed.pages,
+                    (number + 1, count),
+                    page.0.footer(),
+                    |content| contents.write(page, &links, content),
+                );
+                if let Some(sheet) = page.1 {
+                    commands.entity(spawned).insert(sheet.print());
+                }
+                pages.push(spawned);
+            }
             for page in paper.replace_pages(pages) {
                 commands.entity(page).despawn();
+            }
+            if !refiled && let Some(page) = open.and_then(|number| in_file.from(number)) {
+                paper.open_page(page);
             }
             for (tab, divider) in &tabs {
                 if divider.file == file {
@@ -229,6 +251,9 @@ impl ShopManuals {
                     .into_iter()
                     .filter_map(|tab| Some((tab, tab.start(&contents)?)));
                 for (position, (tab, start)) in starts.enumerate() {
+                    // A divider stays in front of the first page after it
+                    // that is in the file.
+                    let start = in_file.from(start).unwrap_or(in_file.numbers().len());
                     let card = DividerTab::spawn(
                         spine,
                         file,
@@ -240,8 +265,13 @@ impl ShopManuals {
                 }
             });
             *stack = Stack::new(&seeds, &cards);
+            stack.jump_to(paper.current_page());
             filed.contents = contents.clone();
-            filed.job = None;
+            filed.pins = run.pins().clone();
+            filed.in_file = in_file;
+            if refiled {
+                filed.job = None;
+            }
         }
     }
 
@@ -259,7 +289,11 @@ impl ShopManuals {
             return;
         }
         filed.job = Some(job.id);
-        if let Some(page) = filed.contents.page_for(&job.level) {
+        if let Some(page) = filed
+            .contents
+            .page_for(&job.level)
+            .and_then(|number| filed.in_file.from(number))
+        {
             paper.open_page(page);
         }
     }
@@ -279,17 +313,33 @@ impl ShopManuals {
         else {
             return;
         };
-        let page = if keys.just_pressed(KeyCode::Home) {
-            Some(0)
+        let Some(open) = filed.in_file.number(paper.current_page()) else {
+            return;
+        };
+        let forward = if keys.just_pressed(KeyCode::Home) {
+            paper.open_page(0);
+            return;
         } else if keys.just_pressed(KeyCode::ArrowDown) {
-            filed.contents.next_entry(paper.current_page(), true)
+            true
         } else if keys.just_pressed(KeyCode::ArrowUp) {
-            filed.contents.next_entry(paper.current_page(), false)
+            false
         } else {
             return;
         };
-        if let Some(page) = page {
-            paper.open_page(page);
+        // Skips entries with all their pages pinned.
+        let mut number = open;
+        while let Some(next) = filed.contents.next_entry(number, forward) {
+            if let Some(page) = filed.in_file.from(next)
+                && filed
+                    .in_file
+                    .number(page)
+                    .and_then(|number| filed.contents.entry_at(number))
+                    == filed.contents.entry_at(next)
+            {
+                paper.open_page(page);
+                return;
+            }
+            number = next;
         }
     }
 
@@ -303,7 +353,9 @@ impl ShopManuals {
             return None;
         }
         let (paper, filed) = files.get(focused.get()?).ok()?;
-        filed.contents.sheet_at(paper.current_page())
+        filed
+            .contents
+            .sheet_at(filed.in_file.number(paper.current_page())?)
     }
 
     fn pin_on_key(
@@ -316,7 +368,7 @@ impl ShopManuals {
         if keys.just_pressed(PIN_KEY)
             && let Some(sheet) = Self::open_sheet(&state, &focused, &files)
         {
-            run.pins_mut().toggle(sheet);
+            run.pins_mut().pin(sheet);
         }
     }
 
@@ -327,9 +379,9 @@ impl ShopManuals {
         run: Res<Run>,
         mut hint: ResMut<KeyHint>,
     ) {
-        let action = Self::open_sheet(&state, &focused, &files).map(|sheet| {
-            let id = if run.pins().contains(sheet) {
-                "hint-unpin"
+        let action = Self::open_sheet(&state, &focused, &files).map(|_| {
+            let id = if run.pins().is_full() {
+                "hint-pin-full"
             } else {
                 "hint-pin"
             };
@@ -471,15 +523,31 @@ mod tests {
             let contents = Contents::of(&run);
             for page in contents.pages() {
                 locale.assert_formats([page.0.footer()]);
+                let in_file = InFile::new(&contents, run.pins());
+                let links = Links {
+                    file: Entity::PLACEHOLDER,
+                    in_file: &in_file,
+                    rail_full: false,
+                };
                 locale.assert_formats(Localized::spawned_by(|content| {
-                    contents.write(Entity::PLACEHOLDER, page, content);
+                    contents.write(page, &links, content);
                 }));
             }
         }
         locale.assert_formats(Section::ALL.map(Section::label));
         locale.assert_formats([Message::new("click-manuals"), Message::new("manuals-spine")]);
-        locale.assert_formats([true, false].map(PinButton::label));
-        locale.assert_formats([Message::new("hint-pin"), Message::new("hint-unpin")]);
+        locale.assert_formats([Message::new("manuals-pin")]);
+        locale.assert_formats(
+            [
+                "hint-pin",
+                "hint-pin-full",
+                "hint-pinned",
+                "hint-open-index",
+                "hint-turn-pages",
+            ]
+            .map(Message::new),
+        );
+        locale.assert_formats([Message::new("hint-open").with("target", "2A")]);
         locale.assert_formats(Tab::ALL.map(Tab::hint));
     }
 
@@ -518,8 +586,30 @@ mod tests {
         press(&mut world);
         let pinned = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
         assert_eq!(world.resource::<Run>().pins().sheets(), [pinned]);
-        press(&mut world);
-        assert!(world.resource::<Run>().pins().is_empty());
+        world.run_system_cached(ShopManuals::file).unwrap();
+        world.flush();
+        let paper = world.get::<Paper>(file).unwrap();
+        assert_eq!(paper.current_page(), 2);
+        assert_eq!(
+            paper.page_count(),
+            Contents::of(&Run::default()).pages().len() - 1
+        );
+        let open = world.get::<Filed>(file).unwrap().in_file.number(2);
+        assert_eq!(open, Some(3));
+    }
+
+    #[test]
+    fn unpinning_puts_the_page_back_in_its_place() {
+        let (mut world, file) = world_with_file();
+        let pinned = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
+        world.resource_mut::<Run>().pins_mut().pin(pinned);
+        world.run_system_cached(ShopManuals::file).unwrap();
+        let count = world.get::<Paper>(file).unwrap().page_count();
+        world.resource_mut::<Run>().pins_mut().unpin(pinned);
+        world.run_system_cached(ShopManuals::file).unwrap();
+        assert_eq!(world.get::<Paper>(file).unwrap().page_count(), count + 1);
+        let filed = world.get::<Filed>(file).unwrap();
+        assert_eq!(filed.in_file.page(2), Some(2));
     }
 
     #[test]

@@ -6,7 +6,8 @@ use bevy::{
     prelude::*,
 };
 
-use super::contents::{Contents, Page, Section};
+use super::contents::{Contents, Entry, Page, Section};
+use super::in_file::InFile;
 use super::pins::Sheet;
 use crate::locale::{Localized, Message};
 use crate::parts::paper::{INK, PAPER, Paper, PaperButton};
@@ -31,17 +32,26 @@ const LINE_PADDING: UiRect = UiRect {
 const PAGE_LINKS_INDENT: f32 = 30.0;
 
 /// A line of the index, or the INDEX button at the top of a page. A click
-/// opens `page` of the manuals file `file`.
+/// opens `page` of the manuals file `file`, unless it is pinned to the
+/// monitor.
 #[derive(Component, Debug)]
 pub(super) struct PageLink {
     pub(super) file: Entity,
-    pub(super) page: usize,
+    pub(super) page: Option<usize>,
 }
 
 /// The button at the top of a page that pins the page to the monitor of
-/// the shop computer, or takes it off again.
+/// the shop computer.
 #[derive(Component, Debug)]
 pub(super) struct PinButton(pub(super) Sheet);
+
+/// Where the links on the pages of `file` go.
+pub(super) struct Links<'a> {
+    pub(super) file: Entity,
+    pub(super) in_file: &'a InFile,
+    /// Whether the monitor has no room for another pinned page.
+    pub(super) rail_full: bool,
+}
 
 /// Something to click on a page that shows when the pointer is over it.
 #[derive(Component, Debug)]
@@ -68,8 +78,9 @@ impl Hover {
         }
     }
 
-    /// A button with a frame, filled so it stands out on the band.
-    fn button() -> impl Bundle {
+    /// A button with a frame, filled so it stands out on the band. Hovering
+    /// it shows `hint`.
+    fn button(hint: Message) -> impl Bundle {
         (
             Node {
                 padding: UiRect::axes(px(10), px(2)),
@@ -79,31 +90,27 @@ impl Hover {
             BorderColor::all(INK),
             BackgroundColor(PAPER),
             Self { idle: PAPER },
-            PaperButton::default(),
+            PaperButton(Some(hint)),
         )
     }
 
     /// A line of the index or a link in it.
-    fn line(node: Node) -> impl Bundle {
+    fn line(node: Node, hint: Message) -> impl Bundle {
         (
             node,
             BackgroundColor(Color::NONE),
             Self { idle: Color::NONE },
-            PaperButton::default(),
+            PaperButton(Some(hint)),
         )
     }
 }
 
 impl PinButton {
-    pub(super) fn label(pinned: bool) -> Message {
-        Message::new(if pinned {
-            "manuals-unpin"
-        } else {
-            "manuals-pin"
-        })
+    pub(super) fn label() -> Message {
+        Message::new("manuals-pin")
     }
 
-    pub(super) fn toggle_on_click(
+    pub(super) fn pin_on_click(
         click: On<PointerClick>,
         buttons: Query<&PinButton>,
         mut run: ResMut<Run>,
@@ -112,26 +119,7 @@ impl PinButton {
             return;
         }
         if let Ok(button) = buttons.get(click.entity) {
-            run.pins_mut().toggle(button.0);
-        }
-    }
-
-    /// Says whether the page is pinned.
-    pub(super) fn show_state(
-        run: Res<Run>,
-        buttons: Query<(Ref<PinButton>, &Children)>,
-        mut labels: Query<&mut Localized>,
-    ) {
-        for (button, children) in &buttons {
-            if !run.is_changed() && !button.is_added() {
-                continue;
-            }
-            let label = Self::label(run.pins().contains(button.0));
-            for &child in children {
-                if let Ok(mut text) = labels.get_mut(child) {
-                    text.set_if_neq(label.clone().into());
-                }
-            }
+            run.pins_mut().pin(button.0);
         }
     }
 }
@@ -145,28 +133,37 @@ impl PageLink {
         if click.button != PointerButton::Primary {
             return;
         }
-        let Ok(link) = links.get(click.entity) else {
+        let Some((file, page)) = links
+            .get(click.entity)
+            .ok()
+            .and_then(|link| Some((link.file, link.page?)))
+        else {
             return;
         };
-        if let Ok(mut paper) = papers.get_mut(link.file) {
-            paper.open_page(link.page);
+        if let Ok(mut paper) = papers.get_mut(file) {
+            paper.open_page(page);
         }
     }
 }
 
 impl Contents {
-    /// Writes `page` of the manuals file `file`. Every page but the index
-    /// starts with a band in the color of its section, a button that pins
-    /// the page and a link back to the index.
+    /// Writes `page` of the manuals file. Every page but the index starts
+    /// with a band in the color of its section, a button that pins the page
+    /// and a link back to the index.
     pub(super) fn write(
         &self,
-        file: Entity,
         (page, sheet): (Page, Option<Sheet>),
+        links: &Links,
         content: &mut ChildSpawnerCommands,
     ) {
         match sheet {
-            None => self.write_index(file, content),
+            None => self.write_index(links, content),
             Some(sheet) => {
+                let pin = if links.rail_full {
+                    "hint-pin-full"
+                } else {
+                    "hint-pin"
+                };
                 content.spawn(sheet.band()).with_child((
                     Node {
                         column_gap: px(8),
@@ -174,13 +171,16 @@ impl Contents {
                     },
                     children![
                         (
-                            Hover::button(),
+                            Hover::button(Message::new(pin)),
                             PinButton(sheet),
-                            children![Paper::text(PinButton::label(false))]
+                            children![Paper::text(PinButton::label())]
                         ),
                         (
-                            Hover::button(),
-                            PageLink { file, page: 0 },
+                            Hover::button(Message::new("hint-open-index")),
+                            PageLink {
+                                file: links.file,
+                                page: Some(0),
+                            },
                             children![Paper::text(Message::new("manuals-index"))],
                         ),
                     ],
@@ -190,9 +190,29 @@ impl Contents {
         }
     }
 
-    fn write_index(&self, file: Entity, page: &mut ChildSpawnerCommands) {
+    /// The first page of `entry` in the file, if any.
+    fn first_in_file(&self, entry: Entry, in_file: &InFile) -> Option<usize> {
+        let start = self.start_of(entry)?;
+        let page = in_file.from(start)?;
+        (in_file.number(page)? < start + entry.pages().len()).then_some(page)
+    }
+
+    fn write_index(&self, links: &Links, page: &mut ChildSpawnerCommands) {
         page.spawn(Paper::title(Message::new("manuals-spine")));
         page.spawn(Paper::faded(Message::new("manuals-index-hint")));
+        let link = |target: Option<usize>, name: Localized| {
+            let hint = match target {
+                Some(_) => Message::new("hint-open").with("target", name),
+                None => Message::new("hint-pinned"),
+            };
+            (
+                PageLink {
+                    file: links.file,
+                    page: target,
+                },
+                hint,
+            )
+        };
         for section in Section::ALL {
             page.spawn((
                 Node {
@@ -223,25 +243,29 @@ impl Contents {
                 let Some(start) = self.start_of(entry) else {
                     continue;
                 };
+                let (target, hint) = link(self.first_in_file(entry, links.in_file), entry.label());
                 page.spawn((
-                    Hover::line(Node {
-                        justify_content: JustifyContent::SpaceBetween,
-                        padding: LINE_PADDING,
-                        ..default()
-                    }),
-                    PageLink { file, page: start },
+                    Hover::line(
+                        Node {
+                            justify_content: JustifyContent::SpaceBetween,
+                            padding: LINE_PADDING,
+                            ..default()
+                        },
+                        hint,
+                    ),
+                    target,
                     children![
                         Paper::text(entry.label()),
                         Paper::text(Localized::verbatim((start + 1).to_string())),
                     ],
                 ));
-                let links: Vec<_> = entry
+                let names: Vec<_> = entry
                     .pages()
                     .into_iter()
                     .enumerate()
                     .filter_map(|(index, page)| Some((start + index, page.short_name()?)))
                     .collect();
-                if links.is_empty() {
+                if names.is_empty() {
                     continue;
                 }
                 page.spawn(Node {
@@ -251,13 +275,17 @@ impl Contents {
                     ..default()
                 })
                 .with_children(|row| {
-                    for (page, name) in links {
+                    for (number, name) in names {
+                        let (target, hint) = link(links.in_file.page(number), name.clone());
                         row.spawn((
-                            Hover::line(Node {
-                                padding: LINE_PADDING,
-                                ..default()
-                            }),
-                            PageLink { file, page },
+                            Hover::line(
+                                Node {
+                                    padding: LINE_PADDING,
+                                    ..default()
+                                },
+                                hint,
+                            ),
+                            target,
                             children![Paper::text(name)],
                         ));
                     }

@@ -17,7 +17,8 @@ pub(crate) struct Sheet {
 }
 
 /// The sheets taken out of the manuals file and pinned to the monitor of
-/// the shop computer, at most [`Pins::MAX`] of them, the oldest first.
+/// the shop computer, at most [`Pins::MAX`] of them, the oldest first. A
+/// pinned sheet is not in the file until it is unpinned.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Vec<Sheet>", into = "Vec<Sheet>")]
 pub(crate) struct Pins(Vec<Sheet>);
@@ -86,27 +87,31 @@ impl Pins {
             .retain(|sheet| contents.entries().contains(&sheet.entry));
     }
 
-    /// Unpins `sheet` if it is pinned, and pins it otherwise. With
-    /// [`Pins::MAX`] sheets pinned already, the oldest one comes off.
-    pub(crate) fn toggle(&mut self, sheet: Sheet) {
-        if let Some(index) = self.0.iter().position(|&other| other == sheet) {
-            self.0.remove(index);
-            return;
+    /// Whether the rail holds [`Pins::MAX`] sheets already.
+    pub(crate) fn is_full(&self) -> bool {
+        self.0.len() >= Self::MAX
+    }
+
+    /// Pins `sheet`, unless it is pinned already or the rail is full.
+    pub(crate) fn pin(&mut self, sheet: Sheet) {
+        if !self.is_full() && !self.contains(sheet) {
+            self.0.push(sheet);
         }
-        if self.0.len() == Self::MAX {
-            self.0.remove(0);
-        }
-        self.0.push(sheet);
+    }
+
+    /// Takes `sheet` off the rail, back into the manuals file.
+    pub(crate) fn unpin(&mut self, sheet: Sheet) {
+        self.0.retain(|&other| other != sheet);
     }
 }
 
 impl From<Vec<Sheet>> for Pins {
-    /// Keeps the newest [`Pins::MAX`] sheets that exist, each once.
+    /// Keeps the oldest [`Pins::MAX`] sheets that exist, each once.
     fn from(sheets: Vec<Sheet>) -> Self {
         let mut pins = Self::default();
         for sheet in sheets {
-            if sheet.page().is_some() && !pins.contains(sheet) {
-                pins.toggle(sheet);
+            if sheet.page().is_some() {
+                pins.pin(sheet);
             }
         }
         pins
@@ -134,45 +139,48 @@ mod tests {
     fn sheets_that_are_not_filed_come_off() {
         let mut pins = Pins::default();
         let other = Sheet::new(Entry::Chip(Revision::B), 0);
-        pins.toggle(chip(0));
-        pins.toggle(other);
+        pins.pin(chip(0));
+        pins.pin(other);
         pins.keep_filed(&Run::default());
         assert_eq!(pins.sheets(), [chip(0)]);
     }
 
     #[test]
-    fn pinning_again_unpins() {
+    fn a_sheet_is_pinned_once_until_it_is_unpinned() {
         let mut pins = Pins::default();
-        pins.toggle(chip(0));
+        pins.pin(chip(0));
+        pins.pin(chip(0));
         assert_eq!(pins.sheets(), [chip(0)]);
-        pins.toggle(chip(0));
+        pins.unpin(chip(0));
         assert!(pins.is_empty());
     }
 
     #[test]
-    fn a_third_pin_takes_off_the_oldest() {
+    fn a_full_rail_takes_no_more_sheets() {
         let mut pins = Pins::default();
         for page in 0..3 {
-            pins.toggle(chip(page));
+            pins.pin(chip(page));
         }
+        assert!(pins.is_full());
+        assert_eq!(pins.sheets(), [chip(0), chip(1)]);
+        pins.unpin(chip(0));
+        pins.pin(chip(2));
         assert_eq!(pins.sheets(), [chip(1), chip(2)]);
-        pins.toggle(chip(1));
-        assert_eq!(pins.sheets(), [chip(2)]);
     }
 
     #[test]
     fn loading_keeps_the_rules() {
         let missing = Sheet::new(Entry::Manual(DeviceKind::Tally2), 99);
         let note = Sheet::new(Entry::Note(TutorialNote(99)), 0);
-        let pins = Pins::from(vec![chip(0), missing, chip(1), chip(0), note, chip(2)]);
-        assert_eq!(pins.sheets(), [chip(1), chip(2)]);
+        let pins = Pins::from(vec![chip(0), missing, chip(0), note, chip(1), chip(2)]);
+        assert_eq!(pins.sheets(), [chip(0), chip(1)]);
     }
 
     #[test]
     fn pins_load_as_saved() {
         let mut pins = Pins::default();
-        pins.toggle(chip(1));
-        pins.toggle(Sheet::new(Entry::Note(TutorialNote(0)), 0));
+        pins.pin(chip(1));
+        pins.pin(Sheet::new(Entry::Note(TutorialNote(0)), 0));
         let text = ron::to_string(&pins).unwrap();
         assert_eq!(ron::from_str::<Pins>(&text).unwrap(), pins);
     }

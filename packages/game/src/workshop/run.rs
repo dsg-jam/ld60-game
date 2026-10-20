@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn pinned_sheets_go_back_for_the_next_run() {
         let mut run = Run::default();
-        run.pins_mut().toggle(Sheet::example());
+        run.pins_mut().pin(Sheet::example());
         assert!(!run.pins().is_empty());
         assert!(run.next().pins().is_empty());
     }
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn pins_are_saved_with_the_run() {
         let mut run = Run::default();
-        run.pins_mut().toggle(Sheet::example());
+        run.pins_mut().pin(Sheet::example());
         let text = ron::to_string(&run).unwrap();
         assert_eq!(ron::from_str::<Run>(&text).unwrap(), run);
     }
