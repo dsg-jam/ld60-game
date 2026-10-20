@@ -6,17 +6,18 @@
 //! crosses the wire, so they stay on the wire however it turns. Lying open,
 //! the pages not turned yet lie face up to the right of the rings and the
 //! turned ones face down to the left, each stack resting on its cover. Shut,
-//! all of them hang across the middle of the spine.
+//! all of them hang across the middle of the spine, spread out on the rings
+//! and fanning in towards their free edges, and the covers lean in on them.
 
 use std::f32::consts::{FRAC_PI_2, PI};
 use std::ops::Range;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 
-use super::dividers::DividerTab;
+use super::dividers::{DividerTab, TAB_OUT};
 use super::model::{
-    HOLE_INSET, HOLE_RADIUS, MECHANISM_TOP, Parts, RING_HEIGHT, RING_RADIUS, SHEET_SIZE,
-    ring_center, ring_holes,
+    COVER, HOLE_INSET, HOLE_RADIUS, MECHANISM_TOP, Parts, RING_HEIGHT, RING_RADIUS, RING_WIRE,
+    SHEET_SIZE, SPINE, ring_center, ring_holes,
 };
 use super::pose::Pose;
 use super::punched::punched_box;
@@ -29,6 +30,19 @@ const PAGE: f32 = 0.0003;
 pub(super) const CARD: f32 = 0.0009;
 /// How far the edges of a sheet stray from the others at most.
 const STRAY: Vec2 = Vec2::new(0.0008, 0.0006);
+/// How many times as far apart the items hang on the rings of the shut
+/// file as they lie open, at most. They fill the rings, so the file looks
+/// fuller.
+const SPREAD: f32 = 4.0;
+/// How many times as far apart the free edges of the items are in the shut
+/// file as they lie open, at most. The items fan in towards them.
+const FORE_SPREAD: f32 = 1.6;
+/// Room the items of the shut file leave on the rings at either end.
+const RING_ROOM: f32 = 0.001;
+/// Room between the items and a shut cover.
+const COVER_GAP: f32 = 0.0015;
+/// How far the covers lean out at most when the file is too full to shut.
+const SPLAY: f32 = 0.3;
 
 /// Something on the rings, from the front of the file to the back.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +60,11 @@ pub(super) struct Stack {
     strays: Vec<Vec2>,
     /// The thickness of the items in front of each item.
     before: Vec<f32>,
+    /// How many times as far apart the items hang with the file shut.
+    spread: f32,
+    /// How far the items of the shut file lean in, in radians for each
+    /// meter they hang from the middle.
+    fan: f32,
     /// How many items lie turned to the left.
     turned: usize,
     pub(super) turning: Option<Turning>,
@@ -112,13 +131,19 @@ impl Stack {
                 Some(before)
             })
             .collect();
-        Self {
+        let mut stack = Self {
             items,
             strays,
             before,
+            spread: 1.0,
+            fan: 0.0,
             turned: 0,
             turning: None,
-        }
+        };
+        let room = 2.0 * (RING_RADIUS - RING_WIRE - RING_ROOM);
+        stack.spread = (room / stack.depth()).clamp(1.0, SPREAD);
+        stack.fan = (1.0 - FORE_SPREAD / stack.spread).max(0.0) / SHEET_SIZE.x;
+        stack
     }
 
     #[cfg(test)]
@@ -208,34 +233,78 @@ impl Stack {
                 .map_or(0.0, |last| self.thickness(last))
     }
 
+    /// How deep the middle of item `index` lies in the stack.
+    fn middle_depth(&self, index: usize) -> f32 {
+        self.before[index] + self.thickness(index) / 2.0
+    }
+
     /// The offset of item `index` lying open to the right and to the left,
     /// and with the file shut.
     fn offsets(&self, index: usize) -> [f32; 3] {
-        let before = self.before[index];
-        let middle = before + self.thickness(index) / 2.0;
+        let middle = self.middle_depth(index);
         let depth = self.depth();
         [
             MECHANISM_TOP + depth - middle - RING_HEIGHT,
             RING_HEIGHT - MECHANISM_TOP - middle,
-            depth / 2.0 - middle,
+            (depth / 2.0 - middle) * self.spread,
         ]
+    }
+
+    /// Where item `index` hangs with the file shut.
+    fn shut(&self, index: usize) -> OnRings {
+        let [_, _, offset] = self.offsets(index);
+        OnRings {
+            angle: FRAC_PI_2 - self.fan * offset,
+            offset,
+        }
+    }
+
+    /// How far the covers of the shut file lean in from upright, in
+    /// radians, so they come as close to the items as they can without
+    /// reaching into them. Each cover turns about the edge of the spine in
+    /// the space of the spine hinge, the back cover at x = 0 and the front
+    /// cover at x = -[`SPINE`].
+    pub(super) fn lean(&self) -> f32 {
+        let mut slope = (SPINE / 2.0 - COVER_GAP) / COVER.x;
+        for (index, &item) in self.items.iter().enumerate() {
+            let frame = self.shut(index).frame();
+            let tab = if matches!(item, Item::Card(_)) {
+                TAB_OUT
+            } else {
+                0.0
+            };
+            let reach = self.middle(index).x + SHEET_SIZE.x / 2.0 + tab;
+            let half = self.thickness(index) / 2.0;
+            for face in [-half, half] {
+                let point = frame.transform_point(Vec3::new(reach, face, 0.0));
+                if point.y <= 0.0 {
+                    continue;
+                }
+                let back = (-point.x - COVER_GAP) / point.y;
+                let front = (point.x + SPINE - COVER_GAP) / point.y;
+                slope = slope.min(back).min(front);
+            }
+        }
+        slope.atan().max(-SPLAY)
     }
 
     /// Where item `index` hangs with the cover `open` from 0 shut to 1, and
     /// a leaf in flight at `turning` radians.
     pub(super) fn on_rings(&self, index: usize, open: f32, turning: f32) -> OnRings {
-        let [right, left, shut] = self.offsets(index);
+        let [right, left, _] = self.offsets(index);
+        let shut = self.shut(index);
         let (left_side, right_side) = self.sides();
         let half = (1.0 - open) * FRAC_PI_2;
+        let tilt = (1.0 - open) * (shut.angle - FRAC_PI_2);
         if left_side.contains(&index) {
             OnRings {
-                angle: PI - half,
-                offset: shut.lerp(left, open),
+                angle: PI - half + tilt,
+                offset: shut.offset.lerp(left, open),
             }
         } else if right_side.contains(&index) {
             OnRings {
-                angle: half,
-                offset: shut.lerp(right, open),
+                angle: half + tilt,
+                offset: shut.offset.lerp(right, open),
             }
         } else {
             OnRings {
@@ -270,11 +339,10 @@ impl Stack {
             .map(|hole| (hole + SHEET_SIZE / 2.0).extend(HOLE_RADIUS))
     }
 
-    /// How far page items `a` and `b` lie apart, from the front of `a`.
+    /// How far page items `a` and `b` lie apart in an open stack, from the
+    /// front of `a`.
     pub(super) fn apart(&self, a: usize, b: usize) -> f32 {
-        let [_, _, a] = self.offsets(a);
-        let [_, _, b] = self.offsets(b);
-        b - a
+        self.middle_depth(a) - self.middle_depth(b)
     }
 
     /// The pages in the stacks as boxes punched for the rings, without the
@@ -514,12 +582,32 @@ mod tests {
     }
 
     #[test]
+    fn shut_covers_lean_in_without_reaching_into_the_items() {
+        let stack = stack();
+        let lean = stack.lean();
+        assert!(lean > 0.02, "{lean}");
+        let inward = Vec2::new(lean.cos(), lean.sin());
+        for index in 0..stack.items().len() {
+            let frame = stack.shut(index).frame();
+            let reach = stack.middle(index).x + SHEET_SIZE.x / 2.0;
+            for along in [0.0, reach / 2.0, reach] {
+                let point = frame.transform_point(Vec3::new(along, 0.0, 0.0)).xy();
+                // Distance into the file from each cover.
+                let from_back = -point.dot(inward);
+                let from_front =
+                    (point - Vec2::new(-SPINE, 0.0)).dot(inward * Vec2::new(1.0, -1.0));
+                assert!(from_back > 0.0 && from_front > 0.0, "{index} {point}");
+            }
+        }
+    }
+
+    #[test]
     fn the_shut_file_hangs_its_items_in_order_across_the_spine() {
         let stack = stack();
         let offsets: Vec<f32> = (0..stack.items().len())
             .map(|index| stack.on_rings(index, 0.0, 0.0).offset)
             .collect();
         assert!(offsets.windows(2).all(|pair| pair[0] > pair[1]));
-        assert!((offsets[0] + offsets.last().unwrap()).abs() < 0.001);
+        assert!((offsets[0] + offsets.last().unwrap()).abs() < 0.001 * stack.spread);
     }
 }

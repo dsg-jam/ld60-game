@@ -26,7 +26,7 @@ const LIP: f32 = 0.0006;
 /// Length of a tab along the outer edge of the pages.
 const TAB_LENGTH: f32 = 0.04;
 /// How far a tab reaches out of the outer edge of the pages.
-const TAB_OUT: f32 = 0.014;
+pub(super) const TAB_OUT: f32 = 0.014;
 /// Room for each tab along the edge, so they don't cover each other.
 const TAB_SLOT: f32 = SHEET_SIZE.y / Tab::ALL.len() as f32;
 const TAB_LABEL: UVec2 = UVec2::new(200, 64);

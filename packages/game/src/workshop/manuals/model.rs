@@ -4,16 +4,18 @@
 //! The parts are laid out for the file lying open: the spine lies in the
 //! middle at x = 0 with the rings on it, running along Z. The back cover lies
 //! to the right and the front cover to the left. [`Pose`](super::pose::Pose)
-//! folds them shut and stands the file up.
+//! folds them shut and stands the file up. The cloth bends round where the
+//! covers meet the spine.
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
 
+use super::cloth;
 use super::top_sheet::TopSheet;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
-use crate::geometry::surface::{Finish, SurfaceMaterial};
+use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::{Localized, Message};
 use crate::parts::paper::{INK, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
@@ -23,12 +25,15 @@ pub(super) const BOARD: f32 = 0.004;
 /// Width and length of each cover. The covers reach past the pages, which
 /// hang further out on the rings while the file is shut.
 pub(super) const COVER: Vec2 = Vec2::new(0.195, 0.24);
-/// Width of the spine. The rings sit on its middle.
-pub(super) const SPINE: f32 = 0.05;
+/// Width of the spine, a little more than the mechanism. The rings sit on
+/// its middle.
+pub(super) const SPINE: f32 = 0.04;
+/// Radius of the rounded corners at the free edge of a cover.
+const COVER_CORNER: f32 = 0.006;
 /// Thickness, height and depth of the closed file standing on its bottom
 /// edge, with the spine towards +Z.
 pub(super) const CLOSED: Vec3 = Vec3::new(SPINE + 2.0 * BOARD, COVER.y, COVER.x + BOARD);
-pub(super) const RING_RADIUS: f32 = 0.018;
+pub(super) const RING_RADIUS: f32 = 0.015;
 pub(super) const RING_WIRE: f32 = 0.0012;
 /// Height of the middle of the rings above the spine.
 pub(super) const RING_HEIGHT: f32 = 0.004;
@@ -46,9 +51,9 @@ pub(super) const HOLE_INSET: f32 = 0.006;
 pub(super) const HOLE_RADIUS: f32 = 0.0026;
 /// Camera height above the open file while reading it.
 const READING_HEIGHT: f32 = 0.33;
-const SPINE_LABEL: Vec2 = Vec2::new(0.17, 0.042);
-pub(super) const SPINE_CANVAS: UVec2 = UVec2::new(680, 168);
-const SPINE_FONT_SIZE: f32 = 78.0;
+const SPINE_LABEL: Vec2 = Vec2::new(0.17, 0.03);
+pub(super) const SPINE_CANVAS: UVec2 = UVec2::new(680, 120);
+const SPINE_FONT_SIZE: f32 = 60.0;
 /// Height of the spine label's center above the bottom edge.
 const SPINE_LABEL_Y: f32 = 0.15;
 const FINGER_HOLE_RADIUS: f32 = 0.012;
@@ -78,6 +83,9 @@ pub(super) struct Parts {
     pub(super) front: Entity,
     /// The pages on either side, but for the open sheets.
     pub(super) stack: Entity,
+    /// The cloth bent round the edges of the spine, at the back cover and
+    /// at the front cover.
+    pub(super) bends: [Handle<Mesh>; 2],
 }
 
 impl Parts {
@@ -88,7 +96,7 @@ impl Parts {
         (pages, spine): (&UiCanvas, &UiCanvas),
         edges: Handle<SurfaceMaterial>,
         meshes: &mut Assets<Mesh>,
-        materials: &mut Assets<StandardMaterial>,
+        (materials, surfaces): (&mut Assets<StandardMaterial>, &mut Assets<SurfaceMaterial>),
     ) -> Self {
         let mut parts = Self {
             open: Entity::PLACEHOLDER,
@@ -97,7 +105,10 @@ impl Parts {
             spine: Entity::PLACEHOLDER,
             front: Entity::PLACEHOLDER,
             stack: Entity::PLACEHOLDER,
+            bends: [(); 2].map(|_| meshes.add(cloth::hinge(0.0, 0.0, BOARD, COVER.y))),
         };
+        let cloth = surfaces.add(Finish::Fabric.material(CLOTH, Form::Freeform, 0.0));
+        let cover = meshes.add(cloth::board(COVER.extend(BOARD).xzy(), COVER_CORNER));
         parts.open = file
             .spawn((
                 Name::new("open"),
@@ -105,15 +116,24 @@ impl Parts {
                 Visibility::Inherited,
             ))
             .with_children(|open| {
-                let back = Block::new(COVER.extend(BOARD).xzy())
-                    .translated(Vec3::X * (SPINE + COVER.x) / 2.0);
-                open.spawn((Shape::cuboid(&back, CLOTH), Finish::Fabric));
+                open.spawn((
+                    Mesh3d(cover.clone()),
+                    MeshMaterial3d(cloth.clone()),
+                    Transform::from_xyz(SPINE / 2.0, 0.0, 0.0),
+                ));
                 parts.spine = open
                     .spawn((Self::spine_hinge(), Visibility::Inherited))
                     .with_children(|hinge| {
                         let board = Block::new(Vec3::new(SPINE, BOARD, COVER.y))
                             .translated(Vec3::new(-SPINE / 2.0, -BOARD, 0.0));
                         hinge.spawn((Shape::cuboid(&board, CLOTH), Finish::Fabric));
+                        for (bend, at) in parts.bends.iter().zip([0.0, -SPINE]) {
+                            hinge.spawn((
+                                Mesh3d(bend.clone()),
+                                MeshMaterial3d(cloth.clone()),
+                                Transform::from_xyz(at, 0.0, 0.0),
+                            ));
+                        }
                         spawn_rings(hinge, meshes, materials);
                         spawn_spine_outside(hinge, spine, meshes, materials);
                         parts.stack = hinge
@@ -136,9 +156,12 @@ impl Parts {
                         parts.front = hinge
                             .spawn((Self::front_hinge(), Visibility::Inherited))
                             .with_children(|front| {
-                                let board = Block::new(COVER.extend(BOARD).xzy())
-                                    .translated(Vec3::new(-COVER.x / 2.0, -BOARD, 0.0));
-                                front.spawn((Shape::cuboid(&board, CLOTH), Finish::Fabric));
+                                front.spawn((
+                                    Mesh3d(cover),
+                                    MeshMaterial3d(cloth),
+                                    Transform::from_xyz(0.0, -BOARD, 0.0)
+                                        .with_rotation(Quat::from_rotation_y(PI)),
+                                ));
                             })
                             .id();
                     })
@@ -240,7 +263,7 @@ fn spawn_spine_outside(
         .with_rotation(Quat::from_rotation_z(-FRAC_PI_2));
     let to_spine = |standing: Transform| {
         GlobalTransform::from(standing)
-            .reparented_to(&GlobalTransform::from(super::pose::standing() * closed))
+            .reparented_to(&GlobalTransform::from(super::pose::standing(0.0) * closed))
     };
     let front = CLOSED.z / 2.0;
     hinge.spawn((

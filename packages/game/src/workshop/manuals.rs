@@ -1,3 +1,4 @@
+mod cloth;
 mod contents;
 mod datasheet;
 mod dividers;
@@ -139,7 +140,7 @@ impl ShopManuals {
                 (&pages, &spine),
                 edges,
                 &mut meshes,
-                &mut materials,
+                (&mut materials, &mut surfaces),
             ));
         });
         let Some(parts) = parts else {
@@ -405,16 +406,18 @@ impl ShopManuals {
         time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
-        mut files: Query<(Entity, &Parts, &Lying, &mut Pose)>,
+        mut files: Query<(Entity, &Parts, &Lying, &mut Pose, Ref<Stack>)>,
         mut transforms: Query<&mut Transform>,
         mut surfaces: Query<&mut ScreenSurface>,
+        mut meshes: ResMut<Assets<Mesh>>,
     ) {
-        for (file, parts, lying, mut pose) in &mut files {
+        for (file, parts, lying, mut pose, stack) in &mut files {
             let open = *state.get() == Focus::Paper && focused.get() == Some(file);
             let moved = pose.bypass_change_detection().step(open, time.delta_secs());
-            if moved || pose.is_added() {
+            let leaned = stack.is_changed() && pose.bypass_change_detection().lean_to(stack.lean());
+            if moved || leaned || pose.is_added() {
                 pose.set_changed();
-                parts.pose(&pose, lying.0, &mut transforms);
+                parts.pose(&pose, lying.0, &mut transforms, &mut meshes);
             }
             if let Ok(mut surface) = surfaces.get_mut(parts.sheet)
                 && surface.active != open
