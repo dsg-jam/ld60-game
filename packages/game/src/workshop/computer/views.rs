@@ -115,7 +115,7 @@ impl Views {
             if zoom.close != close {
                 zoom.close = close;
             }
-            let pins = board.view(run.pins().sheets().len(), perspective);
+            let pins = board.view(run.pins().used(), perspective);
             if aside.view != pins {
                 aside.view = pins;
             }

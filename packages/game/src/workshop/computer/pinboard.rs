@@ -168,7 +168,7 @@ impl PinBoard {
         }
     }
 
-    /// The camera pose that looks straight at the first `count` sheets.
+    /// The camera pose that looks straight at the first `count` slots.
     pub(super) fn view(&self, count: usize, perspective: &PerspectiveProjection) -> Transform {
         let shown = &self.slots[..count.clamp(1, self.slots.len())];
         let corners = shown.iter().flat_map(|slot| {
@@ -192,7 +192,7 @@ impl PinBoard {
             if board.shown.as_ref() == Some(run.pins()) {
                 continue;
             }
-            let sheets = run.pins().sheets();
+            let slots = run.pins().slots();
             let shown = |shown: bool| {
                 if shown {
                     Visibility::Inherited
@@ -202,14 +202,14 @@ impl PinBoard {
             };
             for part in board.parts {
                 if let Ok(mut visibility) = visibilities.get_mut(part) {
-                    visibility.set_if_neq(shown(!sheets.is_empty()));
+                    visibility.set_if_neq(shown(!run.pins().is_empty()));
                 }
             }
             for (index, slot) in board.slots.iter_mut().enumerate() {
                 if let Some(page) = slot.page.take() {
                     commands.entity(page).despawn();
                 }
-                slot.page = sheets.get(index).and_then(|&sheet| {
+                slot.page = slots[index].and_then(|sheet| {
                     commands
                         .entity(slot.sheet)
                         .insert((sheet.print(), Hanging(sheet)));

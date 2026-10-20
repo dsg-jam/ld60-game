@@ -1,5 +1,8 @@
+use std::fmt;
+
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::contents::{Contents, Entry, Page};
 use crate::parts::paper::{Paper, Print};
@@ -17,11 +20,16 @@ pub(crate) struct Sheet {
 }
 
 /// The sheets taken out of the manuals file and pinned to the monitor of
-/// the shop computer, at most [`Pins::MAX`] of them, the oldest first. A
-/// pinned sheet is not in the file until it is unpinned.
+/// the shop computer, each in one of [`Pins::MAX`] slots on the rail. Slot
+/// 0 is next to the monitor. A pinned sheet keeps its slot and is not in the
+/// file until it is unpinned.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "Vec<Sheet>", into = "Vec<Sheet>")]
-pub(crate) struct Pins(Vec<Sheet>);
+#[serde(from = "Vec<SavedSlot>", into = "Vec<Option<Sheet>>")]
+pub(crate) struct Pins([Option<Sheet>; Pins::MAX]);
+
+/// A slot of [`Pins`] as saved. Saves from before slots list the sheets
+/// alone.
+struct SavedSlot(Option<Sheet>);
 
 impl Sheet {
     pub(super) fn new(entry: Entry, page: usize) -> Self {
@@ -68,59 +76,121 @@ impl Sheet {
 impl Pins {
     pub(crate) const MAX: usize = 2;
 
-    pub(crate) fn sheets(&self) -> &[Sheet] {
+    /// What hangs in each slot.
+    pub(crate) fn slots(&self) -> &[Option<Sheet>] {
         &self.0
     }
 
+    /// How many slots there are up to the last one in use.
+    pub(crate) fn used(&self) -> usize {
+        self.0
+            .iter()
+            .rposition(Option::is_some)
+            .map_or(0, |last| last + 1)
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.used() == 0
     }
 
     pub(crate) fn contains(&self, sheet: Sheet) -> bool {
-        self.0.contains(&sheet)
+        self.slot_of(sheet).is_some()
+    }
+
+    pub(crate) fn slot_of(&self, sheet: Sheet) -> Option<usize> {
+        self.0.iter().position(|&other| other == Some(sheet))
     }
 
     /// Unpins the sheets whose entry is not in the manuals file of `run`.
     pub(crate) fn keep_filed(&mut self, run: &Run) {
         let contents = Contents::of(run);
-        self.0
-            .retain(|sheet| contents.entries().contains(&sheet.entry));
-    }
-
-    /// Whether the rail holds [`Pins::MAX`] sheets already.
-    pub(crate) fn is_full(&self) -> bool {
-        self.0.len() >= Self::MAX
-    }
-
-    /// Pins `sheet`, unless it is pinned already or the rail is full.
-    pub(crate) fn pin(&mut self, sheet: Sheet) {
-        if !self.is_full() && !self.contains(sheet) {
-            self.0.push(sheet);
+        for slot in &mut self.0 {
+            if slot.is_some_and(|sheet| !contents.entries().contains(&sheet.entry)) {
+                *slot = None;
+            }
         }
     }
 
-    /// Takes `sheet` off the rail, back into the manuals file.
+    /// Whether every slot holds a sheet already.
+    pub(crate) fn is_full(&self) -> bool {
+        self.free_slot().is_none()
+    }
+
+    /// The free slot closest to the monitor, where the next sheet goes.
+    pub(crate) fn free_slot(&self) -> Option<usize> {
+        self.0.iter().position(Option::is_none)
+    }
+
+    /// Pins `sheet` in the free slot closest to the monitor, unless it is
+    /// pinned already or the rail is full.
+    pub(crate) fn pin(&mut self, sheet: Sheet) {
+        if !self.contains(sheet)
+            && let Some(slot) = self.free_slot()
+        {
+            self.0[slot] = Some(sheet);
+        }
+    }
+
+    /// Takes `sheet` off the rail, back into the manuals file. The other
+    /// sheets stay where they are.
     pub(crate) fn unpin(&mut self, sheet: Sheet) {
-        self.0.retain(|&other| other != sheet);
+        if let Some(slot) = self.slot_of(sheet) {
+            self.0[slot] = None;
+        }
     }
 }
 
-impl From<Vec<Sheet>> for Pins {
-    /// Keeps the oldest [`Pins::MAX`] sheets that exist, each once.
-    fn from(sheets: Vec<Sheet>) -> Self {
+impl From<Vec<SavedSlot>> for Pins {
+    /// Keeps the sheets that exist in their slots, each once.
+    fn from(slots: Vec<SavedSlot>) -> Self {
         let mut pins = Self::default();
-        for sheet in sheets {
-            if sheet.page().is_some() {
-                pins.pin(sheet);
+        for (slot, SavedSlot(sheet)) in slots.into_iter().take(Self::MAX).enumerate() {
+            if let Some(sheet) = sheet
+                && sheet.page().is_some()
+                && !pins.contains(sheet)
+            {
+                pins.0[slot] = Some(sheet);
             }
         }
         pins
     }
 }
 
-impl From<Pins> for Vec<Sheet> {
+impl From<Pins> for Vec<Option<Sheet>> {
     fn from(pins: Pins) -> Self {
-        pins.0
+        pins.0.to_vec()
+    }
+}
+
+impl<'de> Deserialize<'de> for SavedSlot {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(SavedSlotVisitor)
+    }
+}
+
+struct SavedSlotVisitor;
+
+impl<'de> Visitor<'de> for SavedSlotVisitor {
+    type Value = SavedSlot;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a sheet or none")
+    }
+
+    fn visit_none<E>(self) -> Result<SavedSlot, E> {
+        Ok(SavedSlot(None))
+    }
+
+    fn visit_unit<E>(self) -> Result<SavedSlot, E> {
+        Ok(SavedSlot(None))
+    }
+
+    fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<SavedSlot, D::Error> {
+        Sheet::deserialize(deserializer).map(|sheet| SavedSlot(Some(sheet)))
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<SavedSlot, A::Error> {
+        Sheet::deserialize(MapAccessDeserializer::new(map)).map(|sheet| SavedSlot(Some(sheet)))
     }
 }
 
@@ -139,10 +209,10 @@ mod tests {
     fn sheets_that_are_not_filed_come_off() {
         let mut pins = Pins::default();
         let other = Sheet::new(Entry::Chip(Revision::B), 0);
-        pins.pin(chip(0));
         pins.pin(other);
+        pins.pin(chip(0));
         pins.keep_filed(&Run::default());
-        assert_eq!(pins.sheets(), [chip(0)]);
+        assert_eq!(pins.slots(), [None, Some(chip(0))]);
     }
 
     #[test]
@@ -150,7 +220,7 @@ mod tests {
         let mut pins = Pins::default();
         pins.pin(chip(0));
         pins.pin(chip(0));
-        assert_eq!(pins.sheets(), [chip(0)]);
+        assert_eq!(pins.slots(), [Some(chip(0)), None]);
         pins.unpin(chip(0));
         assert!(pins.is_empty());
     }
@@ -162,18 +232,41 @@ mod tests {
             pins.pin(chip(page));
         }
         assert!(pins.is_full());
-        assert_eq!(pins.sheets(), [chip(0), chip(1)]);
+        assert_eq!(pins.slots(), [Some(chip(0)), Some(chip(1))]);
+    }
+
+    #[test]
+    fn sheets_keep_their_slots() {
+        let mut pins = Pins::default();
+        pins.pin(chip(0));
+        pins.pin(chip(1));
         pins.unpin(chip(0));
+        assert_eq!(pins.slots(), [None, Some(chip(1))]);
+        assert_eq!(pins.used(), 2);
         pins.pin(chip(2));
-        assert_eq!(pins.sheets(), [chip(1), chip(2)]);
+        assert_eq!(pins.slots(), [Some(chip(2)), Some(chip(1))]);
+        assert_eq!(pins.slot_of(chip(1)), Some(1));
     }
 
     #[test]
     fn loading_keeps_the_rules() {
         let missing = Sheet::new(Entry::Manual(DeviceKind::Tally2), 99);
         let note = Sheet::new(Entry::Note(TutorialNote(99)), 0);
-        let pins = Pins::from(vec![chip(0), missing, chip(0), note, chip(1), chip(2)]);
-        assert_eq!(pins.sheets(), [chip(0), chip(1)]);
+        let load = |sheets: Vec<Option<Sheet>>| {
+            Pins::from(sheets.into_iter().map(SavedSlot).collect::<Vec<_>>())
+        };
+        assert_eq!(
+            load(vec![Some(missing), Some(chip(0))]).slots(),
+            [None, Some(chip(0))]
+        );
+        assert_eq!(
+            load(vec![Some(chip(0)), Some(chip(0))]).slots(),
+            [Some(chip(0)), None]
+        );
+        assert_eq!(
+            load(vec![Some(note), None, Some(chip(1))]).slots(),
+            [None, None]
+        );
     }
 
     #[test]
@@ -181,7 +274,16 @@ mod tests {
         let mut pins = Pins::default();
         pins.pin(chip(1));
         pins.pin(Sheet::new(Entry::Note(TutorialNote(0)), 0));
+        pins.unpin(chip(1));
         let text = ron::to_string(&pins).unwrap();
         assert_eq!(ron::from_str::<Pins>(&text).unwrap(), pins);
+    }
+
+    #[test]
+    fn pins_from_before_slots_load_in_order() {
+        let manual = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
+        let text = ron::to_string(&vec![manual, chip(0)]).unwrap();
+        let pins = ron::from_str::<Pins>(&text).unwrap();
+        assert_eq!(pins.slots(), [Some(manual), Some(chip(0))]);
     }
 }

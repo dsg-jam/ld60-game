@@ -592,7 +592,7 @@ mod tests {
         world.get_mut::<Paper>(file).unwrap().open_page(2);
         press(&mut world);
         let pinned = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
-        assert_eq!(world.resource::<Run>().pins().sheets(), [pinned]);
+        assert_eq!(world.resource::<Run>().pins().slots(), [Some(pinned), None]);
         world.run_system_cached(ShopManuals::file).unwrap();
         world.flush();
         let paper = world.get::<Paper>(file).unwrap();
