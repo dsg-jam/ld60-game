@@ -1,9 +1,12 @@
+mod stroke;
+
 use bevy::{
     input::keyboard::Key,
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
 
+use self::stroke::Stroke;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
@@ -210,6 +213,7 @@ impl<K: Copy> Keypad<K> {
                     held_by_pointer: false,
                     tapped_by_pointer: false,
                     pressed: false,
+                    stroke: Stroke::default(),
                 },
                 extra(key),
             ));
@@ -274,6 +278,9 @@ impl<K: Copy> Keypad<K> {
 
 /// A key that moves down while held by the pointer or by one of its key
 /// bindings. Inactive keys ignore both.
+///
+/// The key is pressed as soon as the input says so. It moves down and back
+/// up over a short [`Stroke`].
 #[derive(Component, Debug)]
 pub(crate) struct PressableKey {
     rest: Vec3,
@@ -286,6 +293,7 @@ pub(crate) struct PressableKey {
     /// presses and releases within one frame still shows.
     tapped_by_pointer: bool,
     pressed: bool,
+    stroke: Stroke,
 }
 
 impl PressableKey {
@@ -321,6 +329,7 @@ impl PressableKey {
     }
 
     pub(crate) fn update(
+        time: Res<Time>,
         codes: Res<ButtonInput<KeyCode>>,
         keys: Res<ButtonInput<Key>>,
         mut caps: Query<(&mut PressableKey, &mut Transform)>,
@@ -338,8 +347,11 @@ impl PressableKey {
             }
             if pressed != cap.pressed {
                 cap.pressed = pressed;
-                let travel = if pressed { cap.travel } else { 0.0 };
-                transform.translation = cap.rest - Vec3::Y * travel;
+            }
+            let stroke = cap.stroke.step(pressed, time.delta_secs());
+            if stroke != cap.stroke {
+                cap.stroke = stroke;
+                transform.translation = cap.rest - Vec3::Y * cap.travel * stroke.depth();
             }
         }
     }
