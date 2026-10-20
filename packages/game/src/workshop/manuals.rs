@@ -32,7 +32,8 @@ use super::run::Run;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
 use crate::parts::paper::{
-    Binding, Leaf, LeafShape, PAPER, Paper, READING_ZOOM, ShowsOwnPages, Wrinkles,
+    Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, READING_ZOOM,
+    ShowsOwnPages, Wrinkles,
 };
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
@@ -140,7 +141,16 @@ impl ShopManuals {
         );
         model::write_spine(&mut commands, &spine);
         DividerTab::write_labels(&mut commands, &labels);
-        let edges = surfaces.add(Finish::Paper.material(PAPER, Form::Freeform, 0.0));
+        let edges = surfaces.add(Finish::Paper.over(
+            StandardMaterial {
+                base_color: PAPER,
+                perceptual_roughness: PAPER_ROUGHNESS,
+                reflectance: PAPER_REFLECTANCE,
+                ..default()
+            },
+            Form::Freeform,
+            0.0,
+        ));
         let mut parts = None;
         commands.entity(add.entity).with_children(|file| {
             parts = Some(Parts::spawn(

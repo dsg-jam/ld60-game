@@ -12,7 +12,7 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 use std::ops::Range;
 
-use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use bevy::{mesh::VertexAttributeValues, platform::hash::fixed_hash_one, prelude::*};
 
 use super::dividers::{DividerTab, TAB_OUT};
 use super::model::{
@@ -21,7 +21,7 @@ use super::model::{
 };
 use super::pose::Pose;
 use super::punched::punched_box;
-use crate::parts::paper::Leaf;
+use crate::parts::paper::{Leaf, PAPER_SHADE};
 
 /// Thickness of a page, a little more than real paper so the stack shows
 /// each sheet.
@@ -502,12 +502,25 @@ fn empty_mesh() -> Mesh {
 }
 
 /// `mesh` with every vertex in `shade` of gray, so it darkens the material.
+/// Its faces darken further like a sheet does, so a page that peeks out
+/// from under the open sheet looks the same as when it is the open sheet.
 fn colored(mesh: Mesh, shade: f32) -> Mesh {
-    let count = mesh.count_vertices();
-    mesh.with_inserted_attribute(
-        Mesh::ATTRIBUTE_COLOR,
-        vec![[shade, shade, shade, 1.0]; count],
-    )
+    let face = PAPER_SHADE.to_linear().red;
+    let colors: Vec<[f32; 4]> = match mesh.attribute(Mesh::ATTRIBUTE_NORMAL) {
+        Some(VertexAttributeValues::Float32x3(normals)) => normals
+            .iter()
+            .map(|normal| {
+                let shade = if normal[1].abs() > 0.5 {
+                    shade * face
+                } else {
+                    shade
+                };
+                [shade, shade, shade, 1.0]
+            })
+            .collect(),
+        _ => vec![[shade, shade, shade, 1.0]; mesh.count_vertices()],
+    };
+    mesh.with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
 }
 
 #[cfg(test)]

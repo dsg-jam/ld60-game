@@ -64,6 +64,8 @@ pub(crate) const PAPER_REFLECTANCE: f32 = 0.1;
 /// Darkens a sheet under the lamp, so the page is not so bright that the
 /// tone mapping washes out its print.
 pub(crate) const PAPER_SHADE: Color = Color::linear_rgb(0.5, 0.5, 0.5);
+/// Roughness of a sheet.
+pub(crate) const PAPER_ROUGHNESS: f32 = 0.95;
 
 pub(crate) struct PaperPlugin;
 

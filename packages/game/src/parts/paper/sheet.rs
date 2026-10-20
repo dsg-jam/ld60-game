@@ -14,12 +14,11 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::leaf::{relaxed, relaxing};
 use super::press::Print;
-use super::{Binding, PAPER_REFLECTANCE, PAPER_SHADE, Paper};
+use super::{Binding, PAPER_REFLECTANCE, PAPER_ROUGHNESS, PAPER_SHADE, Paper};
 
 /// About one vertex per this many meters. Wrinkles are broad, so this is
 /// enough. The shader draws the sharp fold lines.
 const GRID: f32 = 0.01;
-const ROUGHNESS: f32 = 0.95;
 /// The shader gets one of this many seeds.
 const SEEDS: u64 = 1000;
 /// Width of the bulge along a fold, in meters.
@@ -397,7 +396,7 @@ impl Sheet {
             base: StandardMaterial {
                 base_color: PAPER_SHADE,
                 emissive: glow.map_or(LinearRgba::BLACK, |glow| glow.0),
-                perceptual_roughness: ROUGHNESS,
+                perceptual_roughness: PAPER_ROUGHNESS,
                 reflectance: PAPER_REFLECTANCE,
                 ..default()
             },
