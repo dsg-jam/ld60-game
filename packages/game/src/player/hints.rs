@@ -1,6 +1,6 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
 
-use super::{cursor, look::Gaze};
+use super::{cursor, focus::Focused, look::Gaze};
 use crate::locale::{Localized, Message};
 use crate::menu::Settings;
 
@@ -16,7 +16,8 @@ const TEXT_SIZE: f32 = 18.0;
 const GAP: f32 = 6.0;
 /// From the bottom left corner to the hint for going back.
 const CORNER: f32 = 24.0;
-/// Between the hint for going back, the [`ClickHint`] and the [`KeyHint`].
+/// Between the hint for going back, the [`ClickHint`], the [`KeyHint`] and
+/// the [`Hints`].
 const KEY_HINT_GAP: f32 = 18.0;
 pub(crate) const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
@@ -36,17 +37,25 @@ impl Plugin for HintsPlugin {
             .add_systems(Startup, BackHint::spawn)
             .add_systems(
                 Update,
-                (BackHint::update, KeyHint::update, ClickHint::update),
+                (
+                    BackHint::update,
+                    KeyHint::update,
+                    ClickHint::update,
+                    Hints::update,
+                ),
             );
     }
 }
 
 /// A mouse button or key, drawn with Kenney's input prompt font.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Icon {
+pub(crate) enum Icon {
     MouseLeft,
     MouseRight,
     Escape,
+    Wheel,
+    /// Moving the mouse to the side.
+    Sideways,
 }
 
 #[derive(Resource, Debug)]
@@ -78,6 +87,29 @@ pub(crate) struct KeyHint(pub(crate) Option<(&'static str, Message)>);
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub(crate) struct ClickHint(pub(crate) Option<Message>);
 
+/// What the inputs of the focused thing do, after the [`KeyHint`].
+#[derive(Component, Clone, Debug, Default, PartialEq)]
+pub(crate) struct Hints(pub(crate) Vec<Hint>);
+
+/// One or more inputs that do the same thing.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Hint {
+    pub(crate) inputs: Vec<Input>,
+    pub(crate) action: Message,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Input {
+    Key(&'static str),
+    Icon(Icon),
+    /// A key held while using the mouse.
+    Chord(&'static str, Icon),
+}
+
+/// Holds the rows of the [`Hints`].
+#[derive(Component, Debug)]
+struct HintList;
+
 /// The parts of the [`ClickHint`] line.
 #[derive(Component, Debug)]
 enum ClickHintPart {
@@ -106,15 +138,17 @@ impl Icon {
             Self::MouseLeft => "\u{e0ec}",
             Self::MouseRight => "\u{e0f0}",
             Self::Escape => "\u{e063}",
+            Self::Wheel => "\u{e0f8}",
+            Self::Sideways => "\u{e0ea}",
         }
     }
 
     /// The outline alone. Drawn over [`Icon::glyph`], it leaves only the
-    /// button in the accent color.
+    /// button or the wheel in the accent color.
     const fn outline(self) -> Option<&'static str> {
         match self {
-            Self::MouseLeft | Self::MouseRight => Some("\u{e0ee}"),
-            Self::Escape => None,
+            Self::MouseLeft | Self::MouseRight | Self::Wheel => Some("\u{e0ee}"),
+            Self::Escape | Self::Sideways => None,
         }
     }
 
@@ -204,23 +238,17 @@ impl BackHint {
                     },
                     Pickable::IGNORE,
                     children![
-                        (
-                            Node {
-                                padding: UiRect::axes(px(6), px(1)),
-                                border: px(2).all(),
-                                ..default()
-                            },
-                            BorderColor::all(INK),
-                            Pickable::IGNORE,
-                            children![(
-                                KeyHintPart::Key,
-                                Caption,
-                                TextColor(ACCENT),
-                                Localized::verbatim("")
-                            )],
-                        ),
+                        key_cap((KeyHintPart::Key, Localized::verbatim(""))),
                         (KeyHintPart::Action, Caption, Localized::verbatim("")),
                     ],
+                ));
+                hint.spawn((
+                    HintList,
+                    Node {
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    Pickable::IGNORE,
                 ));
             });
     }
@@ -267,6 +295,66 @@ impl KeyHint {
     }
 }
 
+impl Hints {
+    fn update(
+        focused: Res<Focused>,
+        hints: Query<&Hints>,
+        list: Single<Entity, With<HintList>>,
+        font: Res<IconFont>,
+        mut shown: Local<Hints>,
+        mut commands: Commands,
+    ) {
+        let hints = focused
+            .get()
+            .and_then(|entity| hints.get(entity).ok())
+            .cloned()
+            .unwrap_or_default();
+        if *shown == hints {
+            return;
+        }
+        commands
+            .entity(*list)
+            .despawn_children()
+            .with_children(|list| {
+                for hint in &hints.0 {
+                    hint.spawn(list, &font);
+                }
+            });
+        *shown = hints;
+    }
+}
+
+impl Hint {
+    fn spawn(&self, parent: &mut RelatedSpawnerCommands<ChildOf>, font: &IconFont) {
+        parent
+            .spawn((
+                Node {
+                    align_items: AlignItems::Center,
+                    column_gap: px(GAP),
+                    margin: UiRect::left(px(KEY_HINT_GAP)),
+                    ..default()
+                },
+                Pickable::IGNORE,
+            ))
+            .with_children(|row| {
+                for input in &self.inputs {
+                    match *input {
+                        Input::Key(key) => {
+                            row.spawn(key_cap(Localized::verbatim(key)));
+                        }
+                        Input::Icon(icon) => icon.spawn(row, font),
+                        Input::Chord(key, icon) => {
+                            row.spawn(key_cap(Localized::verbatim(key)));
+                            row.spawn((Caption, Localized::verbatim("+")));
+                            icon.spawn(row, font);
+                        }
+                    }
+                }
+                row.spawn((Caption, Localized::from(self.action.clone())));
+            });
+    }
+}
+
 impl ClickHint {
     fn update(
         hint: Res<ClickHint>,
@@ -291,4 +379,18 @@ impl ClickHint {
             }
         }
     }
+}
+
+/// A key to press, with its `label` in a box.
+fn key_cap(label: impl Bundle) -> impl Bundle {
+    (
+        Node {
+            padding: UiRect::axes(px(6), px(1)),
+            border: px(2).all(),
+            ..default()
+        },
+        BorderColor::all(INK),
+        Pickable::IGNORE,
+        children![(Caption, TextColor(ACCENT), label)],
+    )
 }
