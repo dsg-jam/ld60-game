@@ -80,7 +80,7 @@ pub(super) struct Heard {
 enum Model {
     Tire(Box<TireSound>),
     Motor(MotorSound),
-    Fans(FanSound),
+    Fans(Box<FanSound>),
 }
 
 /// The way from a part to the ears: the sound arrives late by the time it
@@ -157,7 +157,7 @@ impl Model {
         match part {
             Part::Tire(tire) => Self::Tire(Box::new(tire.sound(seed))),
             Part::Motor(motor) => Self::Motor(motor.sound(seed)),
-            Part::Fans(fans) => Self::Fans(fans.sound(seed)),
+            Part::Fans(fans) => Self::Fans(Box::new(fans.sound(seed))),
         }
     }
 
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn a_stopped_voice_ends() {
         let fans = Fans {
-            blades: 450.0,
+            blades: 260.0,
             level: 1.0,
         };
         let (voice, controls) = Voice::new(vec![Part::Fans(fans)], 100.0, 1);

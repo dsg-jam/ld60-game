@@ -30,7 +30,7 @@ const SKY_RANGE: f32 = 300.0;
 /// start at the edge.
 const KEEP: f32 = 1.1;
 const CAR_VOLUME: f32 = 0.019;
-const SKY_VOLUME: f32 = 0.025;
+const SKY_VOLUME: f32 = 0.009;
 /// Millimeters of water on a soaked road.
 const FILM: f32 = 1.0;
 /// Millimeters of water in a puddle per unit [`Wet::puddle`] is above its
@@ -176,7 +176,7 @@ impl SkyCar {
             &mut commands,
             |(), seed| {
                 let fans = Fans {
-                    blades: 450.0 * vary(seed, 0.12),
+                    blades: 260.0 * vary(seed, 0.12),
                     level: 1.0,
                 };
                 Voice::new(vec![Part::Fans(fans)], SKY_RANGE * KEEP, seed)

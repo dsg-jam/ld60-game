@@ -34,6 +34,17 @@ pub(super) struct Tone {
     sin: f32,
 }
 
+/// Noise that wanders slowly around 0 with a spread of about 1. It moves
+/// once per block.
+#[derive(Debug)]
+pub(super) struct Wander {
+    noise: Noise,
+    pull: f32,
+    first: f32,
+    value: f32,
+    scale: f32,
+}
+
 /// A value that follows its target with a time constant.
 #[derive(Debug)]
 pub(super) struct Glide {
@@ -108,6 +119,29 @@ impl Tone {
     }
 }
 
+impl Wander {
+    /// Wanders through two one pole low-passes at `hz`.
+    pub(super) fn new(hz: f32, seed: u32) -> Self {
+        let pull = 1.0 - (-TAU * hz * BLOCK as f32 / RATE as f32).exp();
+        let keep = 1.0 - pull;
+        // White noise from -1 to 1 has a variance of a third.
+        let variance = pull.powi(4) * (1.0 + keep * keep) / (1.0 - keep * keep).powi(3) / 3.0;
+        Self {
+            noise: Noise::new(seed),
+            pull,
+            first: 0.0,
+            value: 0.0,
+            scale: variance.sqrt().recip(),
+        }
+    }
+
+    pub(super) fn next(&mut self) -> f32 {
+        self.first += (self.noise.next() - self.first) * self.pull;
+        self.value += (self.first - self.value) * self.pull;
+        self.value * self.scale
+    }
+}
+
 impl Glide {
     /// Starts at `value` and covers about two thirds of the way to a new
     /// target in `seconds`, updated once per block.
@@ -167,6 +201,14 @@ mod tests {
         }
         assert!((439..=441).contains(&crossings));
         assert!((peak - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn wander_spreads_about_one() {
+        let mut wander = Wander::new(0.5, 3);
+        let count = 200_000;
+        let power = (0..count).map(|_| wander.next().powi(2)).sum::<f32>() / count as f32;
+        assert!((0.6..1.6).contains(&power), "{power}");
     }
 
     #[test]
