@@ -19,7 +19,6 @@ use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};
 use crate::player::hints::{Hint, Hints, Icon, Input};
-use crate::player::zoom::Zoom;
 
 /// How far a held device lifts off the counter.
 const LIFT: f32 = 0.1;
@@ -27,10 +26,6 @@ const LIFT: f32 = 0.1;
 const TILT_UP: f32 = 0.8;
 /// Distance of the player's eyes from a held device.
 const VIEW_DISTANCE: f32 = 0.26;
-/// How far the player leans in on a held device, in meters. Its keys stay
-/// clear of the near end of the view.
-const ZOOM: f32 = 0.09;
-const ZOOM_STEPS: u8 = 2;
 /// Radians of rotation per pixel dragged.
 const DRAG_SPEED: f32 = 0.01;
 /// How quickly a device moves between the counter and the hand.
@@ -109,7 +104,6 @@ impl Holdable {
                 // `Holdable::frame` keeps it in front of the seat.
                 view: View::World(Transform::IDENTITY),
             },
-            Zoom::ahead(ZOOM, ZOOM_STEPS),
             Hints(vec![
                 Hint {
                     inputs: vec![Input::Icon(Icon::MouseLeft)],

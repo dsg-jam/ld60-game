@@ -9,6 +9,7 @@ use bevy::{
     prelude::*,
 };
 
+use super::lens::Lens;
 use super::zoom::Zoom;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
@@ -184,26 +185,27 @@ impl Focused {
     }
 
     /// Right click or Escape goes back to the desk, or first from an open
-    /// [`Aside`] and then from a [`Zoom`] back to the focused view.
+    /// [`Aside`] and then from a [`Zoom`] or the [`Lens`] back to the focused
+    /// view.
     pub(super) fn leave_on_input(
         mouse: Res<ButtonInput<MouseButton>>,
         keys: Res<ButtonInput<KeyCode>>,
         mut focused: ResMut<Focused>,
         mut next: ResMut<NextState<Focus>>,
         mut views: Query<(Option<&mut Aside>, Option<&mut Zoom>)>,
+        mut lens: ResMut<Lens>,
     ) {
         let leave = mouse.just_pressed(MouseButton::Right) || keys.just_pressed(KeyCode::Escape);
         let Some(entity) = focused.0.filter(|_| leave) else {
             return;
         };
-        let Ok((aside, zoom)) = views.get_mut(entity) else {
-            focused.leave(&mut next);
-            return;
-        };
+        let (aside, zoom) = views.get_mut(entity).unwrap_or_default();
         if let Some(mut aside) = aside.filter(|aside| aside.open) {
             aside.open = false;
         } else if let Some(mut zoom) = zoom.filter(|zoom| zoom.zoomed()) {
             zoom.reset();
+        } else if lens.zoomed() {
+            lens.reset();
         } else {
             focused.leave(&mut next);
         }
@@ -341,6 +343,7 @@ mod tests {
         world.init_resource::<ButtonInput<MouseButton>>();
         world.init_resource::<ButtonInput<KeyCode>>();
         world.init_resource::<NextState<Focus>>();
+        world.init_resource::<Lens>();
         let mut aside = Aside::new(Transform::IDENTITY);
         aside.open = true;
         let target = world.spawn(aside).id();
@@ -365,9 +368,10 @@ mod tests {
         world.init_resource::<ButtonInput<MouseButton>>();
         world.init_resource::<ButtonInput<KeyCode>>();
         world.init_resource::<NextState<Focus>>();
+        world.init_resource::<Lens>();
         let mut aside = Aside::new(Transform::IDENTITY);
         aside.open = true;
-        let mut zoom = Zoom::ahead(0.1, 2);
+        let mut zoom = Zoom::to(View::Local(Transform::IDENTITY), 2);
         zoom.step_by(1);
         let target = world.spawn((aside, zoom)).id();
         world.insert_resource(Focused(Some(target)));
@@ -385,6 +389,31 @@ mod tests {
         assert!(!world.get::<Zoom>(target).unwrap().zoomed());
         assert_eq!(world.resource::<Focused>().get(), Some(target));
         right_click(&mut world);
+        assert_eq!(world.resource::<Focused>().get(), None);
+    }
+
+    #[test]
+    fn escape_comes_back_from_the_lens_zoom_first() {
+        let mut world = World::new();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<NextState<Focus>>();
+        let mut lens = Lens::default();
+        lens.step(1.0);
+        world.insert_resource(lens);
+        let target = world.spawn_empty().id();
+        world.insert_resource(Focused(Some(target)));
+        let escape = |world: &mut World| {
+            let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+            keys.release(KeyCode::Escape);
+            keys.clear();
+            keys.press(KeyCode::Escape);
+            world.run_system_cached(Focused::leave_on_input).unwrap();
+        };
+        escape(&mut world);
+        assert!(!world.resource::<Lens>().zoomed());
+        assert_eq!(world.resource::<Focused>().get(), Some(target));
+        escape(&mut world);
         assert_eq!(world.resource::<Focused>().get(), None);
     }
 }

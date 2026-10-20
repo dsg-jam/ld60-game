@@ -13,7 +13,7 @@ use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::{Hint, Hints, Icon, Input};
 use crate::player::lens;
-use crate::player::zoom::{Closer, Zoom};
+use crate::player::zoom::Zoom;
 use crate::workshop::run::Run;
 
 /// How far the wide view looks down at the keyboard, in radians.
@@ -84,16 +84,12 @@ impl Views {
     }
 
     /// The views for a window of the default shape, until the camera has
-    /// one. The zoom stays for the next time at the computer.
+    /// one.
     pub(super) fn initial(&self, board: &PinBoard) -> (View, Zoom, Aside) {
         let perspective = PerspectiveProjection::default();
         (
             View::Local(self.wide(&perspective)),
-            Zoom::to(
-                Closer::View(View::Local(self.close(&perspective))),
-                ZOOM_STEPS,
-            )
-            .kept(),
+            Zoom::to(View::Local(self.close(&perspective)), ZOOM_STEPS),
             Aside::new(board.view(0, &perspective)),
         )
     }
@@ -117,7 +113,7 @@ impl Views {
             if !matches!(target.view, View::Local(view) if view == wide) {
                 target.view = View::Local(wide);
             }
-            let close = Closer::View(View::Local(views.close(perspective)));
+            let close = View::Local(views.close(perspective));
             if zoom.close != close {
                 zoom.close = close;
             }

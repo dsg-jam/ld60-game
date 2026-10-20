@@ -35,8 +35,8 @@ use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
 use crate::menu::AppState;
 use crate::parts::paper::{
-    Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, READING_ZOOM,
-    ShowsOwnPages, Wrinkles,
+    Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
+    Wrinkles,
 };
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::camera::PlayerCamera;
@@ -190,7 +190,6 @@ impl ShopManuals {
                 focus: Focus::Paper,
                 view: View::Local(lying.mul_transform(Parts::reading_view())),
             },
-            READING_ZOOM,
             Lying(lying),
             Hints(vec![
                 Hint {

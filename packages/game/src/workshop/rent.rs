@@ -6,7 +6,7 @@ use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
 use crate::menu::AppState;
-use crate::parts::paper::{Paper, Press, READING_ZOOM, Stock};
+use crate::parts::paper::{Paper, Press, Stock};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 
@@ -63,7 +63,6 @@ impl RentNote {
                     focus: Focus::Paper,
                     view: View::Local(Paper::reading_view(Self::sheet_center())),
                 },
-                READING_ZOOM,
             ))
             .id();
         commands.trigger(FocusOn { entity: note });

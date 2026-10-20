@@ -16,7 +16,6 @@ use crate::parts::latch_button::LatchButton;
 use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::{Hint, Hints, Icon, Input};
-use crate::player::zoom::Zoom;
 
 pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
 /// Twelve characters of five dots.
@@ -34,10 +33,6 @@ const START_VOLUME: f32 = 0.5;
 /// Camera in front of the radio while focused, a little above it to see the
 /// power button on top.
 const VIEW: Vec3 = Vec3::new(0.0, 0.26, 0.38);
-/// How far the camera leans in on the radio, in meters, close enough to read
-/// the display.
-const ZOOM: f32 = 0.14;
-const ZOOM_STEPS: u8 = 2;
 
 const WOOD: Color = Color::srgb_u8(0x6a, 0x44, 0x28);
 const CHROME: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
@@ -134,13 +129,10 @@ impl Radio {
                     Transform::from_translation(VIEW).looking_at(Vec3::Y * CASE.y / 2.0, Vec3::Y),
                 ),
             })
-            .insert((
-                Zoom::ahead(ZOOM, ZOOM_STEPS),
-                Hints(vec![Hint {
-                    inputs: vec![Input::Icon(Icon::Wheel)],
-                    action: Message::new("hint-volume"),
-                }]),
-            ))
+            .insert(Hints(vec![Hint {
+                inputs: vec![Input::Icon(Icon::Wheel)],
+                action: Message::new("hint-volume"),
+            }]))
             .with_children(|parent| {
                 parent.spawn((Shape::cuboid(&case, WOOD), Finish::Wood));
                 front.spawn_panel(parent, &mut meshes, &mut surfaces);

@@ -4,7 +4,6 @@ use super::{
     cursor,
     focus::{Aside, Focused},
     look::Gaze,
-    zoom::Zoom,
 };
 use crate::locale::{Localized, Message};
 use crate::menu::Settings;
@@ -314,12 +313,11 @@ impl KeyHint {
 
 impl Hints {
     /// The hints of the focused thing, then free look and zoom, which work
-    /// in every view. At the desk the wheel zooms the
-    /// [`Lens`](super::lens::Lens).
+    /// in every view but the pinned sheets.
     fn update(
         gaze: Gaze,
         focused: Res<Focused>,
-        hints: Query<(Option<&Hints>, Option<&Zoom>, Option<&Aside>)>,
+        hints: Query<(Option<&Hints>, Option<&Aside>)>,
         list: Single<Entity, With<HintList>>,
         font: Res<IconFont>,
         mut shown: Local<Hints>,
@@ -328,13 +326,13 @@ impl Hints {
         let hints = focused
             .get()
             .and_then(|entity| hints.get(entity).ok())
-            .map(|(hints, zoom, aside)| {
+            .map(|(hints, aside)| {
                 let mut hints = hints.cloned().unwrap_or_default();
                 hints.0.push(Hint {
                     inputs: vec![Input::Key("Ctrl")],
                     action: Message::new("hint-look-around"),
                 });
-                if zoom.is_some() && !aside.is_some_and(|aside| aside.open) {
+                if !aside.is_some_and(|aside| aside.open) {
                     hints.0.push(Hint {
                         inputs: vec![Input::Chord("Ctrl", Icon::Wheel)],
                         action: Message::new("hint-zoom"),

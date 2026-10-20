@@ -9,6 +9,7 @@ use super::camera::PlayerCamera;
 use super::focus::Focused;
 use super::free_look::{FreeLook, MODIFIERS};
 use super::look::Gaze;
+use super::zoom::Zoom;
 use crate::menu::AppState;
 
 /// Vertical field of view of the player camera, in radians, without the
@@ -41,11 +42,11 @@ impl Plugin for LensPlugin {
 }
 
 /// Narrows the field of view with Ctrl and the wheel, like squinting at
-/// something far off. It works seated at the desk and while looking around
-/// with [`FreeLook`], and only turns the view around where it looks.
+/// something. It works seated at the desk and in every focus view without a
+/// [`Zoom`] of its own, also while looking around with [`FreeLook`].
 ///
-/// At the desk the zoom stays until the player gets up or focuses on
-/// something, also over a pause. In free look it lasts until Ctrl comes up.
+/// The zoom stays until the player focuses on something else or gets up,
+/// also over a pause.
 #[derive(Resource, Debug, Default)]
 pub(crate) struct Lens {
     /// The zoom the wheel asks for, as the power of [`NOTCH`].
@@ -61,10 +62,18 @@ enum Holder {
     #[default]
     None,
     Desk,
-    FreeLook(Entity),
+    Focus(Entity),
 }
 
 impl Lens {
+    pub(crate) fn zoomed(&self) -> bool {
+        self.notches > 0.0
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.notches = 0.0;
+    }
+
     /// How much larger things look.
     pub(crate) fn zoom(&self) -> f32 {
         NOTCH.powf(self.shown)
@@ -76,7 +85,7 @@ impl Lens {
     }
 
     /// Zooms in by `notches`, or out if negative.
-    fn step(&mut self, notches: f32) {
+    pub(super) fn step(&mut self, notches: f32) {
         self.notches = (self.notches + notches).clamp(0.0, MAX_ZOOM.log(NOTCH));
     }
 
@@ -84,18 +93,19 @@ impl Lens {
     fn reset_on_change(
         gaze: Gaze,
         focused: Res<Focused>,
+        zooms: Query<(), With<Zoom>>,
         camera: Single<(&PlayerCamera, &Transform)>,
         mut lens: ResMut<Lens>,
     ) {
         let (camera, transform) = *camera;
         let holder = match focused.get() {
             None if gaze.at_desk() && camera.seated(transform) => Holder::Desk,
-            Some(entity) if gaze.free_looking() => Holder::FreeLook(entity),
+            Some(entity) if gaze.focused() && !zooms.contains(entity) => Holder::Focus(entity),
             _ => Holder::None,
         };
         if lens.holder != holder {
             lens.holder = holder;
-            lens.notches = 0.0;
+            lens.reset();
         }
     }
 

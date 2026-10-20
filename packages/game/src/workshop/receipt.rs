@@ -7,7 +7,7 @@ use super::pickup::Pickup;
 use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
 use crate::locale::{Localized, Message};
-use crate::parts::paper::{Paper, READING_ZOOM};
+use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, View};
 
@@ -69,7 +69,6 @@ impl Receipt {
                     focus: Focus::Paper,
                     view: View::Local(Paper::reading_view(Self::sheet_center())),
                 },
-                READING_ZOOM,
             ))
             .id();
         commands.trigger(FocusOn { entity: receipt });

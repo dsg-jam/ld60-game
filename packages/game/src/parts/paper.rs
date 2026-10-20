@@ -35,7 +35,6 @@ use crate::locale::{Localized, Message};
 use crate::player::focus::{self, Focus, Focused};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::ClickHint;
-use crate::player::zoom::Zoom;
 
 pub(crate) const PAPER: Color = Color::srgb_u8(0xf2, 0xec, 0xdc);
 pub(crate) const INK: Color = Color::srgb_u8(0x2a, 0x26, 0x22);
@@ -58,8 +57,6 @@ const SCROLL_PIXELS: f32 = 40.0;
 const SCROLL_PAUSE: f32 = 0.15;
 /// Camera height above a sheet while reading it.
 const READING_HEIGHT: f32 = 0.3;
-/// How far the player leans in on a sheet in the reading view, in meters.
-pub(crate) const READING_ZOOM: Zoom = Zoom::ahead(0.14, 2);
 /// Matte paper reflects little light off its surface, so the print stays
 /// dark under the lamp.
 pub(crate) const PAPER_REFLECTANCE: f32 = 0.1;

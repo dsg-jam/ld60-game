@@ -18,7 +18,7 @@ use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
 use crate::locale::Message;
-use crate::parts::paper::{INK_FADED, PAPER, Paper, READING_ZOOM};
+use crate::parts::paper::{INK_FADED, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 
@@ -150,7 +150,6 @@ impl SalvageCrate {
                 focus: Focus::Paper,
                 view: View::Local(Paper::reading_view(Vec3::Y * CRATE_SIZE.y)),
             },
-            READING_ZOOM,
         )
     }
 
