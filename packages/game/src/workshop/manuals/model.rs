@@ -50,15 +50,16 @@ pub(super) const SPINE_CANVAS: UVec2 = UVec2::new(680, 168);
 const SPINE_FONT_SIZE: f32 = 78.0;
 /// Height of the spine label's center above the bottom edge.
 const SPINE_LABEL_Y: f32 = 0.15;
-const FINGER_HOLE: Vec3 = Vec3::new(0.026, 0.003, 0.026);
-const FINGER_RIM: Vec3 = Vec3::new(0.034, 0.002, 0.034);
+const FINGER_HOLE_RADIUS: f32 = 0.012;
+/// Thickness of the metal grommet around the finger hole.
+const GROMMET_WIRE: f32 = 0.0016;
 const FINGER_HOLE_Y: f32 = 0.045;
 
 const CLOTH: Color = Color::srgb_u8(0x2a, 0x3c, 0x5e);
 pub(super) const METAL: Color = Color::srgb_u8(0xa0, 0xa4, 0xa8);
 /// The mechanism is painted, so the lamp above does not glare on it.
 const MECHANISM_PAINT: Color = Color::srgb_u8(0x5c, 0x60, 0x66);
-const HOLE: Color = Color::srgb_u8(0x14, 0x14, 0x16);
+const HOLE: Color = Color::srgb_u8(0x0c, 0x0c, 0x0e);
 
 /// The parts of the file that move as it opens and as its pages turn.
 #[derive(Component, Debug)]
@@ -250,22 +251,35 @@ fn spawn_spine_outside(
                 .with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
         ),
     ));
+    // A metal grommet around a hole that looks into the dark inside.
     hinge
         .spawn((
-            to_spine(
-                Transform::from_xyz(0.0, FINGER_HOLE_Y, front)
-                    .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
-            ),
+            to_spine(Transform::from_xyz(0.0, FINGER_HOLE_Y, front)),
             Visibility::Inherited,
         ))
         .with_children(|hole| {
             hole.spawn((
-                Shape::cylinder(&Block::new(FINGER_RIM), METAL),
-                Finish::Metal,
+                Mesh3d(meshes.add(Circle::new(FINGER_HOLE_RADIUS))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: HOLE,
+                    perceptual_roughness: 1.0,
+                    ..default()
+                })),
+                Transform::from_xyz(0.0, 0.0, 0.0002),
             ));
             hole.spawn((
-                Shape::cylinder(&Block::new(FINGER_HOLE), HOLE),
-                Finish::Plastic,
+                Mesh3d(meshes.add(Torus {
+                    minor_radius: GROMMET_WIRE,
+                    major_radius: FINGER_HOLE_RADIUS + GROMMET_WIRE / 2.0,
+                })),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: METAL,
+                    metallic: 1.0,
+                    perceptual_roughness: 0.45,
+                    ..default()
+                })),
+                Transform::from_rotation(Quat::from_rotation_x(FRAC_PI_2))
+                    .with_scale(Vec3::new(1.0, 0.5, 1.0)),
             ));
         });
 }
