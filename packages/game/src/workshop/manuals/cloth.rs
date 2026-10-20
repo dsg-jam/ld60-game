@@ -91,12 +91,9 @@ pub(super) fn board(size: Vec3, corner: f32) -> Mesh {
 /// The cloth bent around a hinge on the z axis, filling the gap between
 /// two boards that meet there at an angle. It reaches `radius` out from
 /// the axis between the angles `from` and `to`, counterclockwise in x and
-/// y, and runs `length` along z.
+/// y, and runs `length` along z. `to` is past `from`.
 pub(super) fn hinge(from: f32, to: f32, radius: f32, length: f32) -> Mesh {
     let mut builder = Builder::default();
-    if to <= from {
-        return builder.build();
-    }
     let half = length / 2.0;
     let around: Vec<Vec2> = (0..=SEGMENTS)
         .map(|step| Vec2::from_angle(from + (to - from) * step as f32 / SEGMENTS as f32))

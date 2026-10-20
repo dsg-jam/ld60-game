@@ -427,10 +427,10 @@ impl ShopManuals {
     /// otherwise.
     fn show_open(
         time: Res<Time>,
-        state: Res<State<Focus>>,
-        focused: Res<Focused>,
+        (state, focused): (Res<State<Focus>>, Res<Focused>),
         mut files: Query<(Entity, &Parts, &Lying, &mut Pose, Ref<Stack>)>,
         mut transforms: Query<&mut Transform>,
+        mut visibilities: Query<&mut Visibility>,
         mut surfaces: Query<&mut ScreenSurface>,
         mut meshes: ResMut<Assets<Mesh>>,
     ) {
@@ -440,7 +440,12 @@ impl ShopManuals {
             let leaned = stack.is_changed() && pose.bypass_change_detection().lean_to(stack.lean());
             if moved || leaned || pose.is_added() {
                 pose.set_changed();
-                parts.pose(&pose, lying.0, &mut transforms, &mut meshes);
+                parts.pose(
+                    &pose,
+                    lying.0,
+                    &mut transforms,
+                    (&mut visibilities, &mut meshes),
+                );
             }
             if let Ok(mut surface) = surfaces.get_mut(parts.sheet)
                 && surface.active != open

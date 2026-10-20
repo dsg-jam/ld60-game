@@ -78,8 +78,8 @@ pub(super) struct Parts {
     /// The pages on either side, but for the open sheets.
     pub(super) stack: Entity,
     /// The cloth bent round the edges of the spine, at the back cover and
-    /// at the front cover.
-    pub(super) bends: [Handle<Mesh>; 2],
+    /// at the front cover, each with its mesh.
+    pub(super) bends: [(Entity, Handle<Mesh>); 2],
     pub(super) mechanism: Mechanism,
 }
 
@@ -100,7 +100,12 @@ impl Parts {
             spine: Entity::PLACEHOLDER,
             front: Entity::PLACEHOLDER,
             stack: Entity::PLACEHOLDER,
-            bends: [(); 2].map(|_| meshes.add(cloth::hinge(0.0, 0.0, BOARD, COVER.y))),
+            bends: [(); 2].map(|_| {
+                (
+                    Entity::PLACEHOLDER,
+                    meshes.add(cloth::hinge(0.0, FRAC_PI_2, BOARD, COVER.y)),
+                )
+            }),
             mechanism: Mechanism::default(),
         };
         let cloth = surfaces.add(Finish::Fabric.material(CLOTH, Form::Freeform, 0.0));
@@ -123,12 +128,14 @@ impl Parts {
                         let board = Block::new(Vec3::new(SPINE, BOARD, COVER.y))
                             .translated(Vec3::new(-SPINE / 2.0, -BOARD, 0.0));
                         hinge.spawn((Shape::cuboid(&board, CLOTH), Finish::Fabric));
-                        for (bend, at) in parts.bends.iter().zip([0.0, -SPINE]) {
-                            hinge.spawn((
-                                Mesh3d(bend.clone()),
-                                MeshMaterial3d(cloth.clone()),
-                                Transform::from_xyz(at, 0.0, 0.0),
-                            ));
+                        for ((bend, mesh), at) in parts.bends.iter_mut().zip([0.0, -SPINE]) {
+                            *bend = hinge
+                                .spawn((
+                                    Mesh3d(mesh.clone()),
+                                    MeshMaterial3d(cloth.clone()),
+                                    Transform::from_xyz(at, 0.0, 0.0),
+                                ))
+                                .id();
                         }
                         parts.mechanism = Mechanism::spawn(hinge, meshes, materials);
                         spawn_spine_outside(hinge, spine, meshes, materials);

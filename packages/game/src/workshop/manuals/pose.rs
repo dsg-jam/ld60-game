@@ -15,6 +15,9 @@ const LIE_TIME: f32 = 0.5;
 const COVER_START: f32 = 0.4;
 /// Seconds the cover takes to open or close.
 const COVER_TIME: f32 = 0.4;
+/// Below this fold in radians the cloth lies flat where the covers meet the
+/// spine, and there is no bend to show.
+const FLAT: f32 = 1e-3;
 /// How high the file lifts on its way between standing and lying.
 const LIFT: f32 = 0.06;
 
@@ -81,7 +84,7 @@ impl Parts {
         pose: &Pose,
         lying: Transform,
         transforms: &mut Query<&mut Transform>,
-        meshes: &mut Assets<Mesh>,
+        (visibilities, meshes): (&mut Query<&mut Visibility>, &mut Assets<Mesh>),
     ) {
         let mut set = |entity: Entity, transform: Transform| {
             if let Ok(mut current) = transforms.get_mut(entity) {
@@ -106,12 +109,20 @@ impl Parts {
         set(self.spine, Self::spine_hinge().with_rotation(turn));
         set(self.front, Self::front_hinge().with_rotation(turn));
         let down = -FRAC_PI_2;
-        for (bend, (from, to)) in self
+        let bent = fold > FLAT;
+        for ((bend, mesh), (from, to)) in self
             .bends
             .iter()
             .zip([(down, down + fold), (down - fold, down)])
         {
-            if let Some(mut mesh) = meshes.get_mut(bend) {
+            if let Ok(mut visibility) = visibilities.get_mut(*bend) {
+                visibility.set_if_neq(if bent {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                });
+            }
+            if bent && let Some(mut mesh) = meshes.get_mut(mesh) {
                 *mesh = cloth::hinge(from, to, BOARD, COVER.y);
             }
         }
