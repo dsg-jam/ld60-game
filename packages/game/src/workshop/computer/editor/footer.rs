@@ -10,10 +10,8 @@ use super::Editor;
 use super::breakpoints::Breakpoints;
 use super::page::Page;
 use super::trace::TraceView;
-use crate::audio::KeyClicks;
 use crate::device::Emulator;
 use crate::locale::{Localized, Message};
-use crate::player::focus::{Aside, Focused};
 use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
@@ -31,19 +29,9 @@ pub(super) enum Command {
     Assemble,
     Flash,
     Trace,
-    Clicks,
     Break,
     Step,
     Go,
-    /// Turns the view to the pinned sheets and back.
-    Pinned,
-}
-
-/// The settings that some command labels show.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct Switches {
-    pub(super) clicks: bool,
-    pub(super) trace: bool,
 }
 
 /// The line above the footer that reports what a command did.
@@ -51,18 +39,16 @@ pub(super) struct Switches {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 11] = [
+    pub(super) const ALL: [Self; 9] = [
         Self::Notes,
         Self::Versions,
         Self::Test,
         Self::Assemble,
         Self::Flash,
         Self::Trace,
-        Self::Clicks,
         Self::Break,
         Self::Step,
         Self::Go,
-        Self::Pinned,
     ];
 
     fn key(self) -> KeyCode {
@@ -73,11 +59,9 @@ impl Command {
             Self::Assemble => KeyCode::F5,
             Self::Flash => KeyCode::F6,
             Self::Trace => KeyCode::F7,
-            Self::Clicks => KeyCode::F8,
             Self::Break => KeyCode::F9,
             Self::Step => KeyCode::F10,
             Self::Go => KeyCode::F11,
-            Self::Pinned => KeyCode::F12,
         }
     }
 
@@ -88,55 +72,39 @@ impl Command {
             Self::Trace => Some(ComputerTool::Trace),
             Self::Break => Some(ComputerTool::Breakpoints),
             Self::Step | Self::Go => Some(ComputerTool::Debugger),
-            Self::Notes
-            | Self::Versions
-            | Self::Assemble
-            | Self::Flash
-            | Self::Clicks
-            | Self::Pinned => None,
+            Self::Notes | Self::Versions | Self::Assemble | Self::Flash => None,
         }
     }
 
-    /// Whether the shop has what the command needs. [`Command::Pinned`]
-    /// needs a pinned sheet.
+    /// Whether the shop has what the command needs.
     pub(super) fn available(self, shop: &ShopRun) -> bool {
-        match self {
-            Self::Pinned => !shop.pins().is_empty(),
-            _ => self.tool().is_none_or(|tool| shop.has(tool)),
-        }
+        self.tool().is_none_or(|tool| shop.has(tool))
     }
 
-    pub(super) fn label(self, switches: Switches) -> Message {
+    /// The label of [`Command::Trace`] says whether the trace is on.
+    pub(super) fn label(self, trace: bool) -> Message {
         Message::new(match self {
             Self::Notes => "editor-command-notes",
             Self::Versions => "editor-command-versions",
             Self::Test => "editor-command-test",
             Self::Assemble => "editor-command-assemble",
             Self::Flash => "editor-command-flash",
-            Self::Trace if switches.trace => "editor-command-trace-on",
+            Self::Trace if trace => "editor-command-trace-on",
             Self::Trace => "editor-command-trace-off",
-            Self::Clicks if switches.clicks => "editor-command-clicks-on",
-            Self::Clicks => "editor-command-clicks-off",
             Self::Break => "editor-command-break",
             Self::Step => "editor-command-step",
             Self::Go => "editor-command-go",
-            Self::Pinned => "editor-command-pinned",
         })
     }
 
     /// Labels new commands and follows the settings they show.
     pub(super) fn show_labels(
-        clicks: Res<KeyClicks>,
         trace: Res<TraceView>,
         mut labels: Query<(Ref<Command>, &mut Localized)>,
     ) {
-        let switches = Switches {
-            clicks: clicks.0,
-            trace: trace.0,
-        };
         for (command, mut label) in &mut labels {
-            if clicks.is_changed() || trace.is_changed() || command.is_added() {
-                label.set_if_neq(command.label(switches).into());
+            if trace.is_changed() || command.is_added() {
+                label.set_if_neq(command.label(trace.0).into());
             }
         }
     }
@@ -158,8 +126,6 @@ impl Command {
         }
     }
 
-    /// The key of [`Command::Pinned`] glances at the sheets, which also works
-    /// while the editor has no focus.
     pub(super) fn run_on_key(
         mut input: On<FocusedInput<KeyboardInput>>,
         pages: Query<(), With<Page>>,
@@ -171,7 +137,7 @@ impl Command {
         }
         let Some(command) = Self::ALL
             .into_iter()
-            .filter(|&command| command != Self::Pinned && command.available(&shop))
+            .filter(|&command| command.available(&shop))
             .find(|command| command.key() == input.input.key_code)
         else {
             return;
@@ -214,23 +180,10 @@ pub(super) struct Run(pub(super) Command);
 pub(super) struct Flashed(pub(super) String);
 
 impl Run {
-    /// [`Command::Pinned`] opens the [`Aside`] of the computer, or closes
-    /// it.
-    pub(super) fn look_aside(run: On<Run>, focused: Res<Focused>, mut asides: Query<&mut Aside>) {
-        if run.0 != Command::Pinned {
-            return;
-        }
-        if let Some(mut aside) = focused.get().and_then(|entity| asides.get_mut(entity).ok()) {
-            aside.open = !aside.open;
-        }
-    }
-
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn apply(
         run: On<Run>,
         editor: Single<&EditableText, With<Editor>>,
         job: Option<ResMut<Job>>,
-        mut clicks: ResMut<KeyClicks>,
         breakpoints: Res<Breakpoints>,
         mut emulators: Query<&mut Emulator>,
         mut status: Single<&mut Localized, With<Status>>,
@@ -245,14 +198,9 @@ impl Run {
                 | Command::Trace
                 | Command::Break
                 | Command::Step
-                | Command::Go
-                | Command::Pinned,
+                | Command::Go,
                 _,
             ) => return,
-            (Command::Clicks, _) => {
-                clicks.0 = !clicks.0;
-                return;
-            }
             (_, None) => Message::new("editor-no-job"),
             (Command::Assemble, Some(job)) => match ld60_levels::assemble(&job.level, &source) {
                 Ok(assembly) => Message::new("editor-assembled").with("bytes", assembly.byte_len()),
@@ -313,13 +261,11 @@ mod tests {
     use crate::locale::Locale;
     use crate::workshop::computer::editor::undo::Undo;
     use crate::workshop::levels::Levels;
-    use crate::workshop::manuals::Sheet;
 
     /// What the status line says after `command` runs on `source`, with or
     /// without the first job and its device.
     fn status(job: bool, powered: bool, source: &str, command: Command) -> Localized {
         let mut world = World::new();
-        world.init_resource::<KeyClicks>();
         world.init_resource::<Breakpoints>();
         if job {
             let job = Job::load(&Levels::on_disk(), 0).unwrap().unwrap();
@@ -368,11 +314,9 @@ mod tests {
 
     #[test]
     fn every_label_formats() {
-        let labels = Command::ALL.into_iter().flat_map(|command| {
-            [true, false].into_iter().flat_map(move |clicks| {
-                [true, false].map(|trace| command.label(Switches { clicks, trace }))
-            })
-        });
+        let labels = Command::ALL
+            .into_iter()
+            .flat_map(|command| [true, false].map(|trace| command.label(trace)));
         Locale::on_disk().assert_formats(labels);
     }
 
@@ -395,11 +339,6 @@ mod tests {
         world.run_system(show).unwrap();
         assert!(shown(&world).iter().all(|command| command.tool().is_none()));
         world.insert_resource(ShopRun::with_all_tools());
-        world.run_system(show).unwrap();
-        assert_eq!(shown(&world), Command::ALL[..Command::ALL.len() - 1]);
-        let mut shop = ShopRun::with_all_tools();
-        shop.pins_mut().pin(Sheet::example());
-        world.insert_resource(shop);
         world.run_system(show).unwrap();
         assert_eq!(shown(&world), Command::ALL);
     }

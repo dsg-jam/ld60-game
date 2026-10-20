@@ -6,9 +6,6 @@ editor-command-notes = F2 NOTES
 editor-command-versions = F3 VERSIONS
 editor-command-assemble = F5 ASSEMBLE
 editor-command-flash = F6 FLASH
-editor-command-clicks-on = F8 CLICKS ON
-editor-command-clicks-off = F8 CLICKS OFF
-editor-command-pinned = F12 PINS
 
 editor-no-job = NO JOB ON THE BENCH
 editor-no-more-jobs = NO MORE JOBS TONIGHT.

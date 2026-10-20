@@ -208,16 +208,6 @@ pub(crate) struct Play(pub(crate) Sound);
 #[derive(Event, Debug)]
 pub(crate) struct PlayAt(pub(crate) Sound, pub(crate) Vec3);
 
-/// Whether pressing keys makes a sound.
-#[derive(Resource, Debug)]
-pub(crate) struct KeyClicks(pub(crate) bool);
-
-impl Default for KeyClicks {
-    fn default() -> Self {
-        Self(true)
-    }
-}
-
 impl Default for Mixer {
     fn default() -> Self {
         Self {
@@ -266,8 +256,7 @@ impl Mixer {
 
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<KeyClicks>()
-            .init_resource::<Mixer>()
+        app.init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
             .add_systems(PreUpdate, Mixer::follow_time)
             .add_systems(
@@ -379,7 +368,6 @@ impl Sounds {
     /// back up.
     fn click_keys(
         mut sounds: ResMut<Sounds>,
-        enabled: Res<KeyClicks>,
         mixer: Res<Mixer>,
         keys: Query<(Entity, &PressableKey, &GlobalTransform), Changed<PressableKey>>,
         mut down: Local<EntityHashSet>,
@@ -397,9 +385,6 @@ impl Sounds {
                 }
                 Sound::KeyUp
             };
-            if !enabled.0 {
-                continue;
-            }
             let Some(takes) = sounds.0.get_mut(&sound) else {
                 continue;
             };

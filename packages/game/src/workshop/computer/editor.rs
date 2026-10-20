@@ -114,7 +114,6 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::run_on_click)
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
-        .add_observer(Run::look_aside)
         .add_observer(Verdict::run_on_command)
         .add_observer(DebugPanel::run_on_command)
         .add_observer(Breakpoints::toggle_on_run)
