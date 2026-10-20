@@ -48,9 +48,16 @@ impl FreeLook {
     }
 
     /// `view` with the head turned.
+    ///
+    /// Sideways the head turns about the world's up in level views and about
+    /// the view's own up in views looking down, blended by how steep the view
+    /// is. So the mouse always turns towards the side of the screen, and
+    /// level views keep the horizon level.
     pub(crate) fn turn(&self, view: Transform) -> Transform {
+        let steep = view.forward().y.powi(2);
+        let up = Vec3::Y.lerp(*view.up(), steep).normalize_or(Vec3::Y);
         view.with_rotation(
-            Quat::from_rotation_y(self.yaw) * view.rotation * Quat::from_rotation_x(self.pitch),
+            Quat::from_axis_angle(up, self.yaw) * view.rotation * Quat::from_rotation_x(self.pitch),
         )
     }
 
@@ -129,6 +136,35 @@ mod tests {
         look.step(true, true, Vec2::new(0.1, 0.0));
         assert!(look.looking());
         assert!((look.yaw + 0.2).abs() < 1e-6);
+    }
+
+    fn turned(view: Transform, yaw: f32, pitch: f32) -> Transform {
+        FreeLook {
+            yaw,
+            pitch,
+            phase: Phase::Looking,
+        }
+        .turn(view)
+    }
+
+    #[test]
+    fn turning_moves_towards_the_side_and_top_of_the_screen() {
+        let level = Transform::from_xyz(0.0, 1.0, 1.0).looking_to(Vec3::NEG_Z, Vec3::Y);
+        let pitched =
+            Transform::from_xyz(0.0, 1.0, 1.0).looking_to(Vec3::new(0.0, -0.3, -1.0), Vec3::Y);
+        let down = Transform::from_xyz(0.0, 1.0, 0.0).looking_to(Vec3::NEG_Y, Vec3::NEG_Z);
+        for view in [level, pitched, down] {
+            let left = turned(view, 0.4, 0.0);
+            assert!(left.forward().dot(*view.left()) > 0.35, "{view:?}");
+            assert!(left.forward().dot(*view.up()).abs() < 0.05, "{view:?}");
+            let up = turned(view, 0.0, 0.3);
+            assert!(up.forward().dot(*view.up()) > 0.25, "{view:?}");
+            assert!(up.forward().dot(*view.left()).abs() < 1e-5, "{view:?}");
+        }
+        assert!(turned(level, 0.8, 0.0).right().y.abs() < 1e-5);
+        assert!(turned(pitched, 0.8, 0.0).right().y.abs() < 0.03);
+        let spin = turned(down, 0.8, 0.0).up().angle_between(*down.up());
+        assert!(spin < 1e-4, "{spin}");
     }
 
     #[test]
