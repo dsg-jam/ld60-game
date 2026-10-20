@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <title>Bugs From Home</title>
-    <link data-trunk rel="rust" data-bin="ld60-game" data-wasm-opt="z" />
+    <link data-trunk rel="rust" data-bin="ld60-game" data-wasm-opt="z"
+      data-initializer="initializer.js" />
     <link data-trunk rel="copy-dir" href="../../assets" />
     <script>
     // Browsers start audio suspended until a user gesture.
@@ -39,7 +40,48 @@
       display: block;
       outline: none;
     }
+    #loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1em;
+      padding: 2em;
+      color: #e8dfd0;
+      font: 16px monospace;
+      text-align: center;
+    }
+    #loader a {
+      color: #f0b860;
+    }
+    #loader-progress {
+      width: min(24em, 80vw);
+      accent-color: #f0b860;
+    }
     </style>
+    <noscript>
+      <style>
+      #loader-status,
+      #loader-progress {
+        display: none;
+      }
+      #loader-releases {
+        display: block;
+      }
+      </style>
+    </noscript>
   </head>
-  <body></body>
+  <body>
+    <div id="loader">
+      <p id="loader-status">Loading</p>
+      <noscript><p>This game needs JavaScript and WebGPU.</p></noscript>
+      <progress id="loader-progress"></progress>
+      <p id="loader-releases" hidden>
+        You can download the game for Windows, macOS and Linux from the
+        <a href="https://github.com/dsg-jam/ld60-game/releases">releases page</a>.
+      </p>
+    </div>
+  </body>
 </html>

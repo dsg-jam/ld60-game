@@ -1,2 +1,4 @@
 [build]
 dist = "../../dist"
+# The default preload would download the wasm even without WebGPU.
+pattern_preload = ""
