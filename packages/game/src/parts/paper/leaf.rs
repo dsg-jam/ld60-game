@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     asset::RenderAssetUsages,
@@ -15,6 +15,11 @@ use crate::audio::{PlayAt, Sound};
 
 /// How far a turning page bends at most, in radians over its free width.
 const CURL: f32 = 0.9;
+/// Seconds a sheet takes to show its wrinkles once nothing presses it flat.
+const RELAX_TIME: f32 = 0.45;
+/// A turning leaf presses the sheet it comes down on flat once it is closer
+/// than this many radians.
+const CLEAR: f32 = FRAC_PI_2;
 
 /// How the pages of a [`Paper`](super::Paper) are held together. The held
 /// edge stays flat.
@@ -90,40 +95,35 @@ impl Stiffness {
     }
 }
 
-/// The wrinkled sheet of one page: its front and back, and both of them
-/// lying still.
+/// The wrinkled sheet of one page: its front and back.
 #[derive(Clone, Debug)]
 pub(crate) struct LeafShape {
     size: Vec2,
     front: Mesh,
     back: Mesh,
-    face_up: Handle<Mesh>,
-    face_down: Handle<Mesh>,
 }
 
 impl LeafShape {
-    pub(crate) fn new(wrinkles: &Wrinkles, meshes: &mut Assets<Mesh>) -> Self {
+    pub(crate) fn new(wrinkles: &Wrinkles) -> Self {
         let front = wrinkles.mesh();
         let back = reversed(&front);
         Self {
             size: wrinkles.size(),
-            face_up: meshes.add(front.clone()),
-            face_down: meshes.add(relaxed(&back, -1.0)),
             front,
             back,
         }
     }
 
-    /// The front of the sheet lying face up, like
-    /// [`Paper::sheet`](super::Paper::sheet).
-    pub(crate) fn face_up(&self) -> Handle<Mesh> {
-        self.face_up.clone()
-    }
-
-    /// The back of the sheet lying face down: the same mesh turned over, with
-    /// the wrinkles bulging up from what it lies on instead of into it.
-    pub(crate) fn face_down(&self) -> Handle<Mesh> {
-        self.face_down.clone()
+    /// The sheet lying with `share` of its wrinkles, face up like
+    /// [`Paper::sheet`](super::Paper::sheet) or face down. Face down, the
+    /// mesh turns over with the wrinkles bulging up from what it lies on
+    /// instead of into it.
+    pub(crate) fn lying(&self, face_up: bool, share: f32) -> Mesh {
+        if face_up {
+            relaxed(&self.front, share)
+        } else {
+            relaxed(&self.back, -share)
+        }
     }
 }
 
@@ -168,6 +168,8 @@ pub(crate) struct LeafSpec {
     /// How far from the axis of the leaf the sheet stays flat, where it is
     /// held.
     pub(crate) held: f32,
+    /// Seconds since the sheet was last pressed flat, see [`relaxing`].
+    pub(crate) relaxed: f32,
     pub(crate) sides: Vec<LeafSide>,
 }
 
@@ -175,10 +177,12 @@ pub(crate) struct LeafSpec {
 ///
 /// Its owner places it each frame at [`Leaf::angle`]. In the space of the
 /// leaf, X points across the sheet away from the held edge, Y out of its
-/// front and Z along the axis it turns about.
+/// front and Z along the axis it turns about. Its wrinkles relax as it
+/// turns and it flattens as it comes down on the other stack.
 #[derive(Component, Debug)]
 pub(crate) struct Leaf {
     elapsed: f32,
+    relaxed: f32,
     /// Whether it has made its sound yet. It sounds from where it is once
     /// it has a place in the world.
     sounded: bool,
@@ -242,6 +246,7 @@ impl Leaf {
         }
         let leaf = Leaf {
             elapsed: 0.0,
+            relaxed: spec.relaxed,
             sounded: false,
             forward: spec.forward,
             stiffness: spec.stiffness,
@@ -262,16 +267,27 @@ impl Leaf {
         if self.forward { turned } else { PI - turned }
     }
 
+    /// The share of its wrinkles the leaf shows.
+    fn wrinkles(&self) -> f32 {
+        let left = if self.forward {
+            PI - self.angle()
+        } else {
+            self.angle()
+        };
+        relaxing(self.relaxed).min(clearance(left))
+    }
+
     /// Bends the sides of the sheet so the free edge lags behind the held
     /// edge.
     fn bend(&self, meshes: &mut Assets<Mesh>) {
         let lag = if self.forward { -1.0 } else { 1.0 };
         let curl = lag * self.stiffness.curl() * (self.progress() * PI).sin();
+        let wrinkles = self.wrinkles();
         for (side, bend) in &self.sides {
             let Some(mut mesh) = meshes.get_mut(side) else {
                 continue;
             };
-            let (positions, normals) = bend.bent(curl, self.angle());
+            let (positions, normals) = bend.bent(curl, self.angle(), wrinkles);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
             mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         }
@@ -290,6 +306,7 @@ impl Leaf {
                 continue;
             }
             leaf.elapsed += time.delta_secs();
+            leaf.relaxed += time.delta_secs();
             if leaf.progress() >= 1.0 {
                 commands.entity(root).despawn();
                 continue;
@@ -329,9 +346,10 @@ impl Bend {
     }
 
     /// The positions and normals with the free part of the sheet bent
-    /// evenly by `curl` radians, at `angle` from lying face up.
-    fn bent(&self, curl: f32, angle: f32) -> (Vec<[f32; 3]>, Vec<[f32; 3]>) {
-        let relax = self.bulge.relax(angle);
+    /// evenly by `curl` radians, at `angle` from lying face up, with `share`
+    /// of its wrinkles.
+    fn bent(&self, curl: f32, angle: f32, share: f32) -> (Vec<[f32; 3]>, Vec<[f32; 3]>) {
+        let relax = self.bulge.relax(angle) * share;
         let bend = curl / self.width;
         let positions = self
             .points
@@ -364,6 +382,23 @@ impl Bend {
             .collect();
         (positions, normals)
     }
+}
+
+/// The share of its wrinkles a sheet shows `elapsed` seconds after it was
+/// last pressed flat, from 0 to 1.
+pub(crate) fn relaxing(elapsed: f32) -> f32 {
+    smoothstep(elapsed / RELAX_TIME)
+}
+
+/// The share of its wrinkles the top sheet of a stack shows under a leaf
+/// turning `angle` radians away from it.
+pub(crate) fn clearance(angle: f32) -> f32 {
+    smoothstep(angle / CLEAR)
+}
+
+fn smoothstep(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// `material` with `print` on it instead.
@@ -444,8 +479,8 @@ mod tests {
     #[test]
     fn the_held_strip_stays_put_while_the_leaf_bends() {
         let bend = bend(Bulge::Up);
-        let (flat, _) = bend.bent(0.0, 0.0);
-        let (bent, _) = bend.bent(0.8, 0.0);
+        let (flat, _) = bend.bent(0.0, 0.0, 1.0);
+        let (bent, _) = bend.bent(0.8, 0.0, 1.0);
         for ((point, flat), bent) in bend.points.iter().zip(&flat).zip(&bent) {
             if point.x <= bend.held {
                 assert_eq!(flat, bent);
@@ -454,12 +489,29 @@ mod tests {
     }
 
     #[test]
+    fn a_leaf_lies_flat_as_it_lands() {
+        let mut leaf = Leaf {
+            elapsed: 0.0,
+            relaxed: 1.0,
+            sounded: true,
+            forward: true,
+            stiffness: Stiffness::Paper,
+            sides: Vec::new(),
+        };
+        assert!((leaf.wrinkles() - 1.0).abs() < 1e-6);
+        leaf.elapsed = Stiffness::Paper.time();
+        assert!(leaf.wrinkles().abs() < 1e-6);
+        let (flat, _) = bend(Bulge::Up).bent(0.0, PI, 0.0);
+        assert!(flat.iter().all(|p| p[1].abs() < 1e-6));
+    }
+
+    #[test]
     fn wrinkles_bulge_away_from_the_pages_behind() {
         let front = bend(Bulge::Front);
         let back = bend(Bulge::Back);
         for angle in [0.0, 1.0, 2.0, PI] {
-            let (front, _) = front.bent(0.0, angle);
-            let (back, _) = back.bent(0.0, angle);
+            let (front, _) = front.bent(0.0, angle, 1.0);
+            let (back, _) = back.bent(0.0, angle, 1.0);
             assert!(front.iter().all(|p| p[1] >= -1e-6));
             assert!(back.iter().all(|p| p[1] <= 1e-6));
         }

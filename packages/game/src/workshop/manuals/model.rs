@@ -10,6 +10,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
 
+use super::top_sheet::TopSheet;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
@@ -119,16 +120,19 @@ impl Parts {
                             .spawn((MeshMaterial3d(edges), Transform::default()))
                             .id();
                         parts.sheet = hinge
-                            .spawn(Paper::sheet(
-                                pages,
-                                "manuals",
-                                SHEET_SIZE,
-                                Vec3::ZERO,
-                                meshes,
+                            .spawn((
+                                Paper::sheet(pages, "manuals", SHEET_SIZE, Vec3::ZERO, meshes),
+                                TopSheet::new(true),
                             ))
                             .id();
-                        parts.back_sheet =
-                            hinge.spawn((Transform::default(), Visibility::Hidden)).id();
+                        parts.back_sheet = hinge
+                            .spawn((
+                                Mesh3d(meshes.add(Rectangle::from_size(SHEET_SIZE))),
+                                TopSheet::new(false),
+                                Transform::default(),
+                                Visibility::Hidden,
+                            ))
+                            .id();
                         parts.front = hinge
                             .spawn((Self::front_hinge(), Visibility::Inherited))
                             .with_children(|front| {

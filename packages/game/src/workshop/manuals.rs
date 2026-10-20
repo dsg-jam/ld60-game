@@ -8,6 +8,7 @@ mod pins;
 mod pose;
 mod punched;
 mod stack;
+mod top_sheet;
 mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
@@ -62,6 +63,7 @@ impl Plugin for ManualsPlugin {
                     ShopManuals::show_open,
                     Stack::arrange,
                     Stack::show_pages,
+                    Stack::relax_top_sheets,
                     ShopManuals::show_pin_hint,
                 )
                     .chain()
@@ -222,7 +224,7 @@ impl ShopManuals {
                 let seed = fixed_hash_one(("manuals", page.1));
                 let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
                 filed.shapes.push(PageShape {
-                    leaf: LeafShape::new(&wrinkles, &mut meshes),
+                    leaf: LeafShape::new(&wrinkles),
                     wrinkles,
                 });
                 seeds.push(seed);

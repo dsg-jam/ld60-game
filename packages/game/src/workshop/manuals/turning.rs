@@ -13,6 +13,7 @@ use super::Filed;
 use super::model::{HOLE_INSET, Parts};
 use super::pose::Pose;
 use super::stack::{Stack, Turning};
+use super::top_sheet::TopSheet;
 use crate::parts::paper::{
     Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
     blank_print, reprinted,
@@ -75,6 +76,7 @@ impl Stack {
     pub(super) fn turn(
         mut files: Query<(&Paper, &mut Stack, &Pose, &Parts, &Filed, &LeafKit)>,
         leaves: Query<(), With<Leaf>>,
+        tops: Query<&TopSheet>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut commands: Commands,
     ) {
@@ -133,6 +135,11 @@ impl Stack {
                 });
             }
             let card = items.clone().any(|index| stack.page_at(index).is_none());
+            let lifted = if forward {
+                parts.sheet
+            } else {
+                parts.back_sheet
+            };
             let from = if forward { 0.0 } else { PI };
             let leaf = Leaf::spawn(
                 &mut commands,
@@ -148,6 +155,7 @@ impl Stack {
                         Stiffness::Paper
                     },
                     held: HOLE_INSET,
+                    relaxed: tops.get(lifted).map_or(0.0, |top| top.relaxed),
                     sides,
                 },
                 &mut meshes,
@@ -170,11 +178,11 @@ impl Stack {
             Or<(Changed<Stack>, Added<LeafKit>)>,
         >,
         mut nodes: Query<(&mut Node, &mut UiTargetCamera)>,
+        mut tops: Query<&mut TopSheet>,
         mut cameras: Query<&mut Camera>,
         sheets: Query<&MeshMaterial3d<PaperMaterial>>,
         prints: Query<&Print>,
         mut materials: ResMut<Assets<PaperMaterial>>,
-        mut commands: Commands,
     ) {
         for (paper, stack, parts, filed, kit) in &files {
             let (left, right) = stack.sides();
@@ -207,17 +215,12 @@ impl Stack {
             if let Ok(mut camera) = cameras.get_mut(filed.leaf_pages.camera) {
                 camera.is_active = front.is_some();
             }
+            for (sheet, page) in [(parts.sheet, open), (parts.back_sheet, top)] {
+                if let (Ok(mut sheet), Some((_, page))) = (tops.get_mut(sheet), page) {
+                    sheet.show(page);
+                }
+            }
             let shape = |page: usize| filed.shapes.get(page);
-            if let Some(shape) = open.and_then(|(_, page)| shape(page)) {
-                commands
-                    .entity(parts.sheet)
-                    .insert(Mesh3d(shape.leaf.face_up()));
-            }
-            if let Some(shape) = top.and_then(|(_, page)| shape(page)) {
-                commands
-                    .entity(parts.back_sheet)
-                    .insert(Mesh3d(shape.leaf.face_down()));
-            }
             let pages = [
                 (sheets.get(parts.sheet).ok().map(|m| m.0.id()), open),
                 (Some(kit.front.id()), front),
