@@ -27,23 +27,33 @@ unic-langid = { workspace = true, features = ["macros"] }
 [dependencies.bevy]
 workspace = true
 features = [
-  "3d",
+  "3d_bevy_render",
   "area_light_luts",
   "audio",
+  "bevy_clipboard",
+  "bevy_ui_widgets",
+  "bevy_winit",
   "custom_cursor",
+  "default_app",
+  "default_font",
+  "multi_threaded",
+  "picking",
+  "scene",
+  "std",
+  "sysinfo_plugin",
   "system_clipboard",
-  "ui",
+  "ui_api",
+  "ui_bevy_render",
   "wav",
+  "wayland",
+  "webgl2",
   "webgpu",
+  "x11",
 ]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { workspace = true, features = [
-  "Document",
-  "Element",
-  "Storage",
-  "Window",
-] }
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+workspace = true
+features = ["Document", "Element", "Storage", "Window"]
 
 [lints]
 workspace = true
