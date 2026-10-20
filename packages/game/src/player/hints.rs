@@ -1,11 +1,8 @@
-use bevy::{
-    ecs::relationship::RelatedSpawnerCommands, picking::hover::HoverMap, prelude::*,
-    text::LineHeight,
-};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
 
 use super::{
     cursor,
-    focus::{self, Aside, Clickable, Focused},
+    focus::{Aside, Focused},
     look::Gaze,
     zoom::Zoom,
 };
@@ -24,8 +21,7 @@ const TEXT_SIZE: f32 = 18.0;
 const GAP: f32 = 6.0;
 /// From the bottom left corner to the hint for going back.
 const CORNER: f32 = 24.0;
-/// Between the hint for going back, the [`ClickHint`], the [`KeyHint`] and
-/// the [`Hints`].
+/// Between the hint for going back, the [`KeyHint`] and the [`Hints`].
 const KEY_HINT_GAP: f32 = 18.0;
 pub(crate) const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
@@ -43,15 +39,7 @@ impl Plugin for HintsPlugin {
             .init_resource::<KeyHint>()
             .init_resource::<ClickHint>()
             .add_systems(Startup, BackHint::spawn)
-            .add_systems(
-                Update,
-                (
-                    BackHint::update,
-                    KeyHint::update,
-                    ClickHint::update,
-                    Hints::update,
-                ),
-            );
+            .add_systems(Update, (BackHint::update, KeyHint::update, Hints::update));
     }
 }
 
@@ -99,9 +87,8 @@ struct BackPart;
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub(crate) struct KeyHint(pub(crate) Option<(&'static str, Message)>);
 
-/// What a left click does where the mouse is, shown after the hint for
-/// going back. Without one, the line says what a click on a [`Clickable`]
-/// does.
+/// What a left click does where the mouse is, shown at the cursor in
+/// focus views.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub(crate) struct ClickHint(pub(crate) Option<Message>);
 
@@ -131,13 +118,6 @@ pub(crate) enum Input {
 /// Holds the rows of the [`Hints`].
 #[derive(Component, Debug)]
 struct HintList;
-
-/// The parts of the [`ClickHint`] line.
-#[derive(Component, Debug)]
-enum ClickHintPart {
-    Row,
-    Action,
-}
 
 /// The parts of the [`KeyHint`] line.
 #[derive(Component, Debug)]
@@ -248,21 +228,6 @@ impl BackHint {
                     Icon::MouseRight.spawn(back, &font);
                     Icon::Escape.spawn(back, &font);
                     back.spawn((Caption, Localized::from(Message::new("hint-back"))));
-                });
-                hint.spawn((
-                    ClickHintPart::Row,
-                    Node {
-                        display: Display::None,
-                        align_items: AlignItems::Center,
-                        column_gap: px(GAP),
-                        margin: UiRect::left(px(KEY_HINT_GAP)),
-                        ..default()
-                    },
-                    Pickable::IGNORE,
-                ))
-                .with_children(|row| {
-                    Icon::MouseLeft.spawn(row, &font);
-                    row.spawn((ClickHintPart::Action, Caption, Localized::verbatim("")));
                 });
                 hint.spawn((
                     KeyHintPart::Row,
@@ -442,42 +407,6 @@ impl Hint {
                 }
                 row.spawn((Caption, Localized::from(self.action.clone())));
             });
-    }
-}
-
-impl ClickHint {
-    fn update(
-        hint: Res<ClickHint>,
-        focused: Res<Focused>,
-        hovers: Res<HoverMap>,
-        parents: Query<&ChildOf>,
-        clickables: Query<&Clickable>,
-        mut parts: Query<(&ClickHintPart, &mut Node, Option<&mut Localized>)>,
-        mut shown: Local<Option<Message>>,
-    ) {
-        let action = hint.0.clone().or_else(|| {
-            focused.get()?;
-            focus::hovered_prompt(&hovers, &parents, &clickables, &focused).map(Message::new)
-        });
-        if *shown == action {
-            return;
-        }
-        for (part, mut node, text) in &mut parts {
-            match (part, &action, text) {
-                (ClickHintPart::Row, action, _) => {
-                    node.display = if action.is_some() {
-                        Display::Flex
-                    } else {
-                        Display::None
-                    };
-                }
-                (ClickHintPart::Action, Some(action), Some(mut text)) => {
-                    *text = action.clone().into();
-                }
-                _ => {}
-            }
-        }
-        *shown = action;
     }
 }
 
