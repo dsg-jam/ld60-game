@@ -178,7 +178,7 @@ impl Sound {
 
     pub(crate) fn volume(self) -> f32 {
         match self {
-            Self::LampOn | Self::LampOff => 0.35,
+            Self::LampOn | Self::LampOff => 0.22,
             Self::Chime => 0.4,
             Self::Thunk => 0.6,
             Self::Ding => 0.45,
@@ -186,8 +186,8 @@ impl Sound {
             Self::Ratchet => 0.12,
             Self::Latch | Self::Unlatch => 0.5,
             Self::Static => 0.4,
-            Self::KeyDown => 0.21,
-            Self::KeyUp => 0.12,
+            Self::KeyDown => 0.17,
+            Self::KeyUp => 0.1,
             Self::PageTurn => 0.29,
             Self::DividerTurn => 0.35,
             Self::RingsOpen | Self::RingsShut => 0.35,
