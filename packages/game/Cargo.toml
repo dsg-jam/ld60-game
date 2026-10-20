@@ -35,7 +35,6 @@ features = [
   "bevy_winit",
   "custom_cursor",
   "default_app",
-  "default_font",
   "multi_threaded",
   "picking",
   "scene",
