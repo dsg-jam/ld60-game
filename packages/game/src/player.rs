@@ -1,5 +1,6 @@
 pub(crate) mod camera;
 mod crosshair;
+mod ctrl;
 pub(crate) mod cursor;
 pub(crate) mod focus;
 pub(crate) mod free_look;
@@ -21,6 +22,7 @@ impl Plugin for PlayerPlugin {
         app.add_plugins((
             camera::CameraPlugin,
             crosshair::CrosshairPlugin,
+            ctrl::CtrlPlugin,
             cursor::CursorPlugin,
             focus::FocusPlugin,
             free_look::FreeLookPlugin,

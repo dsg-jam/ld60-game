@@ -23,6 +23,7 @@ ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["std"], optional = true }
 unic-langid = { workspace = true, features = ["macros"] }
+winit = { workspace = true }
 
 [dependencies.bevy]
 workspace = true
