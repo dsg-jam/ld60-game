@@ -78,8 +78,8 @@ mod tests {
 
     #[test]
     fn each_station_is_a_track_ahead() {
-        for station in 0..TRACKS.len() - 1 {
-            let slot = f64::from(TRACKS[station].length + PAUSE);
+        for (station, track) in TRACKS.iter().enumerate().take(TRACKS.len() - 1) {
+            let slot = f64::from(track.length + PAUSE);
             for clock in [0.0, 100.0, 1000.0, 5000.0] {
                 assert_eq!(
                     OnAir::at(station + 1, clock),
