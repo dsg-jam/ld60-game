@@ -41,6 +41,8 @@ enum Kind {
     Cuboid,
     /// Upright cylinder that fills the width and height of its block.
     Cylinder,
+    /// Like [`Kind::Cylinder`], with round ends inside its block.
+    Capsule,
 }
 
 impl Shape {
@@ -63,6 +65,10 @@ impl Shape {
 
     pub(crate) fn cylinder(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Cylinder, block, color)
+    }
+
+    pub(crate) fn capsule(block: &Block, color: Color) -> impl Bundle {
+        Self::bundle(Kind::Capsule, block, color)
     }
 
     /// A cuboid with `region` of `image` on its top face.
@@ -98,6 +104,7 @@ impl Shape {
         let mut mesh: Mesh = match self.kind {
             Kind::Cuboid => Cuboid::from_size(self.size).into(),
             Kind::Cylinder => Cylinder::new(self.size.x / 2.0, self.size.y).into(),
+            Kind::Capsule => Capsule3d::new(self.size.x / 2.0, self.size.y - self.size.x).into(),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);
@@ -117,7 +124,7 @@ impl Shape {
         };
         let form = match shape.kind {
             Kind::Cuboid => Form::Box(shape.size),
-            Kind::Cylinder => Form::Cylinder(shape.size),
+            Kind::Cylinder | Kind::Capsule => Form::Cylinder(shape.size),
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;
         commands.entity(add.entity).insert((

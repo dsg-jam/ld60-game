@@ -1,3 +1,5 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
@@ -18,24 +20,32 @@ use crate::workshop::run::Run;
 /// leave the tools behind them in sight.
 const SHEET_SIZE: Vec2 = Vec2::new(0.1, 0.1375);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
-/// Between the monitor and the first sheet.
-const MONITOR_GAP: f32 = 0.05;
-const SHEET_GAP: f32 = 0.01;
-const RAIL_THICKNESS: f32 = 0.006;
-/// How far the rail sits below the top of the monitor.
-const RAIL_DROP: f32 = 0.004;
-/// How far the rail sits behind the front of the monitor.
-const RAIL_BACK: f32 = 0.012;
-/// How far the rail swings forward from the left side of the monitor, in
+/// Along the rod, between the hinge and the first sheet.
+const MONITOR_GAP: f32 = 0.022;
+const SHEET_GAP: f32 = 0.006;
+/// How far each sheet hangs in front of the one before, so tilted sheets
+/// overlap instead of cutting through each other.
+const SHEET_STAGGER: f32 = 0.0012;
+/// How far the rod reaches past the last sheet.
+const ROD_END: f32 = 0.008;
+const ROD_RADIUS: f32 = 0.0025;
+/// The plate on the side of the monitor that holds the hinge. Its top sits
+/// [`MOUNT_DROP`] below the top of the monitor and its front [`MOUNT_BACK`]
+/// behind the front, so it stays clear of both edges.
+const MOUNT: Vec3 = Vec3::new(0.004, 0.022, 0.03);
+const MOUNT_DROP: f32 = 0.004;
+const MOUNT_BACK: f32 = 0.006;
+/// The upright pin of the hinge, on the outside of the mount.
+const KNUCKLE: Vec2 = Vec2::new(0.009, 0.014);
+/// How far the rod swings forward from the side of the monitor, in
 /// radians.
 const SWING: f32 = 0.5;
-const MOUNT: Vec3 = Vec3::new(0.01, 0.025, 0.03);
-const CLIP: Vec3 = Vec3::new(0.014, 0.009, 0.003);
-/// How far the clips reach up over the rail.
-const CLIP_OVERLAP: f32 = 0.003;
+const CLIP: Vec3 = Vec3::new(0.014, 0.009, 0.006);
+/// How far the clips reach above the rod.
+const CLIP_ABOVE: f32 = 0.001;
 /// How far a sheet reaches up into its clip.
 const CLIP_GRIP: f32 = 0.003;
-/// Between the back of a clip and the sheet it holds.
+/// Between the rod's axis and the sheets.
 const SHEET_SPACE: f32 = 0.0005;
 /// Free space around the sheets while looking at them, as a fraction of the
 /// window.
@@ -88,22 +98,41 @@ impl PinBoard {
         meshes: &mut Assets<Mesh>,
     ) -> Self {
         let body = monitor.body;
-        let hinge = Vec3::new(
-            body.min().x,
-            body.max().y - RAIL_DROP - RAIL_THICKNESS / 2.0,
-            body.max().z - RAIL_BACK,
-        );
-        let rail_space =
-            Transform::from_translation(hinge).with_rotation(Quat::from_rotation_y(SWING));
         let mount = Block::new(MOUNT).left_of(&body).translated(Vec3::new(
             0.0,
-            hinge.y - MOUNT.y / 2.0,
-            hinge.z,
+            body.max().y - MOUNT_DROP - MOUNT.y,
+            body.max().z - MOUNT_BACK - MOUNT.z / 2.0,
         ));
-        let length = MONITOR_GAP + Pins::MAX as f32 * (SHEET_SIZE.x + SHEET_GAP);
+        let hinge = Vec3::new(
+            mount.min().x - KNUCKLE.x / 2.0,
+            mount.center.y,
+            mount.max().z - KNUCKLE.x / 2.0,
+        );
+        let knuckle = Block::new(Vec3::new(KNUCKLE.x, KNUCKLE.y, KNUCKLE.x))
+            .translated(hinge - Vec3::Y * KNUCKLE.y / 2.0);
+        let rail_space =
+            Transform::from_translation(hinge).with_rotation(Quat::from_rotation_y(SWING));
+        let length = MONITOR_GAP
+            + Pins::MAX as f32 * SHEET_SIZE.x
+            + (Pins::MAX - 1) as f32 * SHEET_GAP
+            + ROD_END;
         let rail = Block::between(
-            Vec3::new(-length, -RAIL_THICKNESS / 2.0, -RAIL_THICKNESS / 2.0),
-            Vec3::splat(RAIL_THICKNESS / 2.0).with_x(0.0),
+            Vec3::new(-length, -ROD_RADIUS, -ROD_RADIUS),
+            Vec3::new(KNUCKLE.x / 2.0, ROD_RADIUS, ROD_RADIUS),
+        );
+        // Lies along the rod, which the capsule stands up along.
+        let rod = (
+            Transform::from_translation(rail.center)
+                .with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
+            Visibility::default(),
+            children![(
+                Shape::capsule(
+                    &Block::new(Vec3::new(rail.size.y, rail.size.x, rail.size.z))
+                        .translated(Vec3::NEG_Y * rail.size.x / 2.0),
+                    METAL,
+                ),
+                Finish::Metal,
+            )],
         );
         let canvases: Vec<_> = (0..Pins::MAX)
             .map(|_| UiCanvas::spawn_print(commands, images, CANVAS_SIZE, parent))
@@ -113,29 +142,33 @@ impl PinBoard {
         commands.entity(parent).with_children(|computer| {
             parts[0] = computer
                 .spawn((
-                    Shape::cuboid(&mount, METAL),
-                    Finish::Metal,
                     Visibility::Hidden,
+                    Transform::default(),
+                    children![
+                        (Shape::cuboid(&mount, METAL), Finish::Metal),
+                        (Shape::cylinder(&knuckle, METAL), Finish::Metal),
+                    ],
                 ))
                 .id();
             parts[1] = computer
                 .spawn((Name::new("pin rail"), rail_space, Visibility::Hidden))
                 .with_children(|board| {
-                    board.spawn((Shape::cuboid(&rail, METAL), Finish::Metal));
+                    board.spawn(rod);
                     for (index, canvas) in canvases.into_iter().enumerate() {
                         let x = -MONITOR_GAP
                             - (SHEET_GAP + SHEET_SIZE.x) * index as f32
                             - SHEET_SIZE.x / 2.0;
-                        let clip = Block::new(CLIP).below(&rail).translated(Vec3::new(
+                        let stagger = SHEET_STAGGER * index as f32;
+                        let clip = Block::new(CLIP).translated(Vec3::new(
                             x,
-                            CLIP_OVERLAP,
-                            rail.max().z + CLIP.z / 2.0,
+                            ROD_RADIUS + CLIP_ABOVE - CLIP.y,
+                            stagger + CLIP.z / 2.0,
                         ));
                         board.spawn((Shape::cuboid(&clip, CLIP_COLOR), Finish::Metal));
                         let center = Vec3::new(
                             x,
                             clip.min().y + CLIP_GRIP - SHEET_SIZE.y / 2.0,
-                            clip.min().z - SHEET_SPACE,
+                            stagger - SHEET_SPACE,
                         );
                         let sheet = board
                             .spawn((
