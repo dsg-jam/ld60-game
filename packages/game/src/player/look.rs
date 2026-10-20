@@ -165,9 +165,10 @@ impl Gaze<'_> {
         self.playing() && *self.focus.get() != Focus::Desk
     }
 
-    /// Turning the head with the mouse while focused.
+    /// Turning the head with the mouse while focused. Browsers may refuse
+    /// the lock without a recent click, so this doesn't wait for it.
     pub(super) fn free_looking(&self) -> bool {
-        self.focused() && self.free_look.looking() && self.lock.locked
+        self.focused() && self.free_look.looking()
     }
 
     /// Looking around in the desk view or while focused, with the crosshair
@@ -186,7 +187,7 @@ impl Gaze<'_> {
 ///
 /// Browsers only allow the lock after a click, so a click in the desk view
 /// locks it again. Until a browser grants the lock, the pointer stays
-/// visible to click with.
+/// visible there to click with. In free look it stays hidden either way.
 fn update_cursor(
     app_state: Res<State<AppState>>,
     focus: Res<State<Focus>>,
@@ -210,8 +211,11 @@ fn update_cursor(
     } else if lock {
         cursor.grab_mode = CursorGrabMode::Locked;
         cursor.visible = false;
-    } else if cursor.grab_mode == CursorGrabMode::Locked && cursor.visible == held.locked {
-        cursor.visible = !held.locked;
+    } else if cursor.grab_mode == CursorGrabMode::Locked {
+        let visible = desk && !held.locked;
+        if cursor.visible != visible {
+            cursor.visible = visible;
+        }
     }
 }
 
