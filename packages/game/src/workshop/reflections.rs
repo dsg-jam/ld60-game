@@ -17,24 +17,29 @@ const SURROUNDINGS: [Lobe; 9] = [
     // The dark awning above and the shop behind.
     Lobe::new(Vec3::Y, 1.5, Vec3::new(0.02, 0.016, 0.014)),
     Lobe::new(Vec3::new(0.0, 0.3, 1.0), 2.0, Vec3::new(0.05, 0.035, 0.025)),
-    // The wet street, and the signs across it.
+    // The wet street, and the signs across it. Screen space reflections
+    // show the real signs in puddles, so these stay as dim as those.
     Lobe::new(Vec3::new(0.0, 0.1, -1.0), 4.0, Vec3::new(0.05, 0.05, 0.1)),
     Lobe::new(
         Vec3::new(0.35, 0.35, -1.0),
         150.0,
-        Vec3::new(0.15, 0.9, 1.2),
+        Vec3::new(0.05, 0.3, 0.4),
     ),
     Lobe::new(
         Vec3::new(-0.5, 0.25, -1.0),
         200.0,
-        Vec3::new(1.2, 0.25, 0.8),
+        Vec3::new(0.4, 0.08, 0.27),
     ),
     Lobe::new(
         Vec3::new(0.15, 0.15, -1.0),
         200.0,
-        Vec3::new(1.0, 0.8, 0.25),
+        Vec3::new(0.35, 0.28, 0.08),
     ),
-    Lobe::new(Vec3::new(0.0, 0.08, -1.0), 30.0, Vec3::new(0.08, 0.3, 0.12)),
+    Lobe::new(
+        Vec3::new(0.0, 0.08, -1.0),
+        30.0,
+        Vec3::new(0.03, 0.12, 0.05),
+    ),
     // The screen of the computer.
     Lobe::new(
         Vec3::new(1.0, 0.15, -0.15),
