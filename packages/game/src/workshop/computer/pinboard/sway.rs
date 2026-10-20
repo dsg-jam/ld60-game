@@ -11,16 +11,19 @@ use crate::city::Draft;
 const TILT: f32 = 0.045;
 /// The least it tilts, so each sheet looks a little off.
 const MIN_TILT: f32 = 0.012;
-/// How often a sheet swings back and forth on its own, in hertz.
-const SWING_RATE: f32 = 1.3;
+/// How often a sheet swings back and forth on its own, in hertz. Slower
+/// than a stiff plate, because the air moves with the paper.
+const SWING_RATE: f32 = 0.8;
 /// The share of the critical damping, which the paper's drag in the air
 /// gives the swing.
-const DAMPING: f32 = 0.12;
+const DAMPING: f32 = 0.35;
 /// Angular acceleration per meter per second of draft against the sheet.
-const PUSH: f32 = 22.0;
+const PUSH: f32 = 9.0;
+/// Seconds for the draft on a sheet to build up and die down.
+const GUST_TIME: f32 = 0.35;
 /// Radians of flutter per meter per second of draft.
-const FLUTTER: f32 = 0.05;
-const FLUTTER_RATE: f32 = 6.5;
+const FLUTTER: f32 = 0.015;
+const FLUTTER_RATE: f32 = 2.5;
 /// Longer steps than this, in seconds, are split up, so the swing stays
 /// stable after a hitch.
 const MAX_STEP: f32 = 1.0 / 60.0;
@@ -38,6 +41,8 @@ pub(in crate::workshop::computer) struct Sway {
     /// About the top edge, in radians. Positive swings the bottom back.
     angle: f32,
     speed: f32,
+    /// The draft against the sheet, smoothed, in meters per second.
+    gust: f32,
     /// Seconds of flutter so far, offset for each sheet.
     flutter: f32,
     slot: usize,
@@ -51,6 +56,7 @@ impl Sway {
             tilt: 0.0,
             angle: 0.0,
             speed: 0.0,
+            gust: 0.0,
             flutter: slot as f32 * 0.37,
             slot,
         }
@@ -85,7 +91,7 @@ impl Sway {
         for (mut sway, mut transform, global) in &mut sheets {
             let against = draft.dot(global.forward().as_vec3());
             sway.step(against, time.delta_secs());
-            let flutter = (TAU * FLUTTER_RATE * sway.flutter).sin() * draft.length() * FLUTTER;
+            let flutter = (TAU * FLUTTER_RATE * sway.flutter).sin() * sway.gust.abs() * FLUTTER;
             let pose = sway.pose(flutter);
             if *transform != pose {
                 *transform = pose;
@@ -100,8 +106,9 @@ impl Sway {
         let mut left = dt;
         while left > 0.0 {
             let step = left.min(MAX_STEP);
+            self.gust += (against - self.gust) * (step / GUST_TIME).min(1.0);
             let pull = -omega * omega * self.angle - 2.0 * DAMPING * omega * self.speed;
-            self.speed += (pull + PUSH * against) * step;
+            self.speed += (pull + PUSH * self.gust) * step;
             self.angle += self.speed * step;
             left -= step;
         }
