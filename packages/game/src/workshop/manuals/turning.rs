@@ -5,21 +5,30 @@
 //! canvas, which the leaf shows. That canvas only renders while a leaf
 //! with print on it turns.
 
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 
 use super::Filed;
-use super::model::{HOLE_RADIUS, Parts, holes};
+use super::model::{HOLE_INSET, Parts};
 use super::pose::Pose;
-use super::stack::{Item, Stack, Turning};
+use super::stack::{Stack, Turning};
 use crate::parts::paper::{
-    Leaf, LeafShape, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles, blank_print,
-    reprinted,
+    Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
+    blank_print, reprinted,
 };
 
-/// What the file needs to turn its leaves.
+/// How a page of the file is wrinkled. The open sheet, the sheet on top of
+/// the turned pages and a turning leaf all show it.
+#[derive(Debug)]
+pub(super) struct PageShape {
+    pub(super) wrinkles: Wrinkles,
+    pub(super) leaf: LeafShape,
+}
+
+/// The materials the file needs to turn its leaves.
 #[derive(Component, Debug)]
 pub(super) struct LeafKit {
-    pub(super) shape: LeafShape,
     /// The page on the front of a turning leaf.
     front: Handle<PaperMaterial>,
     /// The blank back of a turning page.
@@ -29,40 +38,32 @@ pub(super) struct LeafKit {
 }
 
 impl LeafKit {
-    /// Punches the open page and makes the kit from it, once the page has
-    /// its material.
+    /// Makes the kit from the material of the open page, once it has one.
     pub(super) fn make(
         files: Query<(Entity, &Parts, &Filed), Without<LeafKit>>,
-        sheets: Query<(&Wrinkles, &MeshMaterial3d<PaperMaterial>)>,
+        sheets: Query<&MeshMaterial3d<PaperMaterial>>,
         mut materials: ResMut<Assets<PaperMaterial>>,
         mut images: ResMut<Assets<Image>>,
-        mut meshes: ResMut<Assets<Mesh>>,
         mut commands: Commands,
     ) {
         for (file, parts, filed) in &files {
-            let Ok((wrinkles, material)) = sheets.get(parts.sheet) else {
+            let Some(sheet) = sheets
+                .get(parts.sheet)
+                .ok()
+                .and_then(|material| materials.get(material))
+                .cloned()
+            else {
                 continue;
-            };
-            let sheet = {
-                let Some(mut sheet) = materials.get_mut(material) else {
-                    continue;
-                };
-                sheet
-                    .extension
-                    .punch(holes().map(|hole| hole.extend(HOLE_RADIUS)));
-                (*sheet).clone()
             };
             let blank = blank_print(&mut images);
             let kit = Self {
-                shape: LeafShape::new(wrinkles, &mut meshes),
                 front: materials.add(reprinted(&sheet, filed.leaf_pages.image.clone())),
                 back: materials.add(reprinted(&sheet, blank.clone())),
                 back_sheet: materials.add(reprinted(&sheet, blank)),
             };
-            commands.entity(parts.back_sheet).insert((
-                Mesh3d(kit.shape.back()),
-                MeshMaterial3d(kit.back_sheet.clone()),
-            ));
+            commands
+                .entity(parts.back_sheet)
+                .insert(MeshMaterial3d(kit.back_sheet.clone()));
             commands.entity(file).insert(kit);
         }
     }
@@ -72,15 +73,19 @@ impl Stack {
     /// Turns towards the open page of the paper one leaf at a time while
     /// the file lies open, and jumps there while it is shut.
     pub(super) fn turn(
-        mut files: Query<(&Paper, &mut Stack, &Pose, &Parts, &LeafKit)>,
+        mut files: Query<(&Paper, &mut Stack, &Pose, &Parts, &Filed, &LeafKit)>,
         leaves: Query<(), With<Leaf>>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut commands: Commands,
     ) {
-        for (paper, mut stack, pose, parts, kit) in &mut files {
+        for (paper, mut stack, pose, parts, filed, kit) in &mut files {
             if let Some(turning) = &stack.turning {
-                if leaves.contains(turning.leaf) {
+                let flying = leaves.contains(turning.leaf);
+                if flying && pose.is_open() {
                     continue;
+                }
+                if flying {
+                    commands.entity(turning.leaf).despawn();
                 }
                 stack.land();
             }
@@ -94,34 +99,56 @@ impl Stack {
             let Some((items, forward)) = stack.next_turn(page) else {
                 continue;
             };
-            let pivot = stack.pivot();
-            let riders: Vec<_> = items
-                .clone()
-                .filter_map(|index| match stack.items()[index] {
-                    Item::Card(card) => Some((
-                        card,
-                        Transform::from_translation(stack.place(index) - pivot),
-                    )),
-                    Item::Page(_) => None,
-                })
-                .collect();
-            let card = !riders.is_empty();
+            let Some(first) = items.clone().find(|&index| stack.page_at(index).is_some()) else {
+                stack.jump_to(page);
+                continue;
+            };
+            let last = items.end - 1;
+            let bundle = items.len() > 1;
+            let shape = |index: usize| {
+                stack
+                    .page_at(index)
+                    .and_then(|page| filed.shapes.get(page))
+                    .map(|shape| shape.leaf.clone())
+            };
+            let mut sides = Vec::new();
+            if first == items.start
+                && let Some(shape) = shape(first)
+            {
+                sides.push(LeafSide {
+                    shape,
+                    back: false,
+                    material: kit.front.clone(),
+                    at: stack.middle(first),
+                    bulge: if bundle { Bulge::Front } else { Bulge::Up },
+                });
+            }
+            if let Some(shape) = shape(last) {
+                sides.push(LeafSide {
+                    shape,
+                    back: true,
+                    material: kit.back.clone(),
+                    at: stack.middle(last) + Vec3::Y * stack.apart(first, last),
+                    bulge: if bundle { Bulge::Back } else { Bulge::Up },
+                });
+            }
+            let card = items.clone().any(|index| stack.page_at(index).is_none());
+            let from = if forward { 0.0 } else { PI };
             let leaf = Leaf::spawn(
                 &mut commands,
-                parts.open,
-                &kit.shape,
+                (
+                    parts.spine,
+                    stack.on_rings(first, pose.cover(), from).frame(),
+                ),
                 LeafSpec {
-                    pivot: Transform::from_translation(pivot),
-                    at: stack.sheet_pose(items.start).translation - pivot,
                     forward,
                     stiffness: if card {
                         Stiffness::Card
                     } else {
                         Stiffness::Paper
                     },
-                    front: kit.front.clone(),
-                    back: (!card).then(|| kit.back.clone()),
-                    riders,
+                    held: HOLE_INSET,
+                    sides,
                 },
                 &mut meshes,
             );
@@ -134,7 +161,8 @@ impl Stack {
     }
 
     /// Shows the open page on the sheet to the right, and the page on a
-    /// turning leaf on the second canvas. The other pages hide.
+    /// turning leaf on the second canvas. The other pages hide. Each sheet
+    /// shows the wrinkles and holes of its page.
     #[expect(clippy::type_complexity, reason = "Bevy query")]
     pub(super) fn show_pages(
         files: Query<
@@ -146,23 +174,25 @@ impl Stack {
         sheets: Query<&MeshMaterial3d<PaperMaterial>>,
         prints: Query<&Print>,
         mut materials: ResMut<Assets<PaperMaterial>>,
+        mut commands: Commands,
     ) {
         for (paper, stack, parts, filed, kit) in &files {
             let (left, right) = stack.sides();
-            let open = stack.page_at(right.start);
+            let page = |index: usize| stack.page_at(index).map(|page| (index, page));
+            let open = page(right.start);
             let turning = stack.turning.as_ref();
-            let front = turning.and_then(|turning| stack.page_at(turning.items.start));
-            let back = turning.and_then(|turning| stack.page_at(turning.items.end - 1));
-            let top = left.end.checked_sub(1).and_then(|top| stack.page_at(top));
+            let front = turning.and_then(|turning| page(turning.items.start));
+            let back = turning.and_then(|turning| page(turning.items.end - 1));
+            let top = left.end.checked_sub(1).and_then(page);
             for index in 0..paper.page_count() {
                 let Some((mut node, mut target)) =
                     paper.page(index).and_then(|page| nodes.get_mut(page).ok())
                 else {
                     continue;
                 };
-                let (camera, display) = if open == Some(index) {
+                let (camera, display) = if open.map(|(_, page)| page) == Some(index) {
                     (filed.pages.camera, Display::Flex)
-                } else if front == Some(index) {
+                } else if front.map(|(_, page)| page) == Some(index) {
                     (filed.leaf_pages.camera, Display::Flex)
                 } else {
                     (filed.pages.camera, Display::None)
@@ -177,6 +207,17 @@ impl Stack {
             if let Ok(mut camera) = cameras.get_mut(filed.leaf_pages.camera) {
                 camera.is_active = front.is_some();
             }
+            let shape = |page: usize| filed.shapes.get(page);
+            if let Some(shape) = open.and_then(|(_, page)| shape(page)) {
+                commands
+                    .entity(parts.sheet)
+                    .insert(Mesh3d(shape.leaf.face_up()));
+            }
+            if let Some(shape) = top.and_then(|(_, page)| shape(page)) {
+                commands
+                    .entity(parts.back_sheet)
+                    .insert(Mesh3d(shape.leaf.face_down()));
+            }
             let pages = [
                 (sheets.get(parts.sheet).ok().map(|m| m.0.id()), open),
                 (Some(kit.front.id()), front),
@@ -184,15 +225,20 @@ impl Stack {
                 (Some(kit.back_sheet.id()), top),
             ];
             for (material, page) in pages {
-                if let (Some(material), Some(page)) = (material, page)
-                    && let Some(mut material) = materials.get_mut(material)
-                {
-                    material.extension.set_page(page);
-                    let print = paper.page(page).and_then(|page| prints.get(page).ok());
-                    material
-                        .extension
-                        .set_print(print.copied().unwrap_or_default());
-                }
+                let (Some(material), Some((index, page))) = (material, page) else {
+                    continue;
+                };
+                let (Some(mut material), Some(shape)) = (materials.get_mut(material), shape(page))
+                else {
+                    continue;
+                };
+                material
+                    .extension
+                    .set_sheet(&shape.wrinkles, stack.sheet_holes(index));
+                let print = paper.page(page).and_then(|page| prints.get(page).ok());
+                material
+                    .extension
+                    .set_print(print.copied().unwrap_or_default());
             }
         }
     }

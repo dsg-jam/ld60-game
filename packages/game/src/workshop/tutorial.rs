@@ -45,7 +45,7 @@ impl Plugin for TutorialPlugin {
 ///
 /// Once the player has read it and put it down, it goes into the manuals
 /// file.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[require(Transform, Visibility)]
 pub(crate) struct TutorialNote(pub(crate) usize);
 

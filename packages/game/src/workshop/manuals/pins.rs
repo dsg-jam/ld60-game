@@ -9,7 +9,7 @@ use crate::workshop::tutorial::TutorialNote;
 
 /// One page of the manuals file, named by its entry so it stays the same
 /// page when more is filed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct Sheet {
     entry: Entry,
     /// Counted from 0 within the entry.

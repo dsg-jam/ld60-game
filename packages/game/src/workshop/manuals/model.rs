@@ -19,22 +19,27 @@ use crate::parts::screen::UiCanvas;
 
 pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 pub(super) const BOARD: f32 = 0.004;
-/// Width and length of each cover.
-pub(super) const COVER: Vec2 = Vec2::new(0.18, 0.24);
+/// Width and length of each cover. The covers reach past the pages, which
+/// hang further out on the rings while the file is shut.
+pub(super) const COVER: Vec2 = Vec2::new(0.195, 0.24);
 /// Width of the spine. The rings sit on its middle.
 pub(super) const SPINE: f32 = 0.05;
 /// Thickness, height and depth of the closed file standing on its bottom
 /// edge, with the spine towards +Z.
 pub(super) const CLOSED: Vec3 = Vec3::new(SPINE + 2.0 * BOARD, COVER.y, COVER.x + BOARD);
-pub(super) const RING_RADIUS: f32 = 0.02;
-const RING_WIRE: f32 = 0.0012;
+pub(super) const RING_RADIUS: f32 = 0.018;
+pub(super) const RING_WIRE: f32 = 0.0012;
 /// Height of the middle of the rings above the spine.
-pub(super) const RING_HEIGHT: f32 = 0.005;
+pub(super) const RING_HEIGHT: f32 = 0.004;
 /// Distance of each ring from the middle of the spine.
 pub(super) const RING_SPREAD: f32 = 0.045;
-/// The rings reach a little into the mechanism at both ends.
-const RING_DIP: f32 = 0.3;
-const MECHANISM: Vec3 = Vec3::new(0.028, 0.004, 0.19);
+/// Height of the top of the mechanism above the spine. The pages lie on it.
+pub(super) const MECHANISM_TOP: f32 = 0.001;
+/// How far the mechanism reaches past the rings on either side.
+const MECHANISM_LIP: f32 = 0.002;
+const MECHANISM_LENGTH: f32 = 0.19;
+/// How deep the rings reach into the mechanism.
+const RING_DIP: f32 = 0.0006;
 /// Distance of the punched holes from the bound edge of the page.
 pub(super) const HOLE_INSET: f32 = 0.006;
 pub(super) const HOLE_RADIUS: f32 = 0.0026;
@@ -64,20 +69,13 @@ pub(super) struct Parts {
     pub(super) sheet: Entity,
     /// The back of the page turned last, on top of the turned pages.
     pub(super) back_sheet: Entity,
-    /// Turns about the spine edge of the back cover, with the rings.
+    /// Turns about the spine edge of the back cover, with the rings and
+    /// everything on them.
     pub(super) spine: Entity,
     /// Turns about the far edge of the spine.
     pub(super) front: Entity,
-    /// Holds the pages not turned yet.
-    pub(super) right: Entity,
-    /// Holds the turned pages, turning them back over the rings as the
-    /// cover closes.
-    pub(super) turned: Entity,
-    pub(super) right_stack: Entity,
-    pub(super) left_stack: Entity,
-    /// What shows through the punched holes of the top page on each side.
-    pub(super) right_holes: Entity,
-    pub(super) left_holes: Entity,
+    /// The pages on either side, but for the open sheets.
+    pub(super) stack: Entity,
 }
 
 impl Parts {
@@ -96,20 +94,8 @@ impl Parts {
             back_sheet: Entity::PLACEHOLDER,
             spine: Entity::PLACEHOLDER,
             front: Entity::PLACEHOLDER,
-            right: Entity::PLACEHOLDER,
-            turned: Entity::PLACEHOLDER,
-            right_stack: Entity::PLACEHOLDER,
-            left_stack: Entity::PLACEHOLDER,
-            right_holes: Entity::PLACEHOLDER,
-            left_holes: Entity::PLACEHOLDER,
+            stack: Entity::PLACEHOLDER,
         };
-        let dark = materials.add(StandardMaterial {
-            base_color: HOLE,
-            perceptual_roughness: 1.0,
-            ..default()
-        });
-        let holes = || (MeshMaterial3d(dark.clone()), Transform::default());
-        let stack = || (MeshMaterial3d(edges.clone()), Transform::default());
         parts.open = file
             .spawn((
                 Name::new("open"),
@@ -120,32 +106,6 @@ impl Parts {
                 let back = Block::new(COVER.extend(BOARD).xzy())
                     .translated(Vec3::X * (SPINE + COVER.x) / 2.0);
                 open.spawn((Shape::cuboid(&back, CLOTH), Finish::Fabric));
-                parts.right = open
-                    .spawn((Transform::default(), Visibility::Inherited))
-                    .with_children(|right| {
-                        parts.right_stack = right.spawn(stack()).id();
-                        parts.right_holes = right.spawn(holes()).id();
-                        parts.sheet = right
-                            .spawn(Paper::sheet(
-                                pages,
-                                "manuals",
-                                SHEET_SIZE,
-                                Vec3::ZERO,
-                                meshes,
-                            ))
-                            .id();
-                    })
-                    .id();
-                parts.turned = open
-                    .spawn((Transform::default(), Visibility::Inherited))
-                    .with_children(|turned| {
-                        parts.left_stack = turned.spawn(stack()).id();
-                        parts.left_holes = turned.spawn(holes()).id();
-                        parts.back_sheet = turned
-                            .spawn((Transform::default(), Visibility::Hidden))
-                            .id();
-                    })
-                    .id();
                 parts.spine = open
                     .spawn((Self::spine_hinge(), Visibility::Inherited))
                     .with_children(|hinge| {
@@ -154,6 +114,20 @@ impl Parts {
                         hinge.spawn((Shape::cuboid(&board, CLOTH), Finish::Fabric));
                         spawn_rings(hinge, meshes, materials);
                         spawn_spine_outside(hinge, spine, meshes, materials);
+                        parts.stack = hinge
+                            .spawn((MeshMaterial3d(edges), Transform::default()))
+                            .id();
+                        parts.sheet = hinge
+                            .spawn(Paper::sheet(
+                                pages,
+                                "manuals",
+                                SHEET_SIZE,
+                                Vec3::ZERO,
+                                meshes,
+                            ))
+                            .id();
+                        parts.back_sheet =
+                            hinge.spawn((Transform::default(), Visibility::Hidden)).id();
                         parts.front = hinge
                             .spawn((Self::front_hinge(), Visibility::Inherited))
                             .with_children(|front| {
@@ -188,25 +162,41 @@ impl Parts {
     }
 }
 
-/// The middle of a page on the pages not yet turned, from the middle of the
-/// spine.
-pub(super) fn page_x() -> f32 {
-    RING_RADIUS - HOLE_INSET + SHEET_SIZE.x / 2.0
+/// The middle of the rings, in the space of the spine hinge. Their axis
+/// runs along Z.
+pub(super) fn ring_center() -> Vec2 {
+    Vec2::new(-SPINE / 2.0, RING_HEIGHT)
 }
 
-/// The punched holes of a page, from its top left corner.
-pub(super) fn holes() -> [Vec2; 2] {
-    [-1.0, 1.0].map(|side| Vec2::new(HOLE_INSET, SHEET_SIZE.y / 2.0 + side * RING_SPREAD))
+/// The punched holes of a sheet, along its bound edge from the middle of the
+/// sheet. Each sits on a ring.
+pub(super) fn ring_holes() -> [f32; 2] {
+    [-RING_SPREAD, RING_SPREAD]
 }
 
-/// The ring mechanism on the spine. Its rings go through the punched holes
-/// of the pages.
+/// The ring mechanism on the spine. Its rings come out of the top of the
+/// mechanism and go through the punched holes of the pages.
 fn spawn_rings(
     hinge: &mut ChildSpawnerCommands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
 ) {
-    let mechanism = Block::new(MECHANISM).translated(Vec3::NEG_X * SPINE / 2.0);
+    let center = ring_center();
+    let low = (MECHANISM_TOP - RING_DIP - center.y) / RING_RADIUS;
+    let foot = low.asin();
+    let width = 2.0 * (RING_RADIUS * foot.cos() + RING_WIRE + MECHANISM_LIP);
+    let mechanism = Block::between(
+        Vec3::new(
+            center.x - width / 2.0,
+            -BOARD / 2.0,
+            -MECHANISM_LENGTH / 2.0,
+        ),
+        Vec3::new(
+            center.x + width / 2.0,
+            MECHANISM_TOP,
+            MECHANISM_LENGTH / 2.0,
+        ),
+    );
     hinge.spawn((Shape::cuboid(&mechanism, MECHANISM_PAINT), Finish::Paint));
     let ring = meshes.add(
         Torus {
@@ -214,7 +204,7 @@ fn spawn_rings(
             major_radius: RING_RADIUS,
         }
         .mesh()
-        .angle_range(-RING_DIP..=PI + RING_DIP)
+        .angle_range(foot..=PI - foot)
         .build(),
     );
     let metal = materials.add(StandardMaterial {
@@ -223,11 +213,11 @@ fn spawn_rings(
         perceptual_roughness: 0.35,
         ..default()
     });
-    for side in [-1.0, 1.0] {
+    for z in ring_holes() {
         hinge.spawn((
             Mesh3d(ring.clone()),
             MeshMaterial3d(metal.clone()),
-            Transform::from_xyz(-SPINE / 2.0, RING_HEIGHT, side * RING_SPREAD)
+            Transform::from_translation(center.extend(z))
                 .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         ));
     }

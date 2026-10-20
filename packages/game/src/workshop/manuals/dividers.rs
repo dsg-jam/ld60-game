@@ -9,11 +9,12 @@ use bevy::{
 };
 
 use super::contents::{Contents, Section};
-use super::model::SHEET_SIZE;
-use super::stack::CARD;
+use super::model::{HOLE_RADIUS, SHEET_SIZE};
+use super::punched::punched_box;
+use super::stack::{CARD, holes, stray};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
+use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::{Localized, Message};
 use crate::parts::paper::{INK, Paper, PaperButton};
 use crate::parts::screen::UiCanvas;
@@ -72,6 +73,11 @@ impl Tab {
             Self::Index => INDEX,
             Self::Section(section) => section.color(),
         }
+    }
+
+    /// Picks how the edges of its divider stray.
+    pub(super) fn seed(self) -> u64 {
+        1000 + self.slot() as u64
     }
 
     fn slot(self) -> usize {
@@ -133,23 +139,29 @@ impl DividerTab {
 
     /// The divider for `tab` in front of page `start`, with its tab the one
     /// at `position` from the top, so the tabs stay together when a section
-    /// has none. Its origin is the middle of its underside, where a page
-    /// would lie.
+    /// has none. Its origin is where the middle of a page would be, and it
+    /// is punched for the rings like one.
     pub(super) fn spawn(
         parent: &mut ChildSpawnerCommands,
         file: Entity,
         (tab, position, start): (Tab, usize, usize),
         labels: &UiCanvas,
+        (meshes, surfaces): (&mut Assets<Mesh>, &mut Assets<SurfaceMaterial>),
     ) -> Entity {
         let count = Tab::ALL.len() as f32;
         let slot = tab.slot() as f32;
         let region = Rect::new(slot / count, 0.0, (slot + 1.0) / count, 1.0);
-        let body = Block::new(Vec3::new(
-            SHEET_SIZE.x + LIP,
-            CARD,
-            SHEET_SIZE.y + 2.0 * LIP,
-        ))
-        .translated(Vec3::X * LIP / 2.0);
+        let lip = Vec2::X * LIP / 2.0;
+        let body = punched_box(
+            Vec3::new(SHEET_SIZE.x + LIP, CARD, SHEET_SIZE.y + 2.0 * LIP),
+            &holes(stray(tab.seed())).map(|hole| hole - lip),
+            HOLE_RADIUS,
+        );
+        let body = (
+            Mesh3d(meshes.add(body)),
+            MeshMaterial3d(surfaces.add(Finish::Paper.material(tab.color(), Form::Freeform, slot))),
+            Transform::from_translation(lip.extend(0.0).xzy()),
+        );
         let label = Block::new(Vec3::new(TAB_LENGTH, CARD / 2.0, TAB_OUT));
         let along = -SHEET_SIZE.y / 2.0 + TAB_SLOT * (position as f32 + 0.5);
         parent
@@ -159,12 +171,12 @@ impl DividerTab {
                 Visibility::Inherited,
             ))
             .with_children(|divider| {
-                divider.spawn((Shape::cuboid(&body, tab.color()), Finish::Paper));
+                divider.spawn(body);
                 divider
                     .spawn((
                         TabLink { file, start },
                         PaperButton(Some(tab.hint())),
-                        Transform::from_xyz((SHEET_SIZE.x + TAB_OUT) / 2.0, CARD / 2.0, along)
+                        Transform::from_xyz((SHEET_SIZE.x + TAB_OUT) / 2.0, 0.0, along)
                             .with_rotation(Quat::from_rotation_y(-FRAC_PI_2)),
                         Visibility::Inherited,
                     ))

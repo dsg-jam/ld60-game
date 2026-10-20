@@ -1,9 +1,11 @@
 use std::f32::consts::{PI, TAU};
+use std::hash::Hash;
 
 use bevy::{
     asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
     mesh::{Indices, PrimitiveTopology},
     pbr::{ExtendedMaterial, MaterialExtension},
+    platform::hash::fixed_hash_one,
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::{ShaderRef, load_shader_library},
@@ -235,6 +237,13 @@ impl Wrinkles {
         }
     }
 
+    /// The wrinkles of `document` on a sheet of `size`, held by `binding`.
+    pub(crate) fn held(size: Vec2, document: impl Hash, binding: &Binding) -> Self {
+        let mut wrinkles = Self::new(size, fixed_hash_one(document));
+        wrinkles.hold(binding);
+        wrinkles
+    }
+
     pub(super) fn size(&self) -> Vec2 {
         self.size
     }
@@ -385,9 +394,12 @@ impl Sheet {
         }
     }
 
-    /// Punches `holes` through the sheet, each a center in the sheet's space
-    /// and a radius.
-    pub(crate) fn punch(&mut self, holes: [Vec3; 2]) {
+    /// Shows the sheet with `wrinkles`, punched with `holes`, each a center
+    /// in the sheet's space and a radius.
+    pub(crate) fn set_sheet(&mut self, wrinkles: &Wrinkles, holes: [Vec3; 2]) {
+        self.params.seed = (wrinkles.seed % SEEDS) as f32;
+        self.params.page = 0.0;
+        self.params.folds = wrinkles.folds;
         self.params.holes = holes.map(|hole| hole.extend(0.0));
     }
 

@@ -19,7 +19,7 @@ use bevy::{
 };
 
 pub(crate) use self::leaf::{
-    Binding, Leaf, LeafShape, LeafSpec, Stiffness, blank_print, reprinted,
+    Binding, Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Stiffness, blank_print, reprinted,
 };
 pub(crate) use self::press::{Press, Print};
 pub(crate) use self::sheet::{PaperMaterial, Wrinkles};

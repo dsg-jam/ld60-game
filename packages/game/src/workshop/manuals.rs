@@ -5,24 +5,25 @@ mod index;
 mod model;
 mod pins;
 mod pose;
+mod punched;
 mod stack;
 mod turning;
 
-use bevy::prelude::*;
+use bevy::{platform::hash::fixed_hash_one, prelude::*};
 
 use self::contents::Contents;
 use self::dividers::{DividerTab, Tab};
 use self::index::{Hover, PageLink, PinButton};
-use self::model::{Parts, SPINE_CANVAS};
+use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
 pub(crate) use self::pins::{Pins, Sheet};
 use self::pose::Pose;
 use self::stack::Stack;
-use self::turning::LeafKit;
+use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
-use crate::parts::paper::{Binding, Leaf, PAPER, Paper, ShowsOwnPages};
+use crate::parts::paper::{Binding, Leaf, LeafShape, PAPER, Paper, ShowsOwnPages, Wrinkles};
 use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use crate::player::hints::KeyHint;
@@ -90,6 +91,8 @@ struct Filed {
     leaf_pages: UiCanvas,
     labels: UiCanvas,
     contents: Contents,
+    /// The shape of each page.
+    shapes: Vec<PageShape>,
     /// The job the file was last opened for.
     job: Option<JobId>,
 }
@@ -155,6 +158,7 @@ impl ShopManuals {
                 leaf_pages,
                 labels,
                 contents: Contents::default(),
+                shapes: Vec::new(),
                 job: None,
             },
         ));
@@ -166,6 +170,8 @@ impl ShopManuals {
         run: Res<Run>,
         mut files: Query<(Entity, &mut Paper, &mut Filed, &mut Stack, &Parts)>,
         tabs: Query<(Entity, &DividerTab)>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut surfaces: ResMut<Assets<SurfaceMaterial>>,
         mut commands: Commands,
     ) {
         let contents = Contents::of(&run);
@@ -175,6 +181,20 @@ impl ShopManuals {
             }
             let pages = contents.pages();
             let count = pages.len();
+            let seeds: Vec<u64> = pages
+                .iter()
+                .map(|(_, sheet)| fixed_hash_one(("manuals", sheet)))
+                .collect();
+            filed.shapes = seeds
+                .iter()
+                .map(|seed| {
+                    let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
+                    PageShape {
+                        leaf: LeafShape::new(&wrinkles, &mut meshes),
+                        wrinkles,
+                    }
+                })
+                .collect();
             let pages = pages
                 .into_iter()
                 .enumerate()
@@ -204,17 +224,22 @@ impl ShopManuals {
                 commands.entity(turning.leaf).despawn();
             }
             let mut cards = Vec::new();
-            commands.entity(parts.right).with_children(|right| {
+            commands.entity(parts.spine).with_children(|spine| {
                 let starts = Tab::ALL
                     .into_iter()
                     .filter_map(|tab| Some((tab, tab.start(&contents)?)));
                 for (position, (tab, start)) in starts.enumerate() {
-                    let card =
-                        DividerTab::spawn(right, file, (tab, position, start), &filed.labels);
-                    cards.push((start, card));
+                    let card = DividerTab::spawn(
+                        spine,
+                        file,
+                        (tab, position, start),
+                        &filed.labels,
+                        (&mut meshes, &mut surfaces),
+                    );
+                    cards.push((start, card, tab.seed()));
                 }
             });
-            *stack = Stack::new(count, &cards);
+            *stack = Stack::new(&seeds, &cards);
             filed.contents = contents.clone();
             filed.job = None;
         }
@@ -319,14 +344,16 @@ impl ShopManuals {
         time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
-        mut files: Query<(Entity, &Parts, &Lying, &mut Pose, Ref<Stack>)>,
+        mut files: Query<(Entity, &Parts, &Lying, &mut Pose)>,
         mut transforms: Query<&mut Transform>,
         mut surfaces: Query<&mut ScreenSurface>,
     ) {
-        for (file, parts, lying, mut pose, stack) in &mut files {
+        for (file, parts, lying, mut pose) in &mut files {
             let open = *state.get() == Focus::Paper && focused.get() == Some(file);
-            if pose.step(open, time.delta_secs()) || stack.is_changed() || pose.is_added() {
-                parts.pose(&pose, lying.0, stack.pivot(), &mut transforms);
+            let moved = pose.bypass_change_detection().step(open, time.delta_secs());
+            if moved || pose.is_added() {
+                pose.set_changed();
+                parts.pose(&pose, lying.0, &mut transforms);
             }
             if let Ok(mut surface) = surfaces.get_mut(parts.sheet)
                 && surface.active != open

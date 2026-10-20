@@ -5,7 +5,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
 
-use super::model::{BOARD, CLOSED, COVER, Parts, RING_HEIGHT, RING_RADIUS, SPINE};
+use super::model::{BOARD, CLOSED, COVER, Parts, SPINE};
 
 /// Seconds to lie down or to stand up.
 const LIE_TIME: f32 = 0.5;
@@ -47,20 +47,19 @@ impl Pose {
     }
 
     /// From 0 shut to 1 open.
-    fn cover(&self) -> f32 {
+    pub(super) fn cover(&self) -> f32 {
         smoothstep((self.0 - COVER_START) / COVER_TIME)
     }
 }
 
 impl Parts {
-    /// Places the parts for `pose`, with the file lying open at `lying`.
-    /// The turned pages turn back over the rings about `pivot` as the cover
-    /// closes.
+    /// Places the covers for `pose`, with the file lying open at `lying`.
+    /// [`Stack::arrange`](super::stack::Stack::arrange) places what is on
+    /// the rings.
     pub(super) fn pose(
         &self,
         pose: &Pose,
         lying: Transform,
-        pivot: Vec3,
         transforms: &mut Query<&mut Transform>,
     ) {
         let mut set = |entity: Entity, transform: Transform| {
@@ -85,14 +84,6 @@ impl Parts {
         let fold = Quat::from_rotation_z(-(1.0 - open) * FRAC_PI_2);
         set(self.spine, Self::spine_hinge().with_rotation(fold));
         set(self.front, Self::front_hinge().with_rotation(fold));
-        let slide = slide(open);
-        set(self.right, Transform::from_xyz(slide, 0.0, 0.0));
-        set(
-            self.turned,
-            Transform::from_translation(pivot + Vec3::X * slide / 2.0)
-                * Transform::from_rotation(Quat::from_rotation_z(-(1.0 - open) * PI))
-                * Transform::from_translation(-pivot),
-        );
     }
 }
 
@@ -118,15 +109,6 @@ pub(super) fn standing() -> Transform {
         .with_translation(Vec3::Y * CLOSED.y / 2.0 - rotation * closed_center())
 }
 
-/// How far the pages not turned slide towards the back cover while the
-/// cover closes, with the rings on the spine. `open` goes from 0 shut to 1.
-fn slide(open: f32) -> f32 {
-    let angle = -(1.0 - open) * FRAC_PI_2;
-    SPINE / 2.0 + angle.cos() * (RING_RADIUS - SPINE / 2.0)
-        - angle.sin() * RING_HEIGHT
-        - RING_RADIUS
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,11 +120,5 @@ mod tests {
         assert!(center.abs_diff_eq(Vec3::Y * CLOSED.y / 2.0, 1e-6));
         let spine_out = stand.rotation * Vec3::NEG_X;
         assert!(spine_out.abs_diff_eq(Vec3::Z, 1e-6));
-    }
-
-    #[test]
-    fn open_pages_do_not_slide() {
-        assert!(slide(1.0).abs() < 1e-6);
-        assert!(slide(0.0) > 0.0);
     }
 }

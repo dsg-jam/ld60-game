@@ -28,7 +28,7 @@ pub(super) enum Section {
 }
 
 /// One thing filed in a [`Section`], with a line in the index.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(super) enum Entry {
     /// The service manual of a device: one page per board revision and the
     /// line tests.

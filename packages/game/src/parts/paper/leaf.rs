@@ -13,7 +13,7 @@ use bevy::{
 use super::sheet::{PaperMaterial, Wrinkles};
 use crate::audio::{PlayAt, Sound};
 
-/// How far a turning page bends at most, in radians over its width.
+/// How far a turning page bends at most, in radians over its free width.
 const CURL: f32 = 0.9;
 
 /// How the pages of a [`Paper`](super::Paper) are held together. The held
@@ -53,7 +53,8 @@ impl Binding {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stiffness {
     Paper,
-    /// Thick card, like a divider. It swings slower and does not bend.
+    /// Thick card, like a divider, or pages held flat by one. It swings
+    /// slower and does not bend.
     Card,
 }
 
@@ -89,16 +90,15 @@ impl Stiffness {
     }
 }
 
-/// The wrinkled sheet that bends as it turns, and its back for a sheet
-/// lying face down.
+/// The wrinkled sheet of one page: its front and back, and both of them
+/// lying still.
 #[derive(Clone, Debug)]
 pub(crate) struct LeafShape {
     size: Vec2,
-    /// How high the wrinkles rise above the flat sheet.
-    rise: f32,
     front: Mesh,
     back: Mesh,
-    back_handle: Handle<Mesh>,
+    face_up: Handle<Mesh>,
+    face_down: Handle<Mesh>,
 }
 
 impl LeafShape {
@@ -107,48 +107,75 @@ impl LeafShape {
         let back = reversed(&front);
         Self {
             size: wrinkles.size(),
-            rise: highest(&front),
-            back_handle: meshes.add(back.clone()),
+            face_up: meshes.add(front.clone()),
+            face_down: meshes.add(relaxed(&back, -1.0)),
             front,
             back,
         }
     }
 
-    /// The back of the whole sheet, seen from below the sheet's front.
-    pub(crate) fn back(&self) -> Handle<Mesh> {
-        self.back_handle.clone()
+    /// The front of the sheet lying face up, like
+    /// [`Paper::sheet`](super::Paper::sheet).
+    pub(crate) fn face_up(&self) -> Handle<Mesh> {
+        self.face_up.clone()
     }
 
-    /// How much higher a sheet lies face down than face up, so its wrinkles
-    /// bulge up from what it lies on instead of into it.
-    pub(crate) fn rise(&self) -> f32 {
-        self.rise
+    /// The back of the sheet lying face down: the same mesh turned over, with
+    /// the wrinkles bulging up from what it lies on instead of into it.
+    pub(crate) fn face_down(&self) -> Handle<Mesh> {
+        self.face_down.clone()
     }
 }
 
-/// What turns over in one go: the sheet on top and anything that turns
-/// with it.
-pub(crate) struct LeafSpec {
-    /// The leaf turns about the Z axis of this. Forward is a half turn the
-    /// right way round, so a sheet lying to the right of the axis ends up
-    /// face down on the left.
-    pub(crate) pivot: Transform,
-    /// The middle of the sheet lying face up to the right, before turning
-    /// forward, relative to `pivot`. Its top points to -Z, like
-    /// [`Paper::sheet`](super::Paper::sheet).
+/// Which way the wrinkles of a side of a leaf may bulge.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Bulge {
+    /// Up, whichever side is up, like a single page.
+    Up,
+    /// Only out of its front, with more pages behind it.
+    Front,
+    /// Only out of its back, with more pages in front of it.
+    Back,
+}
+
+impl Bulge {
+    /// The share of the wrinkles shown out of the front at `angle`.
+    fn relax(self, angle: f32) -> f32 {
+        let up = angle.cos();
+        match self {
+            Self::Up => up,
+            Self::Front => up.max(0.0),
+            Self::Back => up.min(0.0),
+        }
+    }
+}
+
+/// One side of a turning leaf.
+pub(crate) struct LeafSide {
+    pub(crate) shape: LeafShape,
+    /// The back of the sheet instead of its front.
+    pub(crate) back: bool,
+    pub(crate) material: Handle<PaperMaterial>,
+    /// The middle of the sheet lying face up, in the space of the leaf.
     pub(crate) at: Vec3,
+    pub(crate) bulge: Bulge,
+}
+
+/// What turns over in one go.
+pub(crate) struct LeafSpec {
     pub(crate) forward: bool,
     pub(crate) stiffness: Stiffness,
-    pub(crate) front: Handle<PaperMaterial>,
-    /// Shows under the sheet, unless something below covers it.
-    pub(crate) back: Option<Handle<PaperMaterial>>,
-    /// Turn along without bending, each relative to `pivot` before turning
-    /// forward.
-    pub(crate) riders: Vec<(Entity, Transform)>,
+    /// How far from the axis of the leaf the sheet stays flat, where it is
+    /// held.
+    pub(crate) held: f32,
+    pub(crate) sides: Vec<LeafSide>,
 }
 
-/// A leaf turning over, see [`LeafSpec`]. It despawns once it lies flat
-/// again and hands its riders back to its parent.
+/// A leaf turning over, see [`LeafSpec`]. It despawns once it has turned.
+///
+/// Its owner places it each frame at [`Leaf::angle`]. In the space of the
+/// leaf, X points across the sheet away from the held edge, Y out of its
+/// front and Z along the axis it turns about.
 #[derive(Component, Debug)]
 pub(crate) struct Leaf {
     elapsed: f32,
@@ -157,69 +184,51 @@ pub(crate) struct Leaf {
     sounded: bool,
     forward: bool,
     stiffness: Stiffness,
-    pivot: Transform,
-    rise: f32,
-    riders: Vec<(Entity, Transform)>,
-    /// The flat sheet, which [`Leaf::bend`] bends.
-    flat: Bend,
-    /// The meshes of the front and the back, bent each frame.
-    sides: Vec<Handle<Mesh>>,
+    sides: Vec<(Handle<Mesh>, Bend)>,
 }
 
-/// Where the sheet of a leaf lies flat, relative to its root.
+/// A side of the sheet lying flat in the space of the leaf.
 #[derive(Clone, Debug)]
 struct Bend {
-    /// The near edge, where the sheet starts to bend.
-    edge: Vec2,
+    /// Where the sheet starts to bend.
+    held: f32,
+    /// From `held` to the free edge.
     width: f32,
-    /// Each vertex of the sheet mesh, as the distance from the near edge,
-    /// the height above the sheet and the position along the axis.
+    bulge: Bulge,
+    /// Each vertex across the sheet, its height above the sheet and along
+    /// the axis.
     points: Vec<Vec3>,
+    /// How far the side lies out of the front of the leaf.
+    lift: f32,
     /// The normal of each vertex, across, up and along the axis.
     normals: Vec<Vec3>,
 }
 
 impl Leaf {
-    /// Spawns the leaf under `parent` with `meshes` for its sides, and
-    /// returns it.
+    /// Spawns the leaf under `parent` at `at` with `meshes` for its sides,
+    /// and returns it.
     pub(crate) fn spawn(
         commands: &mut Commands,
-        parent: Entity,
-        shape: &LeafShape,
+        (parent, at): (Entity, Transform),
         spec: LeafSpec,
         meshes: &mut Assets<Mesh>,
     ) -> Entity {
-        let mut leaf = Leaf {
-            elapsed: 0.0,
-            sounded: false,
-            forward: spec.forward,
-            stiffness: spec.stiffness,
-            pivot: spec.pivot,
-            rise: if spec.riders.is_empty() {
-                shape.rise
-            } else {
-                0.0
-            },
-            riders: spec.riders,
-            flat: Bend::new(&shape.front, shape.size, spec.at),
-            sides: Vec::with_capacity(2),
-        };
         let root = commands
-            .spawn((leaf.root(), Visibility::Inherited, ChildOf(parent)))
+            .spawn((at, Visibility::Inherited, ChildOf(parent)))
             .id();
-        for &(rider, at) in &leaf.riders {
-            commands.entity(rider).insert((at, ChildOf(root)));
-        }
-        let sides = [(&shape.front, Some(spec.front)), (&shape.back, spec.back)];
-        for (index, (mesh, material)) in sides.into_iter().enumerate() {
-            let Some(material) = material else {
-                continue;
+        let mut sides = Vec::with_capacity(spec.sides.len());
+        for (index, side) in spec.sides.into_iter().enumerate() {
+            let flat = if side.back {
+                &side.shape.back
+            } else {
+                &side.shape.front
             };
-            let mesh = meshes.add(mesh.clone());
+            let bend = Bend::new(flat, side.shape.size, side.at, (spec.held, side.bulge));
+            let mesh = meshes.add(flat.clone());
             // It moves away from its bounds as it bends.
-            let mut side = commands.spawn((
+            let mut entity = commands.spawn((
                 Mesh3d(mesh.clone()),
-                MeshMaterial3d(material),
+                MeshMaterial3d(side.material),
                 Transform::default(),
                 Pickable::IGNORE,
                 NoFrustumCulling,
@@ -227,10 +236,17 @@ impl Leaf {
             ));
             // Front and back lie on each other, so only one casts a shadow.
             if index > 0 {
-                side.insert(NotShadowCaster);
+                entity.insert(NotShadowCaster);
             }
-            leaf.sides.push(mesh);
+            sides.push((mesh, bend));
         }
+        let leaf = Leaf {
+            elapsed: 0.0,
+            sounded: false,
+            forward: spec.forward,
+            stiffness: spec.stiffness,
+            sides,
+        };
         leaf.bend(meshes);
         commands.entity(root).insert(leaf);
         root
@@ -241,61 +257,40 @@ impl Leaf {
     }
 
     /// How far the leaf has turned from lying to the right, in radians.
-    fn angle(&self) -> f32 {
+    pub(crate) fn angle(&self) -> f32 {
         let turned = self.stiffness.ease(self.progress()) * PI;
         if self.forward { turned } else { PI - turned }
     }
 
-    /// Turns about the pivot, and rises as it goes over, see
-    /// [`LeafShape::rise`].
-    fn root(&self) -> Transform {
-        let angle = self.angle();
-        Transform::from_translation(Vec3::Y * self.rise * angle / PI)
-            * self.pivot
-            * Transform::from_rotation(Quat::from_rotation_z(angle))
-    }
-
-    /// Bends the sides of the sheet so the free edge lags behind the edge
-    /// at the axis.
+    /// Bends the sides of the sheet so the free edge lags behind the held
+    /// edge.
     fn bend(&self, meshes: &mut Assets<Mesh>) {
         let lag = if self.forward { -1.0 } else { 1.0 };
         let curl = lag * self.stiffness.curl() * (self.progress() * PI).sin();
-        let (positions, normals) = self.flat.bent(curl);
-        for (index, side) in self.sides.iter().enumerate() {
+        for (side, bend) in &self.sides {
             let Some(mut mesh) = meshes.get_mut(side) else {
                 continue;
             };
-            let sign = if index == 0 { 1.0 } else { -1.0 };
-            let normals: Vec<[f32; 3]> = normals.iter().map(|n| (*n * sign).to_array()).collect();
-            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions.clone());
+            let (positions, normals) = bend.bent(curl, self.angle());
+            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
             mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         }
     }
 
     pub(crate) fn animate(
         time: Res<Time>,
-        mut leaves: Query<(Entity, &mut Leaf, &ChildOf, &GlobalTransform)>,
-        mut transforms: Query<&mut Transform>,
+        mut leaves: Query<(Entity, &mut Leaf, &GlobalTransform)>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut commands: Commands,
     ) {
-        for (root, mut leaf, parent, at) in &mut leaves {
+        for (root, mut leaf, at) in &mut leaves {
             if !leaf.sounded {
                 leaf.sounded = true;
                 commands.trigger(PlayAt(leaf.stiffness.sound(), at.translation()));
                 continue;
             }
             leaf.elapsed += time.delta_secs();
-            let at = leaf.root();
-            if let Ok(mut transform) = transforms.get_mut(root) {
-                *transform = at;
-            }
             if leaf.progress() >= 1.0 {
-                for &(rider, relative) in &leaf.riders {
-                    commands
-                        .entity(rider)
-                        .insert((at * relative, ChildOf(parent.parent())));
-                }
                 commands.entity(root).despawn();
                 continue;
             }
@@ -306,8 +301,9 @@ impl Leaf {
 
 impl Bend {
     /// `mesh` of a sheet of `size` with its middle at `at`, lying like
-    /// [`Paper::sheet`](super::Paper::sheet).
-    fn new(mesh: &Mesh, size: Vec2, at: Vec3) -> Self {
+    /// [`Paper::sheet`](super::Paper::sheet). It bends from `held` on and
+    /// its wrinkles `bulge`.
+    fn new(mesh: &Mesh, size: Vec2, at: Vec3, (held, bulge): (f32, Bulge)) -> Self {
         let attribute = |id| match mesh.attribute(id) {
             Some(VertexAttributeValues::Float32x3(values)) => values.clone(),
             _ => Vec::new(),
@@ -316,36 +312,42 @@ impl Bend {
         // its height along Z.
         let points = attribute(Mesh::ATTRIBUTE_POSITION)
             .into_iter()
-            .map(|[x, y, z]| Vec3::new(x + size.x / 2.0, z, at.z - y))
+            .map(|[x, y, z]| Vec3::new(at.x + x, z, at.z - y))
             .collect();
         let normals = attribute(Mesh::ATTRIBUTE_NORMAL)
             .into_iter()
             .map(|[x, y, z]| Vec3::new(x, z, -y))
             .collect();
         Self {
-            edge: Vec2::new(at.x - size.x / 2.0, at.y),
-            width: size.x,
+            held,
+            width: at.x + size.x / 2.0 - held,
+            bulge,
             points,
+            lift: at.y,
             normals,
         }
     }
 
-    /// The positions and normals with the sheet bent evenly by `curl`
-    /// radians from the near edge to the free edge.
-    fn bent(&self, curl: f32) -> (Vec<[f32; 3]>, Vec<Vec3>) {
+    /// The positions and normals with the free part of the sheet bent
+    /// evenly by `curl` radians, at `angle` from lying face up.
+    fn bent(&self, curl: f32, angle: f32) -> (Vec<[f32; 3]>, Vec<[f32; 3]>) {
+        let relax = self.bulge.relax(angle);
         let bend = curl / self.width;
         let positions = self
             .points
             .iter()
             .map(|point| {
-                let angle = bend * point.x;
+                let free = (point.x - self.held).max(0.0);
+                let angle = bend * free;
                 let along = if bend.abs() < 1e-4 {
-                    Vec2::new(point.x, 0.0)
+                    Vec2::new(free, 0.0)
                 } else {
                     Vec2::new(angle.sin(), 1.0 - angle.cos()) / bend
                 };
                 let up = Vec2::new(-angle.sin(), angle.cos());
-                let at = self.edge + along + up * point.y;
+                let at = Vec2::new(point.x.min(self.held), 0.0)
+                    + along
+                    + up * (point.y * relax + self.lift);
                 [at.x, at.y, point.z]
             })
             .collect();
@@ -354,8 +356,10 @@ impl Bend {
             .iter()
             .zip(&self.normals)
             .map(|(point, normal)| {
-                let turned = Vec2::from_angle(bend * point.x).rotate(normal.xy());
-                turned.extend(normal.z)
+                let relaxed = Vec3::new(normal.x * relax, normal.y, normal.z * relax).normalize();
+                let free = (point.x - self.held).max(0.0);
+                let turned = Vec2::from_angle(bend * free).rotate(relaxed.xy());
+                turned.extend(relaxed.z).to_array()
             })
             .collect();
         (positions, normals)
@@ -400,13 +404,64 @@ fn reversed(mesh: &Mesh) -> Mesh {
     back
 }
 
-/// The height of the highest point of `mesh`.
-fn highest(mesh: &Mesh) -> f32 {
-    match mesh.attribute(Mesh::ATTRIBUTE_POSITION) {
-        Some(VertexAttributeValues::Float32x3(positions)) => positions
-            .iter()
-            .map(|position| position[2])
-            .fold(0.0, f32::max),
-        _ => 0.0,
+/// `mesh` of a sheet with its wrinkles scaled by `relax`, see
+/// [`Bulge::relax`].
+fn relaxed(mesh: &Mesh, relax: f32) -> Mesh {
+    let mut relaxed = mesh.clone();
+    if let Some(VertexAttributeValues::Float32x3(positions)) =
+        relaxed.attribute_mut(Mesh::ATTRIBUTE_POSITION)
+    {
+        for position in positions {
+            position[2] *= relax;
+        }
+    }
+    if let Some(VertexAttributeValues::Float32x3(normals)) =
+        relaxed.attribute_mut(Mesh::ATTRIBUTE_NORMAL)
+    {
+        for normal in normals {
+            *normal = Vec3::new(normal[0] * relax, normal[1] * relax, normal[2])
+                .normalize()
+                .to_array();
+        }
+    }
+    relaxed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bend(bulge: Bulge) -> Bend {
+        let wrinkles = Wrinkles::new(Vec2::new(0.16, 0.22), 7);
+        Bend::new(
+            &wrinkles.mesh(),
+            wrinkles.size(),
+            Vec3::new(0.074, 0.0, 0.0),
+            (0.006, bulge),
+        )
+    }
+
+    #[test]
+    fn the_held_strip_stays_put_while_the_leaf_bends() {
+        let bend = bend(Bulge::Up);
+        let (flat, _) = bend.bent(0.0, 0.0);
+        let (bent, _) = bend.bent(0.8, 0.0);
+        for ((point, flat), bent) in bend.points.iter().zip(&flat).zip(&bent) {
+            if point.x <= bend.held {
+                assert_eq!(flat, bent);
+            }
+        }
+    }
+
+    #[test]
+    fn wrinkles_bulge_away_from_the_pages_behind() {
+        let front = bend(Bulge::Front);
+        let back = bend(Bulge::Back);
+        for angle in [0.0, 1.0, 2.0, PI] {
+            let (front, _) = front.bent(0.0, angle);
+            let (back, _) = back.bent(0.0, angle);
+            assert!(front.iter().all(|p| p[1] >= -1e-6));
+            assert!(back.iter().all(|p| p[1] <= 1e-6));
+        }
     }
 }
