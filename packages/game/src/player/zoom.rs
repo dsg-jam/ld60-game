@@ -4,7 +4,7 @@ use bevy::{
 };
 
 use super::focus::{Aside, Focused, View};
-use super::free_look::MODIFIERS;
+use super::free_look::{FreeLook, MODIFIERS};
 use crate::menu::AppState;
 
 /// How far a trackpad has to scroll for one step.
@@ -96,14 +96,16 @@ impl Zoom {
 
     /// Each notch of a wheel with Ctrl held is one step. A trackpad steps
     /// every [`STEP_PIXELS`]. Nothing zooms while the view is turned aside.
+    /// In free look the wheel zooms the [`Lens`](super::lens::Lens) instead.
     fn step_on_wheel(
         keys: Res<ButtonInput<KeyCode>>,
+        free_look: Res<FreeLook>,
         mut wheel: MessageReader<MouseWheel>,
         focused: Res<Focused>,
         mut targets: Query<(&mut Zoom, Option<&Aside>)>,
         mut swipe: Local<f32>,
     ) {
-        let held = keys.any_pressed(MODIFIERS);
+        let held = keys.any_pressed(MODIFIERS) && !free_look.looking();
         let mut steps = 0;
         for event in wheel.read() {
             if !held {

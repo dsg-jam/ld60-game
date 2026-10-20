@@ -4,6 +4,7 @@ pub(crate) mod cursor;
 pub(crate) mod focus;
 pub(crate) mod free_look;
 pub(crate) mod hints;
+pub(crate) mod lens;
 pub(crate) mod look;
 mod refocus;
 mod shimmer;
@@ -24,6 +25,7 @@ impl Plugin for PlayerPlugin {
             focus::FocusPlugin,
             free_look::FreeLookPlugin,
             hints::HintsPlugin,
+            lens::LensPlugin,
             look::LookPlugin,
             refocus::RefocusPlugin,
             shimmer::ShimmerPlugin,

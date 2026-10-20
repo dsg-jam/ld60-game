@@ -1,6 +1,7 @@
 use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*};
 
 use super::focus::Focus;
+use super::lens::Lens;
 use super::look::SENSITIVITY;
 use crate::menu::{AppState, Settings};
 
@@ -67,12 +68,13 @@ impl FreeLook {
         keys: Res<ButtonInput<KeyCode>>,
         motion: Res<AccumulatedMouseMotion>,
         settings: Res<Settings>,
+        lens: Res<Lens>,
         mut free_look: ResMut<FreeLook>,
     ) {
         let focused = *app_state.get() == AppState::Playing && *focus.get() != Focus::Desk;
         let held = focused && keys.any_pressed(MODIFIERS);
         let shortcut = keys.get_just_pressed().any(|key| !MODIFIERS.contains(key));
-        let delta = motion.delta * SENSITIVITY * settings.sensitivity();
+        let delta = motion.delta * SENSITIVITY * settings.sensitivity() / lens.zoom();
         let mut next = *free_look;
         next.step(held, shortcut, delta);
         free_look.set_if_neq(next);

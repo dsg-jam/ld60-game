@@ -85,9 +85,14 @@ pub(super) struct IconFont(Handle<Font>);
 )]
 pub(super) struct Caption;
 
-/// Says that right click or Escape goes back to the desk, while focused.
+/// The line of hints at the bottom. While focused it starts with right
+/// click or Escape going back to the desk.
 #[derive(Component, Debug)]
 struct BackHint;
+
+/// The part of the [`BackHint`] that says how to go back.
+#[derive(Component, Debug)]
+struct BackPart;
 
 /// A key that the focused thing reacts to and what it does, shown after
 /// the hint for going back.
@@ -230,9 +235,20 @@ impl BackHint {
                 Visibility::Hidden,
             ))
             .with_children(|hint| {
-                Icon::MouseRight.spawn(hint, &font);
-                Icon::Escape.spawn(hint, &font);
-                hint.spawn((Caption, Localized::from(Message::new("hint-back"))));
+                hint.spawn((
+                    BackPart,
+                    Node {
+                        align_items: AlignItems::Center,
+                        column_gap: px(GAP),
+                        ..default()
+                    },
+                    Pickable::IGNORE,
+                ))
+                .with_children(|back| {
+                    Icon::MouseRight.spawn(back, &font);
+                    Icon::Escape.spawn(back, &font);
+                    back.spawn((Caption, Localized::from(Message::new("hint-back"))));
+                });
                 hint.spawn((
                     ClickHintPart::Row,
                     Node {
@@ -282,12 +298,23 @@ impl BackHint {
         gaze: Gaze,
         settings: Res<Settings>,
         mut hint: Single<&mut Visibility, With<BackHint>>,
+        mut back: Single<&mut Node, With<BackPart>>,
     ) {
-        hint.set_if_neq(if gaze.focused() && settings.hints() {
-            Visibility::Inherited
+        hint.set_if_neq(
+            if (gaze.focused() || gaze.looking_around()) && settings.hints() {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            },
+        );
+        let display = if gaze.focused() {
+            Display::Flex
         } else {
-            Visibility::Hidden
-        });
+            Display::None
+        };
+        if back.display != display {
+            back.display = display;
+        }
     }
 }
 
@@ -322,8 +349,10 @@ impl KeyHint {
 
 impl Hints {
     /// The hints of the focused thing, then free look and zoom, which work
-    /// in every view.
+    /// in every view. At the desk the wheel zooms the
+    /// [`Lens`](super::lens::Lens).
     fn update(
+        gaze: Gaze,
         focused: Res<Focused>,
         hints: Query<(Option<&Hints>, Option<&Zoom>, Option<&Aside>)>,
         list: Single<Entity, With<HintList>>,
@@ -348,7 +377,16 @@ impl Hints {
                 }
                 hints
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                Hints(if gaze.looking_around() {
+                    vec![Hint {
+                        inputs: vec![Input::Chord("Ctrl", Icon::Wheel)],
+                        action: Message::new("hint-zoom"),
+                    }]
+                } else {
+                    Vec::new()
+                })
+            });
         if *shown == hints {
             return;
         }
@@ -356,8 +394,10 @@ impl Hints {
             .entity(*list)
             .despawn_children()
             .with_children(|list| {
-                for hint in &hints.0 {
-                    hint.spawn(list, &font);
+                // At the desk nothing comes before the first hint.
+                let lead = focused.get().is_none();
+                for (index, hint) in hints.0.iter().enumerate() {
+                    hint.spawn(list, &font, lead && index == 0);
                 }
             });
         *shown = hints;
@@ -365,13 +405,13 @@ impl Hints {
 }
 
 impl Hint {
-    fn spawn(&self, parent: &mut RelatedSpawnerCommands<ChildOf>, font: &IconFont) {
+    fn spawn(&self, parent: &mut RelatedSpawnerCommands<ChildOf>, font: &IconFont, lead: bool) {
         parent
             .spawn((
                 Node {
                     align_items: AlignItems::Center,
                     column_gap: px(GAP),
-                    margin: UiRect::left(px(KEY_HINT_GAP)),
+                    margin: UiRect::left(px(if lead { 0.0 } else { KEY_HINT_GAP })),
                     ..default()
                 },
                 Pickable::IGNORE,

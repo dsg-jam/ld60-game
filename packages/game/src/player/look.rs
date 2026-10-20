@@ -13,7 +13,7 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
 };
 
-use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook};
+use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook, lens::Lens};
 use crate::menu::{AppState, Settings};
 
 pub(super) const SENSITIVITY: f32 = 0.0025;
@@ -77,11 +77,12 @@ impl LookAngles {
     /// Turns freely, but never past looking straight up or down.
     ///
     /// Moving the mouse while the camera turns on its own takes over from
-    /// where it looks.
+    /// where it looks. The [`Lens`] zoom slows the turn down with it.
     pub(super) fn update(
         gaze: Gaze,
         motion: Res<AccumulatedMouseMotion>,
         settings: Res<Settings>,
+        lens: Res<Lens>,
         camera: Single<(&mut PlayerCamera, &Transform)>,
         mut angles: ResMut<LookAngles>,
     ) {
@@ -93,7 +94,7 @@ impl LookAngles {
         if camera.take_over() {
             *angles = Self::facing(seat, transform.rotation);
         }
-        let delta = motion.delta * SENSITIVITY * settings.sensitivity();
+        let delta = motion.delta * SENSITIVITY * settings.sensitivity() / lens.zoom();
         let (_, seat_pitch, _) = seat.rotation.to_euler(EulerRot::YXZ);
         angles.yaw -= delta.x;
         angles.pitch =
@@ -150,7 +151,12 @@ pub(super) struct Gaze<'w> {
 impl Gaze<'_> {
     /// Turning the head with the mouse, in the desk view.
     pub(super) fn looking_around(&self) -> bool {
-        self.playing() && *self.focus.get() == Focus::Desk && self.lock.locked
+        self.at_desk() && self.lock.locked
+    }
+
+    /// In the desk view, whether the cursor is locked yet or not.
+    pub(super) fn at_desk(&self) -> bool {
+        self.playing() && *self.focus.get() == Focus::Desk
     }
 
     /// Focused on something, with the cursor free unless

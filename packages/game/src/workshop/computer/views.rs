@@ -12,6 +12,7 @@ use crate::player::camera::{PlayerCamera, framing};
 use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::{Hint, Hints, Icon, Input};
+use crate::player::lens;
 use crate::player::zoom::{Closer, Zoom};
 use crate::workshop::run::Run;
 
@@ -105,6 +106,11 @@ impl Views {
     ) {
         let Projection::Perspective(perspective) = *camera else {
             return;
+        };
+        // The views frame their subject without the zoom of the lens.
+        let perspective = &PerspectiveProjection {
+            fov: lens::FOV,
+            ..perspective.clone()
         };
         for (views, board, mut target, mut zoom, mut aside) in &mut computers {
             let wide = views.wide(perspective);
