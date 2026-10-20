@@ -27,7 +27,6 @@ click-crate = Look in crate
 click-device = Inspect device
 click-lamp-off = Switch off lamp
 click-lamp-on = Switch on lamp
-click-note = Read note
 click-unpin = Unpin
 click-look-pins = Look at pins
 click-look-screen = Look at screen

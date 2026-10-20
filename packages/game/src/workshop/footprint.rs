@@ -8,7 +8,7 @@ use super::manuals::ShopManuals;
 use super::{
     BELL_SPOT, COMPUTER_SPOT, COMPUTER_YAW, LAMP_SPOT, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW,
     RADIO_SPOT, RADIO_YAW, STAMP_SPOT, STAMP_YAW, job, lamp, radio, receipt, rent, salvage, ticket,
-    tools, tutorial,
+    tools,
 };
 use crate::device::Handheld;
 use crate::geometry::block::Block;
@@ -126,11 +126,6 @@ fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
             "device",
             counter.place(job::DEVICE_SPOT, job::DEVICE_YAW),
             Block::new(device),
-        ),
-        Footprint::new(
-            "tutorial note",
-            counter.place_on_mat(tutorial::SPOT, tutorial::YAW),
-            sheet(tutorial::SHEET_SIZE),
         ),
     ];
     props.extend(Clutter::footprints(counter));

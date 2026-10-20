@@ -16,7 +16,7 @@ mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 
-use self::contents::Contents;
+use self::contents::{Contents, Entry};
 use self::dividers::{DividerTab, Tab};
 use self::in_file::InFile;
 use self::index::{Hover, Links, PageLink};
@@ -29,13 +29,16 @@ use self::stack::Stack;
 use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
+use super::tutorial::{FirstNote, TutorialNote};
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::locale::Message;
+use crate::menu::AppState;
 use crate::parts::paper::{
     Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, READING_ZOOM,
     ShowsOwnPages, Wrinkles,
 };
 use crate::parts::screen::{ScreenSurface, UiCanvas};
+use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use crate::player::hints::{Hint, Hints, Icon, Input, KeyHint};
 
@@ -75,6 +78,13 @@ impl Plugin for ManualsPlugin {
                 )
                     .chain()
                     .after(Leaf::animate),
+            )
+            .add_systems(
+                Update,
+                ShopManuals::open_first_note
+                    .run_if(resource_exists::<FirstNote>)
+                    .run_if(in_state(Focus::Desk))
+                    .run_if(in_state(AppState::Playing)),
             );
     }
 }
@@ -317,7 +327,8 @@ impl ShopManuals {
     }
 
     /// The first time the file is opened for a job, it goes to the page
-    /// about it. After that, it stays on the page the player left it at.
+    /// about it: the note about a job of the tutorial, or the page about its
+    /// board. After that, it stays on the page the player left it at.
     fn open_at_job(
         focus_on: On<FocusOn>,
         job: Option<Res<Job>>,
@@ -330,12 +341,34 @@ impl ShopManuals {
             return;
         }
         filed.job = Some(job.id);
-        if let Some(page) = filed
-            .contents
-            .page_for(&job.level)
-            .and_then(|number| filed.in_file.from(number))
-        {
+        let note = TutorialNote::for_job(&job).and_then(|note| {
+            let start = filed.contents.start_of(Entry::Note(note))?;
+            filed.in_file.page(start)
+        });
+        if let Some(page) = note.or_else(|| {
+            filed
+                .contents
+                .page_for(&job.level)
+                .and_then(|number| filed.in_file.from(number))
+        }) {
             paper.open_page(page);
+        }
+    }
+
+    /// Opens the file at the first note once the player sits at the bench,
+    /// so the camera does not swing to it on its way in from the street.
+    fn open_first_note(
+        camera: Single<(&PlayerCamera, &Transform)>,
+        files: Query<Entity, With<ShopManuals>>,
+        mut commands: Commands,
+    ) {
+        let (camera, at) = *camera;
+        if !camera.seated(at) {
+            return;
+        }
+        commands.remove_resource::<FirstNote>();
+        for file in &files {
+            commands.trigger(FocusOn { entity: file });
         }
     }
 
