@@ -40,7 +40,7 @@ impl Plugin for ShimmerPlugin {
         app.add_plugins(MaterialPlugin::<ShimmerMaterial>::default())
             .add_systems(
                 PostUpdate,
-                (Shimmer::start, Shimmer::update)
+                (Shimmer::start, Shimmer::follow, Shimmer::update)
                     .chain()
                     .before(TransformSystems::Propagate),
             );
@@ -118,16 +118,13 @@ impl Shimmer {
         focus::under_mouse(hovers, parents).find(|&entity| targets.contains(entity))
     }
 
-    /// Adds overlays to a newly hovered target.
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
+    /// Starts a shimmer on a newly hovered target.
     fn start(
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
         targets: Query<(), With<Clickable>>,
         parents: Query<&ChildOf>,
-        children: Query<&Children>,
         shimmers: Query<(), With<Shimmer>>,
-        meshes: Query<&Mesh3d, Without<ShimmerOverlay>>,
         mut materials: ResMut<Assets<ShimmerMaterial>>,
         mut commands: Commands,
     ) {
@@ -146,23 +143,51 @@ impl Shimmer {
                 band_width: BAND_WIDTH,
             },
         });
-        for entity in iter::once(target).chain(children.iter_descendants(target)) {
-            if let Ok(mesh) = meshes.get(entity) {
-                commands.entity(entity).with_child((
-                    ShimmerOverlay,
-                    mesh.clone(),
-                    MeshMaterial3d(material.clone()),
-                    NotShadowCaster,
-                    Pickable::IGNORE,
-                ));
-            }
-        }
         commands.entity(target).insert(Shimmer {
             level: 0.0,
             elapsed: 0.0,
             hovered: true,
             material,
         });
+    }
+
+    /// Keeps an overlay on each mesh of a shimmering target, with the mesh
+    /// the target shows now. Targets that animate swap their meshes or add
+    /// new ones while they shimmer.
+    fn follow(
+        shimmers: Query<(Entity, &Shimmer)>,
+        children: Query<&Children>,
+        meshes: Query<&Mesh3d, Without<ShimmerOverlay>>,
+        mut overlays: Query<&mut Mesh3d, With<ShimmerOverlay>>,
+        mut commands: Commands,
+    ) {
+        for (target, shimmer) in &shimmers {
+            for entity in iter::once(target).chain(children.iter_descendants(target)) {
+                let Ok(mesh) = meshes.get(entity) else {
+                    continue;
+                };
+                let overlay = children
+                    .get(entity)
+                    .ok()
+                    .and_then(|kids| kids.iter().find(|&kid| overlays.contains(kid)));
+                match overlay.and_then(|overlay| overlays.get_mut(overlay).ok()) {
+                    Some(mut overlay) => {
+                        if overlay.0 != mesh.0 {
+                            overlay.0 = mesh.0.clone();
+                        }
+                    }
+                    None => {
+                        commands.entity(entity).with_child((
+                            ShimmerOverlay,
+                            mesh.clone(),
+                            MeshMaterial3d(shimmer.material.clone()),
+                            NotShadowCaster,
+                            Pickable::IGNORE,
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     /// Extent of the visible overlays on `target` along [`SWEEP_DIRECTION`]
