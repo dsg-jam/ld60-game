@@ -29,6 +29,8 @@ const SKY_RANGE: f32 = 300.0;
 /// A voice keeps playing a little beyond its range, so it doesn't stop and
 /// start at the edge.
 const KEEP: f32 = 1.1;
+/// Flying cars fade in over this many meters at the edge of their range.
+const SKY_EDGE: f32 = 60.0;
 const CAR_VOLUME: f32 = 0.019;
 const SKY_VOLUME: f32 = 0.009;
 /// Millimeters of water on a soaked road.
@@ -196,11 +198,14 @@ impl SkyCar {
         for (car, transform, played) in &cars {
             let controls = &played.0;
             controls.hold(time.is_paused());
-            controls.gain.set(SKY_VOLUME * mixer.gain());
+            let at = transform.transform_point(SkyCar::FANS);
+            let edge = ((SKY_RANGE - at.distance(ears.at)) / SKY_EDGE).clamp(0.0, 1.0);
+            controls
+                .gain
+                .set(SKY_VOLUME * mixer.gain() * edge * car.in_the_open());
             let velocity = car.velocity().unwrap_or_default();
             let fans = &controls.parts[0];
             fans.speed.set(velocity.length());
-            let at = transform.transform_point(SkyCar::FANS);
             ears.hear(fans, at, velocity, &SKY);
         }
     }

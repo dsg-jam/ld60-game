@@ -1,34 +1,21 @@
-use std::f32::consts::TAU;
+mod route;
+
 use std::ops::Range;
 
-use bevy::{prelude::*, shape::Aabb3d};
+use bevy::prelude::*;
 use rand::{Rng, RngExt, rngs::SmallRng};
 
-use super::super::buildings::Skyline;
-use super::super::{FACADES, Kit, Segment, rng};
+use self::route::{Route, Sight};
+use super::super::{Kit, rng};
 use super::models::Fleet;
-use crate::geometry::block::Block;
 
 const SEED: u64 = 9;
 /// How far a flying car bobs up and down, in meters.
 const HOVER_BOB: f32 = 0.25;
 const CARS: usize = 22;
-/// Routes pass over a random point in this area, beyond the street.
-const AREA_X: Range<f32> = -160.0..160.0;
-const AREA_Z: Range<f32> = -240.0..-20.0;
-const ALTITUDE: Range<f32> = 18.0..140.0;
-/// Cars start and end this far from the point their route passes over.
-const REACH: f32 = 220.0;
-const SPEED: Range<f32> = 12.0..45.0;
-/// Climb or descent over a whole route.
-const CLIMB: Range<f32> = -25.0..25.0;
-/// Routes keep this far away from buildings.
-const CLEARANCE: f32 = 8.0;
-const TRIES: usize = 30;
-/// Half length of the stretch of street that no route flies over.
-const STREET_HALF_LENGTH: f32 = 140.0;
-/// Margin beyond the facades and behind the shop.
-const STREET_MARGIN: f32 = 12.0;
+/// Seconds for a car to come out from behind a building, and its sound
+/// with it.
+const EMERGE: f32 = 2.0;
 /// Time before a car sets off on its next route.
 const PAUSE: Range<f32> = 0.0..25.0;
 
@@ -36,8 +23,14 @@ pub(super) struct FlyingPlugin;
 
 impl Plugin for FlyingPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(SkyRng(rng(SEED)))
-            .add_systems(Update, SkyCar::fly);
+        app.insert_resource(SkyRng(rng(SEED))).add_systems(
+            Update,
+            (
+                Sight::build.run_if(not(resource_exists::<Sight>)),
+                SkyCar::fly.run_if(resource_exists::<Sight>),
+            )
+                .chain(),
+        );
     }
 }
 
@@ -57,14 +50,6 @@ pub(super) struct SkyCar {
     phase: f32,
 }
 
-#[derive(Debug)]
-struct Route {
-    start: Vec3,
-    velocity: Vec3,
-    elapsed: f32,
-    duration: f32,
-}
-
 impl SkyCar {
     pub(super) fn spawn_all(commands: &mut Commands, fleet: &Fleet, kit: &Kit, rng: &mut impl Rng) {
         for _ in 0..CARS {
@@ -80,6 +65,15 @@ impl SkyCar {
         }
     }
 
+    /// From 0 to 1, how much of the car comes out from behind the buildings
+    /// it starts and ends its route behind.
+    pub(super) fn in_the_open(&self) -> f32 {
+        self.route.as_ref().map_or(0.0, |route| {
+            let left = route.duration - route.elapsed;
+            (route.elapsed.min(left) / EMERGE).clamp(0.0, 1.0)
+        })
+    }
+
     /// Meters per second, while the car is on a route.
     pub(super) fn velocity(&self) -> Option<Vec3> {
         self.route.as_ref().map(|route| route.velocity)
@@ -87,7 +81,7 @@ impl SkyCar {
 
     fn fly(
         time: Res<Time>,
-        skyline: Res<Skyline>,
+        sight: Res<Sight>,
         mut rng: ResMut<SkyRng>,
         mut cars: Query<(&mut SkyCar, &mut Transform, &mut Visibility)>,
     ) {
@@ -99,7 +93,7 @@ impl SkyCar {
                 if car.pause > 0.0 {
                     continue;
                 }
-                car.route = Route::random(&skyline.volumes, &mut rng.0);
+                car.route = Route::random(&sight, &mut rng.0);
                 let Some(route) = &mut car.route else {
                     car.pause = rng.0.random_range(PAUSE);
                     continue;
@@ -113,7 +107,6 @@ impl SkyCar {
             let Some(route) = &mut car.route else {
                 continue;
             };
-            route.elapsed += dt;
             if route.elapsed > route.duration {
                 car.route = None;
                 car.pause = rng.0.random_range(PAUSE);
@@ -121,55 +114,12 @@ impl SkyCar {
                 continue;
             }
             let bob = (time.elapsed_secs() * 0.8 + car.phase).sin() * HOVER_BOB;
-            transform.translation = route.start + route.velocity * route.elapsed + Vec3::Y * bob;
+            transform.translation = route.at() + Vec3::Y * bob;
             // Local +X is the front.
             transform.rotation =
                 Quat::from_rotation_y(f32::atan2(-route.velocity.z, route.velocity.x));
+            // Shown from the very start of the route, which is out of sight.
+            route.elapsed += dt;
         }
-    }
-}
-
-impl Route {
-    /// A straight route that keeps clear of every building, if one turns up
-    /// within a few tries.
-    fn random(volumes: &[Block], rng: &mut SmallRng) -> Option<Self> {
-        (0..TRIES).find_map(|_| {
-            let over = Vec3::new(
-                rng.random_range(AREA_X),
-                rng.random_range(ALTITUDE),
-                rng.random_range(AREA_Z),
-            );
-            let heading = rng.random_range(0.0..TAU);
-            let across = Vec3::new(heading.cos(), 0.0, heading.sin()) * REACH;
-            let climb = Vec3::Y * rng.random_range(CLIMB) / 2.0;
-            let start = over - across - climb;
-            let end = over + across + climb;
-            let street = Self::over_street();
-            let route = Segment {
-                from: start,
-                to: end,
-            };
-            let clear = route.misses(&street)
-                && volumes.iter().all(|block| {
-                    route.misses(&Aabb3d::new(block.center, block.size / 2.0 + CLEARANCE))
-                });
-            clear.then(|| {
-                let speed = rng.random_range(SPEED);
-                let duration = start.distance(end) / speed;
-                Self {
-                    start,
-                    velocity: (end - start) / duration,
-                    elapsed: 0.0,
-                    duration,
-                }
-            })
-        })
-    }
-
-    /// The sky above the street in front of the shop.
-    fn over_street() -> Aabb3d {
-        let lo = Vec3::new(-STREET_HALF_LENGTH, 0.0, FACADES - STREET_MARGIN);
-        let hi = Vec3::new(STREET_HALF_LENGTH, 2.0 * ALTITUDE.end, STREET_MARGIN);
-        Aabb3d::new((lo + hi) / 2.0, (hi - lo) / 2.0)
     }
 }
