@@ -70,6 +70,10 @@ pub(crate) enum Sound {
     PageTurn,
     /// A divider of card turning over, stiffer and slower than a page.
     DividerTurn,
+    /// The lever of the manuals file opening its rings.
+    RingsOpen,
+    /// The rings of the manuals file snapping shut.
+    RingsShut,
     /// Rain on the road, a loop.
     AsphaltRain,
     /// Rain on the sidewalk, a loop.
@@ -89,7 +93,7 @@ pub(crate) enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 13] = [
+    const ALL: [Self; 15] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
@@ -103,6 +107,8 @@ impl Sound {
         Self::KeyUp,
         Self::PageTurn,
         Self::DividerTurn,
+        Self::RingsOpen,
+        Self::RingsShut,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -126,6 +132,8 @@ impl Sound {
             | Self::Static
             | Self::PageTurn
             | Self::DividerTurn
+            | Self::RingsOpen
+            | Self::RingsShut
             | Self::Drip
             | Self::Plunk => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
@@ -154,6 +162,8 @@ impl Sound {
             Self::KeyUp => Samples::key_up(take),
             Self::PageTurn => Samples::page_turn(take),
             Self::DividerTurn => Samples::divider_turn(take),
+            Self::RingsOpen => Samples::rings_open(take),
+            Self::RingsShut => Samples::rings_shut(take),
             Self::AsphaltRain => Samples::asphalt_rain(take),
             Self::ConcreteRain => Samples::concrete_rain(take),
             Self::PuddleRain => Samples::puddle_rain(take),
@@ -178,6 +188,7 @@ impl Sound {
             Self::KeyUp => 0.12,
             Self::PageTurn => 0.29,
             Self::DividerTurn => 0.35,
+            Self::RingsOpen | Self::RingsShut => 0.35,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,

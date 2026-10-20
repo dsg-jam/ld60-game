@@ -4,6 +4,7 @@ mod keys;
 mod lamp;
 mod paper;
 mod rain;
+mod rings;
 mod room;
 
 use std::f32::consts::{PI, TAU};
