@@ -29,6 +29,10 @@ struct Wet {
     curbs: vec2<f32>,
 }
 
+/// How far below the level of a puddle the thin film of water around it
+/// reaches, in the units of the pool noise. About ten centimeters.
+const SHORE: f32 = 0.05;
+
 // The prepass binds the time elsewhere than the main pass.
 @if(PREPASS_PIPELINE)
 @group(0) @binding(1) var<uniform> globals: Globals;
@@ -87,14 +91,23 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         let curb = min(abs(in.world_position.z - wet.curbs.x), abs(in.world_position.z - wet.curbs.y));
         let gutter = 0.25 * (1.0 - smoothstep(0.0, 1.5, curb));
         let level = mix(1.0, 0.5, wet.puddles);
-        let puddle = smoothstep(level - 0.02, level + 0.02, pools + gutter);
+        // A ragged shore, so the water seems to follow the dips of the ground.
+        let ragged = (noise(p * 3.0, s + 4.0) - 0.5) * 0.05 + (noise(p * 11.0, s + 5.0) - 0.5) * 0.025;
+        let depth = pools + gutter + ragged - level;
+        // Damp ground turns into a thin film of water a few centimeters
+        // before the standing water. Its roughness goes down evenly all the
+        // way, so screen space reflections fade in across the film instead
+        // of at a line.
+        let film = smoothstep(-SHORE, 0.0, depth);
+        let water = smoothstep(-SHORE, 0.04, depth);
+        let puddle = smoothstep(-0.01, 0.04, depth);
         let damp = wet.wetness * mix(0.6, 1.0, noise(p * 0.05, s + 3.0));
 
         var color = pbr_input.material.base_color.rgb * stones(p);
-        color *= mix(1.0, 0.55, damp) * mix(1.0, 0.5, puddle);
+        color *= mix(1.0, 0.55, damp) * mix(1.0, 0.5, water);
         var rough = pbr_input.material.perceptual_roughness;
         rough = mix(rough, 0.3, damp);
-        rough = mix(rough, 0.02, puddle);
+        rough = mix(rough, 0.02, water);
         pbr_input.material.base_color = vec4<f32>(color, 1.0);
         pbr_input.material.perceptual_roughness = rough;
 
@@ -104,9 +117,9 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         let splashes = ripples(p, t * 3.0, 0.2, s + 17.0);
         let slope = rings * puddle + splashes * (1.0 - puddle) * damp * 0.15;
         let strength = wet.ripples * 0.03;
-        let water = normalize(vec3<f32>(-slope.x * strength, 1.0, -slope.y * strength));
+        let surface = normalize(vec3<f32>(-slope.x * strength, 1.0, -slope.y * strength));
         // Water fills the grain of the ground.
-        let n = normalize(mix(rough_ground, water, max(puddle, damp * 0.5)));
+        let n = normalize(mix(rough_ground, surface, max(film, damp * 0.5)));
         pbr_input.N = n;
         pbr_input.clearcoat_N = n;
     }
