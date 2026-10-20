@@ -1,3 +1,4 @@
+mod back;
 mod hints;
 mod leaf;
 mod press;
@@ -20,6 +21,7 @@ use bevy::{
     prelude::*,
 };
 
+pub(crate) use self::back::BlankBack;
 pub(crate) use self::leaf::{
     Binding, Bulge, Leaf, LeafShape, LeafSide, LeafSpec, RELAX_TIME, Stiffness, blank_print,
     clearance, relaxing, reprinted,
@@ -71,7 +73,7 @@ pub(crate) struct PaperPlugin;
 
 impl Plugin for PaperPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(SheetPlugin)
+        app.add_plugins((SheetPlugin, back::BackPlugin))
             .add_systems(
                 Update,
                 (
@@ -196,7 +198,7 @@ impl Paper {
 
     /// Like [`Paper::sheet`], but upright and hanging from a clip on its top
     /// edge. It gives off `glow` where it is bare, so it stays readable in
-    /// the shade.
+    /// the shade, and shows blank paper from behind.
     pub(crate) fn hanging_sheet(
         canvas: &UiCanvas,
         document: impl Hash,
@@ -212,6 +214,7 @@ impl Paper {
             wrinkles,
             SheetPrint(canvas.image.clone()),
             SheetGlow(glow),
+            BlankBack::default(),
             Transform::from_translation(at),
         )
     }

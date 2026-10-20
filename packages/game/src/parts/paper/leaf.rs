@@ -422,7 +422,7 @@ pub(crate) fn blank_print(images: &mut Assets<Image>) -> Handle<Image> {
 
 /// `mesh` seen from behind: the same triangles wound the other way round,
 /// with the normals flipped.
-fn reversed(mesh: &Mesh) -> Mesh {
+pub(super) fn reversed(mesh: &Mesh) -> Mesh {
     let mut back = mesh.clone();
     if let Some(VertexAttributeValues::Float32x3(normals)) =
         back.attribute_mut(Mesh::ATTRIBUTE_NORMAL)
