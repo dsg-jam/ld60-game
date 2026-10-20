@@ -15,6 +15,7 @@ import package::geometry::{
 };
 import package::parts::paper::punch::punched;
 import package::parts::paper::press::printed;
+import package::parts::paper::stock::toned;
 
 struct Sheet {
     size: vec2<f32>,
@@ -25,6 +26,8 @@ struct Sheet {
     /// How the page was printed, see `press.wesl`.
     press: u32,
     run: f32,
+    /// The paper's tint, and in `w` its age, see `stock.wesl`.
+    stock: vec4<f32>,
     /// Point on the fold, its angle and depth, in meters from the top left.
     folds: array<vec4<f32>, 2>,
     /// Center and radius of each punched hole, in meters from the top left.
@@ -37,7 +40,6 @@ struct Sheet {
 
 const COFFEE: vec3<f32> = vec3<f32>(0.78, 0.6, 0.4);
 const GRIME: vec3<f32> = vec3<f32>(0.7, 0.64, 0.54);
-const AGED: vec3<f32> = vec3<f32>(1.0, 0.96, 0.86);
 /// Spacing of the ridges of a fingerprint, in meters.
 const RIDGES: f32 = 0.00045;
 
@@ -100,7 +102,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     // Grain and uneven pulp.
     stain *= 0.975 + 0.04 * noise(p * 3500.0, sheet.seed + 1.0) * visible(0.0003, pixel)
         + 0.02 * fiber * visible(0.0004, pixel);
-    stain *= mix(vec3<f32>(1.0), AGED, 0.5 * noise(p * 9.0, sheet.seed + 2.0));
+    stain *= toned(p, size, sheet.stock, sheet.run, s, pixel);
 
     // Grime: blotches, and dirt along the edges where hands hold it.
     let blotch = noise(p * 20.0, s + 3.0) * 0.6 + noise(p * 70.0, s + 4.0) * 0.4;

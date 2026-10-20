@@ -2,6 +2,7 @@ mod hints;
 mod leaf;
 mod press;
 mod sheet;
+mod stock;
 
 use std::f32::consts::FRAC_PI_2;
 use std::hash::Hash;
@@ -26,6 +27,7 @@ pub(crate) use self::leaf::{
 pub(crate) use self::press::{Press, Print};
 pub(crate) use self::sheet::{PaperMaterial, Pressed, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
+pub(crate) use self::stock::Stock;
 use super::screen::UiCanvas;
 use crate::locale::{Localized, Message};
 use crate::player::focus::{self, Focus, Focused};

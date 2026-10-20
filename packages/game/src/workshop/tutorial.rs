@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::run::Run;
 use crate::locale::Message;
 use crate::menu::AppState;
-use crate::parts::paper::{Paper, Press, Print, READING_ZOOM};
+use crate::parts::paper::{Paper, Press, Print, READING_ZOOM, Stock};
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
@@ -143,7 +143,9 @@ impl TutorialNote {
 
     /// Marta typed her notes.
     pub(super) fn print(self) -> Print {
-        Press::Typewriter.run(("tutorial", self.0))
+        Press::Typewriter
+            .run(("tutorial", self.0))
+            .on(Stock::TYPING)
     }
 
     pub(super) fn write(self, page: &mut ChildSpawnerCommands) {

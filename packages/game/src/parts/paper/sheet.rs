@@ -35,6 +35,7 @@ impl Plugin for SheetPlugin {
     fn build(&self, app: &mut App) {
         load_shader_library!(app, "punch.wesl");
         load_shader_library!(app, "press.wesl");
+        load_shader_library!(app, "stock.wesl");
         embedded_asset!(app, "sheet.wesl");
         app.add_plugins(MaterialPlugin::<PaperMaterial>::default())
             .add_systems(Update, (Sheet::follow_print, Pressed::press))
@@ -90,6 +91,8 @@ struct SheetParams {
     /// The [`Press`](super::press::Press) the page was printed on.
     press: u32,
     run: f32,
+    /// The paper's tint, and in `w` its age, see [`Stock`](super::Stock).
+    stock: Vec4,
     /// Two folds as a point on the line, its angle and its depth, in the
     /// sheet's space: meters from the top left corner, with y down.
     folds: [Vec4; 2],
@@ -406,6 +409,7 @@ impl Sheet {
                     stains: 1.0,
                     press: printed.press as u32,
                     run: printed.run,
+                    stock: printed.stock.params(),
                     folds: wrinkles.folds,
                     holes: [Vec4::ZERO; 2],
                 },
@@ -450,6 +454,7 @@ impl Sheet {
     pub(crate) fn set_print(&mut self, print: Print) {
         self.params.press = print.press as u32;
         self.params.run = print.run;
+        self.params.stock = print.stock.params();
     }
 
     /// Stains each page of a sheet in its own way.
