@@ -126,6 +126,7 @@ impl Vehicle {
 
     fn follow(
         listener: Single<&GlobalTransform, With<SpatialListener>>,
+        time: Res<Time<Virtual>>,
         mixer: Res<Mixer>,
         weather: Res<Weather>,
         cars: Query<(&Vehicle, &GlobalTransform, &Played)>,
@@ -133,6 +134,7 @@ impl Vehicle {
         let ears = Ears::new(&listener);
         for (vehicle, transform, played) in &cars {
             let controls = &played.0;
+            controls.hold(time.is_paused());
             controls.gain.set(CAR_VOLUME * mixer.gain());
             let velocity = Vec3::X * vehicle.velocity;
             let speed = vehicle.velocity.abs();
@@ -186,12 +188,14 @@ impl SkyCar {
 
     fn follow(
         listener: Single<&GlobalTransform, With<SpatialListener>>,
+        time: Res<Time<Virtual>>,
         mixer: Res<Mixer>,
         cars: Query<(&SkyCar, &GlobalTransform, &Played)>,
     ) {
         let ears = Ears::new(&listener);
         for (car, transform, played) in &cars {
             let controls = &played.0;
+            controls.hold(time.is_paused());
             controls.gain.set(SKY_VOLUME * mixer.gain());
             let velocity = car.velocity().unwrap_or_default();
             let fans = &controls.parts[0];

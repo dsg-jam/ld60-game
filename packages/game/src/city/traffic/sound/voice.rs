@@ -11,6 +11,7 @@ use super::dsp::{Glide, one_pole};
 use super::fans::{FanSound, Fans};
 use super::motor::{Motor, MotorSound};
 use super::tire::{Tire, TireSound};
+use crate::audio::HUSH;
 
 /// Low enough to save work on the web, high enough for the hiss of water.
 pub(super) const RATE: u32 = 32_000;
@@ -57,6 +58,8 @@ pub(super) struct Controls {
     /// The mixer's gain times the volume of the voice.
     pub(super) gain: Shared,
     playing: AtomicBool,
+    /// While held, the voice falls silent and stays where it is.
+    held: AtomicBool,
     pub(super) parts: Box<[Heard]>,
 }
 
@@ -106,6 +109,10 @@ pub(super) struct Stream {
     controls: Arc<Controls>,
     parts: Vec<(Model, Path)>,
     fade: Glide,
+    /// From 0 while held to 1.
+    hold: f32,
+    /// Whether this block is held, and only silence comes out.
+    silent: bool,
     gain: f32,
     step: f32,
     left_in_block: usize,
@@ -119,6 +126,7 @@ impl Voice {
         let controls = Arc::new(Controls {
             gain: Shared::default(),
             playing: AtomicBool::new(true),
+            held: AtomicBool::new(false),
             parts: parts.iter().map(|_| Heard::default()).collect(),
         });
         let voice = Self {
@@ -149,6 +157,15 @@ impl Controls {
 
     fn playing(&self) -> bool {
         self.playing.load(Ordering::Relaxed)
+    }
+
+    /// Holds the voice where it is, or lets it go on.
+    pub(super) fn hold(&self, held: bool) {
+        self.held.store(held, Ordering::Relaxed);
+    }
+
+    fn held(&self) -> bool {
+        self.held.load(Ordering::Relaxed)
     }
 }
 
@@ -245,21 +262,33 @@ impl Stream {
     /// Reads the controls and sets up the next block.
     fn block(&mut self) -> bool {
         let playing = self.controls.playing();
+        self.left_in_block = BLOCK;
+        let step = BLOCK as f32 / (HUSH * RATE as f32);
+        let hold = if self.controls.held() {
+            (self.hold - step).max(0.0)
+        } else {
+            (self.hold + step).min(1.0)
+        };
+        self.silent = hold == 0.0 && self.hold == 0.0;
+        self.hold = hold;
+        if self.silent {
+            return playing;
+        }
         let target = if playing {
             self.controls.gain.get()
         } else {
             0.0
         };
-        let gain = self.fade.follow(target);
-        if !playing && gain < 1e-5 {
+        let faded = self.fade.follow(target);
+        if !playing && faded < 1e-5 {
             return false;
         }
+        let gain = faded * hold;
         self.step = (gain - self.gain) / BLOCK as f32;
         for ((model, path), heard) in self.parts.iter_mut().zip(&self.controls.parts) {
             model.block(heard);
             path.block(heard);
         }
-        self.left_in_block = BLOCK;
         true
     }
 }
@@ -281,6 +310,8 @@ impl Decodable for Voice {
             controls: self.controls.clone(),
             parts,
             fade: Glide::new(0.0, FADE),
+            hold: 1.0,
+            silent: false,
             gain: 0.0,
             step: 0.0,
             left_in_block: 0,
@@ -300,6 +331,10 @@ impl Iterator for Stream {
             return None;
         }
         self.left_in_block -= 1;
+        if self.silent {
+            self.right = Some(0.0);
+            return Some(0.0);
+        }
         self.gain += self.step;
         let mut out = [0.0; 2];
         for (model, path) in &mut self.parts {
@@ -387,10 +422,56 @@ mod tests {
         assert!(peak < 1.05, "{peak}");
     }
 
+    fn fans() -> (Stream, Arc<Controls>) {
+        let fans = Fans {
+            blades: 260.0,
+            level: 1.0,
+        };
+        let (voice, controls) = Voice::new(vec![Part::Fans(fans)], 100.0, 1);
+        controls.gain.set(1.0);
+        let heard = &controls.parts[0];
+        heard.distance.set(20.0);
+        heard.gains[0].set(1.0);
+        heard.cutoffs[0].set(16_000.0);
+        heard.speed.set(20.0);
+        (voice.decoder(), controls)
+    }
+
+    /// The loudness of the left ear over the next `seconds`.
+    fn power(stream: &mut Stream, seconds: f32) -> f32 {
+        let frames = (seconds * RATE as f32) as usize;
+        let left = stream.by_ref().take(2 * frames).step_by(2);
+        left.map(|x| x * x).sum::<f32>() / frames as f32
+    }
+
+    #[test]
+    fn a_held_voice_falls_silent_and_comes_back() {
+        let (mut stream, controls) = fans();
+        power(&mut stream, 1.0);
+        let before = power(&mut stream, 1.0);
+        controls.hold(true);
+        power(&mut stream, HUSH + 0.01);
+        assert_eq!(power(&mut stream, 3.0), 0.0);
+        controls.hold(false);
+        power(&mut stream, HUSH + 0.01);
+        let after = power(&mut stream, 1.0);
+        assert!((0.7..1.4).contains(&(after / before)), "{before} {after}");
+    }
+
+    #[test]
+    fn a_voice_stopped_while_held_ends() {
+        let (mut stream, controls) = fans();
+        power(&mut stream, 0.5);
+        controls.hold(true);
+        power(&mut stream, 0.5);
+        controls.stop();
+        assert!(stream.take(RATE as usize).count() < 2 * BLOCK);
+    }
+
     #[test]
     fn a_stopped_voice_ends() {
         let fans = Fans {
-            blades: 260.0,
+            blades: 450.0,
             level: 1.0,
         };
         let (voice, controls) = Voice::new(vec![Part::Fans(fans)], 100.0, 1);

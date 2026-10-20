@@ -110,7 +110,7 @@ impl Emitter {
             }
             emitter.distance = Some(distance);
             emitter.heard += (emitter.level - emitter.heard) * (dt / GLIDE).min(1.0);
-            sink.set_volume(Volume::Linear(emitter.gain(&mixer, distance)));
+            mixer.hold(&mut *sink, emitter.gain(&mixer, distance));
             sink.set_speed(emitter.pitch * SOUND_SPEED / (SOUND_SPEED + emitter.receding));
         }
     }

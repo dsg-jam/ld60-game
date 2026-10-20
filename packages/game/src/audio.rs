@@ -3,7 +3,7 @@ mod synth;
 use std::sync::Arc;
 
 use bevy::{
-    audio::{SpatialScale, Volume},
+    audio::{AudioSinkPlayback, SpatialScale, Volume},
     ecs::entity::EntityHashSet,
     platform::collections::HashMap,
     prelude::*,
@@ -15,6 +15,9 @@ use crate::player::camera::PlayerCamera;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
+/// Seconds for the sounds of the world to fade out when its time stops, and
+/// back in when it goes on.
+pub(crate) const HUSH: f32 = 0.08;
 /// Keys at least this wide in meters, like the space bar, rest on a
 /// stabilizer wire and sound a little lower.
 const LONG_KEY: f32 = 0.08;
@@ -191,6 +194,9 @@ pub(crate) struct Mixer {
     pub(crate) volume: f32,
     /// Quieter while a menu is open.
     ducked: bool,
+    /// How much of the world is heard, from 0 while its time stands still
+    /// to 1.
+    world: f32,
 }
 
 /// Plays a [`Sound`].
@@ -218,6 +224,7 @@ impl Default for Mixer {
             volume: 1.0,
             // The game starts on the title screen.
             ducked: true,
+            world: 1.0,
         }
     }
 }
@@ -235,6 +242,26 @@ impl Mixer {
     pub(crate) fn duck<const ON: bool>(mut mixer: ResMut<Mixer>) {
         mixer.ducked = ON;
     }
+
+    /// Plays a sound of the world at `volume` while its time runs, and
+    /// holds it where it is while time stands still.
+    pub(crate) fn hold(&self, sink: &mut impl AudioSinkPlayback, volume: f32) {
+        sink.set_volume(Volume::Linear(volume * self.world));
+        if self.world > 0.0 {
+            sink.play();
+        } else {
+            sink.pause();
+        }
+    }
+
+    /// Fades the world out while its time stands still.
+    fn follow_time(time: Res<Time<Real>>, world: Res<Time<Virtual>>, mut mixer: ResMut<Mixer>) {
+        let target = if world.is_paused() { 0.0 } else { 1.0 };
+        if mixer.world != target {
+            let step = time.delta_secs() / HUSH;
+            mixer.world += (target - mixer.world).clamp(-step, step);
+        }
+    }
 }
 
 impl Plugin for AudioPlugin {
@@ -242,7 +269,14 @@ impl Plugin for AudioPlugin {
         app.init_resource::<KeyClicks>()
             .init_resource::<Mixer>()
             .add_systems(Startup, Sounds::load)
-            .add_systems(Update, Sounds::click_keys.run_if(resource_exists::<Sounds>))
+            .add_systems(PreUpdate, Mixer::follow_time)
+            .add_systems(
+                Update,
+                (
+                    Sounds::click_keys.run_if(resource_exists::<Sounds>),
+                    Held::follow.run_if(resource_changed::<Mixer>),
+                ),
+            )
             .add_observer(Sounds::play)
             .add_observer(Sounds::play_at)
             .add_observer(listen);
@@ -251,6 +285,11 @@ impl Plugin for AudioPlugin {
 
 #[derive(Resource)]
 struct Sounds(HashMap<Sound, Takes<Handle<AudioSource>>>);
+
+/// A one-shot that started while the world's time ran, at this volume. It
+/// holds still with it.
+#[derive(Component, Debug)]
+struct Held(f32);
 
 /// The takes of a sound, picked at random.
 pub(crate) struct Takes<T> {
@@ -285,11 +324,12 @@ impl Sounds {
         if let Some(mut sounds) = sounds
             && let Some(source) = sounds.0.get_mut(&play.0).map(|takes| takes.next().clone())
         {
-            commands.spawn((
+            let volume = play.0.volume() * mixer.gain();
+            let mut sound = commands.spawn((
                 AudioPlayer(source),
-                PlaybackSettings::DESPAWN
-                    .with_volume(Volume::Linear(play.0.volume() * mixer.gain())),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume)),
             ));
+            Held::start(&mut sound, &mixer, volume);
         }
     }
 
@@ -303,26 +343,36 @@ impl Sounds {
         if let Some(mut sounds) = sounds
             && let Some(source) = sounds.0.get_mut(&sound).map(|takes| takes.next().clone())
         {
-            commands.spawn(Self::spatial(
+            Self::play_from(
+                &mut commands,
+                &mixer,
                 source,
                 at,
                 PlaybackSettings::DESPAWN
                     .with_volume(Volume::Linear(sound.volume() * mixer.gain())),
-            ));
+            );
         }
     }
 
-    /// `source` playing from `at`, as loud as with `settings` alone when
+    /// Plays `source` from `at`, as loud as with `settings` alone when
     /// straight ahead.
-    fn spatial(source: Handle<AudioSource>, at: Vec3, settings: PlaybackSettings) -> impl Bundle {
-        (
+    fn play_from(
+        commands: &mut Commands,
+        mixer: &Mixer,
+        source: Handle<AudioSource>,
+        at: Vec3,
+        settings: PlaybackSettings,
+    ) {
+        let volume = settings.volume.to_linear() / CENTER_LOSS;
+        let mut sound = commands.spawn((
             AudioPlayer(source),
             settings
                 .with_spatial(true)
                 .with_spatial_scale(NEAR)
-                .with_volume(settings.volume * Volume::Linear(1.0 / CENTER_LOSS)),
+                .with_volume(Volume::Linear(volume)),
             Transform::from_translation(at),
-        )
+        ));
+        Held::start(&mut sound, mixer, volume);
     }
 
     /// Keys sound from where they are as they go down and as they come
@@ -359,13 +409,39 @@ impl Sounds {
                 LONG_KEY_PITCH
             };
             let volume = sound.volume() * mixer.gain() * takes.nudge(KEY_NUDGE);
-            commands.spawn(Self::spatial(
+            Self::play_from(
+                &mut commands,
+                &mixer,
                 takes.next().clone(),
                 transform.translation(),
                 PlaybackSettings::DESPAWN
                     .with_volume(Volume::Linear(volume))
                     .with_speed(pitch),
-            ));
+            );
+        }
+    }
+}
+
+impl Held {
+    /// Holds `sound` at `volume` with the world, if the world's time runs.
+    /// Sounds that start while it stands still, like those of a menu, play
+    /// on.
+    fn start(sound: &mut EntityCommands, mixer: &Mixer, volume: f32) {
+        if mixer.world > 0.0 {
+            sound.insert(Self(volume));
+        }
+    }
+
+    fn follow(
+        mixer: Res<Mixer>,
+        mut sinks: Query<(&Held, &mut AudioSink)>,
+        mut spatial: Query<(&Held, &mut SpatialAudioSink)>,
+    ) {
+        for (held, mut sink) in &mut sinks {
+            mixer.hold(&mut *sink, held.0);
+        }
+        for (held, mut sink) in &mut spatial {
+            mixer.hold(&mut *sink, held.0);
         }
     }
 }
