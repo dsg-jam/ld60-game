@@ -1,0 +1,17 @@
+(
+    id: "lock4-04",
+    title: "Sunburn",
+    device: Lock4,
+    boards: [A],
+    chip: Calco((revision: C, date_code: 7630)),
+    unit: "00047",
+    remarks: ["sun", "factory"],
+    rom: (kind: Eprom, blank_available: false),
+    faults: [FadedRomBits(addr: 53, mask: 2)],
+    tests: [
+        (keys: "C #", display: "0000 OPEN"),
+        (keys: "C 12#", display: "0012 SHUT"),
+    ],
+    reward: 16,
+    firmware: Some((source: "lock4/firmware.fw")),
+)

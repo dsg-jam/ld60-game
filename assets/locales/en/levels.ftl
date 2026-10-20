@@ -13,6 +13,12 @@ tally2-02 =
     .remark-works-fine = Both buttons and the little window work fine.
     .remark-first-thinking = Still has its first thinking, version 1.0.
 
+tally2-03 =
+    .customer = Hubb, bridge toll
+    .complaint = Busy day. After 99 carts the left number turned into an angry squiggle.
+    .remark-line-tests = Passes every factory test on the checklist.
+    .remark-first-thinking = Still has its first thinking, version 1.0.
+
 summa6-01 =
     .customer = Zib, bookkeeper
     .complaint = When I wake it up, the little window shows angry squiggles. The C button chases them away.
@@ -54,6 +60,30 @@ summa6-07 =
     .complaint = A trader gave it new thinking, version 1.1. It is shorter, he said. Now it freezes when I press +, - or =.
     .remark-trader = Thinking 1.1, put in by the trader's office.
     .remark-stuck = Gets stuck after +, - or =. Only putting it to sleep and waking it up again helps.
+
+lock4-01 =
+    .customer = Fennick, cellar keeper
+    .complaint = I type my code wrong sometimes. Then right. After a week it locked me out of my own cellar.
+    .remark-typos = Customer admits to fat fingers.
+    .remark-first-thinking = Still has its first thinking, version 1.0.
+
+lock4-02 =
+    .customer = Moxa, jewel cutter
+    .complaint = Somebody changed my code while the door was shut. I want my jewels back and a lock that locks.
+    .remark-new-code = Opens fine with the new code. Customer did not set it.
+    .remark-first-thinking = Still has its first thinking, version 1.0.
+
+lock4-03 =
+    .customer = Orrin, vault guard
+    .complaint = A thief guessed codes all night and the lock never stopped him. It should give up after 3 tries.
+    .remark-guard = Thief pressed C between every guess, says the guard.
+    .remark-first-thinking = Still has its first thinking, version 1.0.
+
+lock4-04 =
+    .customer = Grandma Tuk, sweet shop
+    .complaint = 12 years it worked. Now OPEN and SHUT both light up when it opens. Which one is it?
+    .remark-sun = Sat in a sunny shop window for years. The sticker over the little glass window on its black brain peeled off.
+    .remark-factory = Thinking is the factory version 1.0. Nobody changed it.
 
 # Generated jobs share the messages below. The complaint is about the first
 # test of the job. { $keys } are the keys it presses, { $key } is the last of

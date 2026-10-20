@@ -96,8 +96,10 @@ fn key_checks_use_the_board_codes() {
             }
             for firmware in firmwares {
                 let checks = compares(firmware);
-                for key in ['+', 'C'] {
-                    let code = board.key_code(key).unwrap();
+                for key in ['+', '*', 'C'] {
+                    let Some(code) = board.key_code(key) else {
+                        continue;
+                    };
                     assert!(checks.contains(&code), "{} {key}\n{firmware}", source.path);
                 }
             }

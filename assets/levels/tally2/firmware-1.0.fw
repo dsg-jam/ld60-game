@@ -41,8 +41,14 @@ block ones {
 
 routine tens {
     a = tally[1] + 1
-    if a >= 10 {
-        a = 0
+    bug "no-rollover" {
+        fixed {
+            if a >= 10 {
+                a = 0
+            }
+        }
+        buggy {
+        }
     }
     tally[1] = a
 }

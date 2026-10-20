@@ -1,0 +1,16 @@
+(
+    id: "lock4-03",
+    title: "Endless guesses",
+    device: Lock4,
+    chip: Calco((revision: C, date_code: 7630)),
+    unit: "00904",
+    remarks: ["guard", "first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "C 1# C 2# C 3#", display: "E"),
+        (keys: "C 1# C 2# C 3# C #", display: "E"),
+        (keys: "C 1# C 2# C #", display: "0000 OPEN"),
+    ],
+    reward: 22,
+    firmware: Some((source: "lock4/firmware.fw", switches: ["clear-strikes"])),
+)

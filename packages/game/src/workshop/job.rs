@@ -463,16 +463,11 @@ mod tests {
     fn generated_jobs_follow_the_tutorial() {
         let levels = Levels::on_disk();
         let mut run = Run::default().next();
-        for _ in 0..3 {
+        for index in 0..3 {
             let job = Job::new(run.pick(&levels), &run, &levels).unwrap();
+            assert_eq!(job.level.device, DeviceKind::Tally2);
             assert!(
-                matches!(
-                    job.origin,
-                    Origin::Generated {
-                        device: DeviceKind::Tally2,
-                        ..
-                    }
-                ),
+                index > 0 || matches!(job.origin, Origin::Generated { .. }),
                 "{:?}",
                 job.origin
             );

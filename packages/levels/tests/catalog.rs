@@ -11,7 +11,14 @@ const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
 static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
 
 /// Levels whose bug only the customer's tests find.
-const MISSED_BY_LINE_TESTS: &[&str] = &["summa6-05", "summa6-06"];
+const MISSED_BY_LINE_TESTS: &[&str] = &[
+    "tally2-03",
+    "summa6-05",
+    "summa6-06",
+    "lock4-01",
+    "lock4-02",
+    "lock4-03",
+];
 
 #[test]
 fn line_tests_catch_the_bug_unless_listed() {

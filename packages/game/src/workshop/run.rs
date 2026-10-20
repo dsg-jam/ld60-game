@@ -647,10 +647,12 @@ mod tests {
     fn a_special_comes_once() {
         let levels = Levels::on_disk();
         let mut run = Run::default().next();
-        run.signs = vec![DeviceKind::Summa6];
+        run.signs = DeviceKind::ALL.to_vec();
         run.errata = vec![Revision::B];
-        for _ in 0..100 {
-            run.served.add(DeviceKind::Summa6);
+        for device in DeviceKind::ALL {
+            for _ in 0..100 {
+                run.served.add(device);
+            }
         }
         let mut seen = Vec::new();
         while run.job < 200 && seen.len() < levels.specials().count() {
