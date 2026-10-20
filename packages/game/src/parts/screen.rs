@@ -189,13 +189,18 @@ impl ScreenSurface {
         commands.entity(add.entity).insert(id);
     }
 
-    /// Stops clicks on the surface mesh from taking focus away from its UI.
+    /// Stops clicks on the world from taking focus away from the UI, like
+    /// the editor on the computer screen.
     ///
-    /// The real mouse clicks the mesh whenever the virtual pointer clicks
-    /// the UI. Without this the click would bubble to the window, which
-    /// clears focus.
-    fn keep_ui_focus(mut acquire: On<AcquireFocus>, surfaces: Query<(), With<ScreenSurface>>) {
-        if surfaces.contains(acquire.focused_entity) {
+    /// The real mouse clicks the surface mesh whenever the virtual pointer
+    /// clicks the UI, and keys or the desk around it can be clicked too.
+    /// Without this the click would bubble to the window, which clears
+    /// focus.
+    fn keep_ui_focus(
+        mut acquire: On<AcquireFocus>,
+        world: Query<(), (Without<Node>, Without<Window>)>,
+    ) {
+        if world.contains(acquire.focused_entity) {
             acquire.propagate(false);
         }
     }
