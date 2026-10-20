@@ -55,6 +55,8 @@ pub(crate) struct UiCanvas {
     pub(crate) image: Handle<Image>,
     pub(crate) camera: Entity,
     pub(crate) size: UVec2,
+    /// Texels per UI pixel.
+    scale: f32,
     owner: Entity,
 }
 
@@ -137,6 +139,7 @@ impl UiCanvas {
             image,
             camera,
             size,
+            scale,
             owner,
         }
     }
@@ -164,7 +167,12 @@ pub(crate) struct ScreenSurface {
 impl ScreenSurface {
     pub(crate) fn new(canvas: &UiCanvas) -> Self {
         Self {
-            target: NormalizedRenderTarget::Image(canvas.image.clone().into()),
+            // The UI only picks with a pointer on the same target, scale
+            // included.
+            target: NormalizedRenderTarget::Image(ImageRenderTarget {
+                handle: canvas.image.clone(),
+                scale_factor: canvas.scale,
+            }),
             size: canvas.size.as_vec2(),
             cursor: None,
             active: false,
