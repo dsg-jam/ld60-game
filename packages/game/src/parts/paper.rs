@@ -38,7 +38,10 @@ const TEXT_SIZE: f32 = 17.0;
 const TABLE_SIZE: f32 = 15.0;
 /// Clicks within this fraction of the sheet from its bottom right corner
 /// turn to the next page.
-const CORNER_ZONE: f32 = 0.3;
+const CORNER_ZONE: f32 = 0.4;
+/// Clicks within this fraction of the sheet from its right edge turn to
+/// the next page too, and from its left edge back on a loose sheet.
+const EDGE_ZONE: f32 = 0.15;
 /// Keeps text clear of the edges of the sheet.
 const MARGIN: f32 = 48.0;
 /// Trackpad scrolling this far, in pixels, turns a page.
@@ -76,10 +79,11 @@ impl Plugin for PaperPlugin {
 
 /// A document shown one page at a time on a sheet lying face up.
 ///
-/// While the paper is focused, clicking the bottom right corner of the
-/// sheet or pressing the right arrow turns to the next page. Clicking the
-/// turned pages past its [`Binding`], or the bottom left corner of a loose
-/// sheet, and the left arrow go back. Scrolling down turns to the next page
+/// While the paper is focused, clicking along the right edge or in the
+/// bottom right corner of the sheet or pressing the right arrow turns to
+/// the next page. Clicking the turned pages past its [`Binding`], or the
+/// left edge or bottom left corner of a loose sheet, and the left arrow go
+/// back. Scrolling down turns to the next page
 /// and scrolling up goes back.
 #[derive(Component, Debug)]
 pub(crate) struct Paper {
@@ -296,8 +300,9 @@ impl Paper {
     }
 
     /// Whether a click at `hit` turns forward or back, if it turns at all.
-    /// The bottom right corner of the sheet turns forward. The turned pages
-    /// past the binding turn back, or the bottom left corner without one.
+    /// The right edge and the bottom right corner of the sheet turn forward.
+    /// The turned pages past the binding turn back, or the left edge and the
+    /// bottom left corner without one.
     fn turn_at(
         &self,
         hit: Vec3,
@@ -306,11 +311,12 @@ impl Paper {
     ) -> Option<bool> {
         let point = self.sheet_point(hit, sheets)?;
         let low = point.y < CORNER_ZONE - 0.5;
+        let near = |edge: f32| edge > 0.5 - EDGE_ZONE || (low && edge > 0.5 - CORNER_ZONE);
         let back = match binding {
             Some(binding) => binding.beyond(point),
-            None => low && point.x < CORNER_ZONE - 0.5,
+            None => near(-point.x),
         };
-        let forward = !back && low && point.x > 0.5 - CORNER_ZONE;
+        let forward = !back && near(point.x);
         if back && self.current > 0 {
             Some(false)
         } else if forward && self.current + 1 < self.pages.len() {
@@ -471,26 +477,29 @@ impl MouseOnPaper<'_, '_> {
             .collect();
         if !path.contains(&entity)
             || path.iter().any(|&entity| self.buttons.contains(entity))
-            || self.on_printed_button(paper.sheet)
+            || self.printed_button().is_some()
         {
             return None;
         }
         paper.turn_at(data.position?, binding, &self.transforms)
     }
 
-    /// Whether the pointer that `sheet` drives in its canvas is on a button.
-    fn on_printed_button(&self, sheet: Entity) -> bool {
-        self.pointers
-            .get(sheet)
-            .ok()
-            .and_then(|pointer| self.hovers.get(pointer))
-            .is_some_and(|hits| {
-                hits.keys().any(|&hit| {
-                    iter::once(hit)
-                        .chain(self.parents.iter_ancestors(hit))
-                        .any(|entity| self.buttons.contains(entity))
-                })
-            })
+    /// The button printed on the focused paper under the mouse, if any.
+    fn printed_button(&self) -> Option<&PaperButton> {
+        let (paper, _) = self.papers.get(self.focused.get()?).ok()?;
+        let (&hit, _) = self
+            .hovers
+            .get(&PointerId::Mouse)?
+            .iter()
+            .min_by(|a, b| a.1.depth.total_cmp(&b.1.depth))?;
+        // The canvas keeps its last hover while the mouse is off the sheet.
+        if hit != paper.sheet {
+            return None;
+        }
+        let hits = self.hovers.get(self.pointers.get(paper.sheet).ok()?)?;
+        hits.keys()
+            .flat_map(|&hit| iter::once(hit).chain(self.parents.iter_ancestors(hit)))
+            .find_map(|entity| self.buttons.get(entity).ok())
     }
 
     /// What a click does: the hint of a [`PaperButton`], or turning a page.
@@ -499,7 +508,8 @@ impl MouseOnPaper<'_, '_> {
             return None;
         }
         let button = focus::under_mouse(&self.hovers, &self.parents)
-            .find_map(|entity| self.buttons.get(entity).ok());
+            .find_map(|entity| self.buttons.get(entity).ok())
+            .or_else(|| self.printed_button());
         if let Some(button) = button {
             return button.0.clone();
         }
