@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
     ecs::{lifecycle::HookContext, world::DeferredWorld},
-    picking::{events::PointerPress, pointer::PointerButton},
+    picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
 use ld60_core::audio::{Play, Sound};
@@ -13,7 +13,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::board::BoardLayout;
-use super::{Connected, Holdable};
+use super::{Connected, Holdable, Turned};
 
 /// Thickness of the back cover. The board and the header fit inside it.
 pub(super) const COVER: f32 = 0.005;
@@ -355,8 +355,9 @@ impl Casing {
 
 impl Screw {
     fn press(
-        mut press: On<PointerPress>,
+        mut press: On<PointerClick>,
         focused: Res<Focused>,
+        turned: Res<Turned>,
         parents: Query<&ChildOf>,
         screws: Query<&Screw>,
         mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
@@ -365,7 +366,7 @@ impl Screw {
         let Ok(screw) = screws.get(press.entity) else {
             return;
         };
-        if press.button != PointerButton::Primary {
+        if press.button != PointerButton::Primary || !turned.clicked() {
             return;
         }
         let Some((_, mut casing, ..)) =
@@ -382,8 +383,9 @@ impl Screw {
 impl Hole {
     /// Puts the screw back in from beside the device.
     fn press(
-        mut press: On<PointerPress>,
+        mut press: On<PointerClick>,
         focused: Res<Focused>,
+        turned: Res<Turned>,
         parents: Query<&ChildOf>,
         holes: Query<&Hole>,
         mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
@@ -392,7 +394,7 @@ impl Hole {
         let Ok(hole) = holes.get(press.entity) else {
             return;
         };
-        if press.button != PointerButton::Primary {
+        if press.button != PointerButton::Primary || !turned.clicked() {
             return;
         }
         let Some((_, mut casing, ..)) =
@@ -408,14 +410,18 @@ impl Hole {
 
 impl CoverPlate {
     fn press(
-        mut press: On<PointerPress>,
+        mut press: On<PointerClick>,
         focused: Res<Focused>,
+        turned: Res<Turned>,
         parents: Query<&ChildOf>,
         plates: Query<(), With<CoverPlate>>,
         mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
         mut commands: Commands,
     ) {
-        if !plates.contains(press.entity) || press.button != PointerButton::Primary {
+        if !plates.contains(press.entity)
+            || press.button != PointerButton::Primary
+            || !turned.clicked()
+        {
             return;
         }
         let Some((_, mut casing, mut holdable, _)) =
@@ -436,14 +442,18 @@ impl CoverPlate {
 
 impl Board {
     fn press(
-        mut press: On<PointerPress>,
+        mut press: On<PointerClick>,
         focused: Res<Focused>,
+        turned: Res<Turned>,
         parents: Query<&ChildOf>,
         boards: Query<(), With<Board>>,
         mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
         mut commands: Commands,
     ) {
-        if !boards.contains(press.entity) || press.button != PointerButton::Primary {
+        if !boards.contains(press.entity)
+            || press.button != PointerButton::Primary
+            || !turned.clicked()
+        {
             return;
         }
         let Some((_, mut casing, mut holdable, plugged)) =
@@ -465,14 +475,18 @@ impl Board {
 impl Header {
     /// Plugs the debug cable in, or pulls it out.
     fn press(
-        mut press: On<PointerPress>,
+        mut press: On<PointerClick>,
         focused: Res<Focused>,
+        turned: Res<Turned>,
         parents: Query<&ChildOf>,
         headers: Query<(), With<Header>>,
         mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
         mut commands: Commands,
     ) {
-        if !headers.contains(press.entity) || press.button != PointerButton::Primary {
+        if !headers.contains(press.entity)
+            || press.button != PointerButton::Primary
+            || !turned.clicked()
+        {
             return;
         }
         let Some((device, casing, _, plugged)) =
