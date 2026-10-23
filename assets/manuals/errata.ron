@@ -1,0 +1,13 @@
+// Errata come as slips from a small print shop.
+(
+    print: (press: Letterpress, stock: Laid),
+    footer: "datasheet-footer",
+    pages: [
+        (
+            blocks: [
+                Heading("datasheet-errata"),
+                Errata,
+            ],
+        ),
+    ],
+)

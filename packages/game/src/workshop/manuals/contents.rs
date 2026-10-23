@@ -1,16 +1,15 @@
 use bevy::prelude::*;
 use ld60_calco::Revision;
-use ld60_core::parts::paper::{Press, Print, Stock};
-use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
+use ld60_core::parts::paper::Print;
+use ld60_devices::{ChipSpec, DeviceKind};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 use serde::{Deserialize, Serialize};
 
-use super::datasheet::ChipSheet;
+use super::layout::{Layouts, ManualFile, PageLayout, Subject};
 use super::pins::Sheet;
 use crate::device::DeviceName;
 use crate::workshop::run::Run;
-use crate::workshop::service::ServiceSheet;
 use crate::workshop::tutorial::TutorialNote;
 
 const GADGETS: Color = Color::srgb_u8(0xe8, 0xcc, 0x6a);
@@ -44,11 +43,12 @@ pub(super) enum Entry {
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Page {
     Index,
-    Service(ServiceSheet),
-    LineTests(ServiceSheet),
-    /// The page at an index of [`ChipSheet::PAGES`].
-    Datasheet(ChipSheet, usize),
-    Errata(ChipSheet),
+    /// A page from the layout files in `assets/manuals/`.
+    Laid {
+        file: &'static ManualFile,
+        layout: &'static PageLayout,
+        subject: Subject,
+    },
     Note(TutorialNote),
 }
 
@@ -114,33 +114,48 @@ impl Entry {
     /// How the shop's copy was printed, and on what paper. Each manual is a
     /// print run of its own.
     pub(super) fn print(self) -> Print {
-        match self {
-            Self::Manual(device) => match device {
-                DeviceKind::Tally2 => Press::Offset.run(device).on(Stock::CREAM),
-                DeviceKind::Summa6 => Press::Photocopy.run(device).on(Stock::RECYCLED),
-                DeviceKind::Lock4 => Press::Spirit.run(device).on(Stock::OLD),
-            },
-            Self::Chip(revision) => Press::Offset.run(("datasheet", revision)).on(Stock::BRIGHT),
-            // Errata come as slips from a small print shop.
-            Self::Errata(revision) => Press::Letterpress.run(("errata", revision)).on(Stock::LAID),
-            Self::Note(note) => note.print(),
-        }
+        let layouts = Layouts::get();
+        let (file, run) = match self {
+            Self::Manual(device) => {
+                let file = layouts.manual(device);
+                (file, file.press().run(device))
+            }
+            Self::Chip(revision) => {
+                let file = layouts.datasheet();
+                (file, file.press().run(("datasheet", revision)))
+            }
+            Self::Errata(revision) => {
+                let file = layouts.errata();
+                (file, file.press().run(("errata", revision)))
+            }
+            Self::Note(note) => return note.print(),
+        };
+        run.on(file.stock())
     }
 
     pub(super) fn pages(self) -> Vec<Page> {
+        let layouts = Layouts::get();
+        let laid = |file: &'static ManualFile, subject| {
+            file.pages().iter().map(move |layout| Page::Laid {
+                file,
+                layout,
+                subject,
+            })
+        };
         match self {
-            Self::Manual(device) => device
-                .boards()
-                .iter()
-                .map(|board| Page::Service(ServiceSheet::new(board)))
-                .chain([Page::LineTests(ServiceSheet::new(
-                    device.board(BoardRev::A),
-                ))])
-                .collect(),
-            Self::Chip(revision) => (0..ChipSheet::PAGES.len())
-                .map(|index| Page::Datasheet(ChipSheet::new(revision), index))
-                .collect(),
-            Self::Errata(revision) => vec![Page::Errata(ChipSheet::new(revision))],
+            Self::Manual(device) => {
+                let file = layouts.manual(device);
+                let boards = file.board_page().into_iter().flat_map(|layout| {
+                    device.boards().iter().map(move |board| Page::Laid {
+                        file,
+                        layout,
+                        subject: Subject::Board(board),
+                    })
+                });
+                boards.chain(laid(file, Subject::Device(device))).collect()
+            }
+            Self::Chip(revision) => laid(layouts.datasheet(), Subject::Chip(revision)).collect(),
+            Self::Errata(revision) => laid(layouts.errata(), Subject::Chip(revision)).collect(),
             Self::Note(note) => vec![Page::Note(note)],
         }
     }
@@ -150,29 +165,32 @@ impl Page {
     pub(super) fn footer(self) -> Message {
         match self {
             Self::Index => Message::new("manuals-footer"),
-            Self::Service(sheet) | Self::LineTests(sheet) => sheet.footer(),
-            Self::Datasheet(sheet, _) | Self::Errata(sheet) => sheet.footer(),
+            Self::Laid { file, subject, .. } => subject.args(Message::new(file.footer())),
             Self::Note(note) => note.footer(),
         }
     }
 
     /// What the band at the top of the page says after the entry, for the
-    /// pages of a manual.
+    /// pages with a heading in their layout.
     pub(super) fn heading(self) -> Option<Localized> {
         match self {
-            Self::Service(sheet) => Some(sheet.board_heading().into()),
-            Self::LineTests(_) => Some(Message::new("service-line-tests-short").into()),
-            Self::Index | Self::Datasheet(..) | Self::Errata(_) | Self::Note(_) => None,
+            Self::Laid {
+                layout, subject, ..
+            } => Some(subject.args(Message::new(layout.heading()?)).into()),
+            Self::Index | Self::Note(_) => None,
         }
     }
 
-    /// How the index names the page under its entry, for the pages of a
-    /// manual.
+    /// How the index names the page under its entry: the board of a board
+    /// page, otherwise the heading.
     pub(super) fn short_name(self) -> Option<Localized> {
         match self {
-            Self::Service(sheet) => Some(sheet.board_name()),
-            Self::LineTests(_) => Some(Message::new("service-line-tests-short").into()),
-            Self::Index | Self::Datasheet(..) | Self::Errata(_) | Self::Note(_) => None,
+            Self::Laid {
+                subject: Subject::Board(board),
+                ..
+            } => Some(Localized::verbatim(board.name())),
+            Self::Laid { .. } => self.heading(),
+            Self::Index | Self::Note(_) => None,
         }
     }
 
@@ -180,10 +198,9 @@ impl Page {
     pub(super) fn write(self, page: &mut ChildSpawnerCommands) {
         match self {
             Self::Index => {}
-            Self::Service(sheet) => sheet.write(page),
-            Self::LineTests(sheet) => sheet.write_line_tests(page),
-            Self::Datasheet(sheet, index) => ChipSheet::PAGES[index](page, sheet),
-            Self::Errata(sheet) => ChipSheet::errata(page, sheet),
+            Self::Laid {
+                layout, subject, ..
+            } => layout.write(subject, page),
             Self::Note(note) => note.write(page),
         }
     }

@@ -1,0 +1,36 @@
+(
+    print: (press: Offset, stock: Bright),
+    footer: "datasheet-footer",
+    pages: [
+        (
+            blocks: [
+                Title("datasheet-title"),
+                Faded("datasheet-subtitle"),
+                Heading("datasheet-registers"),
+                Registers,
+                Heading("datasheet-memory"),
+                Text("datasheet-rom"),
+                Text("datasheet-ram"),
+                Reset,
+                Heading("datasheet-ports"),
+                Ports,
+            ],
+        ),
+        (
+            blocks: [
+                Heading("datasheet-instructions"),
+                Instructions,
+                Faded("datasheet-flag-legend"),
+                Faded("datasheet-operand-legend"),
+            ],
+        ),
+        (
+            blocks: [
+                Heading("datasheet-conditions"),
+                Conditions,
+                Compare,
+                ChipNotes,
+            ],
+        ),
+    ],
+)

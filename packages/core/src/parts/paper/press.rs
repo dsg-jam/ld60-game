@@ -1,6 +1,7 @@
 use std::hash::Hash;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use serde::Deserialize;
 
 use super::stock::Stock;
 
@@ -10,7 +11,7 @@ const RUNS: u64 = 1000;
 /// A way of printing a page, which leaves its own marks in the ink.
 ///
 /// Matches the constants in `press.wesl`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 pub enum Press {
     /// The shop's own impact printer, for everything the bench prints.
     #[default]

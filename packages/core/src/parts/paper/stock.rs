@@ -1,12 +1,27 @@
 use bevy::prelude::*;
+use serde::Deserialize;
 
 /// The paper a print run went onto, and how far it has aged since.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+#[serde(from = "StockName")]
 pub struct Stock {
     /// The fresh paper, as a shade of the canvas's paper color.
     tint: Vec3,
     /// How far the paper has yellowed, from 0 for new to 1 for old.
     age: f32,
+}
+
+/// A [`Stock`] by the name of its constant, for data files.
+#[derive(Clone, Copy, Debug, Deserialize)]
+enum StockName {
+    Shop,
+    Bright,
+    Cream,
+    Recycled,
+    Old,
+    Laid,
+    Typing,
+    Newsprint,
 }
 
 impl Stock {
@@ -40,5 +55,20 @@ impl Stock {
 impl Default for Stock {
     fn default() -> Self {
         Self::SHOP
+    }
+}
+
+impl From<StockName> for Stock {
+    fn from(name: StockName) -> Self {
+        match name {
+            StockName::Shop => Self::SHOP,
+            StockName::Bright => Self::BRIGHT,
+            StockName::Cream => Self::CREAM,
+            StockName::Recycled => Self::RECYCLED,
+            StockName::Old => Self::OLD,
+            StockName::Laid => Self::LAID,
+            StockName::Typing => Self::TYPING,
+            StockName::Newsprint => Self::NEWSPRINT,
+        }
     }
 }
