@@ -1,6 +1,7 @@
 mod beep;
 mod city;
 mod drops;
+mod fasten;
 mod hinge;
 mod keys;
 mod lamp;
