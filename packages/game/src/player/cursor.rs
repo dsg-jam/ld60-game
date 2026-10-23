@@ -10,8 +10,8 @@ use bevy::{
 use self::sprite::Sprite;
 use super::crosshair::Prompt;
 use super::focus::{self, Clickable, Focus};
-use crate::menu::AppState;
 use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
+use crate::state::AppState;
 
 /// Diameter of the dot cursor, in logical pixels.
 pub(crate) const DOT_SIZE: f32 = 10.0;

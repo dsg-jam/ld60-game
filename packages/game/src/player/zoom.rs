@@ -5,7 +5,7 @@ use bevy::{
 
 use super::focus::{Aside, Focused, View};
 use super::free_look::MODIFIERS;
-use crate::menu::AppState;
+use crate::state::AppState;
 
 /// How far a trackpad has to scroll for one step.
 const STEP_PIXELS: f32 = 40.0;

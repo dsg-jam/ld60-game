@@ -6,7 +6,7 @@ use super::{
     focus::{Aside, Focused},
     look::Gaze,
 };
-use crate::menu::Settings;
+use crate::settings::Settings;
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";
 const ICON_SIZE: f32 = 64.0;

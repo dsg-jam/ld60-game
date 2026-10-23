@@ -17,7 +17,8 @@ use super::look::LookAngles;
 use super::zoom::Zoom;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
-use crate::menu::{AppState, Settings};
+use crate::settings::Settings;
+use crate::state::AppState;
 
 /// How quickly the camera moves to a new view.
 const DECAY_RATE: f32 = 8.0;

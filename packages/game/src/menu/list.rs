@@ -9,8 +9,8 @@ use bevy::{
 use ld60_locale::{Localized, Message};
 
 use super::AppState;
-use super::settings::{Adjust, Setting};
 use crate::player::hints::{ACCENT, INK, SHADOW};
+use crate::settings::{Adjust, Setting};
 
 const ENTRY_SIZE: f32 = 28.0;
 const ENTRY_GAP: f32 = 10.0;

@@ -10,7 +10,7 @@ use super::focus::Focused;
 use super::free_look::{FreeLook, MODIFIERS};
 use super::look::Gaze;
 use super::zoom::Zoom;
-use crate::menu::AppState;
+use crate::state::AppState;
 
 /// Vertical field of view of the player camera, in radians, without the
 /// [`Lens`] zoom.

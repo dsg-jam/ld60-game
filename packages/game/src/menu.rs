@@ -13,10 +13,11 @@ use self::closed::StatsPage;
 use self::credits::{Credits, CreditsHandle, CreditsPage};
 use self::list::{Action, Entries};
 use self::restart::RestartPage;
-pub(crate) use self::settings::Settings;
 use self::settings::SettingsPage;
 use crate::audio::Mixer;
 use crate::player::hints::{INK, SHADOW};
+use crate::settings::SettingsPlugin;
+use crate::state::AppState;
 use crate::workshop::run::{NewRun, Run};
 
 const HEADING_SIZE: f32 = 56.0;
@@ -35,11 +36,12 @@ impl Plugin for MenuPlugin {
             .add_sub_state::<Page>()
             .init_resource::<Started>()
             .add_plugins((
+                SettingsPlugin,
                 closed::ClosedPlugin,
                 credits::CreditsPlugin,
                 list::ListPlugin,
                 pause::PausePlugin,
-                settings::SettingsPlugin,
+                settings::SettingsPagePlugin,
                 title::TitlePlugin,
             ))
             .add_systems(
@@ -54,18 +56,6 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(AppState::Playing), Mixer::duck::<true>)
             .add_observer(Action::apply);
     }
-}
-
-/// Whether the game runs or waits behind a menu.
-#[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub(crate) enum AppState {
-    /// The title screen, shown at the start.
-    #[default]
-    Title,
-    Playing,
-    Paused,
-    /// The landlord closed the shop, so the run is over.
-    Closed,
 }
 
 /// The page a menu shows.
@@ -233,8 +223,8 @@ impl Action {
 mod tests {
     use ld60_locale::Locale;
 
-    use super::settings::Setting;
     use super::*;
+    use crate::settings::{Setting, Settings};
 
     #[test]
     fn every_menu_text_exists() {

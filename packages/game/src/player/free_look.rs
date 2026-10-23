@@ -3,7 +3,8 @@ use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*};
 use super::focus::Focus;
 use super::lens::Lens;
 use super::look::SENSITIVITY;
-use crate::menu::{AppState, Settings};
+use crate::settings::Settings;
+use crate::state::AppState;
 
 /// Held to look around while focused, and with the wheel to zoom.
 pub(crate) const MODIFIERS: [KeyCode; 2] = [KeyCode::ControlLeft, KeyCode::ControlRight];

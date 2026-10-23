@@ -16,6 +16,8 @@ mod layout;
 mod menu;
 mod parts;
 mod player;
+mod settings;
+mod state;
 mod workshop;
 
 use bevy::asset::AssetMetaCheck;

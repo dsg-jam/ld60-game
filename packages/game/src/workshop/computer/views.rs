@@ -7,13 +7,13 @@ use bevy::{
 use ld60_locale::Message;
 
 use super::pinboard::PinBoard;
-use crate::menu::AppState;
 use crate::player::camera::{PlayerCamera, framing};
 use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::{Hint, Hints, Icon, Input};
 use crate::player::lens;
 use crate::player::zoom::Zoom;
+use crate::state::AppState;
 use crate::workshop::run::Run;
 
 /// How far the wide view looks down at the keyboard, in radians.

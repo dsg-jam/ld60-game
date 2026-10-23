@@ -15,9 +15,9 @@ use super::FACADES;
 use super::weather::Weather;
 use crate::clock::Clock;
 use crate::layout::shop;
-use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::Focus;
+use crate::settings::Settings;
 
 /// Air lit by the city, which everything fades into far away.
 const FOG: Color = Color::srgb_u8(0x42, 0x36, 0x3e);
@@ -141,7 +141,7 @@ impl AtmospherePlugin {
         }
     }
 
-    /// Drops the costly effects on lower [`Quality`](crate::menu::Settings::quality).
+    /// Drops the costly effects on lower [`Quality`](crate::settings::Settings::quality).
     fn match_quality(
         settings: Res<Settings>,
         cameras: Query<Entity, With<PlayerCamera>>,
