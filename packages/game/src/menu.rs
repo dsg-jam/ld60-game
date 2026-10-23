@@ -1,6 +1,7 @@
 mod closed;
 mod credits;
 mod list;
+mod loading;
 mod pause;
 mod restart;
 mod settings;
@@ -40,6 +41,7 @@ impl Plugin for MenuPlugin {
                 closed::ClosedPlugin,
                 credits::CreditsPlugin,
                 list::ListPlugin,
+                loading::LoadingPlugin,
                 pause::PausePlugin,
                 settings::SettingsPagePlugin,
                 title::TitlePlugin,
@@ -262,7 +264,7 @@ mod tests {
     fn a_new_run_is_asked_for_first() {
         let mut app = App::new();
         app.add_plugins(bevy::state::app::StatesPlugin)
-            .init_state::<AppState>()
+            .insert_state(AppState::Title)
             .add_sub_state::<Page>()
             .init_resource::<Started>()
             .init_resource::<Run>()

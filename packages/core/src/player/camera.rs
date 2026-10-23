@@ -59,7 +59,9 @@ impl Plugin for CameraPlugin {
                         .after(Focused::leave_on_input)
                         .after(LookAngles::update)
                         .after(FreeLook::update)
-                        .run_if(not(in_state(AppState::Title))),
+                        .run_if(not(
+                            in_state(AppState::Loading).or_eager(in_state(AppState::Title))
+                        )),
                     PlayerCamera::match_quality.run_if(
                         resource_changed::<Settings>
                             .or_else(any_match_filter::<Added<PlayerCamera>>),

@@ -57,8 +57,9 @@ pub enum Icon {
     ArrowsUpDown,
 }
 
+/// The font of the key and mouse icons.
 #[derive(Resource, Debug)]
-pub(super) struct IconFont(Handle<Font>);
+pub struct IconFont(Handle<Font>);
 
 /// Text next to an [`Icon`].
 #[derive(Component, Debug)]
@@ -129,6 +130,12 @@ enum KeyHintPart {
 impl FromWorld for IconFont {
     fn from_world(world: &mut World) -> Self {
         Self(world.resource::<AssetServer>().load(ICON_FONT))
+    }
+}
+
+impl IconFont {
+    pub fn is_loaded(&self, assets: &AssetServer) -> bool {
+        assets.is_loaded_with_dependencies(&self.0)
     }
 }
 

@@ -38,7 +38,12 @@ pub(super) struct TitlePlugin;
 impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::Title), spawn)
-            .add_systems(Update, drift.run_if(in_state(AppState::Title)));
+            .add_systems(
+                Update,
+                // While loading, the scene that comes into view is the one
+                // whose shaders get compiled.
+                drift.run_if(in_state(AppState::Loading).or_eager(in_state(AppState::Title))),
+            );
     }
 }
 
