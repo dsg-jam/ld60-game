@@ -13,7 +13,7 @@ use super::Editor;
 use super::footer::{Command, Run, Status};
 use super::highlight::Highlight;
 use super::listing::Listing;
-use crate::device::Emulator;
+use crate::device::{Connected, Emulator};
 use crate::workshop::job::{Job, JobId};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
@@ -79,7 +79,7 @@ impl Breakpoints {
     pub(super) fn arm(
         breakpoints: Res<Breakpoints>,
         listing: Res<Listing>,
-        mut emulators: Query<&mut Emulator>,
+        mut emulators: Query<&mut Emulator, With<Connected>>,
     ) {
         let addresses = listing
             .assembly()

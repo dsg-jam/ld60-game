@@ -4,7 +4,7 @@ use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run, Status};
-use crate::device::Emulator;
+use crate::device::{Connected, Emulator};
 use crate::workshop::job::Job;
 use crate::workshop::pickup::Complaint;
 
@@ -23,7 +23,7 @@ impl Verdict {
     pub(super) fn run_on_command(
         run: On<Run>,
         job: Option<Res<Job>>,
-        emulators: Query<&Emulator>,
+        emulators: Query<&Emulator, With<Connected>>,
         mut status: Single<&mut Localized, With<Status>>,
     ) {
         if run.0 != Command::Test {

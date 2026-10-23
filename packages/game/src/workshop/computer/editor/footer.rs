@@ -12,7 +12,7 @@ use super::breakpoints::Breakpoints;
 use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
-use crate::device::Emulator;
+use crate::device::{Connected, Emulator};
 use crate::workshop::chore::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
@@ -186,7 +186,7 @@ impl Run {
         editor: Single<&EditableText, With<Editor>>,
         job: Option<ResMut<Job>>,
         breakpoints: Res<Breakpoints>,
-        mut emulators: Query<&mut Emulator>,
+        mut emulators: Query<&mut Emulator, With<Connected>>,
         mut status: Single<&mut Localized, With<Status>>,
         mut commands: Commands,
     ) {

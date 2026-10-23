@@ -5,7 +5,7 @@ use ld60_machine::{Cpu, Step};
 use super::PHOSPHOR;
 use super::footer::{Command, Run, Status};
 use super::listing::Listing;
-use crate::device::{Emulator, Stop};
+use crate::device::{Connected, Emulator, Stop};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
 /// RAM cells the panel shows.
@@ -70,7 +70,7 @@ impl DebugPanel {
 
     pub(super) fn update(
         shop: Res<ShopRun>,
-        emulators: Query<&Emulator>,
+        emulators: Query<&Emulator, With<Connected>>,
         mut panel: Single<&mut Node, With<DebugPanel>>,
         mut registers: Single<&mut Localized, With<RegisterLine>>,
         mut ram: Single<&mut Localized, (With<RamLine>, Without<RegisterLine>)>,
@@ -98,7 +98,7 @@ impl DebugPanel {
     pub(super) fn run_on_command(
         run: On<Run>,
         listing: Res<Listing>,
-        mut emulators: Query<&mut Emulator>,
+        mut emulators: Query<&mut Emulator, With<Connected>>,
         mut status: Single<&mut Localized, With<Status>>,
     ) {
         if !matches!(run.0, Command::Step | Command::Go) {
