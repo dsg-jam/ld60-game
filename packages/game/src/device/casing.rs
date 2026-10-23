@@ -6,6 +6,8 @@ use bevy::{
     prelude::*,
 };
 use ld60_core::audio::{Play, Sound};
+#[cfg(feature = "debug_port")]
+use ld60_core::debug_port::DebugMethods;
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::player::focus::{Clickable, Focused};
 use ld60_geometry::block::Block;
@@ -44,6 +46,8 @@ impl Plugin for CasingPlugin {
             .add_observer(CoverPlate::press)
             .add_observer(Board::press)
             .add_observer(Header::press);
+        #[cfg(feature = "debug_port")]
+        app.add_debug_method("ld60.device", Casing::debug_device);
     }
 }
 
@@ -333,6 +337,52 @@ impl Casing {
                 }
             }
         }
+    }
+
+    /// `ld60.device { "open": true, "plugged": true }` opens or closes the
+    /// devices and plugs the cable in or pulls it, as the player would. Both
+    /// fields are optional. Returns the state of each device.
+    #[cfg(feature = "debug_port")]
+    fn debug_device(
+        In(params): In<Option<serde_json::Value>>,
+        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
+        mut commands: Commands,
+    ) -> bevy::remote::BrpResult {
+        let flag = |name: &str| {
+            params
+                .as_ref()
+                .and_then(|params| params.get(name))
+                .and_then(serde_json::Value::as_bool)
+        };
+        let mut states = Vec::new();
+        for (device, mut casing, mut holdable, mut plugged) in &mut casings {
+            if flag("plugged") == Some(false) && plugged {
+                commands.entity(device).remove::<Connected>();
+                plugged = false;
+            }
+            match flag("open") {
+                Some(true) if !casing.open => {
+                    casing.loose.fill(true);
+                    casing.lift_cover();
+                    holdable.turn_over(casing.bounds.size.y);
+                }
+                Some(false) if casing.close_cover(plugged) => {
+                    casing.loose.fill(false);
+                    holdable.turn_over(casing.bounds.size.y);
+                }
+                _ => {}
+            }
+            if flag("plugged") == Some(true) && casing.open && !plugged {
+                commands.entity(device).insert(Connected);
+                plugged = true;
+            }
+            states.push(serde_json::json!({
+                "open": casing.open,
+                "sealed": casing.sealed(),
+                "plugged": plugged,
+            }));
+        }
+        Ok(states.into())
     }
 
     /// The device that `part` belongs to, if the player holds it.
