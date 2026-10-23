@@ -1,10 +1,10 @@
 use bevy::prelude::*;
+use ld60_locale::{Localized, Message};
 
 use super::clock::PlanetSet;
 use super::counter::CounterLayout;
 use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
-use crate::locale::{Localized, Message};
 use crate::menu::AppState;
 use crate::parts::paper::{Paper, Press, Stock};
 use crate::parts::screen::UiCanvas;
@@ -144,8 +144,9 @@ impl RentNote {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_note_formats() {

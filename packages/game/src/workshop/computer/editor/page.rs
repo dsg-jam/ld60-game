@@ -2,12 +2,12 @@ use bevy::{
     input_focus::{FocusCause, InputFocus},
     prelude::*,
 };
+use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run};
 use super::{PHOSPHOR, PHOSPHOR_DIM};
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
-use crate::locale::{Localized, Message};
 use crate::player::focus::{Aside, Focus};
 
 pub(super) struct PagePlugin;
@@ -153,8 +153,9 @@ impl ActivePage {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_title_formats() {

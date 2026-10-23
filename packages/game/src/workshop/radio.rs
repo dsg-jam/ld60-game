@@ -2,13 +2,13 @@ mod broadcast;
 mod front;
 
 use bevy::{picking::events::PointerScroll, prelude::*};
+use ld60_locale::Message;
 
 use self::broadcast::{TRACKS, Tuner};
 use self::front::Front;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::{Finish, SurfaceMaterial};
-use crate::locale::Message;
 use crate::parts::dot_matrix::DotMatrix;
 use crate::parts::gauge::Gauge;
 use crate::parts::knob::Knob;
@@ -281,8 +281,9 @@ impl Radio {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_hint_formats() {

@@ -56,9 +56,9 @@ impl Notes {
 #[cfg(test)]
 mod tests {
     use bevy::ecs::system::RunSystemOnce;
+    use ld60_locale::Localized;
 
     use super::*;
-    use crate::locale::Localized;
     use crate::workshop::computer::editor::{Editor, footer::Status, undo::Undo};
     use crate::workshop::job::Job;
     use crate::workshop::levels::Levels;

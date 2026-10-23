@@ -6,10 +6,10 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_locale::{Localized, Message};
 
 use super::AppState;
 use super::settings::{Adjust, Setting};
-use crate::locale::{Localized, Message};
 use crate::player::hints::{ACCENT, INK, SHADOW};
 
 const ENTRY_SIZE: f32 = 28.0;

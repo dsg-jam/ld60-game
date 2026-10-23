@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use ld60_calco::datasheet::{INSTRUCTIONS, NOTES, PORTS};
 use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
+use ld60_locale::{Localized, Message};
 
-use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 
 /// The CalCo datasheet of one chip revision, and its errata pages.
@@ -186,8 +186,9 @@ impl ChipSheet {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_page_formats() {

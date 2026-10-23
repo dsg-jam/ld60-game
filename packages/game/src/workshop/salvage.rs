@@ -4,6 +4,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_locale::Message;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
@@ -17,7 +18,6 @@ use crate::audio::{Play, Sound};
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
-use crate::locale::Message;
 use crate::parts::paper::{INK_FADED, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
@@ -363,9 +363,9 @@ mod tests {
     use std::collections::HashSet;
 
     use ld60_devices::DeviceKind;
+    use ld60_locale::{Locale, Localized};
 
     use super::*;
-    use crate::locale::{Locale, Localized};
     use crate::player::focus::FocusOn;
     use crate::workshop::clock::PlanetSet;
     use crate::workshop::run::ComputerTool;

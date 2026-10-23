@@ -7,6 +7,7 @@ mod settings;
 mod title;
 
 use bevy::prelude::*;
+use ld60_locale::{Localized, Message};
 
 use self::closed::StatsPage;
 use self::credits::{Credits, CreditsHandle, CreditsPage};
@@ -16,7 +17,6 @@ pub(crate) use self::settings::Settings;
 use self::settings::SettingsPage;
 pub(crate) use self::title::TITLE_EYES;
 use crate::audio::Mixer;
-use crate::locale::{Localized, Message};
 use crate::player::hints::{INK, SHADOW};
 use crate::workshop::run::{NewRun, Run};
 
@@ -232,9 +232,10 @@ impl Action {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::settings::Setting;
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_menu_text_exists() {

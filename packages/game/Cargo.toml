@@ -13,17 +13,16 @@ publish = { workspace = true }
 debug_port = ["bevy/bevy_remote", "dep:serde_json"]
 
 [dependencies]
-fluent-bundle = { workspace = true }
 ld60-calco = { workspace = true, features = ["serde"] }
 ld60-devices = { workspace = true, features = ["serde"] }
 ld60-levels = { workspace = true }
+ld60-locale = { workspace = true }
 ld60-machine = { workspace = true }
 ld60-store = { workspace = true }
 rand = { workspace = true }
 ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["std"], optional = true }
-unic-langid = { workspace = true, features = ["macros"] }
 winit = { workspace = true }
 
 [dependencies.bevy]
@@ -58,6 +57,7 @@ workspace = true
 features = ["Document", "Element", "Storage", "Window"]
 
 [dev-dependencies]
+ld60-locale = { workspace = true, features = ["test-support"] }
 ld60-store = { workspace = true, features = ["test-support"] }
 
 [lints]

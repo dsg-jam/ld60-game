@@ -3608,17 +3608,16 @@ name = "ld60-game"
 version = "0.2.2"
 dependencies = [
  "bevy",
- "fluent-bundle",
  "ld60-calco",
  "ld60-devices",
  "ld60-levels",
+ "ld60-locale",
  "ld60-machine",
  "ld60-store",
  "rand",
  "ron",
  "serde",
  "serde_json",
- "unic-langid",
  "web-sys",
  "winit",
 ]
@@ -3634,6 +3633,15 @@ dependencies = [
  "ld60-machine",
  "ron",
  "serde",
+]
+
+[[package]]
+name = "ld60-locale"
+version = "0.2.2"
+dependencies = [
+ "bevy",
+ "fluent-bundle",
+ "unic-langid",
 ]
 
 [[package]]

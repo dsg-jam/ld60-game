@@ -6,11 +6,11 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_locale::{Localized, Message};
 use serde::Deserialize;
 
 use super::Page;
 use super::list::{Action, Entries, Entry, Navigation};
-use crate::locale::{Localized, Message};
 use crate::player::hints::{ACCENT, INK, SHADOW};
 
 const CREDITS: &str = "credits.ron";
@@ -272,8 +272,9 @@ impl CreditsPage {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn credits_load_and_show() {

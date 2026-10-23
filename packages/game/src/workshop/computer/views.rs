@@ -4,9 +4,9 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_locale::Message;
 
 use super::pinboard::PinBoard;
-use crate::locale::Message;
 use crate::menu::AppState;
 use crate::player::camera::{PlayerCamera, framing};
 use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
@@ -230,8 +230,9 @@ impl BackToScreen {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::manuals::Sheet;
 
     #[test]

@@ -1,12 +1,12 @@
 mod quality;
 
 use bevy::prelude::*;
+use ld60_locale::{Localized, Message};
 use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
 use super::list::{Action, Entries, Entry};
 use crate::audio::Mixer;
-use crate::locale::{Localized, Message};
 
 use self::quality::Quality;
 

@@ -1,11 +1,11 @@
 use bevy::prelude::*;
+use ld60_locale::{Localized, Message};
 use ld60_machine::{Cpu, Step};
 
 use super::PHOSPHOR;
 use super::footer::{Command, Run, Status};
 use super::listing::Listing;
 use crate::device::{Emulator, Stop};
-use crate::locale::{Localized, Message};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
 /// RAM cells the panel shows.
@@ -156,9 +156,9 @@ impl DebugPanel {
 mod tests {
     use ld60_devices::AnyDevice;
     use ld60_levels::{Level, device, initial_rom};
+    use ld60_locale::Locale;
 
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::levels::Levels;
 
     fn tally() -> (Level, String, AnyDevice) {

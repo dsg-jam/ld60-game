@@ -2,9 +2,9 @@
 
 use bevy::prelude::*;
 use ld60_devices::{Annunciator, Board, DeviceKind};
+use ld60_locale::{Localized, Message};
 
 use crate::device::DeviceName;
-use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 
 const KEY_WIDTH: f32 = 120.0;
@@ -174,8 +174,9 @@ impl ServiceSheet {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_sheet_formats() {

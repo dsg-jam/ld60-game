@@ -9,12 +9,12 @@ use bevy::{
     picking::{events::PointerDrag, pointer::PointerButton},
     prelude::*,
 };
+use ld60_locale::Message;
 
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::name::{BoardLetter, DeviceName};
 pub(crate) use self::silhouette::Silhouette;
-use crate::locale::Message;
 use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusTarget, Focused, View};

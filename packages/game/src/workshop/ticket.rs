@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use ld60_devices::{ChipSpec, RomKind};
 use ld60_levels::Level;
+use ld60_locale::{Localized, Message};
 
 use super::job::Job;
 use super::levels::Levels;
@@ -9,7 +10,6 @@ use crate::device::DeviceName;
 use crate::geometry::block::Block;
 use crate::geometry::shape::Shape;
 use crate::geometry::surface::Finish;
-use crate::locale::{Localized, Message};
 use crate::parts::paper::{Binding, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};
@@ -351,8 +351,9 @@ impl ShopStamp {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::levels::Levels;
 
     #[test]

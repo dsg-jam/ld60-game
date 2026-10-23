@@ -5,11 +5,11 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_locale::{Localized, Message};
 
 use super::contents::{Contents, Entry, Page, Section};
 use super::in_file::InFile;
 use super::pins::Sheet;
-use crate::locale::{Localized, Message};
 use crate::parts::paper::{Paper, PaperButton};
 
 /// Under the pointer, buttons and index lines take this color.

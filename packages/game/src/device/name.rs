@@ -1,8 +1,7 @@
 use std::fmt;
 
 use ld60_devices::{BoardRev, DeviceKind};
-
-use crate::locale::Message;
+use ld60_locale::Message;
 
 /// What a device kind is called, in the player's language.
 pub(crate) trait DeviceName: Sized {

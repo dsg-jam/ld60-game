@@ -30,6 +30,7 @@ use bevy::{
     ui::{UiSystems, widget::update_editable_text_styles},
     ui_widgets::TextInput,
 };
+use ld60_locale::{Localized, Message};
 
 use self::bench::Verdict;
 use self::breakpoints::Breakpoints;
@@ -47,7 +48,6 @@ use self::undo::Undo;
 use self::versions::VersionsPage;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
-use crate::locale::{Localized, Message};
 use crate::parts::screen::UiCanvas;
 use crate::player::free_look::MODIFIERS;
 use crate::workshop::job::{Job, JobId};

@@ -20,6 +20,7 @@ use bevy::{
     platform::hash::fixed_hash_one,
     prelude::*,
 };
+use ld60_locale::{Localized, Message};
 
 pub(crate) use self::back::BlankBack;
 pub(crate) use self::leaf::{
@@ -31,7 +32,6 @@ pub(crate) use self::sheet::{PaperMaterial, Pressed, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
 pub(crate) use self::stock::Stock;
 use super::screen::UiCanvas;
-use crate::locale::{Localized, Message};
 use crate::player::focus::{self, Focus, Focused};
 use crate::player::free_look::MODIFIERS;
 use crate::player::hints::ClickHint;
@@ -551,8 +551,9 @@ struct Swipe {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn footers_format() {

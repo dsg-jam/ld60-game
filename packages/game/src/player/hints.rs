@@ -1,11 +1,11 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
+use ld60_locale::{Localized, Message};
 
 use super::{
     cursor,
     focus::{Aside, Focused},
     look::Gaze,
 };
-use crate::locale::{Localized, Message};
 use crate::menu::Settings;
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";

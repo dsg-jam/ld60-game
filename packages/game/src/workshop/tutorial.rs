@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
 use super::job::Job;
 use super::run::{Origin, Run};
-use crate::locale::Message;
 use crate::parts::paper::{Paper, Press, Print, Stock};
 
 /// The paragraphs of each note, as attributes of its message.
@@ -105,8 +105,9 @@ impl TutorialNote {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::{Locale, Localized};
+
     use super::*;
-    use crate::locale::{Locale, Localized};
     use crate::workshop::levels::Levels;
 
     #[test]
