@@ -8,7 +8,9 @@ use super::run::{Origin, Run};
 
 /// The paragraphs of each note, as attributes of its message.
 const LESSONS: [&[&str]; 2] = [
-    &["welcome", "ticket", "computer", "flash", "try", "finish"],
+    &[
+        "welcome", "ticket", "open", "cable", "computer", "flash", "try", "finish",
+    ],
     &["datasheet", "lines", "versions", "rent", "trader"],
 ];
 
