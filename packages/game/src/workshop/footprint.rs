@@ -11,7 +11,7 @@ use super::{
     BELL_SPOT, COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW,
     STAMP_SPOT, STAMP_YAW, cable, job, lamp, radio, receipt, rent, salvage, ticket, tools,
 };
-use crate::device::Handheld;
+use crate::device::{Casing, Handheld};
 
 /// Space kept between the keyboard and the mat.
 const MAT_MARGIN: f32 = 0.01;
@@ -166,6 +166,37 @@ fn no_two_counter_props_overlap() {
                 prop.name,
                 other.name
             );
+        }
+    }
+}
+
+#[test]
+fn screws_taken_out_lie_clear_of_everything() {
+    let counter = CounterLayout::new();
+    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    let mut others: Vec<_> = counter_props(&counter)
+        .into_iter()
+        .filter(|prop| prop.name != "device")
+        .collect();
+    others.extend(Clutter::screw_footprints(&counter));
+    for kind in DeviceKind::ALL {
+        let bounds = Block::new(Handheld::body_size(kind));
+        let device = Footprint::new("device", rest, bounds);
+        for index in 0..Handheld::screw_count(kind) {
+            let at = Casing::aside_at(&bounds, index, &rest);
+            // The screw lies along the row, so only its turn on the counter
+            // counts.
+            let along = at.rotation * Vec3::Y;
+            let yaw = Quat::from_rotation_y(along.x.atan2(along.z));
+            let area = Block::new(Vec3::new(0.0055, 0.0055, 0.0094)).translated(Vec3::Z * 0.0033);
+            let screw = Footprint::new("screw aside", at.with_rotation(yaw), area);
+            for other in others.iter().chain([&device]) {
+                assert!(
+                    !screw.overlaps(other),
+                    "{kind:?} screw {index} overlaps {}",
+                    other.name
+                );
+            }
         }
     }
 }

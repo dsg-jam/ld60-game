@@ -247,6 +247,10 @@ impl Handheld {
     pub(crate) fn body_size(kind: DeviceKind) -> Vec3 {
         Model::of(kind).body_size
     }
+
+    pub(crate) fn screw_count(kind: DeviceKind) -> usize {
+        Model::of(kind).casing.screws.len()
+    }
 }
 
 impl Handheld {

@@ -69,6 +69,20 @@ impl Clutter {
         footprints.extend(sides::footprints(counter));
         footprints
     }
+
+    /// The screws lying on the mat.
+    pub(super) fn screw_footprints(counter: &CounterLayout) -> Vec<Footprint> {
+        SCREWS
+            .iter()
+            .map(|&(spot, yaw)| {
+                Footprint::new(
+                    "screw on the mat",
+                    counter.place_on_mat(spot, yaw),
+                    Props::screw_area(),
+                )
+            })
+            .collect()
+    }
 }
 
 impl Clutter {
