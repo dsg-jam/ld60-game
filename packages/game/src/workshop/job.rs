@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use bevy::prelude::*;
 use ld60_core::layout::counter::CounterLayout;
+use ld60_devices::DeviceKind;
 use ld60_levels::{Difficulty, Generated, Level, LevelSource, Variant};
 use ld60_machine::Isa;
 
@@ -109,6 +110,9 @@ impl Job {
         } = variant;
         if !matches!(origin, Origin::Lesson { .. }) {
             level.reward = run.demand().pay(level.device, level.reward);
+        }
+        if let Origin::Generated { device, number } = origin {
+            level.id = Self::generated_id(device, number);
         }
         Ok(Self {
             id: JobId::next(),
@@ -277,6 +281,14 @@ impl HandIn {
     }
 }
 
+impl Job {
+    /// The job number of the generated job `number` for `device`, like
+    /// `tally2-005`. Three digits keep it apart from the special jobs.
+    fn generated_id(device: DeviceKind, number: u32) -> String {
+        format!("{device:?}-{:03}", number + 1).to_lowercase()
+    }
+}
+
 #[cfg(test)]
 impl Job {
     /// The job built from the level at `index`, as the first job of a run.
@@ -292,7 +304,6 @@ impl Job {
 
 #[cfg(test)]
 mod tests {
-    use ld60_devices::DeviceKind;
     use ld60_levels::{Catalog, GAME_SEED, assemble, burn, initial_rom};
 
     use super::*;
@@ -472,6 +483,9 @@ mod tests {
                 job.origin
             );
             assert!(job.level.reward >= 1);
+            if let Origin::Generated { number, .. } = job.origin {
+                assert_eq!(job.level.id, format!("tally2-{:03}", number + 1));
+            }
             run.settle(&job, &Pickup::Paid(job.level.reward));
         }
     }
