@@ -433,45 +433,112 @@ impl BoardLayout {
         art
     }
 
-    /// The silkscreen: outlines, names of the parts and of the board.
+    /// The silkscreen: outlines, names of the parts and of the board. Each
+    /// name goes in the first place next to its part that keeps clear of the
+    /// pads, the holes, the parts and the other names.
     fn print(&self, art: &mut PcbArt, name: &str) {
-        let (header, header_size) = self.footprint(&self.header);
-        Self::outline(art, header, header_size + 0.0012);
-        art.silk_text(
-            "J1 DEBUG",
-            header + Vec2::new(-header_size.x / 2.0, header_size.y / 2.0 + 0.0024),
-            TEXT,
+        let mut taken: Vec<(Vec2, Vec2)> = self
+            .pads()
+            .into_iter()
+            .map(|(center, size, _)| (center, size + 0.0006))
+            .collect();
+        taken.extend(
+            self.screws
+                .iter()
+                .map(|&screw| (self.to_art(screw), Vec2::splat(0.0056))),
         );
-        let (chip, chip_size) = self.footprint(&self.chip);
+        let mut parts = vec![self.footprint(&self.header), self.footprint(&self.chip)];
+        parts.extend(
+            self.passives
+                .iter()
+                .map(|passive| self.footprint(&passive.block)),
+        );
+        parts.extend(self.springs.iter().map(|spring| self.footprint(spring)));
+        taken.extend(parts.iter().map(|&(center, size)| (center, size + 0.0004)));
+
+        let (header, header_size) = parts[0];
+        Self::outline(art, header, header_size + 0.0012);
+        let (chip, chip_size) = parts[1];
         Self::outline(art, chip, chip_size + 0.0004);
         art.silk_line(
             &[chip + (chip_size / 2.0 - 0.0008) * Vec2::new(-1.0, 1.0)],
             0.0006,
         );
-        art.silk_text(
-            "U1",
-            chip + Vec2::new(chip_size.x / 2.0 + 0.0024, chip_size.y / 2.0),
-            TEXT,
-        );
+
+        let mut labels = vec![
+            ("J1 DEBUG".to_owned(), header, header_size + 0.0012, TEXT),
+            ("U1".to_owned(), chip, chip_size, TEXT),
+        ];
         for passive in &self.passives {
             let (middle, size) = self.footprint(&passive.block);
-            art.silk_text(
-                &passive.label,
-                middle + Vec2::new(size.x / 2.0 + 0.0004, size.y / 2.0 + 0.0008),
-                TEXT * 0.8,
-            );
+            labels.push((passive.label.clone(), middle, size, TEXT * 0.8));
         }
-        let display = self.to_art(self.board.top_spot(self.display));
-        art.silk_text("LCD", display + Vec2::new(-0.0018, -0.0022), TEXT * 0.8);
-        let keypad = self.to_art(self.board.top_spot(KEYPAD_SPOT));
-        art.silk_text("KEYS", keypad + Vec2::new(-0.0045, 0.0072), TEXT * 0.8);
-        let battery = self.to_art(self.board.top_spot(BATTERY_SPOT));
-        art.silk_text("BAT", battery + Vec2::new(-0.0018, 0.0046), TEXT * 0.8);
+        let contacts = [
+            ("LCD", self.display, Vec2::new(0.012, 0.0024)),
+            ("KEYS", KEYPAD_SPOT, Vec2::new(0.0018, 0.0098)),
+            ("BAT", BATTERY_SPOT, Vec2::new(0.0034, 0.0058)),
+        ];
+        for (text, spot, size) in contacts {
+            let middle = self.to_art(self.board.top_spot(spot));
+            labels.push((text.to_owned(), middle, size, TEXT * 0.8));
+        }
+        for (text, middle, size, height) in labels {
+            let room = PcbArt::text_size(&text, height);
+            let gap = (size + room) / 2.0 + 0.0006;
+            let around = [
+                Vec2::new(0.0, gap.y),
+                Vec2::new(0.0, -gap.y),
+                Vec2::new(gap.x, 0.0),
+                Vec2::new(-gap.x, 0.0),
+            ];
+            if let Some(at) = self.free_place(&mut taken, room, around.map(|off| middle + off)) {
+                art.silk_text(&text, at, height);
+            }
+        }
 
-        let half = self.board.size.xz() / 2.0;
-        let corner = Vec2::new(-half.x + 0.004, -half.y + 0.0045);
-        art.silk_text(name, corner + Vec2::Y * (TEXT * 1.6), TEXT);
-        art.silk_text("DSG ELECTRONICS", corner, TEXT * 0.8);
+        let lines = [(name, TEXT), ("DSG ELECTRONICS", TEXT * 0.8)];
+        let room = Vec2::new(
+            lines
+                .iter()
+                .map(|(text, height)| PcbArt::text_size(text, *height).x)
+                .fold(0.0, f32::max),
+            TEXT * 1.6 + TEXT * 0.8,
+        );
+        let reach = self.board.size.xz() / 2.0 - 0.0025 - room / 2.0;
+        let spots = [
+            Vec2::new(-1.0, -1.0),
+            Vec2::new(1.0, -1.0),
+            Vec2::new(-1.0, 1.0),
+            Vec2::new(1.0, 1.0),
+            Vec2::new(0.0, -1.0),
+            Vec2::new(0.0, 1.0),
+            Vec2::new(-1.0, 0.0),
+            Vec2::new(1.0, 0.0),
+        ];
+        if let Some(at) = self.free_place(&mut taken, room, spots.map(|spot| spot * reach)) {
+            art.silk_text(name, at, TEXT);
+            art.silk_text("DSG ELECTRONICS", at - Vec2::Y * (TEXT * 1.6), TEXT * 0.8);
+        }
+    }
+
+    /// The top left of the first of the `centers` where `room` fits on the
+    /// board and clear of `taken`, which it then takes too.
+    fn free_place(
+        &self,
+        taken: &mut Vec<(Vec2, Vec2)>,
+        room: Vec2,
+        centers: impl IntoIterator<Item = Vec2>,
+    ) -> Option<Vec2> {
+        let inside = self.board.size.xz() / 2.0 - 0.001;
+        let center = centers.into_iter().find(|&center| {
+            let on_board = (center.abs() + room / 2.0).cmplt(inside).all();
+            on_board
+                && taken.iter().all(|&(other, size)| {
+                    ((center - other).abs() - (room + size) / 2.0).max_element() > 0.0
+                })
+        })?;
+        taken.push((center, room));
+        Some(center + Vec2::new(-room.x / 2.0, room.y / 2.0))
     }
 
     /// The pins of a part at `middle` of `size`: two rows of `count` along
