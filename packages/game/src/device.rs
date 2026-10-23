@@ -1,10 +1,11 @@
+mod casing;
 mod emulator;
 mod handheld;
 mod link;
 mod name;
 mod silhouette;
 
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     picking::{events::PointerDrag, pointer::PointerButton},
@@ -16,6 +17,7 @@ use ld60_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
+pub(crate) use self::casing::{Casing, Header};
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::link::Connected;
@@ -38,7 +40,11 @@ pub(crate) struct DevicePlugin;
 impl Plugin for DevicePlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DeviceKey>()
-            .add_plugins((emulator::EmulatorPlugin, handheld::HandheldPlugin))
+            .add_plugins((
+                casing::CasingPlugin,
+                emulator::EmulatorPlugin,
+                handheld::HandheldPlugin,
+            ))
             .add_systems(
                 Update,
                 (
@@ -127,6 +133,13 @@ impl Holdable {
         let facing = Transform::from_translation(center + towards).looking_at(center, Vec3::Y);
         let face_up = Quat::from_rotation_x(FRAC_PI_2);
         Transform::from_translation(center).with_rotation(facing.rotation * self.spin * face_up)
+    }
+
+    /// Turns the resting pose upside down onto the top of a device `height`
+    /// tall, or back.
+    fn turn_over(&mut self, height: f32) {
+        self.rest.translation += self.rest.rotation * Vec3::Y * height;
+        self.rest.rotation *= Quat::from_rotation_z(PI);
     }
 
     fn held_center(&self) -> Vec3 {
