@@ -1,11 +1,11 @@
 //! Service sheets: what the board around the chip does, per board revision.
 
 use bevy::prelude::*;
+use ld60_core::parts::paper::Paper;
 use ld60_devices::{Annunciator, Board, DeviceKind};
 use ld60_locale::{Localized, Message};
 
 use crate::device::DeviceName;
-use crate::parts::paper::Paper;
 
 const KEY_WIDTH: f32 = 120.0;
 const CODE_WIDTH: f32 = 120.0;

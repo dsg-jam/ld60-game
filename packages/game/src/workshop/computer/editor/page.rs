@@ -2,13 +2,13 @@ use bevy::{
     input_focus::{FocusCause, InputFocus},
     prelude::*,
 };
+#[cfg(feature = "debug_port")]
+use ld60_core::debug_port::DebugMethods;
+use ld60_core::player::focus::{Aside, Focus};
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run};
 use super::{PHOSPHOR, PHOSPHOR_DIM};
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-use crate::player::focus::{Aside, Focus};
 
 pub(super) struct PagePlugin;
 

@@ -7,6 +7,10 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::parts::paper::Paper;
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::camera::framing;
+use ld60_core::player::focus::{Aside, Clickable, Focus};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -14,10 +18,6 @@ use ld60_geometry::surface::Finish;
 use self::arm::Arm;
 use self::sway::Sway;
 use super::monitor::Monitor;
-use crate::parts::paper::Paper;
-use crate::parts::screen::UiCanvas;
-use crate::player::camera::framing;
-use crate::player::focus::{Aside, Clickable, Focus};
 use crate::workshop::manuals::{MoveSheet, Pins, RailSlot, Sheet};
 use crate::workshop::run::Run;
 

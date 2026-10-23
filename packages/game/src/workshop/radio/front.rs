@@ -1,11 +1,11 @@
 use bevy::prelude::*;
+use ld60_core::parts::dot_matrix::DotMatrix;
 use ld60_geometry::block::Block;
 use ld60_geometry::frame::Frame;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
 use super::CASE;
-use crate::parts::dot_matrix::DotMatrix;
 
 /// Wood shows around the front panel.
 const BORDER: f32 = 0.012;

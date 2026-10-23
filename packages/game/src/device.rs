@@ -9,16 +9,16 @@ use bevy::{
     picking::{events::PointerDrag, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::parts::keypad::PressableKey;
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::player::focus::{Focus, FocusTarget, Focused, View};
+use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::name::{BoardLetter, DeviceName};
 pub(crate) use self::silhouette::Silhouette;
-use crate::parts::keypad::PressableKey;
-use crate::player::camera::PlayerCamera;
-use crate::player::focus::{Focus, FocusTarget, Focused, View};
-use crate::player::hints::{Hint, Hints, Icon, Input};
 
 /// How far a held device lifts off the counter.
 const LIFT: f32 = 0.1;

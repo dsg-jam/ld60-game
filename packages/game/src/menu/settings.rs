@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_core::settings::{Setting, Settings};
 use ld60_locale::{Localized, Message};
 
 use super::list::{Action, Entries, Entry};
-use crate::settings::{Setting, Settings};
 
 /// Room for the name of a setting, so the values line up.
 const LABEL_WIDTH: f32 = 340.0;

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
+use ld60_core::debug_port::DebugMethods;
 
 /// Wind at street level along X and Z, in meters per second. The rain
 /// drifts with it, and the clouds with the stronger wind up high.

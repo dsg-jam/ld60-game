@@ -3,7 +3,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use crate::layout::counter::CounterLayout;
+use ld60_core::layout::counter::CounterLayout;
 
 const SLAT: f32 = 0.12;
 const SLAT_GAP: f32 = 0.008;

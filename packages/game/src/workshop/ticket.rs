@@ -1,4 +1,8 @@
 use bevy::prelude::*;
+use ld60_core::audio::{Play, Sound};
+use ld60_core::parts::paper::{Binding, Paper};
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::focus::{Focus, FocusTarget, View};
 use ld60_devices::{ChipSpec, RomKind};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -8,11 +12,7 @@ use ld60_locale::{Localized, Message};
 
 use super::job::Job;
 use super::levels::Levels;
-use crate::audio::{Play, Sound};
 use crate::device::DeviceName;
-use crate::parts::paper::{Binding, Paper};
-use crate::parts::screen::UiCanvas;
-use crate::player::focus::{Focus, FocusTarget, View};
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);

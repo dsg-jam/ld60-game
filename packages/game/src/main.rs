@@ -6,18 +6,9 @@
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
-mod audio;
 mod city;
-mod clock;
-#[cfg(feature = "debug_port")]
-mod debug_port;
 mod device;
-mod layout;
 mod menu;
-mod parts;
-mod player;
-mod settings;
-mod state;
 mod workshop;
 
 use bevy::asset::AssetMetaCheck;
@@ -25,8 +16,6 @@ use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 
 const TITLE: &str = "Bugs From Home";
-/// Meters per second squared, down.
-const GRAVITY: f32 = 9.81;
 
 fn main() -> AppExit {
     let mut app = App::new();
@@ -46,17 +35,17 @@ fn main() -> AppExit {
             }),
     );
     #[cfg(feature = "debug_port")]
-    app.add_plugins(debug_port::DebugPortPlugin);
+    app.add_plugins(ld60_core::debug_port::DebugPortPlugin);
     app.add_plugins((
         MeshPickingPlugin,
-        audio::AudioPlugin,
+        ld60_core::audio::AudioPlugin,
         city::CityPlugin,
-        clock::ClockPlugin,
+        ld60_core::clock::ClockPlugin,
         ld60_geometry::GeometryPlugin,
         ld60_locale::LocalePlugin,
         menu::MenuPlugin,
-        parts::PartsPlugin,
-        player::PlayerPlugin,
+        ld60_core::parts::PartsPlugin,
+        ld60_core::player::PlayerPlugin,
         ld60_locale::TypefacePlugin,
         workshop::WorkshopPlugin,
         device::DevicePlugin,

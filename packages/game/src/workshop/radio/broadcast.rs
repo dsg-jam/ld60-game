@@ -5,11 +5,11 @@ use std::error::Error;
 use std::time::Duration;
 
 use bevy::{asset::LoadState, audio::Volume, prelude::*};
+use ld60_core::audio::{Mixer, Sound, Takes};
 
 use self::pan::{Pan, Panned};
 use self::program::OnAir;
 use super::{Front, Radio};
-use crate::audio::{Mixer, Sound, Takes};
 
 /// Station n starts with track n and plays on through the ones after it.
 pub(super) const TRACKS: [Track; 11] = [

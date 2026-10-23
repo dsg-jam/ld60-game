@@ -29,6 +29,9 @@ mod tutorial;
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
+use ld60_core::layout::counter::CounterLayout;
+use ld60_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
+use ld60_core::player::camera::PlayerCamera;
 
 use self::clutter::Clutter;
 use self::computer::Computer;
@@ -40,9 +43,6 @@ use self::manuals::ShopManuals;
 use self::radio::Radio;
 use self::shop::Shop;
 use self::tools::Tool;
-use crate::layout::counter::CounterLayout;
-use crate::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
-use crate::player::camera::PlayerCamera;
 
 const COMPUTER_YAW: f32 = -0.4;
 const LAMP_YAW: f32 = -0.7;

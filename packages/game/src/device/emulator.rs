@@ -2,14 +2,14 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 use bevy::prelude::*;
+#[cfg(feature = "debug_port")]
+use ld60_core::debug_port::DebugMethods;
+use ld60_core::parts::lcd::LcdDisplay;
 use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, Rom};
 use ld60_levels::TEST_SEEDS;
 use ld60_machine::{Cpu, Step};
 
 use super::{DeviceButton, DeviceKey};
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-use crate::parts::lcd::LcdDisplay;
 
 /// How many instructions the trace remembers.
 pub(crate) const TRACE_LEN: usize = 64;

@@ -1,12 +1,12 @@
 use std::fmt;
 
 use bevy::prelude::*;
+use ld60_core::parts::paper::{Paper, Print};
+use ld60_core::parts::screen::UiCanvas;
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::contents::{Contents, Entry, Page};
-use crate::parts::paper::{Paper, Print};
-use crate::parts::screen::UiCanvas;
 use crate::workshop::run::Run;
 use crate::workshop::tutorial::TutorialNote;
 

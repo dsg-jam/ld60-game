@@ -1,11 +1,11 @@
 use bevy::{input::keyboard::NativeKeyCode, prelude::*};
+use ld60_core::parts::keypad::KeyBinding::Code;
+use ld60_core::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::{CASE, CASE_DARK};
-use crate::parts::keypad::KeyBinding::Code;
-use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 
 /// Base border around the keys.
 const MARGIN: f32 = 0.012;

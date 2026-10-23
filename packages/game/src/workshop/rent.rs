@@ -1,14 +1,14 @@
 use bevy::prelude::*;
+use ld60_core::audio::{Play, Sound};
+use ld60_core::layout::counter::CounterLayout;
+use ld60_core::parts::paper::{Paper, Press, Stock};
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
+use ld60_core::state::AppState;
 use ld60_locale::{Localized, Message};
 
 use super::chore::PlanetSet;
 use super::run::{Rent, Run};
-use crate::audio::{Play, Sound};
-use crate::layout::counter::CounterLayout;
-use crate::parts::paper::{Paper, Press, Stock};
-use crate::parts::screen::UiCanvas;
-use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
-use crate::state::AppState;
 
 /// Next to the receipt, a little closer to the player.
 pub(super) const SPOT: Vec2 = Vec2::new(-0.6, -0.06);

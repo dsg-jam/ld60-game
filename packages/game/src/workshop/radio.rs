@@ -2,6 +2,13 @@ mod broadcast;
 mod front;
 
 use bevy::{picking::events::PointerScroll, prelude::*};
+use ld60_core::parts::dot_matrix::DotMatrix;
+use ld60_core::parts::gauge::Gauge;
+use ld60_core::parts::knob::Knob;
+use ld60_core::parts::latch_button::LatchButton;
+use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
+use ld60_core::player::free_look::MODIFIERS;
+use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -9,13 +16,6 @@ use ld60_locale::Message;
 
 use self::broadcast::{TRACKS, Tuner};
 use self::front::Front;
-use crate::parts::dot_matrix::DotMatrix;
-use crate::parts::gauge::Gauge;
-use crate::parts::knob::Knob;
-use crate::parts::latch_button::LatchButton;
-use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
-use crate::player::free_look::MODIFIERS;
-use crate::player::hints::{Hint, Hints, Icon, Input};
 
 pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
 /// Twelve characters of five dots.

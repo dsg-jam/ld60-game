@@ -1,11 +1,11 @@
 use bevy::prelude::*;
+use ld60_core::clock::Clock;
 use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
 use super::job::{Bench, Job};
 use super::run::Run;
 use super::salvage::SalvageCrate;
-use crate::clock::Clock;
 
 pub(crate) struct SavePlugin;
 
@@ -100,10 +100,10 @@ impl SavedShop {
 #[cfg(test)]
 mod tests {
     use ld60_calco::Revision;
+    use ld60_core::player::focus::{Focus, Focused};
     use ld60_devices::DeviceKind;
 
     use super::*;
-    use crate::player::focus::{Focus, Focused};
     use crate::workshop::chore::PlanetSet;
     use crate::workshop::levels::Levels;
     use crate::workshop::rent::RentNote;

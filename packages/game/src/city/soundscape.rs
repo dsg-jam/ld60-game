@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
 };
 
-use crate::audio::{Mixer, Sound};
+use ld60_core::audio::{Mixer, Sound};
 
 /// So small that rodio's own fall off with the squared distance never kicks
 /// in. [`Emitter`] fades with distance instead.

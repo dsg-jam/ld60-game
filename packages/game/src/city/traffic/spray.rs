@@ -4,13 +4,13 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_core::GRAVITY;
 use ld60_geometry::quads::Quads;
 use rand::RngExt;
 
 use super::super::rng;
 use super::super::weather::Weather;
 use super::models::{TRACK, WHEELBASE};
-use crate::GRAVITY;
 
 const SEED: u64 = 6;
 /// Droplets per rear wheel. The front wheels throw fewer.

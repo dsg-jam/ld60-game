@@ -1,12 +1,12 @@
 use std::f32::consts::TAU;
 
 use bevy::prelude::*;
+use ld60_core::layout::title::{EYE, SWAY};
+use ld60_core::player::camera::PlayerCamera;
 use ld60_locale::Message;
 
 use super::list::Action;
 use super::{AppState, Column, Started};
-use crate::layout::title::{EYE, SWAY};
-use crate::player::camera::PlayerCamera;
 
 const AT: Vec3 = Vec3::new(-0.2, 1.4, 0.0);
 /// Seconds for one sway to the side and back.

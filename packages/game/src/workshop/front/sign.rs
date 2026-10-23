@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use ld60_core::layout::shop::{FRONT, PILLAR};
+use ld60_core::parts::script::{GLYPH_SIZE, Word};
 use ld60_devices::DeviceKind;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
@@ -9,8 +11,6 @@ use rand::{Rng, RngExt, SeedableRng};
 
 use super::{BEAM_HEIGHT, Front};
 use crate::device::Silhouette;
-use crate::layout::shop::{FRONT, PILLAR};
-use crate::parts::script::{GLYPH_SIZE, Word};
 use crate::workshop::run::Run;
 
 const BOARD: Vec3 = Vec3::new(0.3, 0.22, 0.012);

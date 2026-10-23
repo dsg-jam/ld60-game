@@ -1,10 +1,10 @@
 use bevy::prelude::*;
+use ld60_core::layout::shop::{FRONT, PILLAR, PLATFORM, SIZE, ShopLayout, WALL};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::rug::Rug;
-use crate::layout::shop::{FRONT, PILLAR, PLATFORM, SIZE, ShopLayout, WALL};
 
 const SHELF_BOARDS: usize = 5;
 const BOARD: f32 = 0.025;

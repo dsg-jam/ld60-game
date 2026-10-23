@@ -3586,6 +3586,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ld60-core"
+version = "0.2.2"
+dependencies = [
+ "bevy",
+ "ld60-devices",
+ "ld60-geometry",
+ "ld60-locale",
+ "ld60-store",
+ "rand",
+ "serde",
+ "serde_json",
+ "web-sys",
+ "winit",
+]
+
+[[package]]
 name = "ld60-devices"
 version = "0.2.2"
 dependencies = [
@@ -3609,6 +3625,7 @@ version = "0.2.2"
 dependencies = [
  "bevy",
  "ld60-calco",
+ "ld60-core",
  "ld60-devices",
  "ld60-geometry",
  "ld60-levels",
@@ -3619,8 +3636,6 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
- "web-sys",
- "winit",
 ]
 
 [[package]]

@@ -1,15 +1,15 @@
 use bevy::prelude::*;
+use ld60_core::audio::{Play, Sound};
+use ld60_core::layout::counter::CounterLayout;
+use ld60_core::parts::paper::Paper;
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, View};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::levels::Levels;
 use super::pickup::Pickup;
 use super::ticket::JobTicket;
-use crate::audio::{Play, Sound};
-use crate::layout::counter::CounterLayout;
-use crate::parts::paper::Paper;
-use crate::parts::screen::UiCanvas;
-use crate::player::focus::{Focus, FocusOn, FocusTarget, View};
 
 pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
 pub(super) const YAW: f32 = 0.1;

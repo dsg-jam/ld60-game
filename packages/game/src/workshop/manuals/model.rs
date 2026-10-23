@@ -10,6 +10,8 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
+use ld60_core::parts::paper::{INK, PAPER, Paper};
+use ld60_core::parts::screen::UiCanvas;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
@@ -18,8 +20,6 @@ use ld60_locale::{Localized, Message};
 use super::cloth;
 use super::mechanism::Mechanism;
 use super::top_sheet::TopSheet;
-use crate::parts::paper::{INK, PAPER, Paper};
-use crate::parts::screen::UiCanvas;
 
 pub(super) const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 pub(super) const BOARD: f32 = 0.004;

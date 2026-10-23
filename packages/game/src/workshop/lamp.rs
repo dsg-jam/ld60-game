@@ -8,14 +8,14 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::audio::{PlayAt, Sound};
+use ld60_core::parts::bulb::Bulb;
+use ld60_core::player::focus::{Clickable, Focus};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::dust::Dust;
-use crate::audio::{PlayAt, Sound};
-use crate::parts::bulb::Bulb;
-use crate::player::focus::{Clickable, Focus};
 
 pub(super) const BASE_SIZE: Vec3 = Vec3::new(0.14, 0.02, 0.14);
 const POLE_SIZE: Vec3 = Vec3::new(0.016, 0.46, 0.016);

@@ -2,6 +2,11 @@ use std::error::Error;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{input::keyboard::Key, prelude::*};
+use ld60_core::parts::keypad::KeyBinding::{Named, Typed};
+use ld60_core::parts::keypad::{KeyDef, Keypad, KeypadStyle};
+use ld60_core::parts::lcd;
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::parts::sticker::{Sticker, StickerMaterial};
 use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -12,11 +17,6 @@ use ld60_locale::{Localized, Message};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
 use super::{DeviceButton, DeviceName, Holdable};
-use crate::parts::keypad::KeyBinding::{Named, Typed};
-use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
-use crate::parts::lcd;
-use crate::parts::screen::UiCanvas;
-use crate::parts::sticker::{Sticker, StickerMaterial};
 
 /// Dark frame around the LCD.
 const LCD_BORDER: f32 = 0.003;

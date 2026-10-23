@@ -1,4 +1,5 @@
 use bevy::{light::VolumetricLight, prelude::*};
+use ld60_core::layout::shop;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -6,7 +7,6 @@ use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use super::wet::{Wet, WetMaterial};
 use super::{CURB_HEIGHT, FACADES, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, turned_to};
 use super::{glow, matte};
-use crate::layout::shop;
 
 /// Thickness of the ground slabs below their top.
 const SLAB_DEPTH: f32 = 0.4;
