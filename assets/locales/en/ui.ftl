@@ -19,6 +19,7 @@ hint-look-pins = Look at pins
 hint-look-screen = Look at screen
 
 click-bell = Ring bell
+click-bell-open = Close up the device first
 click-manuals = Open shop manuals
 click-buy = Buy
 click-buy-short = Not enough money in the till
