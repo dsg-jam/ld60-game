@@ -7,15 +7,15 @@ use bevy::{
     picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::{Localized, Message};
 
 use super::contents::{Contents, Section};
 use super::model::{HOLE_RADIUS, SHEET_SIZE};
 use super::punched::punched_box;
 use super::stack::{CARD, holes, stray};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::parts::paper::{INK, Paper, PaperButton};
 use crate::parts::screen::UiCanvas;
 

@@ -12,7 +12,7 @@ import bevy_pbr::render::{
     forward_io::{VertexOutput, FragmentOutput},
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
 };
-import package::geometry::{
+import package::{
     bump::bumped,
     floor::{plank, plank_color, plank_height, rug, rug_height},
     metal::steel,

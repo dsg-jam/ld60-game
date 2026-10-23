@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
+use ld60_geometry::block::Block;
 
 use super::clutter::Clutter;
 use super::computer::ComputerLayout;
@@ -11,7 +12,6 @@ use super::{
     tools,
 };
 use crate::device::Handheld;
-use crate::geometry::block::Block;
 
 /// Space kept between the keyboard and the mat.
 const MAT_MARGIN: f32 = 0.01;

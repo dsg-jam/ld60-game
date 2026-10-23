@@ -1,11 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{light::VolumetricLight, prelude::*, shape::ConvexPolygonError};
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 use super::super::{Kit, NEON, Pick, glow, matte};
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 
 /// Side view of a sedan, front towards +X. Hull and windows.
 const SEDAN_HULL: [Vec2; 6] = [

@@ -1,6 +1,6 @@
 /// Punched holes and the wear a binder leaves around them.
 
-import package::geometry::noise::{TAU, hash, noise};
+import ld60_geometry::noise::{TAU, hash, noise};
 
 /// Share of the holes that tore out towards the edge.
 const TEARS: f32 = 0.25;

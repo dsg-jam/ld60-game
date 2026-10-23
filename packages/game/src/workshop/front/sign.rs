@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
+use ld60_geometry::bar::Bar;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt, SeedableRng};
 
 use super::{BEAM_HEIGHT, Front};
 use crate::device::Silhouette;
-use crate::geometry::bar::Bar;
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::script::{GLYPH_SIZE, Word};
 use crate::workshop::run::Run;
 use crate::workshop::shop::{FRONT, PILLAR};

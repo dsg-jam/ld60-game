@@ -12,7 +12,7 @@ import bevy_pbr::render::{
     forward_io::{VertexOutput, FragmentOutput},
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
 };
-import package::geometry::{
+import ld60_geometry::{
     bump::bumped,
     noise::{hash, noise, visible},
 };

@@ -6,6 +6,7 @@ mod typing;
 mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
+use ld60_geometry::block::Block;
 
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
@@ -16,7 +17,6 @@ use self::pinboard::sway::Sway;
 use self::typing::MouseTyping;
 use self::views::{BackToScreen, Views};
 use super::dust::Dust;
-use crate::geometry::block::Block;
 use crate::parts::keypad::PressableKey;
 use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
 use crate::player::focus::{Focus, FocusTarget};

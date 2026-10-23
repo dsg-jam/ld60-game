@@ -7,13 +7,13 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use self::arm::Arm;
 use self::sway::Sway;
 use super::monitor::Monitor;
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::camera::framing;

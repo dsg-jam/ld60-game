@@ -5,11 +5,10 @@ use bevy::{
     mesh::{Indices, PrimitiveTopology},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
-
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 
 /// The knotted part, long along Z.
 pub(super) const SIZE: Vec3 = Vec3::new(1.3, 0.008, 1.8);

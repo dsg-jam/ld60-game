@@ -6,13 +6,13 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::job::{HandIn, Job};
 use super::ticket::{JobTicket, Landing};
 use crate::audio::{Play, Sound};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::paper::Paper;
 use crate::player::focus::{Clickable, Focus, FocusOn};
 

@@ -1,12 +1,12 @@
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_geometry::bar::Bar;
+use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::{Additions, Wall};
 use crate::city::Kit;
-use crate::geometry::bar::Bar;
-use crate::geometry::block::Block;
 
 const SCAFFOLD_CHANCE: f64 = 0.15;
 const BAYS: Range<usize> = 2..6;

@@ -3,7 +3,7 @@
 /// sheet differs a little in how far it yellowed, how dark its edges went
 /// and which side the sun faded.
 
-import package::geometry::noise::{TAU, hash, noise, specks};
+import ld60_geometry::noise::{TAU, hash, noise, specks};
 
 /// Paper yellowed all the way.
 const YELLOWED: vec3<f32> = vec3<f32>(1.0, 0.86, 0.62);

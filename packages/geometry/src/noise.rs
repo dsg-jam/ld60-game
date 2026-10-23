@@ -11,14 +11,14 @@ fn pcg(seed: u32) -> u32 {
 }
 
 /// A random number from 0 to 1 for a cell, like `hash1` in `noise.wesl`.
-pub(crate) fn hash1(cell: Vec2, salt: f32) -> f32 {
+pub fn hash1(cell: Vec2, salt: f32) -> f32 {
     let state = pcg(cell.x as i32 as u32 ^ pcg(cell.y as i32 as u32 ^ pcg((salt * 977.0) as u32)));
     state as f32 / u32::MAX as f32
 }
 
 /// Smooth noise from 0 to 1 with features of size 1, like `noise` in
 /// `noise.wesl`.
-pub(crate) fn noise(p: Vec2, salt: f32) -> f32 {
+pub fn noise(p: Vec2, salt: f32) -> f32 {
     let i = p.floor();
     let f = p - i;
     let u = f * f * (3.0 - 2.0 * f);

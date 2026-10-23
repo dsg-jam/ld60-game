@@ -9,18 +9,18 @@ use super::block::Block;
 /// A slab with rectangular holes through it, like a panel with openings
 /// for the parts that sit in it. The holes lie inside the slab and don't
 /// overlap.
-pub(crate) struct Frame<'a> {
-    pub(crate) outer: Block,
+pub struct Frame<'a> {
+    pub outer: Block,
     /// Each hole's walls reach back from the front of `outer` to the back
     /// of the hole's block, at most to the back of `outer`. A hole whose
     /// block starts at the front or beyond has no walls, for parts that
     /// fill it.
-    pub(crate) holes: &'a [Block],
+    pub holes: &'a [Block],
 }
 
 impl Frame<'_> {
     /// The front and sides, as one mesh so no seams show.
-    pub(crate) fn mesh(&self) -> Mesh {
+    pub fn mesh(&self) -> Mesh {
         let (outer, holes) = (&self.outer, self.holes);
         let (low, high) = (outer.min(), outer.max());
         let mut positions = Vec::new();

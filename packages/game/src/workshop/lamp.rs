@@ -8,12 +8,12 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::dust::Dust;
 use crate::audio::{PlayAt, Sound};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::bulb::Bulb;
 use crate::player::focus::{Clickable, Focus};
 

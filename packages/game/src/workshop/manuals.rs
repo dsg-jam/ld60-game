@@ -15,6 +15,7 @@ mod top_sheet;
 mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::Message;
 
 use self::contents::{Contents, Entry};
@@ -32,7 +33,6 @@ use super::job::{Job, JobId};
 use super::run::Run;
 use super::tutorial::{FirstNote, TutorialNote};
 use crate::audio::{Play, Sound};
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::menu::AppState;
 use crate::parts::paper::{
     Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,

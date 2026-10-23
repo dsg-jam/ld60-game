@@ -1,5 +1,5 @@
 /// Draws the density of a steam plume into a 3D texture, every frame.
-import package::geometry::noise::pcg;
+import ld60_geometry::noise::pcg;
 
 /// Matches `PlumeParams` in `steam.rs`.
 struct Plume {

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::workshop::counter::CounterLayout;
 #[cfg(test)]
 use crate::workshop::footprint::Footprint;

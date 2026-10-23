@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::{CASE, CASE_DARK};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 
 const STAND_SIZE: Vec3 = Vec3::new(0.2, 0.03, 0.2);
 const BODY_SIZE: Vec3 = Vec3::new(0.38, 0.32, 0.36);

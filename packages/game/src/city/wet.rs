@@ -5,10 +5,10 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_geometry::noise::noise;
 
 use super::weather::Weather;
 use super::{FAR_CURB, NEAR_CURB};
-use crate::geometry::noise::noise;
 
 /// How dark and glossy the ground gets when fully wet.
 const WETNESS: f32 = 0.6;

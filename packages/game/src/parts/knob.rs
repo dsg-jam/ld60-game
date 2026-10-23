@@ -10,11 +10,11 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
 use crate::audio::{Play, Sound};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::player::focus::Focused;
 use crate::player::free_look::MODIFIERS;
 

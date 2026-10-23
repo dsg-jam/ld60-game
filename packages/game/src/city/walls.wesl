@@ -1,7 +1,7 @@
 /// What the outer walls of buildings are clad in, and how weather and age
 /// marked them. Positions are in meters across the wall, with y going up.
 
-import package::geometry::noise::{hash1, noise};
+import ld60_geometry::noise::{hash1, noise};
 
 /// Matches `Cladding` in `buildings/cladding.rs`.
 const CONCRETE: u32 = 0u;

@@ -7,11 +7,11 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::super::weather::Weather;
 use super::cladding::Cladding;
-use crate::geometry::block::Block;
 
 const WINDOW_PITCH: Range<f32> = 1.8..3.6;
 const LIT: Range<f32> = 0.2..0.5;

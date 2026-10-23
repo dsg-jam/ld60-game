@@ -12,7 +12,7 @@ import bevy_pbr::render::{
 };
 @if(PREPASS_PIPELINE)
 import bevy_render::globals::Globals;
-import package::geometry::{
+import ld60_geometry::{
     bump::bumped,
     noise::{hash, hash1, noise},
 };

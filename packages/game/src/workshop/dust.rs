@@ -1,7 +1,6 @@
 use bevy::{light::NotShadowCaster, prelude::*};
+use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
-
-use crate::geometry::block::Block;
 
 const MOTE_RADIUS: f32 = 0.0009;
 /// Meters per second.

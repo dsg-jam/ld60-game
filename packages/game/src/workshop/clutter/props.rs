@@ -1,10 +1,10 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-
 #[cfg(test)]
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
+
 use crate::parts::liquid::{Foam, Liquid};
 use crate::parts::steam::Steam;
 

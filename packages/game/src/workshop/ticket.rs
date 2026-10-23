@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 use ld60_devices::{ChipSpec, RomKind};
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
@@ -7,9 +10,6 @@ use super::job::Job;
 use super::levels::Levels;
 use crate::audio::{Play, Sound};
 use crate::device::DeviceName;
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::paper::{Binding, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusTarget, View};

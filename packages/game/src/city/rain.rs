@@ -6,11 +6,11 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_geometry::quads::Quads;
 use rand::RngExt;
 
 use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
-use crate::geometry::quads::Quads;
 use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::workshop::shop;

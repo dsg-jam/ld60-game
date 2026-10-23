@@ -5,14 +5,14 @@ use std::collections::HashSet;
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_geometry::bar::Bar;
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 use super::buildings::{Facade, FacadeMaterial, WindowGrid};
 use super::market::MARKET_HEIGHT;
 use super::{Kit, Pick, glow};
-use crate::geometry::bar::Bar;
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, SurfaceMaterial};
 
 /// Additions start above the shop signs.
 const LOWEST: f32 = MARKET_HEIGHT + 2.4;

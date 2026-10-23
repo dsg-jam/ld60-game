@@ -2,7 +2,7 @@
 /// board, darker latewood, pores along the fibers and a sheen that moves
 /// with the view, after Liu, Marschner and Dye, "Procedural wood textures".
 
-import package::geometry::noise::{hash, hash1, noise, visible};
+import package::noise::{hash, hash1, noise, visible};
 
 /// Width of one year's growth, in meters.
 const RING: f32 = 0.006;

@@ -5,14 +5,14 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::model::{
     BOARD, HOLE_RADIUS, MECHANISM_TOP, METAL, Parts, RING_RADIUS, RING_WIRE, ring_center,
     ring_holes,
 };
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 
 /// How far the mechanism reaches past the rings on either side.
 const MECHANISM_LIP: f32 = 0.002;

@@ -9,7 +9,7 @@ use bevy::{
 /// How used every surface looks, from 0 to 1.
 const WEAR: f32 = 0.8;
 
-pub(crate) struct SurfacePlugin;
+pub struct SurfacePlugin;
 
 impl Plugin for SurfacePlugin {
     fn build(&self, app: &mut App) {
@@ -22,13 +22,13 @@ impl Plugin for SurfacePlugin {
     }
 }
 
-pub(crate) type SurfaceMaterial = ExtendedMaterial<StandardMaterial, Surface>;
+pub type SurfaceMaterial = ExtendedMaterial<StandardMaterial, Surface>;
 
 /// What a surface is made of, which decides its detail and how it wears.
 ///
 /// Matches the constants in `surface.wesl`.
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) enum Finish {
+pub enum Finish {
     #[default]
     Paint = 0,
     Plastic = 1,
@@ -60,7 +60,7 @@ pub(crate) enum Finish {
 ///
 /// Matches the constants in `surface.wesl`.
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum Form {
+pub enum Form {
     /// A box of this size.
     Box(Vec3),
     /// An upright cylinder filling a box of this size.
@@ -75,7 +75,7 @@ pub(crate) enum Form {
 /// Detail and signs of use on a surface: grain, bumps, worn edges, grime,
 /// dust and scratches.
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub(crate) struct Surface {
+pub struct Surface {
     #[uniform(100)]
     params: SurfaceParams,
 }
@@ -93,12 +93,12 @@ struct SurfaceParams {
 impl Finish {
     /// A material in `color` with this finish, for a shape of `form`. The
     /// `seed` keeps similar shapes from looking the same.
-    pub(crate) fn material(self, color: Color, form: Form, seed: f32) -> SurfaceMaterial {
+    pub fn material(self, color: Color, form: Form, seed: f32) -> SurfaceMaterial {
         self.textured(color, None, form, seed)
     }
 
     /// Like [`Self::material`], with `texture` printed on.
-    pub(crate) fn textured(
+    pub fn textured(
         self,
         color: Color,
         texture: Option<Handle<Image>>,
@@ -117,13 +117,13 @@ impl Finish {
 
     /// A material in `color` with this finish for any number of unit cubes,
     /// each scaled to the size of a box.
-    pub(crate) fn scaled(self, color: Color) -> SurfaceMaterial {
+    pub fn scaled(self, color: Color) -> SurfaceMaterial {
         self.material(color, Form::Scaled, 0.0)
     }
 
     /// Like [`Self::material`], over a `base` that sets more than the color,
     /// like the gloss of car paint.
-    pub(crate) fn over(self, base: StandardMaterial, form: Form, seed: f32) -> SurfaceMaterial {
+    pub fn over(self, base: StandardMaterial, form: Form, seed: f32) -> SurfaceMaterial {
         let half_size = match form {
             Form::Box(size) | Form::Cylinder(size) => size / 2.0,
             Form::Freeform | Form::Scaled => Vec3::ZERO,

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
+use ld60_geometry::block::Block;
 
 use super::handheld::Model;
-use crate::geometry::block::Block;
 
 /// A device seen from above, flattened to colored rectangles.
 ///
