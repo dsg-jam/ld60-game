@@ -83,6 +83,18 @@ pub enum Sound {
     Hinge,
     /// Something the player asked for can't be done.
     Refuse,
+    /// A screw turned out of a device.
+    ScrewOut,
+    /// A screw turned into a device.
+    ScrewIn,
+    /// The debug plug pushed onto a device.
+    PlugIn,
+    /// The debug plug pulled off a device.
+    PlugOut,
+    /// The back cover of a device lifting off.
+    CoverOff,
+    /// The back cover of a device pressed back on.
+    CoverOn,
     /// Rain on the road, a loop.
     AsphaltRain,
     /// Rain on the sidewalk, a loop.
@@ -102,7 +114,7 @@ pub enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 18] = [
+    const ALL: [Self; 24] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
@@ -121,6 +133,12 @@ impl Sound {
         Self::RingsShut,
         Self::Hinge,
         Self::Refuse,
+        Self::ScrewOut,
+        Self::ScrewIn,
+        Self::PlugIn,
+        Self::PlugOut,
+        Self::CoverOff,
+        Self::CoverOn,
     ];
 
     /// The takes of the sound as assets, for playing them in other ways
@@ -149,7 +167,13 @@ impl Sound {
             | Self::RingsShut
             | Self::Hinge
             | Self::Drip
-            | Self::Plunk => TAKES,
+            | Self::Plunk
+            | Self::ScrewOut
+            | Self::ScrewIn
+            | Self::PlugIn
+            | Self::PlugOut
+            | Self::CoverOff
+            | Self::CoverOn => TAKES,
             Self::KeyDown | Self::KeyUp => 2 * TAKES,
             Self::AsphaltRain
             | Self::ConcreteRain
@@ -181,6 +205,12 @@ impl Sound {
             Self::RingsShut => Samples::rings_shut(take),
             Self::Hinge => Samples::hinge(take),
             Self::Refuse => Samples::refuse(),
+            Self::ScrewOut => Samples::screw_out(take),
+            Self::ScrewIn => Samples::screw_in(take),
+            Self::PlugIn => Samples::plug_in(take),
+            Self::PlugOut => Samples::plug_out(take),
+            Self::CoverOff => Samples::cover_off(take),
+            Self::CoverOn => Samples::cover_on(take),
             Self::AsphaltRain => Samples::asphalt_rain(take),
             Self::ConcreteRain => Samples::concrete_rain(take),
             Self::PuddleRain => Samples::puddle_rain(take),
@@ -209,6 +239,9 @@ impl Sound {
             Self::RingsOpen | Self::RingsShut => 0.24,
             Self::Hinge => 0.12,
             Self::Refuse => 0.12,
+            Self::ScrewOut | Self::ScrewIn => 0.35,
+            Self::PlugIn | Self::PlugOut => 0.45,
+            Self::CoverOff | Self::CoverOn => 0.45,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,
