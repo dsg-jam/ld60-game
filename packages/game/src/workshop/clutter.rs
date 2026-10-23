@@ -7,9 +7,9 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
 
 use self::props::{Finishes, Props};
-use super::counter::CounterLayout;
 #[cfg(test)]
 use super::footprint::Footprint;
+use crate::layout::counter::CounterLayout;
 
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);

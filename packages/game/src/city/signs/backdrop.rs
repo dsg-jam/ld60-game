@@ -6,8 +6,8 @@ use rand::{Rng, RngExt};
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
 use crate::city::EYE_HEIGHT;
 use crate::city::buildings::{Backdrop, FacadeMaterial};
+use crate::layout::shop;
 use crate::parts::script::Word;
-use crate::workshop::shop;
 
 const CHANCE: f64 = 0.5;
 const IN_SIGHT_CHANCE: f64 = 0.9;

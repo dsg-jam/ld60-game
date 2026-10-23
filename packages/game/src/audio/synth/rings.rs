@@ -1,7 +1,7 @@
 use std::f32::consts::TAU;
 
 use super::{Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::workshop::DeskSpots;
+use crate::layout::desk::DeskSpots;
 
 /// Meters from the eyes to the manuals file while reading it.
 const REACH: f32 = 0.33;

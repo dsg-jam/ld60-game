@@ -8,7 +8,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use self::candle::{Candle, Paper};
-use super::shop::{FRONT, PILLAR, SIZE};
+use crate::layout::shop::{FRONT, PILLAR, SIZE};
 use crate::parts::script::ALPHABET;
 
 /// Box of the rolled up shutter above the opening.
@@ -207,8 +207,8 @@ impl Front {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layout::counter::CounterLayout;
     use crate::workshop::clock::{Clock, PLANET_SIZE};
-    use crate::workshop::counter::CounterLayout;
 
     #[test]
     fn the_whole_planet_shows_under_the_noren() {

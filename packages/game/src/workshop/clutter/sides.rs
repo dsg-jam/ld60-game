@@ -3,7 +3,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use crate::workshop::counter::CounterLayout;
+use crate::layout::counter::CounterLayout;
 #[cfg(test)]
 use crate::workshop::footprint::Footprint;
 

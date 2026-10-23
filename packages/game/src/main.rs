@@ -11,6 +11,7 @@ mod city;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod device;
+mod layout;
 mod menu;
 mod parts;
 mod player;

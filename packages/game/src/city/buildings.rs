@@ -15,7 +15,7 @@ use super::additions::Additions;
 use super::drips::{DripEdge, DripEdges};
 use super::market::{MARKET_HEIGHT, STALL_DEPTH, Stock};
 use super::{Kit, NEON, Pick, glow, rng};
-use crate::workshop::shop;
+use crate::layout::shop;
 
 const SEED: u64 = 2;
 

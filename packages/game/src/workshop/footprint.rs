@@ -4,14 +4,14 @@ use ld60_geometry::block::Block;
 
 use super::clutter::Clutter;
 use super::computer::ComputerLayout;
-use super::counter::CounterLayout;
 use super::manuals::ShopManuals;
 use super::{
-    BELL_SPOT, COMPUTER_SPOT, COMPUTER_YAW, LAMP_SPOT, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW,
-    RADIO_SPOT, RADIO_YAW, STAMP_SPOT, STAMP_YAW, job, lamp, radio, receipt, rent, salvage, ticket,
-    tools,
+    BELL_SPOT, COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW,
+    STAMP_SPOT, STAMP_YAW, job, lamp, radio, receipt, rent, salvage, ticket, tools,
 };
 use crate::device::Handheld;
+use crate::layout::counter::CounterLayout;
+use crate::layout::desk::{COMPUTER_SPOT, LAMP_SPOT};
 
 /// Space kept between the keyboard and the mat.
 const MAT_MARGIN: f32 = 0.01;

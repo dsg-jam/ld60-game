@@ -11,8 +11,8 @@ use rand::{Rng, RngExt};
 
 use super::signs::{Sign, SignBounds};
 use super::{FACADES, Kit, Pick, Segment, rng};
+use crate::layout::shop;
 use crate::parts::bulb::Bulb;
-use crate::workshop::shop;
 
 const SEED: u64 = 8;
 const CABLES: usize = 14;

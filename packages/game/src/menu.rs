@@ -15,7 +15,6 @@ use self::list::{Action, Entries};
 use self::restart::RestartPage;
 pub(crate) use self::settings::Settings;
 use self::settings::SettingsPage;
-pub(crate) use self::title::TITLE_EYES;
 use crate::audio::Mixer;
 use crate::player::hints::{INK, SHADOW};
 use crate::workshop::run::{NewRun, Run};
