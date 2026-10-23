@@ -15,7 +15,7 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
-use super::board::BoardLayout;
+use super::board::{BoardLayout, BoardSpots};
 use super::casing::{COVER, Casing, CasingSpots};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
@@ -92,7 +92,7 @@ const SUMMA6: Model = Model {
             Vec2::new(-0.8, 0.85),
             Vec2::new(0.8, 0.85),
         ],
-        header: Vec2::new(0.0, -0.6),
+        header: Vec2::new(0.0, -0.1),
     },
     words: false,
 };
@@ -112,7 +112,7 @@ const LOCK4: Model = Model {
             Vec2::new(0.75, -0.85),
             Vec2::new(0.0, 0.88),
         ],
-        header: Vec2::new(0.0, -0.6),
+        header: Vec2::new(0.0, -0.1),
     },
     words: true,
 };
@@ -157,7 +157,7 @@ const TALLY2: Model = Model {
     sticker_spot: Vec2::ZERO,
     casing: CasingSpots {
         screws: &[Vec2::new(-0.82, -0.8), Vec2::new(0.82, 0.8)],
-        header: Vec2::new(0.0, -0.65),
+        header: Vec2::new(0.0, -0.1),
     },
     words: false,
 };
@@ -298,15 +298,23 @@ impl Handheld {
         let shell = Block::new(model.body_size.with_y(model.body_size.y - COVER))
             .translated(Vec3::Y * COVER);
         let height = model.body_size.y + STYLE.key_size.y;
-        let board = BoardLayout::new(
-            &shell,
-            COVER,
-            model.casing.header,
-            model.casing.screws,
-            sticker_seed,
-        );
+        let plate = Block::new(shell.size.with_y(COVER));
+        let screws: Vec<_> = model
+            .casing
+            .screws
+            .iter()
+            .map(|&spot| plate.top_spot(spot).with_y(0.0))
+            .collect();
+        let spots = BoardSpots {
+            header: model.casing.header,
+            display: model.window_spot,
+            screws: &screws,
+        };
+        // Boards of one revision come off the same artwork.
         let name = format!("PCB {}", level.board().name());
-        let face = board.face(&name, sticker_seed, &mut meshes, &mut images, &mut pcbs);
+        let artwork = Sticker::seed(&format!("{:?} {name}", level.device));
+        let board = BoardLayout::new(&shell, COVER, &spots, artwork);
+        let face = board.face(&name, &mut meshes, &mut images, &mut pcbs);
         let unlit = |texture: Handle<Image>| StandardMaterial {
             base_color_texture: Some(texture),
             unlit: true,
