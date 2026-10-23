@@ -21,8 +21,14 @@ const BOOT: Vec3 = Vec3::new(0.007, 0.007, 0.014);
 /// How high the port for the cable sits on the side of the monitor.
 const PORT_HEIGHT: f32 = 0.025;
 const RADIUS: f32 = 0.0016;
-/// Long enough to reach a device held up to the eyes.
-const LENGTH: f32 = 0.8;
+/// The cable is this much longer than the way between its ends, so it
+/// hangs a little, and comes out of the computer or goes back in to keep it
+/// so.
+const SLACK: f32 = 1.25;
+const EXTRA: f32 = 0.05;
+/// How fast the cable comes out of or goes back into the computer, in
+/// meters per second.
+const REEL: f32 = 0.6;
 /// The cable is a chain of this many points.
 const POINTS: usize = 48;
 /// Steps of the simulation per frame. Small steps keep it stiff and calm.
@@ -76,8 +82,14 @@ struct Cable {
     points: Vec<Vec3>,
     /// Where the points were a step ago, which gives their speed.
     previous: Vec<Vec3>,
+    /// How long the cable is now, see [`SLACK`].
+    length: f32,
     /// Where the plug end was when the cable went to sleep.
     asleep: Option<Vec3>,
+    /// The ends a frame ago. Each step moves them a little of the way to
+    /// where they are now, so a fast turn of the device does not yank the
+    /// cable or sweep through it.
+    last: Option<Ends>,
 }
 
 /// The end of the cable that goes onto the [`Header`] of a device.
@@ -92,10 +104,33 @@ struct Segment(usize);
 
 /// Where the cable ends at the plug, the way it leaves the plug, and the
 /// box of the device it is plugged into.
+#[derive(Clone, Copy, Debug)]
 struct Ends {
     end: Vec3,
     exit: Vec3,
     device: Option<(Affine3A, Block)>,
+}
+
+impl Ends {
+    /// The ends `t` of the way from these to `other`.
+    fn towards(&self, other: &Self, t: f32) -> Self {
+        let device = match (self.device, other.device) {
+            (Some((from, _)), Some((to, bounds))) => {
+                let (_, a, p) = from.to_scale_rotation_translation();
+                let (_, b, q) = to.to_scale_rotation_translation();
+                Some((
+                    Affine3A::from_rotation_translation(a.slerp(b, t), p.lerp(q, t)),
+                    bounds,
+                ))
+            }
+            (_, device) => device,
+        };
+        Self {
+            end: self.end.lerp(other.end, t),
+            exit: self.exit.lerp(other.exit, t).normalize_or(other.exit),
+            device,
+        }
+    }
 }
 
 impl Cable {
@@ -146,7 +181,9 @@ impl Cable {
             ],
             points: Vec::new(),
             previous: Vec::new(),
+            length: 0.0,
             asleep: None,
+            last: None,
         };
         let exit = rest.rotation * Vec3::Z;
         cable.lay(rest.translation + exit * (PLUG.z / 2.0));
@@ -227,6 +264,7 @@ impl Cable {
     /// Lays the cable out straight from the computer to `end` to fall into
     /// place from.
     fn lay(&mut self, end: Vec3) {
+        self.length = Self::length_for(self.socket, end);
         self.points = (0..POINTS)
             .map(|index| {
                 let t = index as f32 / (POINTS - 1) as f32;
@@ -240,16 +278,22 @@ impl Cable {
     /// Moves the cable on by one frame, unless it sleeps and the plug has
     /// not moved. Returns whether it moved.
     fn frame(&mut self, ends: &Ends) -> bool {
-        if self
-            .asleep
-            .is_some_and(|end| end.distance(ends.end) < SLEEP)
+        let wanted = Self::length_for(self.socket, ends.end);
+        if wanted == self.length
+            && self
+                .asleep
+                .is_some_and(|end| end.distance(ends.end) < SLEEP)
         {
             return false;
         }
+        self.length += (wanted - self.length).clamp(-REEL * FRAME, REEL * FRAME);
         let before = self.points.clone();
-        for _ in 0..SUBSTEPS {
-            self.step(FRAME / SUBSTEPS as f32, ends);
+        let from = self.last.unwrap_or(*ends);
+        for substep in 1..=SUBSTEPS {
+            let between = from.towards(ends, substep as f32 / SUBSTEPS as f32);
+            self.step(FRAME / SUBSTEPS as f32, &between);
         }
+        self.last = Some(*ends);
         let moved = before
             .iter()
             .zip(&self.points)
@@ -259,11 +303,16 @@ impl Cable {
         true
     }
 
+    /// How long the cable wants to be between `socket` and `end`.
+    fn length_for(socket: Vec3, end: Vec3) -> f32 {
+        socket.distance(end) * SLACK + EXTRA
+    }
+
     /// One small step of `dt` seconds.
     fn step(&mut self, dt: f32, ends: &Ends) {
         let last = POINTS - 1;
-        let spacing = LENGTH / last as f32;
-        let free = 2..last - 1;
+        let spacing = self.length / last as f32;
+        let free = 3..last - 2;
         let keep = (1.0 - DAMPING * dt).max(0.0);
         for index in free.clone() {
             let point = self.points[index];
@@ -274,6 +323,8 @@ impl Cable {
         let pinned = [
             (0, self.socket),
             (1, self.socket + self.out * spacing),
+            (2, self.socket + self.out * 2.0 * spacing),
+            (last - 2, ends.end + ends.exit * 2.0 * spacing),
             (last - 1, ends.end + ends.exit * spacing),
             (last, ends.end),
         ];
@@ -393,7 +444,9 @@ mod tests {
             solids: Vec::new(),
             points: Vec::new(),
             previous: Vec::new(),
+            length: 0.0,
             asleep: None,
+            last: None,
         };
         cable.lay(end);
         cable
