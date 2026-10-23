@@ -129,6 +129,13 @@ impl PcbArt {
         self.stroke(path, width, &[Layer::Silk]);
     }
 
+    /// How much room `text` in the 5x7 font takes, `height` tall.
+    pub fn text_size(text: &str, height: f32) -> Vec2 {
+        let dot = height / 7.0;
+        let columns = (text.chars().count() * 6).saturating_sub(1);
+        Vec2::new(columns as f32 * dot, height)
+    }
+
     /// Printed `text` in the 5x7 font, `height` tall, with its top left at
     /// `at`.
     pub fn silk_text(&mut self, text: &str, at: Vec2, height: f32) {
@@ -175,12 +182,9 @@ impl PcbArt {
                     }
                 }
                 let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
-                data.extend([
-                    byte(texel[0]),
-                    byte(texel[1]),
-                    byte(texel[2]),
-                    byte(sum / area),
-                ]);
+                // Print never goes onto bare copper or into holes.
+                let silk = texel[2] * (1.0 - texel[1]);
+                data.extend([byte(texel[0]), byte(texel[1]), byte(silk), byte(sum / area)]);
             }
         }
         let mut image = Image::new(
