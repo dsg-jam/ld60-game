@@ -4,7 +4,7 @@ use bevy::{asset::AssetId, prelude::*};
 /// letters of English.
 const DEFAULT_FONT: &str = "fonts/fira-mono-medium.ttf";
 
-pub(crate) struct TypefacePlugin;
+pub struct TypefacePlugin;
 
 impl Plugin for TypefacePlugin {
     fn build(&self, app: &mut App) {
