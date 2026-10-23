@@ -13,8 +13,8 @@ use bevy::{
 
 use super::atmosphere::SKY;
 use super::weather::{WIND, Weather};
+use crate::clock::{Clock, PLANET_SIZE};
 use crate::player::camera::PlayerCamera;
-use crate::workshop::clock::{Clock, PLANET_SIZE};
 
 /// Far away, but still inside the camera's far plane.
 const RADIUS: f32 = 900.0;

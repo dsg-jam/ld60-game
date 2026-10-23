@@ -13,7 +13,7 @@ use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
 use crate::device::Emulator;
-use crate::workshop::clock::{Busy, Chore};
+use crate::workshop::chore::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 

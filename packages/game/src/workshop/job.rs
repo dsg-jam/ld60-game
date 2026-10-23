@@ -10,7 +10,7 @@ use ld60_machine::Isa;
 
 pub(crate) use self::bench::Bench;
 pub(crate) use self::error::JobError;
-use super::clock::{Busy, Chore};
+use super::chore::{Busy, Chore};
 use super::levels::Levels;
 use super::pickup::{Complaint, Pickup, TRIES};
 use super::receipt::Receipt;

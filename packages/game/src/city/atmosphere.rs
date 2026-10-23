@@ -13,11 +13,11 @@ use ld60_geometry::block::Block;
 use self::height_fog::HeightFog;
 use super::FACADES;
 use super::weather::Weather;
+use crate::clock::Clock;
 use crate::layout::shop;
 use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::Focus;
-use crate::workshop::clock::Clock;
 
 /// Air lit by the city, which everything fades into far away.
 const FOG: Color = Color::srgb_u8(0x42, 0x36, 0x3e);

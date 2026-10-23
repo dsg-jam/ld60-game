@@ -2,10 +2,10 @@ use bevy::prelude::*;
 use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
-use super::clock::Clock;
 use super::job::{Bench, Job};
 use super::run::Run;
 use super::salvage::SalvageCrate;
+use crate::clock::Clock;
 
 pub(crate) struct SavePlugin;
 
@@ -104,7 +104,7 @@ mod tests {
 
     use super::*;
     use crate::player::focus::{Focus, Focused};
-    use crate::workshop::clock::PlanetSet;
+    use crate::workshop::chore::PlanetSet;
     use crate::workshop::levels::Levels;
     use crate::workshop::rent::RentNote;
     use crate::workshop::run::NewRun;

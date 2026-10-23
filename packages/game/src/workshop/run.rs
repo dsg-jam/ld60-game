@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) use self::demand::Demand;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
-use super::clock::Clock;
 use super::job::{Job, JobItem};
 use super::manuals::Pins;
 use super::pickup::Pickup;
@@ -21,6 +20,7 @@ use super::receipt::Receipt;
 use super::rent::RentNote;
 use super::salvage::{Find, SalvageCrate};
 use super::tutorial::TutorialNote;
+use crate::clock::Clock;
 use crate::player::focus::{Focus, Focused};
 
 /// What the landlord takes the first time the planet sets.

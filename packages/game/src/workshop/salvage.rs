@@ -367,7 +367,7 @@ mod tests {
 
     use super::*;
     use crate::player::focus::FocusOn;
-    use crate::workshop::clock::PlanetSet;
+    use crate::workshop::chore::PlanetSet;
     use crate::workshop::run::ComputerTool;
 
     fn paid_rent(run: &mut Run) {

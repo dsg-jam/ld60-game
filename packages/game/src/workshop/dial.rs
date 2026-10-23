@@ -5,7 +5,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use super::clock::Clock;
+use crate::clock::Clock;
 
 const BOARD: Vec3 = Vec3::new(0.3, 0.02, 0.3);
 const FACE: Vec3 = Vec3::new(0.26, 0.004, 0.26);
