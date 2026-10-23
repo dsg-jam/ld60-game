@@ -1,4 +1,5 @@
 datasheet-footer = DSG ELECTRONICS  CALCO REV { $revision }
+datasheet-title = CALCO
 datasheet-subtitle = 8-bit calculator coprocessor. One decimal digit per byte.
 
 datasheet-registers = REGISTERS

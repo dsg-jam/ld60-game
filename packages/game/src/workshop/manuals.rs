@@ -4,6 +4,7 @@ mod datasheet;
 mod dividers;
 mod in_file;
 mod index;
+mod layout;
 mod mechanism;
 mod model;
 mod moves;
