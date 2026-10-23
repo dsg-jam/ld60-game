@@ -17,7 +17,7 @@ use ld60_locale::{Localized, Message};
 use super::casing::{COVER, Casing, CasingSpots};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
-use super::{Connected, DeviceButton, DeviceName, Holdable};
+use super::{DeviceButton, DeviceName, Holdable};
 
 /// Dark frame around the LCD.
 const LCD_BORDER: f32 = 0.003;
@@ -303,7 +303,7 @@ impl Handheld {
         let mut entity = commands.entity(add.entity);
         match unit.build_device() {
             Ok(device) => {
-                entity.insert((Emulator::power_on(device), Connected));
+                entity.insert(Emulator::power_on(device));
             }
             Err(err) => error!(
                 error = &err as &dyn Error,
