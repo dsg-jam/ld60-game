@@ -23,7 +23,10 @@ use bevy::{
     input_focus::{FocusedInput, InputFocus, tab_navigation::TabIndex},
     picking::events::PointerScroll,
     prelude::*,
-    text::{EditableText, TextCursorStyle, TextEdit, detect_text_needs_rerender},
+    text::{
+        EditableText, FontFeatureTag, FontFeatures, TextCursorStyle, TextEdit,
+        detect_text_needs_rerender,
+    },
     ui::{UiSystems, widget::update_editable_text_styles},
     ui_widgets::TextInput,
 };
@@ -138,6 +141,9 @@ impl Editor {
     pub(super) fn spawn(commands: &mut Commands, canvas: &UiCanvas) {
         let font = TextFont {
             font_size: FontSize::Px(FONT_SIZE),
+            font_features: FontFeatures::builder()
+                .enable(FontFeatureTag::SLASHED_ZERO)
+                .build(),
             ..default()
         };
         let title = |text: Localized| (text, font.clone(), TextColor(Color::BLACK));
