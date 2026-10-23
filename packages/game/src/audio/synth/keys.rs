@@ -1,5 +1,5 @@
 use super::{Lowpass, Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::workshop::DeskSpots;
+use crate::layout::desk::DeskSpots;
 
 /// All keys share the same caps, plate, case and springs, so they ring at
 /// the same frequencies. Only how a key is hit differs from press to press.

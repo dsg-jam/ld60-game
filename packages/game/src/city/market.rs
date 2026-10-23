@@ -9,8 +9,8 @@ use rand::{Rng, RngExt};
 use super::drips::DripEdge;
 use super::signs::Tube;
 use super::{Kit, Pick, glow, turned_to};
+use crate::layout::shop;
 use crate::parts::script::Word;
-use crate::workshop::shop;
 
 /// Height of the market floor, where the building above starts. The same
 /// as our own shop.

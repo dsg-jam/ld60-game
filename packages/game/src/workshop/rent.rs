@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use ld60_locale::{Localized, Message};
 
 use super::clock::PlanetSet;
-use super::counter::CounterLayout;
 use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
+use crate::layout::counter::CounterLayout;
 use crate::menu::AppState;
 use crate::parts::paper::{Paper, Press, Stock};
 use crate::parts::screen::UiCanvas;

@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use super::{Band, Lowpass, Mode, Noise, Resonator, Room, SAMPLE_RATE, Samples, Vary};
-use crate::workshop::DeskSpots;
+use crate::layout::desk::DeskSpots;
 
 /// Meters from the eyes to the open manuals file while reading it.
 const REACH: f32 = 0.33;

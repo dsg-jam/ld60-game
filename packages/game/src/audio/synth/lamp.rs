@@ -1,5 +1,5 @@
 use super::{Lowpass, Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::workshop::DeskSpots;
+use crate::layout::desk::DeskSpots;
 
 /// The plastic plunger of the switch knocking against its stops.
 const PLUNGER: [Mode; 3] = [

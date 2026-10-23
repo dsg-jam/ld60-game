@@ -10,8 +10,8 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 
-/// The knotted part, long along Z.
-pub(super) const SIZE: Vec3 = Vec3::new(1.3, 0.008, 1.8);
+use crate::layout::shop::RUG_SIZE;
+
 const RED: Color = Color::srgb_u8(0x7a, 0x24, 0x1e);
 const WOOL: Color = Color::srgb_u8(0x9e, 0x8c, 0x6c);
 
@@ -63,7 +63,7 @@ impl Rug {
             ..default()
         });
         commands.entity(add.entity).with_children(|rug| {
-            rug.spawn((Shape::cuboid(&Block::new(SIZE), RED), Finish::Rug));
+            rug.spawn((Shape::cuboid(&Block::new(RUG_SIZE), RED), Finish::Rug));
             rug.spawn((Mesh3d(fringe), MeshMaterial3d(wool)));
         });
     }
@@ -73,11 +73,11 @@ impl Rug {
     fn fringe(rng: &mut impl Rng) -> Mesh {
         let mut positions = Vec::new();
         let mut indices = Vec::new();
-        let count = (SIZE.x / SPACING) as usize;
+        let count = (RUG_SIZE.x / SPACING) as usize;
         let tassels = [rng.random_range(0.0..10.0), rng.random_range(0.0..10.0)];
         for (end, phase) in [-1.0, 1.0].into_iter().zip(tassels) {
             for index in 0..count {
-                let x = -SIZE.x / 2.0
+                let x = -RUG_SIZE.x / 2.0
                     + SPACING * (index as f32 + 0.5)
                     + rng.random_range(-0.002..0.002);
                 // Slow waves along the end, so neighbors lean together.
@@ -90,7 +90,7 @@ impl Rug {
                     .random_bool(FOLDED_CHANCE)
                     .then(|| if rng.random_bool(0.5) { FOLD } else { -FOLD });
                 let layer = (index % 3) as f32 * LAYER;
-                let mut at = Vec2::new(x, end * SIZE.z / 2.0);
+                let mut at = Vec2::new(x, end * RUG_SIZE.z / 2.0);
                 let first = positions.len() as u32;
                 for segment in 0..=SEGMENTS {
                     let along = segment as f32 / SEGMENTS as f32;
@@ -103,11 +103,11 @@ impl Rug {
                     let side =
                         Vec2::new(direction.y, -direction.x) * WIDTH / 2.0 * (1.0 - 0.5 * along);
                     // Out of the knots, then down to the floor or over the rug.
-                    let on_rug = at.y.abs() < SIZE.z / 2.0 - 0.002;
+                    let on_rug = at.y.abs() < RUG_SIZE.z / 2.0 - 0.002;
                     let height = if segment == 0 {
-                        SIZE.y / 2.0
+                        RUG_SIZE.y / 2.0
                     } else if on_rug {
-                        SIZE.y + LIFT + layer
+                        RUG_SIZE.y + LIFT + layer
                     } else {
                         LIFT + layer
                     };

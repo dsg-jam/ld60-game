@@ -9,9 +9,9 @@ use rand::{Rng, RngExt, SeedableRng};
 
 use super::{BEAM_HEIGHT, Front};
 use crate::device::Silhouette;
+use crate::layout::shop::{FRONT, PILLAR};
 use crate::parts::script::{GLYPH_SIZE, Word};
 use crate::workshop::run::Run;
-use crate::workshop::shop::{FRONT, PILLAR};
 
 const BOARD: Vec3 = Vec3::new(0.3, 0.22, 0.012);
 /// Height of the top edge of the signs.

@@ -14,10 +14,10 @@ use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 pub(crate) use self::find::Find;
-use super::counter::CounterLayout;
 use super::rent::RentNote;
 use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
+use crate::layout::counter::CounterLayout;
 use crate::parts::paper::{INK_FADED, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};

@@ -21,7 +21,7 @@ pub(crate) mod run;
 mod salvage;
 mod save;
 mod service;
-pub(crate) mod shop;
+mod shop;
 mod ticket;
 mod tools;
 mod tutorial;
@@ -32,7 +32,7 @@ use bevy::prelude::*;
 
 use self::clutter::Clutter;
 use self::computer::Computer;
-use self::counter::{Counter, CounterLayout};
+use self::counter::Counter;
 use self::dial::Dial;
 use self::front::Front;
 use self::lamp::Lamp;
@@ -40,11 +40,11 @@ use self::manuals::ShopManuals;
 use self::radio::Radio;
 use self::shop::Shop;
 use self::tools::Tool;
+use crate::layout::counter::CounterLayout;
+use crate::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use crate::player::camera::PlayerCamera;
 
-const COMPUTER_SPOT: Vec2 = Vec2::new(0.7, -0.3);
 const COMPUTER_YAW: f32 = -0.4;
-const LAMP_SPOT: Vec2 = Vec2::new(-0.8, -0.6);
 const LAMP_YAW: f32 = -0.7;
 const RADIO_SPOT: Vec2 = Vec2::new(-0.47, -0.62);
 const RADIO_YAW: f32 = 0.25;
@@ -54,34 +54,8 @@ const BELL_SPOT: Vec2 = Vec2::new(0.23, -0.75);
 /// Standing at the back, right of the radio.
 const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
-/// Lying open on the left part of the mat, see
-/// [`CounterLayout::place_on_mat`].
-const MANUALS_OPEN_SPOT: Vec2 = Vec2::new(-0.62, -0.4);
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
-
-/// Where the player sits and where the things that make sounds on the
-/// counter stand, in the world.
-pub(crate) struct DeskSpots {
-    /// The eyes and ears of the seated player.
-    pub(crate) seat: Vec3,
-    pub(crate) computer: Vec3,
-    /// The manuals file, lying open.
-    pub(crate) manuals: Vec3,
-    pub(crate) lamp: Vec3,
-}
-
-impl DeskSpots {
-    pub(crate) fn new() -> Self {
-        let counter = CounterLayout::new();
-        Self {
-            seat: counter.seated_view().translation,
-            computer: counter.place(COMPUTER_SPOT, 0.0).translation,
-            manuals: counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0).translation,
-            lamp: counter.place(LAMP_SPOT, 0.0).translation,
-        }
-    }
-}
 
 pub(crate) struct WorkshopPlugin;
 

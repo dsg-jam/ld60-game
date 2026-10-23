@@ -6,7 +6,7 @@ use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use super::wet::{Wet, WetMaterial};
 use super::{CURB_HEIGHT, FACADES, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, turned_to};
 use super::{glow, matte};
-use crate::workshop::shop;
+use crate::layout::shop;
 
 /// Thickness of the ground slabs below their top.
 const SLAB_DEPTH: f32 = 0.4;

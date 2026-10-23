@@ -9,7 +9,7 @@ use rand::{RngExt, rngs::SmallRng};
 
 use super::super::super::buildings::Skyline;
 use super::super::super::{FACADES, Segment};
-use crate::menu::TITLE_EYES;
+use crate::layout::title::TITLE_EYES;
 use crate::player::camera::PlayerCamera;
 
 /// Routes cross the sky the player sees from the seat, through a point

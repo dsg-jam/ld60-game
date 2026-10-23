@@ -7,7 +7,7 @@ use rand::{Rng, RngExt};
 use super::super::market::MARKET_HEIGHT;
 use super::super::{EYE_HEIGHT, FACADES, HALF_LENGTH};
 use super::PARAPET;
-use crate::workshop::shop;
+use crate::layout::shop;
 
 /// Plots are at least this wide, so everything on them fits.
 const MIN_PLOT: f32 = 3.0;

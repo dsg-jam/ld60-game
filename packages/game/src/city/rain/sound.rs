@@ -7,7 +7,7 @@ use super::super::street::water;
 use super::super::weather::Weather;
 use super::super::{CURB_HEIGHT, FACADES};
 use crate::audio::{Mixer, Sound};
-use crate::workshop::shop;
+use crate::layout::shop;
 
 /// Seconds for the rain to grow or fade with the weather.
 const GLIDE: f32 = 3.0;

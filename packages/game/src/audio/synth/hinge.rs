@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::math::Vec3;
 
 use super::{Lowpass, Mode, Noise, Resonator, Room, SAMPLE_RATE, Samples, Vary};
-use crate::workshop::DeskSpots;
+use crate::layout::desk::DeskSpots;
 
 const SECONDS: f32 = 0.5;
 /// How long the rod swings, in seconds, before it settles with a click.
