@@ -1,10 +1,10 @@
 use std::f32::consts::TAU;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use ld60_city::Draft;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::Hanging;
-use crate::city::Draft;
 
 /// The most a sheet tilts about its clip, as if clipped on in a rush, in
 /// radians.

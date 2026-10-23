@@ -11,7 +11,7 @@ use ld60_core::parts::liquid::Shake;
 use ld60_geometry::surface::SurfaceMaterial;
 use rand::RngExt;
 
-pub(crate) use self::draft::Draft;
+pub use self::draft::Draft;
 use self::flying::SkyCar;
 use self::models::{Body, Fleet};
 use self::spray::Spray;

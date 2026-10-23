@@ -7,7 +7,7 @@ use bevy::{
 use rand::{RngExt, rngs::SmallRng};
 
 use super::SkyMaterial;
-use crate::city::rng;
+use crate::rng;
 
 /// Voxels along each side of the noise, which repeats seamlessly.
 const SIZE: usize = 64;

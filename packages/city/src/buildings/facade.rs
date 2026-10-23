@@ -34,11 +34,11 @@ impl Plugin for FacadePlugin {
     }
 }
 
-pub(in crate::city) type FacadeMaterial = ExtendedMaterial<StandardMaterial, Facade>;
+pub(crate) type FacadeMaterial = ExtendedMaterial<StandardMaterial, Facade>;
 
 /// Windows drawn onto the walls of a building.
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub(in crate::city) struct Facade {
+pub(crate) struct Facade {
     #[uniform(100)]
     params: FacadeParams,
 }
@@ -74,11 +74,11 @@ struct FacadeParams {
 
 /// Where the windows of a facade are.
 #[derive(Clone, Copy, Debug)]
-pub(in crate::city) struct WindowGrid {
+pub(crate) struct WindowGrid {
     /// Horizontal window pitch and floor height.
-    pub(in crate::city) cell: Vec2,
+    pub(crate) cell: Vec2,
     /// Window size as a share of the cell, centered in it.
-    pub(in crate::city) window: Vec2,
+    pub(crate) window: Vec2,
 }
 
 /// What a building is used for, which decides how its windows light up.
@@ -99,7 +99,7 @@ impl Facade {
             .into()
     }
 
-    pub(in crate::city) fn grid(&self) -> WindowGrid {
+    pub(crate) fn grid(&self) -> WindowGrid {
         WindowGrid {
             cell: self.params.cell,
             window: self.params.window,
@@ -113,7 +113,7 @@ impl Facade {
     }
 
     /// Hides the windows behind `area` of the shop side, in world X and Y.
-    pub(in crate::city) fn cover(&mut self, area: Rect) {
+    pub(crate) fn cover(&mut self, area: Rect) {
         let origin = self.params.origin.xy();
         let free = self
             .params
@@ -129,7 +129,7 @@ impl Facade {
 
     /// Windows for `block` with floors of height `floor`. The block faces
     /// the street along `facing`.
-    pub(in crate::city) fn random(
+    pub(crate) fn random(
         block: &Block,
         facing: f32,
         floor: f32,

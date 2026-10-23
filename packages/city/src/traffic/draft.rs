@@ -14,7 +14,7 @@ const PUSH: f32 = 0.05;
 
 /// Air that passing vehicles push into the shop, in meters per second.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct Draft(pub(crate) Vec3);
+pub struct Draft(pub Vec3);
 
 impl Draft {
     /// The gust at the shop, at the origin, from a vehicle at `at` going at

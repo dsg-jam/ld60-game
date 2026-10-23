@@ -6,8 +6,8 @@ use ld60_core::parts::script::Word;
 use rand::{Rng, RngExt};
 
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
-use crate::city::EYE_HEIGHT;
-use crate::city::buildings::{Backdrop, FacadeMaterial};
+use crate::EYE_HEIGHT;
+use crate::buildings::{Backdrop, FacadeMaterial};
 
 const CHANCE: f64 = 0.5;
 const IN_SIGHT_CHANCE: f64 = 0.9;
