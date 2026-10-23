@@ -286,4 +286,13 @@ mod tests {
         assert!(texts.len() > credits.research.len());
         Locale::on_disk().assert_formats(texts);
     }
+
+    #[test]
+    fn research_points_at_files_that_exist() {
+        let text = std::fs::read_to_string(format!("{}/{CREDITS}", env!("LD60_ASSETS"))).unwrap();
+        let root = std::path::Path::new(env!("LD60_ASSETS")).join("..");
+        for file in text.split('"').filter(|text| text.starts_with("packages/")) {
+            assert!(root.join(file).exists(), "{file}");
+        }
+    }
 }
