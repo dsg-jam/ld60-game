@@ -45,9 +45,9 @@ pub(crate) struct Casing {
     /// Whether each screw is out.
     loose: Vec<bool>,
     open: bool,
-    /// How tall the device is from the cover to the tops of its keys. Open,
-    /// it rests on its keys.
-    height: f32,
+    /// The box around the device, from the cover to the tops of its keys.
+    /// Open, it rests on its keys.
+    bounds: Block,
 }
 
 /// Where the screws and the header of a device sit on its underside, see
@@ -79,12 +79,17 @@ struct Board;
 pub(crate) struct Header;
 
 impl Casing {
-    fn new(screws: usize, height: f32) -> Self {
+    fn new(screws: usize, bounds: Block) -> Self {
         Self {
             loose: vec![false; screws],
             open: false,
-            height,
+            bounds,
         }
+    }
+
+    /// The box around the device, in its own space.
+    pub(crate) fn bounds(&self) -> &Block {
+        &self.bounds
     }
 
     /// Whether the cover is on and all screws are in, as the customer
@@ -161,7 +166,7 @@ impl Casing {
         for (part, color) in &layout.parts {
             device.spawn((Shape::cuboid(part, *color), Finish::Plastic));
         }
-        Self::new(spots.screws.len(), height)
+        Self::new(spots.screws.len(), Block::new(shell.size.with_y(height)))
     }
 
     /// Turns a screw in or out. Screws only turn while the cover is on.
@@ -297,7 +302,7 @@ impl CoverPlate {
         };
         press.propagate(false);
         let sound = if casing.lift_cover() {
-            holdable.turn_over(casing.height);
+            holdable.turn_over(casing.bounds.size.y);
             Sound::Unlatch
         } else {
             Sound::Refuse
@@ -325,7 +330,7 @@ impl Board {
         };
         press.propagate(false);
         let sound = if casing.close_cover(plugged) {
-            holdable.turn_over(casing.height);
+            holdable.turn_over(casing.bounds.size.y);
             Sound::Latch
         } else {
             Sound::Refuse
@@ -390,7 +395,7 @@ mod tests {
 
     #[test]
     fn the_cover_comes_off_only_without_screws() {
-        let mut casing = Casing::new(2, 0.02);
+        let mut casing = Casing::new(2, Block::new(Vec3::splat(0.02)));
         assert!(casing.sealed());
         assert!(!casing.lift_cover());
         assert!(casing.turn_screw(0));
@@ -403,7 +408,7 @@ mod tests {
 
     #[test]
     fn the_cover_stays_off_while_plugged_in() {
-        let mut casing = Casing::new(1, 0.02);
+        let mut casing = Casing::new(1, Block::new(Vec3::splat(0.02)));
         casing.turn_screw(0);
         casing.lift_cover();
         assert!(!casing.close_cover(true));
