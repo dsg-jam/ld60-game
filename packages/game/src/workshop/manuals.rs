@@ -15,6 +15,16 @@ mod top_sheet;
 mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use ld60_core::audio::{Play, Sound};
+use ld60_core::parts::paper::{
+    Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
+    Wrinkles,
+};
+use ld60_core::parts::screen::{ScreenSurface, UiCanvas};
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
+use ld60_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use ld60_core::state::AppState;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::Message;
 
@@ -32,16 +42,6 @@ use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
 use super::tutorial::{FirstNote, TutorialNote};
-use crate::audio::{Play, Sound};
-use crate::parts::paper::{
-    Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
-    Wrinkles,
-};
-use crate::parts::screen::{ScreenSurface, UiCanvas};
-use crate::player::camera::PlayerCamera;
-use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
-use crate::player::hints::{Hint, Hints, Icon, Input, KeyHint};
-use crate::state::AppState;
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;

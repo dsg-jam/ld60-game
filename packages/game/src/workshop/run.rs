@@ -4,6 +4,8 @@ mod tools;
 
 use bevy::prelude::*;
 use ld60_calco::{Errata, Revision};
+use ld60_core::clock::Clock;
+use ld60_core::player::focus::{Focus, Focused};
 use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_levels::{Catalog, GAME_SEED, LevelSource, Reference};
 use rand::rngs::SmallRng;
@@ -20,8 +22,6 @@ use super::receipt::Receipt;
 use super::rent::RentNote;
 use super::salvage::{Find, SalvageCrate};
 use super::tutorial::TutorialNote;
-use crate::clock::Clock;
-use crate::player::focus::{Focus, Focused};
 
 /// What the landlord takes the first time the planet sets.
 const RENT: u32 = 6;
@@ -502,10 +502,10 @@ impl Run {
 
 #[cfg(test)]
 mod tests {
+    use ld60_core::player::focus::{FocusOn, FocusTarget, View};
     use ld60_levels::Difficulty;
 
     use super::*;
-    use crate::player::focus::{FocusOn, FocusTarget, View};
     use crate::workshop::levels::Levels;
     use crate::workshop::manuals::Sheet;
     use crate::workshop::pickup::Complaint;

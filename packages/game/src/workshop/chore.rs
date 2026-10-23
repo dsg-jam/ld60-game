@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_core::clock::Clock;
 
 use super::job::Job;
 use super::run::Origin;
-use crate::clock::Clock;
 
 pub(crate) struct ChorePlugin;
 
@@ -60,8 +60,9 @@ impl Busy {
 
 #[cfg(test)]
 mod tests {
+    use ld60_core::clock::{CYCLE, OPENING};
+
     use super::*;
-    use crate::clock::{CYCLE, OPENING};
     use crate::workshop::levels::Levels;
     use crate::workshop::run::Run;
 

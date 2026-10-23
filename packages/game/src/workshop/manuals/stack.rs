@@ -13,6 +13,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use std::ops::Range;
 
 use bevy::{mesh::VertexAttributeValues, platform::hash::fixed_hash_one, prelude::*};
+use ld60_core::parts::paper::{Leaf, PAPER_SHADE};
 
 use super::dividers::{DividerTab, TAB_OUT};
 use super::model::{
@@ -21,7 +22,6 @@ use super::model::{
 };
 use super::pose::Pose;
 use super::punched::punched_box;
-use crate::parts::paper::{Leaf, PAPER_SHADE};
 
 /// Thickness of a page, a little more than real paper so the stack shows
 /// each sheet.
@@ -320,7 +320,7 @@ impl Stack {
     }
 
     /// How page item `index` lies, for a sheet from
-    /// [`Paper::sheet`](crate::parts::paper::Paper::sheet) in `frame`.
+    /// [`Paper::sheet`](ld60_core::parts::paper::Paper::sheet) in `frame`.
     pub(super) fn sheet_in(&self, index: usize, frame: Transform) -> Transform {
         frame
             * Transform::from_translation(self.middle(index))
@@ -348,7 +348,7 @@ impl Stack {
     }
 
     /// The holes of page item `index`, each a center in the sheet's space
-    /// and a radius, for [`Sheet::set_sheet`](crate::parts::paper::Sheet).
+    /// and a radius, for [`Sheet::set_sheet`](ld60_core::parts::paper::Sheet).
     pub(super) fn sheet_holes(&self, index: usize) -> [Vec3; 2] {
         self.holes(index)
             .map(|hole| (hole + SHEET_SIZE / 2.0).extend(HOLE_RADIUS))

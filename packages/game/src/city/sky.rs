@@ -10,11 +10,11 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_core::clock::{Clock, PLANET_SIZE};
+use ld60_core::player::camera::PlayerCamera;
 
 use super::atmosphere::SKY;
 use super::weather::{WIND, Weather};
-use crate::clock::{Clock, PLANET_SIZE};
-use crate::player::camera::PlayerCamera;
 
 /// Far away, but still inside the camera's far plane.
 const RADIUS: f32 = 900.0;

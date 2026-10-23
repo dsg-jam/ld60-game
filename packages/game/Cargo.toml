@@ -10,10 +10,11 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [features]
-debug_port = ["bevy/bevy_remote", "dep:serde_json"]
+debug_port = ["bevy/bevy_remote", "dep:serde_json", "ld60-core/debug_port"]
 
 [dependencies]
 ld60-calco = { workspace = true, features = ["serde"] }
+ld60-core = { workspace = true }
 ld60-devices = { workspace = true, features = ["serde"] }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }
@@ -24,7 +25,6 @@ rand = { workspace = true }
 ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["std"], optional = true }
-winit = { workspace = true }
 
 [dependencies.bevy]
 workspace = true
@@ -53,11 +53,8 @@ features = [
   "x11",
 ]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-workspace = true
-features = ["Document", "Element", "Storage", "Window"]
-
 [dev-dependencies]
+ld60-core = { workspace = true, features = ["test-support"] }
 ld60-locale = { workspace = true, features = ["test-support"] }
 ld60-store = { workspace = true, features = ["test-support"] }
 

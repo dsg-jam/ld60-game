@@ -8,6 +8,7 @@ use std::f32::consts::FRAC_PI_4;
 use std::sync::Arc;
 
 use bevy::{audio::AddAudioSource, math::Affine3A, prelude::*};
+use ld60_core::audio::Mixer;
 
 use self::fans::Fans;
 use self::motor::Motor;
@@ -19,7 +20,6 @@ use super::super::wet::Wet;
 use super::Vehicle;
 use super::flying::SkyCar;
 use super::models::{Body, WHEEL_RADIUS, WHEELBASE};
-use crate::audio::Mixer;
 
 /// The closest cars are heard, up to this many and this many meters away.
 const CARS: usize = 3;

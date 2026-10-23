@@ -4,6 +4,7 @@ mod frontage;
 use std::ops::Range;
 
 use bevy::{light::VolumetricLight, prelude::*, shape::Aabb3d};
+use ld60_core::parts::script::{GLYPH_SIZE, Word};
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -11,7 +12,6 @@ use rand::{Rng, RngExt};
 
 use super::buildings::{FacadeMaterial, Skyline};
 use super::{Kit, NEON, glow, rng, turned_to};
-use crate::parts::script::{GLYPH_SIZE, Word};
 
 const SEED: u64 = 3;
 

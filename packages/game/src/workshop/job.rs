@@ -5,6 +5,7 @@ use std::error::Error;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use bevy::prelude::*;
+use ld60_core::layout::counter::CounterLayout;
 use ld60_levels::{Difficulty, Generated, Level, LevelSource, Variant};
 use ld60_machine::Isa;
 
@@ -17,7 +18,6 @@ use super::receipt::Receipt;
 use super::run::{Origin, Run};
 use super::ticket::JobTicket;
 use crate::device::{Emulator, Handheld};
-use crate::layout::counter::CounterLayout;
 
 pub(super) const DEVICE_SPOT: Vec2 = Vec2::new(0.03, 0.3);
 pub(super) const DEVICE_YAW: f32 = 0.15;

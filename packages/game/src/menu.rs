@@ -7,6 +7,10 @@ mod settings;
 mod title;
 
 use bevy::prelude::*;
+use ld60_core::audio::Mixer;
+use ld60_core::player::hints::{INK, SHADOW};
+use ld60_core::settings::SettingsPlugin;
+use ld60_core::state::AppState;
 use ld60_locale::{Localized, Message};
 
 use self::closed::StatsPage;
@@ -14,10 +18,6 @@ use self::credits::{Credits, CreditsHandle, CreditsPage};
 use self::list::{Action, Entries};
 use self::restart::RestartPage;
 use self::settings::SettingsPage;
-use crate::audio::Mixer;
-use crate::player::hints::{INK, SHADOW};
-use crate::settings::SettingsPlugin;
-use crate::state::AppState;
 use crate::workshop::run::{NewRun, Run};
 
 const HEADING_SIZE: f32 = 56.0;
@@ -221,10 +221,10 @@ impl Action {
 
 #[cfg(test)]
 mod tests {
+    use ld60_core::settings::{Setting, Settings};
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::settings::{Setting, Settings};
 
     #[test]
     fn every_menu_text_exists() {

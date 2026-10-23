@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use ld60_core::layout::counter::CounterLayout;
+use ld60_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT};
 use ld60_devices::DeviceKind;
 use ld60_geometry::block::Block;
 
@@ -10,8 +12,6 @@ use super::{
     STAMP_SPOT, STAMP_YAW, job, lamp, radio, receipt, rent, salvage, ticket, tools,
 };
 use crate::device::Handheld;
-use crate::layout::counter::CounterLayout;
-use crate::layout::desk::{COMPUTER_SPOT, LAMP_SPOT};
 
 /// Space kept between the keyboard and the mat.
 const MAT_MARGIN: f32 = 0.01;

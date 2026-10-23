@@ -5,12 +5,12 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_core::parts::paper::{Paper, PaperButton};
 use ld60_locale::{Localized, Message};
 
 use super::contents::{Contents, Entry, Page, Section};
 use super::in_file::InFile;
 use super::pins::Sheet;
-use crate::parts::paper::{Paper, PaperButton};
 
 /// Under the pointer, buttons and index lines take this color.
 const HOVER: Color = Color::srgba_u8(0x2a, 0x26, 0x22, 0x30);

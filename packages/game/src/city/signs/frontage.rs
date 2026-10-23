@@ -2,13 +2,13 @@ use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_core::parts::script::Word;
 use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
 use crate::city::buildings::FacadeMaterial;
 use crate::city::market::{AWNING_ABOVE, MARKET_HEIGHT};
-use crate::parts::script::Word;
 
 const SHOP_SIGN_CHANCE: f64 = 0.8;
 const SHOP_SIGN_HEIGHT: Range<f32> = 0.9..1.6;

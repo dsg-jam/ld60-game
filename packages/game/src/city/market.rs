@@ -1,6 +1,8 @@
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_core::layout::shop;
+use ld60_core::parts::script::Word;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -9,8 +11,6 @@ use rand::{Rng, RngExt};
 use super::drips::DripEdge;
 use super::signs::Tube;
 use super::{Kit, Pick, glow, turned_to};
-use crate::layout::shop;
-use crate::parts::script::Word;
 
 /// Height of the market floor, where the building above starts. The same
 /// as our own shop.

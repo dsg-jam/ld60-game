@@ -6,6 +6,7 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_core::GRAVITY;
 use ld60_geometry::noise::hash1;
 use ld60_geometry::quads::Quads;
 use rand::RngExt;
@@ -13,7 +14,6 @@ use rand::RngExt;
 use super::buildings::Skyline;
 use super::rng;
 use super::weather::Weather;
-use crate::GRAVITY;
 
 const SEED: u64 = 7;
 const DROPS_PER_METER: f32 = 4.0;

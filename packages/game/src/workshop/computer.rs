@@ -6,6 +6,10 @@ mod typing;
 mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
+use ld60_core::parts::keypad::PressableKey;
+use ld60_core::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
+use ld60_core::player::focus::{Focus, FocusTarget};
+use ld60_core::player::hints::Hints;
 use ld60_geometry::block::Block;
 
 use self::editor::Editor;
@@ -17,10 +21,6 @@ use self::pinboard::sway::Sway;
 use self::typing::MouseTyping;
 use self::views::{BackToScreen, Views};
 use super::dust::Dust;
-use crate::parts::keypad::PressableKey;
-use crate::parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
-use crate::player::focus::{Focus, FocusTarget};
-use crate::player::hints::Hints;
 
 const CASE: Color = Color::srgb_u8(0xd8, 0xcf, 0xb8);
 const CASE_DARK: Color = Color::srgb_u8(0xb3, 0xa8, 0x8e);

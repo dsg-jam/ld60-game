@@ -5,12 +5,12 @@ use bevy::{
     prelude::*,
     shape::{Aabb3d, RayCast3d},
 };
+use ld60_core::layout::title::TITLE_EYES;
+use ld60_core::player::camera::PlayerCamera;
 use rand::{RngExt, rngs::SmallRng};
 
 use super::super::super::buildings::Skyline;
 use super::super::super::{FACADES, Segment};
-use crate::layout::title::TITLE_EYES;
-use crate::player::camera::PlayerCamera;
 
 /// Routes cross the sky the player sees from the seat, through a point
 /// this far to the side of straight ahead and this high up, in radians,

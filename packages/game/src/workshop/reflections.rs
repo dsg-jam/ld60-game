@@ -1,10 +1,10 @@
 mod cubemap;
 
 use bevy::prelude::*;
+use ld60_core::player::camera::PlayerCamera;
 
 use self::cubemap::Lobe;
 use super::lamp::Lamp;
-use crate::player::camera::PlayerCamera;
 
 /// Texels along the side of a face of the reflections.
 const SIZE: u32 = 64;

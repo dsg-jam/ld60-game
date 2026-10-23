@@ -4,6 +4,11 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::audio::{Play, Sound};
+use ld60_core::layout::counter::CounterLayout;
+use ld60_core::parts::paper::{INK_FADED, PAPER, Paper};
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -16,11 +21,6 @@ use serde::{Deserialize, Serialize};
 pub(crate) use self::find::Find;
 use super::rent::RentNote;
 use super::run::{Rent, Run};
-use crate::audio::{Play, Sound};
-use crate::layout::counter::CounterLayout;
-use crate::parts::paper::{INK_FADED, PAPER, Paper};
-use crate::parts::screen::UiCanvas;
-use crate::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 
 /// At the front right of the counter, beside the keyboard.
 pub(super) const SPOT: Vec2 = Vec2::new(1.0, 0.72);
@@ -362,11 +362,11 @@ impl SalvageCrate {
 mod tests {
     use std::collections::HashSet;
 
+    use ld60_core::player::focus::FocusOn;
     use ld60_devices::DeviceKind;
     use ld60_locale::{Locale, Localized};
 
     use super::*;
-    use crate::player::focus::FocusOn;
     use crate::workshop::chore::PlanetSet;
     use crate::workshop::run::ComputerTool;
 

@@ -8,16 +8,16 @@ use bevy::{
     post_process::bloom::Bloom,
     prelude::*,
 };
+use ld60_core::clock::Clock;
+use ld60_core::layout::shop;
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::player::focus::Focus;
+use ld60_core::settings::Settings;
 use ld60_geometry::block::Block;
 
 use self::height_fog::HeightFog;
 use super::FACADES;
 use super::weather::Weather;
-use crate::clock::Clock;
-use crate::layout::shop;
-use crate::player::camera::PlayerCamera;
-use crate::player::focus::Focus;
-use crate::settings::Settings;
 
 /// Air lit by the city, which everything fades into far away.
 const FOG: Color = Color::srgb_u8(0x42, 0x36, 0x3e);
@@ -141,7 +141,7 @@ impl AtmospherePlugin {
         }
     }
 
-    /// Drops the costly effects on lower [`Quality`](crate::settings::Settings::quality).
+    /// Drops the costly effects on lower [`Quality`](ld60_core::settings::Settings::quality).
     fn match_quality(
         settings: Res<Settings>,
         cameras: Query<Entity, With<PlayerCamera>>,

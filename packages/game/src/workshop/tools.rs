@@ -6,15 +6,15 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::audio::{Play, Sound};
+use ld60_core::parts::paper::Paper;
+use ld60_core::player::focus::{Clickable, Focus, FocusOn};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::job::{HandIn, Job};
 use super::ticket::{JobTicket, Landing};
-use crate::audio::{Play, Sound};
-use crate::parts::paper::Paper;
-use crate::player::focus::{Clickable, Focus, FocusOn};
 
 pub(super) const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
 const STAMP_PAD_SIZE: Vec3 = Vec3::new(0.058, 0.005, 0.038);

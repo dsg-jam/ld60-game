@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
-use crate::parts::liquid::{Foam, Liquid};
-use crate::parts::steam::Steam;
+use ld60_core::parts::liquid::{Foam, Liquid};
+use ld60_core::parts::steam::Steam;
 
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;

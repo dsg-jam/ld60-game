@@ -8,6 +8,11 @@ use std::collections::VecDeque;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use ld60_core::audio::{PlayAt, Sound};
+use ld60_core::parts::paper::{
+    Binding, LeafShape, Paper, PaperMaterial, Pressed, RELAX_TIME, Wrinkles, reprinted,
+};
+use ld60_core::player::focus::{Focus, Focused};
 
 use super::Filed;
 use super::index::Links;
@@ -17,11 +22,6 @@ use super::pins::{Pins, Sheet};
 use super::pose::Pose;
 use super::stack::{Stack, holes, middle, stray};
 use super::top_sheet::TopSheet;
-use crate::audio::{PlayAt, Sound};
-use crate::parts::paper::{
-    Binding, LeafShape, Paper, PaperMaterial, Pressed, RELAX_TIME, Wrinkles, reprinted,
-};
-use crate::player::focus::{Focus, Focused};
 use crate::workshop::run::Run;
 
 /// Seconds the lever takes to open the rings.

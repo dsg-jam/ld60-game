@@ -6,12 +6,12 @@ use bevy::{
     audio::{ChannelCount, Decodable, Sample, SampleRate},
     prelude::*,
 };
+use ld60_core::audio::HUSH;
 
 use super::dsp::{Glide, one_pole};
 use super::fans::{FanSound, Fans};
 use super::motor::{Motor, MotorSound};
 use super::tire::{Tire, TireSound};
-use crate::audio::HUSH;
 
 /// Low enough to save work on the web, high enough for the hiss of water.
 pub(super) const RATE: u32 = 32_000;

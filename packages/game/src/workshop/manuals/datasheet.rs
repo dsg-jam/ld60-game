@@ -3,7 +3,7 @@ use ld60_calco::datasheet::{INSTRUCTIONS, NOTES, PORTS};
 use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
 use ld60_locale::{Localized, Message};
 
-use crate::parts::paper::Paper;
+use ld60_core::parts::paper::Paper;
 
 /// The CalCo datasheet of one chip revision, and its errata pages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

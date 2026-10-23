@@ -30,6 +30,10 @@ use bevy::{
     ui::{UiSystems, widget::update_editable_text_styles},
     ui_widgets::TextInput,
 };
+#[cfg(feature = "debug_port")]
+use ld60_core::debug_port::DebugMethods;
+use ld60_core::parts::screen::UiCanvas;
+use ld60_core::player::free_look::MODIFIERS;
 use ld60_locale::{Localized, Message};
 
 use self::bench::Verdict;
@@ -46,10 +50,6 @@ use self::shades::Shades;
 use self::trace::TraceView;
 use self::undo::Undo;
 use self::versions::VersionsPage;
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-use crate::parts::screen::UiCanvas;
-use crate::player::free_look::MODIFIERS;
 use crate::workshop::job::{Job, JobId};
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);

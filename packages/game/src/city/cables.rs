@@ -4,6 +4,8 @@ use bevy::{
     prelude::*,
     shape::{Aabb3d, BoundingVolume},
 };
+use ld60_core::layout::shop;
+use ld60_core::parts::bulb::Bulb;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -11,8 +13,6 @@ use rand::{Rng, RngExt};
 
 use super::signs::{Sign, SignBounds};
 use super::{FACADES, Kit, Pick, Segment, rng};
-use crate::layout::shop;
-use crate::parts::bulb::Bulb;
 
 const SEED: u64 = 8;
 const CABLES: usize = 14;

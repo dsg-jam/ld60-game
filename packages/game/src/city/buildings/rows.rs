@@ -1,13 +1,13 @@
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_core::layout::shop;
 use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::super::market::MARKET_HEIGHT;
 use super::super::{EYE_HEIGHT, FACADES, HALF_LENGTH};
 use super::PARAPET;
-use crate::layout::shop;
 
 /// Plots are at least this wide, so everything on them fits.
 const MIN_PLOT: f32 = 3.0;

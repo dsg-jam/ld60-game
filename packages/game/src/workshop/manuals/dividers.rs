@@ -7,6 +7,8 @@ use bevy::{
     picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::parts::paper::{INK, Paper, PaperButton};
+use ld60_core::parts::screen::UiCanvas;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
@@ -16,8 +18,6 @@ use super::contents::{Contents, Section};
 use super::model::{HOLE_RADIUS, SHEET_SIZE};
 use super::punched::punched_box;
 use super::stack::{CARD, holes, stray};
-use crate::parts::paper::{INK, Paper, PaperButton};
-use crate::parts::screen::UiCanvas;
 
 const INDEX: Color = Color::srgb_u8(0xcc, 0xc6, 0xb8);
 /// How far a divider reaches past the pages on the other edges, so its

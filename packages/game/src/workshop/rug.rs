@@ -10,7 +10,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 
-use crate::layout::shop::RUG_SIZE;
+use ld60_core::layout::shop::RUG_SIZE;
 
 const RED: Color = Color::srgb_u8(0x7a, 0x24, 0x1e);
 const WOOL: Color = Color::srgb_u8(0x9e, 0x8c, 0x6c);

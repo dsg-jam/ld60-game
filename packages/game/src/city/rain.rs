@@ -6,14 +6,14 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_core::layout::shop;
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::settings::Settings;
 use ld60_geometry::quads::Quads;
 use rand::RngExt;
 
 use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
-use crate::layout::shop;
-use crate::player::camera::PlayerCamera;
-use crate::settings::Settings;
 
 const SEED: u64 = 5;
 const STREAKS: usize = 6000;

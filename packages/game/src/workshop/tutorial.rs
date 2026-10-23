@@ -1,10 +1,10 @@
 use bevy::prelude::*;
+use ld60_core::parts::paper::{Paper, Press, Print, Stock};
 use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
 use super::job::Job;
 use super::run::{Origin, Run};
-use crate::parts::paper::{Paper, Press, Print, Stock};
 
 /// The paragraphs of each note, as attributes of its message.
 const LESSONS: [&[&str]; 2] = [

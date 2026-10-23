@@ -6,11 +6,11 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_core::player::hints::{ACCENT, INK, SHADOW};
+use ld60_core::settings::{Adjust, Setting};
 use ld60_locale::{Localized, Message};
 
 use super::AppState;
-use crate::player::hints::{ACCENT, INK, SHADOW};
-use crate::settings::{Adjust, Setting};
 
 const ENTRY_SIZE: f32 = 28.0;
 const ENTRY_GAP: f32 = 10.0;

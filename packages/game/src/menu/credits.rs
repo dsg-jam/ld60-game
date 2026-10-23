@@ -6,12 +6,12 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_core::player::hints::{ACCENT, INK, SHADOW};
 use ld60_locale::{Localized, Message};
 use serde::Deserialize;
 
 use super::Page;
 use super::list::{Action, Entries, Entry, Navigation};
-use crate::player::hints::{ACCENT, INK, SHADOW};
 
 const CREDITS: &str = "credits.ron";
 const HEADING_SIZE: f32 = 22.0;

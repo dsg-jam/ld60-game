@@ -8,6 +8,10 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use ld60_core::parts::paper::{
+    Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
+    blank_print, reprinted,
+};
 
 use super::Filed;
 use super::model::{HOLE_INSET, Parts};
@@ -15,10 +19,6 @@ use super::moves::SheetMoves;
 use super::pose::Pose;
 use super::stack::{Stack, Turning};
 use super::top_sheet::TopSheet;
-use crate::parts::paper::{
-    Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
-    blank_print, reprinted,
-};
 
 /// How a page of the file is wrinkled. The open sheet, the sheet on top of
 /// the turned pages and a turning leaf all show it.

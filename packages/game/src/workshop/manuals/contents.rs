@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use ld60_calco::Revision;
+use ld60_core::parts::paper::{Press, Print, Stock};
 use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
@@ -8,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use super::datasheet::ChipSheet;
 use super::pins::Sheet;
 use crate::device::DeviceName;
-use crate::parts::paper::{Press, Print, Stock};
 use crate::workshop::run::Run;
 use crate::workshop::service::ServiceSheet;
 use crate::workshop::tutorial::TutorialNote;

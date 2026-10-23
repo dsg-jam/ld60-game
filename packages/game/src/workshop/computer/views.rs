@@ -4,16 +4,16 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_core::player::camera::{PlayerCamera, framing};
+use ld60_core::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
+use ld60_core::player::free_look::MODIFIERS;
+use ld60_core::player::hints::{Hint, Hints, Icon, Input};
+use ld60_core::player::lens;
+use ld60_core::player::zoom::Zoom;
+use ld60_core::state::AppState;
 use ld60_locale::Message;
 
 use super::pinboard::PinBoard;
-use crate::player::camera::{PlayerCamera, framing};
-use crate::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
-use crate::player::free_look::MODIFIERS;
-use crate::player::hints::{Hint, Hints, Icon, Input};
-use crate::player::lens;
-use crate::player::zoom::Zoom;
-use crate::state::AppState;
 use crate::workshop::run::Run;
 
 /// How far the wide view looks down at the keyboard, in radians.

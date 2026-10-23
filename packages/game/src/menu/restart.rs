@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_core::player::hints::{INK, SHADOW};
 use ld60_locale::{Localized, Message};
 
 use super::list::{Action, Entries};
-use crate::player::hints::{INK, SHADOW};
 
 const WARNING_SIZE: f32 = 22.0;
 

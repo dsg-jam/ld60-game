@@ -2,14 +2,14 @@ mod candle;
 mod sign;
 
 use bevy::prelude::*;
+use ld60_core::layout::shop::{FRONT, PILLAR, SIZE};
+use ld60_core::parts::script::ALPHABET;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use self::candle::{Candle, Paper};
-use crate::layout::shop::{FRONT, PILLAR, SIZE};
-use crate::parts::script::ALPHABET;
 
 /// Box of the rolled up shutter above the opening.
 const SHUTTER_HEIGHT: f32 = 0.3;
@@ -206,9 +206,10 @@ impl Front {
 
 #[cfg(test)]
 mod tests {
+    use ld60_core::clock::{Clock, PLANET_SIZE};
+    use ld60_core::layout::counter::CounterLayout;
+
     use super::*;
-    use crate::clock::{Clock, PLANET_SIZE};
-    use crate::layout::counter::CounterLayout;
 
     #[test]
     fn the_whole_planet_shows_under_the_noren() {

@@ -1,4 +1,6 @@
 use bevy::{platform::collections::HashMap, prelude::*};
+use ld60_core::audio::{Mixer, Sound};
+use ld60_core::layout::shop;
 
 use super::super::buildings::Skyline;
 use super::super::drips::{DripEdge, DripEdges};
@@ -6,8 +8,6 @@ use super::super::soundscape::Emitter;
 use super::super::street::water;
 use super::super::weather::Weather;
 use super::super::{CURB_HEIGHT, FACADES};
-use crate::audio::{Mixer, Sound};
-use crate::layout::shop;
 
 /// Seconds for the rain to grow or fade with the weather.
 const GLIDE: f32 = 3.0;

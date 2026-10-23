@@ -7,9 +7,9 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
+use ld60_core::parts::keypad::PressableKey;
 
 use super::keyboard::KeyboardKey;
-use crate::parts::keypad::PressableKey;
 
 /// The printed characters of the keyboard, without and with Shift.
 const CHARACTERS: &[(KeyCode, char, char)] = &[

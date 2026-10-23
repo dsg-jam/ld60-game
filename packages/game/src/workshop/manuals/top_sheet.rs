@@ -6,12 +6,12 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use ld60_core::parts::paper::{Leaf, clearance, relaxing};
 
 use super::Filed;
 use super::model::Parts;
 use super::pose::Pose;
 use super::stack::Stack;
-use crate::parts::paper::{Leaf, clearance, relaxing};
 
 /// A sheet on top of a stack, showing the wrinkles of its page.
 #[derive(Component, Debug)]
