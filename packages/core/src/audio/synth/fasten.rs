@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use super::{Hit, Lowpass, Mode, Noise, Resonator, Samples, Vary};
 
 /// The thread of a small steel screw catching, high and short.
@@ -21,8 +23,35 @@ const KNOCK: [Mode; 2] = [
     Mode::new(480.0, 600.0, 1.0),
     Mode::new(1_050.0, 900.0, 0.45),
 ];
+/// Steel grinding in a plastic thread.
+const GRIND: Rub = Rub {
+    modes: &THREAD,
+    level: 2.0,
+    pulses: 14.0,
+};
+/// Plastic sliding over pins.
+const SLIDE: Rub = Rub {
+    modes: &CASE,
+    level: 1.5,
+    pulses: 0.0,
+};
+/// A wide plastic part creaking as it bends.
+const CREAK: Rub = Rub {
+    modes: &KNOCK,
+    level: 1.0,
+    pulses: 35.0,
+};
+
 /// How many times the thread catches while a screw turns in or out.
 const TURNS: usize = 7;
+
+/// Parts sliding against each other: noise that makes `modes` ring, as
+/// loud as `level`, swelling `pulses` times a second, or steady at 0.
+struct Rub<'a> {
+    modes: &'a [Mode],
+    level: f32,
+    pulses: f32,
+}
 
 impl Samples {
     /// A screw turned out: the thread ticks, quicker as it loosens, and the
@@ -36,7 +65,7 @@ impl Samples {
             at += 0.06 * (1.0 - turn as f32 / (2.0 * TURNS as f32)) * vary.by(0.15);
         }
         ticks.push(Hit::new(at + 0.02, 0.0008, 0.8, &CASE));
-        Self::fastening(seed, at + 0.08, vary.by(0.05), &ticks, 0.6)
+        Self::fastening(seed, at + 0.08, vary.by(0.05), &ticks, &GRIND)
     }
 
     /// A screw turned in: the thread ticks, slower as it tightens, and it
@@ -51,7 +80,7 @@ impl Samples {
         }
         ticks.push(Hit::new(at, 0.0006, 1.0, &CASE));
         ticks.push(Hit::new(at + 0.002, 0.0003, 0.7, &THREAD));
-        Self::fastening(seed, at + 0.06, vary.by(0.05), &ticks, 0.8)
+        Self::fastening(seed, at + 0.06, vary.by(0.05), &ticks, &GRIND)
     }
 
     /// The debug plug pushed onto the header: the plastic slides over the
@@ -67,7 +96,7 @@ impl Samples {
                 Hit::new(home, 0.0004, 1.0, &SNAP),
                 Hit::new(home + 0.003, 0.0008, 0.6, &KNOCK),
             ],
-            0.5,
+            &SLIDE,
         )
     }
 
@@ -82,7 +111,7 @@ impl Samples {
                 Hit::new(0.0, 0.0003, 0.8, &SNAP),
                 Hit::new(0.03 * vary.by(0.2), 0.0005, 0.25, &KNOCK),
             ],
-            0.35,
+            &SLIDE,
         )
     }
 
@@ -99,7 +128,7 @@ impl Samples {
                 Hit::new(second, 0.0004, 0.6, &SNAP),
                 Hit::new(second + 0.025, 0.001, 0.5, &KNOCK),
             ],
-            0.2,
+            &CREAK,
         )
     }
 
@@ -116,23 +145,34 @@ impl Samples {
                 Hit::new(snap, 0.0004, 1.0, &SNAP),
                 Hit::new(snap + 0.012 * vary.by(0.3), 0.0004, 0.8, &SNAP),
             ],
-            0.1,
+            &CREAK,
         )
     }
 
-    /// `hits` over `seconds`, with all modes tuned by `pitch`, and a soft rub
-    /// of parts sliding against each other as loud as `rub`.
-    fn fastening(seed: u32, seconds: f32, pitch: f32, hits: &[Hit], rub: f32) -> Self {
+    /// `hits` over `seconds`, with all modes tuned by `pitch`, over the
+    /// rub of parts sliding against each other until the last hit.
+    fn fastening(seed: u32, seconds: f32, pitch: f32, hits: &[Hit], rub: &Rub) -> Self {
         let mut noise = Noise::new(seed.wrapping_add(180));
-        let mut hiss = Lowpass::new(0.25);
+        let mut grit = Lowpass::new(0.6);
         let mut banks: Vec<_> = hits
             .iter()
             .map(|hit| Resonator::bank(hit.modes, pitch))
             .collect();
+        let mut rubbing = Resonator::bank(rub.modes, pitch * 1.03);
         let end = hits.iter().map(|hit| hit.at).fold(0.0, f32::max);
         Self::generate(seconds, |t| {
-            let sliding = if t < end { 1.0 } else { 0.0 };
-            let rubbing = hiss.next(noise.next()) * rub * 0.03 * sliding;
+            // Stick and slip: the rub swells and fades with each turn.
+            let swell = if rub.pulses > 0.0 {
+                0.35 + 0.65 * (TAU * rub.pulses * t).sin().max(0.0)
+            } else {
+                1.0
+            };
+            let drive = if t < end {
+                grit.next(noise.next()) * rub.level * swell
+            } else {
+                0.0
+            };
+            let rub = rubbing.iter_mut().map(|mode| mode.next(drive)).sum::<f32>();
             hits.iter()
                 .zip(&mut banks)
                 .map(|(hit, bank)| {
@@ -140,7 +180,7 @@ impl Samples {
                     bank.iter_mut().map(|mode| mode.next(force)).sum::<f32>()
                 })
                 .sum::<f32>()
-                + rubbing
+                + rub
         })
         .normalized(0.8)
     }
