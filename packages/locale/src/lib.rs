@@ -1,5 +1,5 @@
 //! Text in the player's language, from the Fluent files in
-//! `assets/locales/`.
+//! `assets/locales/`, and the font that shows it.
 //!
 //! # Features
 //!
@@ -9,6 +9,7 @@
 mod check;
 mod localized;
 mod messages;
+mod typeface;
 
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ use unic_langid::{LanguageIdentifier, langid};
 
 pub use self::localized::{Arg, Localized, Message};
 use self::messages::{Messages, MessagesLoader};
+pub use self::typeface::TypefacePlugin;
 
 const LANGUAGE: LanguageIdentifier = langid!("en");
 /// The Fluent files of each language, in `locales/<language>/`.
