@@ -5,8 +5,7 @@ use std::error::Error;
 use bevy::prelude::*;
 use ld60_devices::Rom;
 use ld60_levels::{Level, Outcome, TEST_SEEDS};
-
-use crate::locale::Message;
+use ld60_locale::Message;
 
 /// How often a customer tries the device before they take it home broken.
 pub(crate) const TRIES: u32 = 3;

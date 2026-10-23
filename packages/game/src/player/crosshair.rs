@@ -1,4 +1,5 @@
 use bevy::{picking::hover::HoverMap, prelude::*, window::PrimaryWindow};
+use ld60_locale::{Localized, Message};
 
 use super::{
     cursor,
@@ -6,7 +7,6 @@ use super::{
     hints::{Caption, ClickHint, Icon, IconFont},
     look::Gaze,
 };
-use crate::locale::{Localized, Message};
 use crate::menu::Settings;
 
 pub(super) struct CrosshairPlugin;

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_locale::{Localized, Message};
 
 use super::list::{Action, Entries};
 use super::{AppState, Column};
-use crate::locale::{Localized, Message};
 use crate::player::hints::{INK, SHADOW};
 use crate::workshop::run::Stats;
 

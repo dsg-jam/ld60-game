@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use ld60_levels::Level;
+use ld60_locale::{Localized, Message};
 
 use super::counter::CounterLayout;
 use super::levels::Levels;
 use super::pickup::Pickup;
 use super::ticket::JobTicket;
 use crate::audio::{Play, Sound};
-use crate::locale::{Localized, Message};
 use crate::parts::paper::Paper;
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, View};
@@ -149,8 +149,9 @@ impl Receipt {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
+
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::levels::Levels;
     use crate::workshop::pickup::Complaint;
 

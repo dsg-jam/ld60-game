@@ -6,6 +6,7 @@ use bevy::{
     text::EditableText,
     ui::{ComputedUiRenderTargetInfo, UiGlobalTransform},
 };
+use ld60_locale::{Localized, Message};
 use ld60_machine::Assembly;
 
 use super::Editor;
@@ -13,7 +14,6 @@ use super::footer::{Command, Run, Status};
 use super::highlight::Highlight;
 use super::listing::Listing;
 use crate::device::Emulator;
-use crate::locale::{Localized, Message};
 use crate::workshop::job::{Job, JobId};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
@@ -162,10 +162,10 @@ impl Breakpoints {
 
 #[cfg(test)]
 mod tests {
+    use ld60_locale::Locale;
     use ld60_machine::Isa;
 
     use super::*;
-    use crate::locale::Locale;
 
     fn listing() -> Listing {
         let isa = ld60_calco::Revision::C.isa();

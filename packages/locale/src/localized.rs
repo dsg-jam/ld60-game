@@ -17,7 +17,7 @@ macro_rules! number_args {
 /// Fills the [`Text`] of its entity with text in the player's language.
 #[derive(Component, Clone, Debug, PartialEq)]
 #[require(Text)]
-pub(crate) enum Localized {
+pub enum Localized {
     Message(Message),
     /// Reads the same in every language, like a name or a serial number.
     Verbatim(String),
@@ -26,7 +26,7 @@ pub(crate) enum Localized {
 /// A Fluent message, or one of its attributes, and the values to fill into
 /// it.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Message {
+pub struct Message {
     pub(super) id: Cow<'static, str>,
     pub(super) attribute: Option<Cow<'static, str>>,
     pub(super) args: Vec<(&'static str, Arg)>,
@@ -34,7 +34,7 @@ pub(crate) struct Message {
 
 /// A value to fill into a [`Message`].
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Arg {
+pub enum Arg {
     Number(f64),
     /// Reads the same in every language.
     Text(String),
@@ -43,7 +43,7 @@ pub(crate) enum Arg {
 }
 
 impl Localized {
-    pub(crate) fn verbatim(text: impl Into<String>) -> Self {
+    pub fn verbatim(text: impl Into<String>) -> Self {
         Self::Verbatim(text.into())
     }
 
@@ -75,7 +75,7 @@ impl From<Message> for Localized {
 }
 
 impl Message {
-    pub(crate) fn new(id: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new(id: impl Into<Cow<'static, str>>) -> Self {
         Self {
             id: id.into(),
             attribute: None,
@@ -83,12 +83,12 @@ impl Message {
         }
     }
 
-    pub(crate) fn attribute(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn attribute(mut self, name: impl Into<Cow<'static, str>>) -> Self {
         self.attribute = Some(name.into());
         self
     }
 
-    pub(crate) fn with(mut self, name: &'static str, arg: impl Into<Arg>) -> Self {
+    pub fn with(mut self, name: &'static str, arg: impl Into<Arg>) -> Self {
         self.args.push((name, arg.into()));
         self
     }

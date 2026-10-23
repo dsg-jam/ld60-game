@@ -4,8 +4,7 @@ use bevy::{
 };
 use ld60_devices::{ChipSpec, DeviceKind};
 use ld60_levels::{Catalog, GenerateError, Level, LevelSource, Order, Reference};
-
-use crate::locale::Message;
+use ld60_locale::Message;
 
 const CATALOG: &str = "levels/catalog.ron";
 
@@ -247,9 +246,9 @@ fn is_update<A: Asset>(event: &AssetEvent<A>) -> bool {
 mod tests {
     use ld60_devices::{BoardRev, DeviceKind};
     use ld60_levels::{Difficulty, Generated, JobText, Reference, Symptom, TestCase, Variant};
+    use ld60_locale::Locale;
 
     use super::*;
-    use crate::locale::Locale;
 
     #[test]
     fn every_level_has_its_text() {

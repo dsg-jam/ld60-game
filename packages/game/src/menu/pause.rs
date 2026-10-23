@@ -9,10 +9,10 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowFocused},
 };
+use ld60_locale::Message;
 
 use super::list::{Action, Navigation};
 use super::{AppState, Column};
-use crate::locale::Message;
 use crate::player::{focus::Focus, look::CursorLock};
 
 const SHADE: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);

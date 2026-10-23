@@ -1,4 +1,11 @@
-#[cfg(test)]
+//! Text in the player's language, from the Fluent files in
+//! `assets/locales/`.
+//!
+//! # Features
+//!
+//! - `test-support`: adds checks that read the files straight from disk.
+
+#[cfg(any(test, feature = "test-support"))]
 mod check;
 mod localized;
 mod messages;
@@ -12,7 +19,7 @@ use fluent_bundle::{
 };
 use unic_langid::{LanguageIdentifier, langid};
 
-pub(crate) use self::localized::{Arg, Localized, Message};
+pub use self::localized::{Arg, Localized, Message};
 use self::messages::{Messages, MessagesLoader};
 
 const LANGUAGE: LanguageIdentifier = langid!("en");
@@ -34,7 +41,7 @@ const FILES: &[&str] = &[
     "ui.ftl",
 ];
 
-pub(crate) struct LocalePlugin;
+pub struct LocalePlugin;
 
 impl Plugin for LocalePlugin {
     fn build(&self, app: &mut App) {
@@ -53,7 +60,7 @@ impl Plugin for LocalePlugin {
 
 /// The messages of the player's language.
 #[derive(Resource)]
-pub(crate) struct Locale {
+pub struct Locale {
     language: LanguageIdentifier,
     files: Vec<Handle<Messages>>,
     /// Empty until all files are loaded.
@@ -78,7 +85,7 @@ impl FromWorld for Locale {
 impl Locale {
     /// The text in the player's language. A message is empty until the
     /// messages are loaded, and shows its ID if there is no such message.
-    pub(crate) fn text(&self, localized: &Localized) -> String {
+    pub fn text(&self, localized: &Localized) -> String {
         match localized {
             Localized::Message(message) => self.message(message),
             Localized::Verbatim(text) => text.clone(),

@@ -5,13 +5,14 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
+use ld60_locale::{Localized, Message};
 
 use super::Editor;
 use super::breakpoints::Breakpoints;
+use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
 use crate::device::Emulator;
-use crate::locale::{Localized, Message};
 use crate::workshop::clock::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
@@ -204,7 +205,7 @@ impl Run {
             (_, None) => Message::new("editor-no-job"),
             (Command::Assemble, Some(job)) => match ld60_levels::assemble(&job.level, &source) {
                 Ok(assembly) => Message::new("editor-assembled").with("bytes", assembly.byte_len()),
-                Err(err) => Message::from(&err),
+                Err(err) => err.message(),
             },
             (Command::Flash, Some(mut job)) => match emulators.single_mut() {
                 Ok(mut emulator) => Self::flash(
@@ -231,16 +232,16 @@ impl Run {
     ) -> Message {
         let assembly = match ld60_levels::assemble(&job.level, source) {
             Ok(assembly) => assembly,
-            Err(err) => return Message::from(&err),
+            Err(err) => return err.message(),
         };
         let addresses = breakpoints.addresses(&assembly);
         let rom = match ld60_levels::burn(&job.level, emulator.rom(), assembly.image) {
             Ok(rom) => rom,
-            Err(err) => return err.into(),
+            Err(err) => return err.message(),
         };
         let device = match ld60_levels::device(&job.level, rom.clone()) {
             Ok(device) => device,
-            Err(err) => return Message::from(&err),
+            Err(err) => return err.message(),
         };
         emulator.set_breakpoints(addresses);
         emulator.restart(device);
@@ -256,9 +257,9 @@ impl Run {
 #[cfg(test)]
 mod tests {
     use ld60_levels::{GAME_SEED, Variant};
+    use ld60_locale::Locale;
 
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::computer::editor::undo::Undo;
     use crate::workshop::levels::Levels;
 

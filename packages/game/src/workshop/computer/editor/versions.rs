@@ -3,15 +3,6 @@ mod list;
 
 use std::time::Duration;
 
-use self::list::{MAX_VERSIONS, Removal, SaveError, Version, VersionList};
-use super::footer::{Flashed, Status};
-use super::page::{ActivePage, Page};
-use super::undo::Undo;
-use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-use crate::locale::{Locale, Localized, Message};
-use crate::workshop::job::{Job, JobId};
 use bevy::{
     input::keyboard::KeyboardInput,
     input_focus::{FocusedInput, tab_navigation::TabIndex},
@@ -19,6 +10,16 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
+use ld60_locale::{Locale, Localized, Message};
+
+use self::list::{MAX_VERSIONS, Removal, SaveError, Version, VersionList};
+use super::footer::{Flashed, Status};
+use super::page::{ActivePage, Page};
+use super::undo::Undo;
+use super::{Editor, FONT_SIZE, PHOSPHOR, PHOSPHOR_DIM, ROW_GAP};
+#[cfg(feature = "debug_port")]
+use crate::debug_port::DebugMethods;
+use crate::workshop::job::{Job, JobId};
 
 /// Width of the label column. Longer labels are cut, so the marks line up.
 const LABEL_WIDTH: usize = 26;

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
+use ld60_locale::Localized;
 
-use crate::locale::Localized;
 use crate::workshop::job::Job;
 
 /// The editor header text that names the chip of the job.

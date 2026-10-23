@@ -1,8 +1,8 @@
 use ld60_calco::{Erratum, Revision};
 use ld60_devices::DeviceKind;
+use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::locale::Message;
 use crate::workshop::run::{ComputerTool, Run};
 
 /// Something the scrap trader found, for sale in the salvage crate.

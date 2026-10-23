@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use ld60_devices::Rom;
 use ld60_levels::Level;
+use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run, Status};
 use crate::device::Emulator;
-use crate::locale::{Localized, Message};
 use crate::workshop::job::Job;
 use crate::workshop::pickup::Complaint;
 
@@ -77,9 +77,9 @@ impl Verdict {
 #[cfg(test)]
 mod tests {
     use ld60_levels::{assemble, burn, initial_rom};
+    use ld60_locale::Locale;
 
     use super::*;
-    use crate::locale::Locale;
     use crate::workshop::levels::Levels;
 
     #[test]

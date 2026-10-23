@@ -15,6 +15,7 @@ mod top_sheet;
 mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
+use ld60_locale::Message;
 
 use self::contents::{Contents, Entry};
 use self::dividers::{DividerTab, Tab};
@@ -32,7 +33,6 @@ use super::run::Run;
 use super::tutorial::{FirstNote, TutorialNote};
 use crate::audio::{Play, Sound};
 use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
-use crate::locale::Message;
 use crate::menu::AppState;
 use crate::parts::paper::{
     Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
@@ -510,10 +510,10 @@ struct Lying(Transform);
 mod tests {
     use ld60_calco::Revision;
     use ld60_devices::{BoardRev, DeviceKind};
+    use ld60_locale::{Locale, Localized, Message};
 
     use super::contents::{Entry, Section};
     use super::*;
-    use crate::locale::{Locale, Localized, Message};
     use crate::workshop::levels::Levels;
     use crate::workshop::salvage::Find;
     use crate::workshop::tutorial::TutorialNote;

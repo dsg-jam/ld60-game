@@ -1,7 +1,7 @@
 use bevy::prelude::*;
+use ld60_locale::Message;
 
 use super::{Paper, ShowsOwnPages};
-use crate::locale::Message;
 use crate::player::hints::{Hint, Hints, Icon, Input};
 
 impl Paper {

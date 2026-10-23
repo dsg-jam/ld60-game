@@ -1,43 +1,48 @@
 use ld60_devices::{DeviceError, IsaKind, ProgramError};
 use ld60_levels::LevelError;
+use ld60_locale::Message;
 use ld60_machine::AsmErrorKind;
 
 use crate::device::{BoardLetter, DeviceName};
-use crate::locale::Message;
 
-impl From<&LevelError> for Message {
+/// What the editor says about an error.
+pub(super) trait Explain {
+    fn message(&self) -> Message;
+}
+
+impl Explain for LevelError {
     /// The first assembler error with its line, or the error itself.
-    fn from(err: &LevelError) -> Self {
-        match err {
+    fn message(&self) -> Message {
+        match self {
             LevelError::Assemble(errors) => match errors.as_slice() {
-                [] => Self::new("editor-assembly-failed"),
-                [only] => Self::new("editor-asm-error")
+                [] => Message::new("editor-assembly-failed"),
+                [only] => Message::new("editor-asm-error")
                     .with("line", only.line)
-                    .with("message", Self::from(&only.kind)),
-                [first, rest @ ..] => Self::new("editor-asm-error-more")
+                    .with("message", only.kind.message()),
+                [first, rest @ ..] => Message::new("editor-asm-error-more")
                     .with("line", first.line)
-                    .with("message", Self::from(&first.kind))
+                    .with("message", first.kind.message())
                     .with("more", rest.len()),
             },
-            LevelError::Parse(err) => Self::new("editor-error-parse")
+            LevelError::Parse(err) => Message::new("editor-error-parse")
                 .with("line", err.span.start.line)
                 .with("column", err.span.start.col),
-            LevelError::Write(_) => Self::new("editor-error-write"),
-            LevelError::BoardNotAllowed(rev) => Self::new("editor-error-board-not-allowed")
+            LevelError::Write(_) => Message::new("editor-error-write"),
+            LevelError::BoardNotAllowed(rev) => Message::new("editor-error-board-not-allowed")
                 .with("board", BoardLetter(*rev).to_string()),
             LevelError::NoRewrite(rev) => {
-                Self::new("editor-error-no-rewrite").with("board", BoardLetter(*rev).to_string())
+                Message::new("editor-error-no-rewrite").with("board", BoardLetter(*rev).to_string())
             }
             LevelError::Device(DeviceError::ChipMismatch { device, chip }) => {
                 let chip = match chip {
                     IsaKind::Calco => "CalCo",
                 };
-                Self::new("editor-error-chip-mismatch")
+                Message::new("editor-error-chip-mismatch")
                     .with("device", device.name())
                     .with("chip", chip)
             }
             LevelError::Device(DeviceError::RomSize { expected, actual }) => {
-                Self::new("editor-error-rom-size")
+                Message::new("editor-error-rom-size")
                     .with("expected", *expected)
                     .with("actual", *actual)
             }
@@ -45,90 +50,90 @@ impl From<&LevelError> for Message {
     }
 }
 
-impl From<&AsmErrorKind> for Message {
-    fn from(kind: &AsmErrorKind) -> Self {
-        match kind {
+impl Explain for AsmErrorKind {
+    fn message(&self) -> Message {
+        match self {
             AsmErrorKind::InvalidLabel { name } => {
-                Self::new("editor-asm-invalid-label").with("name", name.as_str())
+                Message::new("editor-asm-invalid-label").with("name", name.as_str())
             }
             AsmErrorKind::InvalidNumber { text } => {
-                Self::new("editor-asm-invalid-number").with("text", text.as_str())
+                Message::new("editor-asm-invalid-number").with("text", text.as_str())
             }
             AsmErrorKind::InvalidOperand { text } => {
-                Self::new("editor-asm-invalid-operand").with("text", text.as_str())
+                Message::new("editor-asm-invalid-operand").with("text", text.as_str())
             }
             AsmErrorKind::DirectiveExpectsNumbers { directive } => {
-                Self::new("editor-asm-directive-expects-numbers")
+                Message::new("editor-asm-directive-expects-numbers")
                     .with("directive", directive.as_str())
             }
-            AsmErrorKind::OrgExpectsAddress => Self::new("editor-asm-org-expects-address"),
-            AsmErrorKind::DbExpectsValue => Self::new("editor-asm-db-expects-value"),
+            AsmErrorKind::OrgExpectsAddress => Message::new("editor-asm-org-expects-address"),
+            AsmErrorKind::DbExpectsValue => Message::new("editor-asm-db-expects-value"),
             AsmErrorKind::UnknownDirective { directive } => {
-                Self::new("editor-asm-unknown-directive").with("directive", directive.as_str())
+                Message::new("editor-asm-unknown-directive").with("directive", directive.as_str())
             }
             AsmErrorKind::DuplicateLabel { name } => {
-                Self::new("editor-asm-duplicate-label").with("name", name.as_str())
+                Message::new("editor-asm-duplicate-label").with("name", name.as_str())
             }
             AsmErrorKind::OutsideRom { addr } => {
-                Self::new("editor-asm-outside-rom").with("address", addr.to_string())
+                Message::new("editor-asm-outside-rom").with("address", addr.to_string())
             }
-            AsmErrorKind::RomFull => Self::new("editor-asm-rom-full"),
+            AsmErrorKind::RomFull => Message::new("editor-asm-rom-full"),
             AsmErrorKind::Overlap { addr } => {
-                Self::new("editor-asm-overlap").with("address", format!("0x{addr:02X}"))
+                Message::new("editor-asm-overlap").with("address", format!("0x{addr:02X}"))
             }
             AsmErrorKind::WordRange { value } => {
-                Self::new("editor-asm-word-range").with("value", value.to_string())
+                Message::new("editor-asm-word-range").with("value", value.to_string())
             }
             AsmErrorKind::UnknownLabel { name } => {
-                Self::new("editor-asm-unknown-label").with("name", name.as_str())
+                Message::new("editor-asm-unknown-label").with("name", name.as_str())
             }
-            AsmErrorKind::ExpectsValue => Self::new("editor-asm-expects-value"),
+            AsmErrorKind::ExpectsValue => Message::new("editor-asm-expects-value"),
             AsmErrorKind::UnknownMnemonic { mnemonic } => {
-                Self::new("editor-asm-unknown-mnemonic").with("mnemonic", mnemonic.as_str())
+                Message::new("editor-asm-unknown-mnemonic").with("mnemonic", mnemonic.as_str())
             }
-            AsmErrorKind::Unsupported { form, isa } => Self::new("editor-asm-unsupported")
+            AsmErrorKind::Unsupported { form, isa } => Message::new("editor-asm-unsupported")
                 .with("form", form.as_str())
                 .with("chip", *isa),
             AsmErrorKind::TakesNoOperands { mnemonic } => {
-                Self::new("editor-asm-takes-no-operands").with("mnemonic", mnemonic.as_str())
+                Message::new("editor-asm-takes-no-operands").with("mnemonic", mnemonic.as_str())
             }
             AsmErrorKind::ExpectsOneOperand { mnemonic } => {
-                Self::new("editor-asm-expects-one-operand").with("mnemonic", mnemonic.as_str())
+                Message::new("editor-asm-expects-one-operand").with("mnemonic", mnemonic.as_str())
             }
             AsmErrorKind::ExpectsRegisterAndValue { mnemonic } => {
-                Self::new("editor-asm-expects-register-and-value")
+                Message::new("editor-asm-expects-register-and-value")
                     .with("mnemonic", mnemonic.as_str())
             }
             AsmErrorKind::ExpectsAOrB { mnemonic } => {
-                Self::new("editor-asm-expects-a-or-b").with("mnemonic", mnemonic.as_str())
+                Message::new("editor-asm-expects-a-or-b").with("mnemonic", mnemonic.as_str())
             }
             AsmErrorKind::ExpectsMemory { mnemonic } => {
-                Self::new("editor-asm-expects-memory").with("mnemonic", mnemonic.as_str())
+                Message::new("editor-asm-expects-memory").with("mnemonic", mnemonic.as_str())
             }
             AsmErrorKind::OffsetRange { offset } => {
-                Self::new("editor-asm-offset-range").with("offset", offset.to_string())
+                Message::new("editor-asm-offset-range").with("offset", offset.to_string())
             }
             AsmErrorKind::UnknownPort { name } => {
-                Self::new("editor-asm-unknown-port").with("name", name.as_str())
+                Message::new("editor-asm-unknown-port").with("name", name.as_str())
             }
             AsmErrorKind::PortRange { port } => {
-                Self::new("editor-asm-port-range").with("port", port.to_string())
+                Message::new("editor-asm-port-range").with("port", port.to_string())
             }
-            AsmErrorKind::ExpectsPort => Self::new("editor-asm-expects-port"),
+            AsmErrorKind::ExpectsPort => Message::new("editor-asm-expects-port"),
             AsmErrorKind::ByteRange { value } => {
-                Self::new("editor-asm-byte-range").with("value", value.to_string())
+                Message::new("editor-asm-byte-range").with("value", value.to_string())
             }
         }
     }
 }
 
-impl From<ProgramError> for Message {
-    fn from(err: ProgramError) -> Self {
-        match err {
-            ProgramError::MaskRom => Self::new("editor-burn-mask-rom"),
-            ProgramError::SizeMismatch => Self::new("editor-burn-size-mismatch"),
+impl Explain for ProgramError {
+    fn message(&self) -> Message {
+        match self {
+            ProgramError::MaskRom => Message::new("editor-burn-mask-rom"),
+            ProgramError::SizeMismatch => Message::new("editor-burn-size-mismatch"),
             ProgramError::BitConflict { addr } => {
-                Self::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
+                Message::new("editor-burn-bit-conflict").with("address", format!("0x{addr:02X}"))
             }
         }
     }
@@ -138,10 +143,10 @@ impl From<ProgramError> for Message {
 mod tests {
     use ld60_devices::{BoardRev, DeviceKind};
     use ld60_levels::Level;
+    use ld60_locale::Locale;
     use ld60_machine::AsmError;
 
     use super::*;
-    use crate::locale::Locale;
 
     fn kinds() -> Vec<AsmErrorKind> {
         let name = || "loop".to_string();
@@ -206,7 +211,7 @@ mod tests {
                 kind,
             }])
         });
-        Locale::on_disk().assert_formats(errors.map(|err| Message::from(&err)));
+        Locale::on_disk().assert_formats(errors.map(|err| err.message()));
     }
 
     #[test]
@@ -239,16 +244,14 @@ mod tests {
             ProgramError::BitConflict { addr: 0x1F },
         ];
         let locale = Locale::on_disk();
-        locale.assert_formats(errors.iter().map(Message::from));
-        locale.assert_formats(burns.map(Message::from));
+        locale.assert_formats(errors.iter().map(Explain::message));
+        locale.assert_formats(burns.iter().map(Explain::message));
     }
 
     #[test]
     fn parse_errors_show_where() {
         let err = Level::from_ron("(\n  id: 3,\n)").unwrap_err();
-        let text = Locale::on_disk()
-            .check(&Message::from(&err).into())
-            .unwrap();
+        let text = Locale::on_disk().check(&err.message().into()).unwrap();
         assert!(text.contains("line 2"), "{text}");
     }
 }
