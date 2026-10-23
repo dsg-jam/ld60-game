@@ -136,6 +136,11 @@ impl Holdable {
         Transform::from_translation(center).with_rotation(facing.rotation * self.spin * face_up)
     }
 
+    /// Where it rests on the counter.
+    pub(crate) fn rest(&self) -> &Transform {
+        &self.rest
+    }
+
     /// Turns the resting pose upside down onto the top of a device `height`
     /// tall, or back.
     fn turn_over(&mut self, height: f32) {

@@ -88,6 +88,18 @@ impl Props<'_> {
         )
     }
 
+    /// The ground under a screw lying on its side, head towards -X.
+    #[cfg(test)]
+    pub(super) fn screw_area() -> Block {
+        let length = SCREW_HEAD_LENGTH + SCREW_SHANK_LENGTH;
+        Block::new(Vec3::new(
+            length,
+            2.0 * SCREW_HEAD_RADIUS,
+            2.0 * SCREW_HEAD_RADIUS,
+        ))
+        .translated(Vec3::X * (length / 2.0 - SCREW_HEAD_LENGTH / 2.0))
+    }
+
     /// The ground under the screwdriver, from the grip to the tip.
     pub(super) fn screwdriver_area() -> Block {
         let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
