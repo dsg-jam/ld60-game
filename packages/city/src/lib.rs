@@ -1,3 +1,9 @@
+//! The street outside the shop: buildings, traffic, rain, weather and sky.
+//!
+//! # Features
+//!
+//! - `debug_port`: adds `ld60.weather` to the debug port.
+
 mod additions;
 mod atmosphere;
 mod buildings;
@@ -13,7 +19,7 @@ mod traffic;
 mod weather;
 mod wet;
 
-pub(crate) use self::traffic::Draft;
+pub use self::traffic::Draft;
 
 use std::f32::consts::PI;
 
@@ -52,7 +58,7 @@ const NEON: [Color; 6] = [
     Color::srgb_u8(0xff, 0x4f, 0x2e),
 ];
 
-pub(crate) struct CityPlugin;
+pub struct CityPlugin;
 
 impl Plugin for CityPlugin {
     fn build(&self, app: &mut App) {

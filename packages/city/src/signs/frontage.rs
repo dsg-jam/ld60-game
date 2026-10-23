@@ -7,8 +7,8 @@ use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
-use crate::city::buildings::FacadeMaterial;
-use crate::city::market::{AWNING_ABOVE, MARKET_HEIGHT};
+use crate::buildings::FacadeMaterial;
+use crate::market::{AWNING_ABOVE, MARKET_HEIGHT};
 
 const SHOP_SIGN_CHANCE: f64 = 0.8;
 const SHOP_SIGN_HEIGHT: Range<f32> = 0.9..1.6;

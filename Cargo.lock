@@ -3573,6 +3573,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ld60-city"
+version = "0.2.2"
+dependencies = [
+ "bevy",
+ "ld60-core",
+ "ld60-geometry",
+ "rand",
+ "serde_json",
+]
+
+[[package]]
 name = "ld60-cli"
 version = "0.2.2"
 dependencies = [
@@ -3625,6 +3636,7 @@ version = "0.2.2"
 dependencies = [
  "bevy",
  "ld60-calco",
+ "ld60-city",
  "ld60-core",
  "ld60-devices",
  "ld60-geometry",

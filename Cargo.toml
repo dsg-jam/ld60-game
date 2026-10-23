@@ -15,6 +15,7 @@ publish = false
 [workspace.dependencies]
 ld60-asm = { path = "packages/asm" }
 ld60-calco = { path = "packages/calco" }
+ld60-city = { path = "packages/city" }
 ld60-core = { path = "packages/core" }
 ld60-devices = { path = "packages/devices" }
 ld60-dsl = { path = "packages/dsl" }

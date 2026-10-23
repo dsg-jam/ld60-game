@@ -5,7 +5,7 @@ use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::{Additions, Wall};
-use crate::city::Kit;
+use crate::Kit;
 
 /// Thickness of the pipes running along a wall.
 const PIPE: f32 = 0.12;
