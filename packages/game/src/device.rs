@@ -1,3 +1,4 @@
+mod board;
 mod casing;
 mod emulator;
 mod handheld;

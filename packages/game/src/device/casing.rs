@@ -8,20 +8,15 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
+use super::board::BoardLayout;
 use super::{Connected, Holdable};
 
 /// Thickness of the back cover. The board and the header fit inside it.
 pub(super) const COVER: f32 = 0.005;
-/// How far the board stays inside the edges of the body.
-const BOARD_INSET: f32 = 0.006;
-const BOARD_THICKNESS: f32 = 0.0012;
-const HEADER: Vec3 = Vec3::new(0.012, 0.0025, 0.005);
-const SCREW: Vec3 = Vec3::new(0.0045, 0.0012, 0.0045);
+const SCREW: Vec3 = Vec3::new(0.0055, 0.0014, 0.0055);
 /// How far a loose screw stands out of its hole.
 const SCREW_OUT: f32 = 0.004;
-const BOARD: Color = Color::srgb_u8(0x3c, 0x7c, 0x4c);
-const HEADER_BLACK: Color = Color::srgb_u8(0x1a, 0x1a, 0x1c);
-const SCREW_METAL: Color = Color::srgb_u8(0x9a, 0x9c, 0xa0);
+const SCREW_METAL: Color = Color::srgb_u8(0xc8, 0xca, 0xce);
 
 /// The parts of a casing whose click prompt changes.
 type Prompted<'a> = (
@@ -98,14 +93,18 @@ impl Casing {
         !self.open && !self.loose.contains(&true)
     }
 
-    /// Spawns the cover with `sticker` on it, the board and the header into
-    /// `device`, below `shell`. Returns the casing of a device `height` tall.
+    /// Spawns the cover with `sticker` on it into `device`, below `shell`,
+    /// and the board of `layout` with `face` and its parts under the cover.
+    /// Returns the casing of a device `height` tall.
+    #[expect(clippy::too_many_arguments, reason = "the parts of a casing")]
     pub(super) fn spawn(
         device: &mut ChildSpawnerCommands,
         shell: &Block,
         color: Color,
         spots: &CasingSpots,
         sticker: impl Bundle,
+        layout: &BoardLayout,
+        face: impl Bundle,
         height: f32,
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
@@ -137,33 +136,31 @@ impl Casing {
                 }
                 cover.spawn(sticker);
             });
-        let board = Block::new(Vec3::new(
-            shell.size.x - 2.0 * BOARD_INSET,
-            BOARD_THICKNESS,
-            shell.size.z - 2.0 * BOARD_INSET,
-        ))
-        .translated(Vec3::Y * (COVER - BOARD_THICKNESS));
+        let board = || {
+            (
+                Board,
+                Clickable {
+                    prompt: "click-cover-on",
+                },
+            )
+        };
         device.spawn((
-            Board,
-            Clickable {
-                prompt: "click-cover-on",
-            },
-            Shape::cuboid(&board, BOARD),
+            board(),
+            Shape::cuboid(&layout.board, BoardLayout::edge()),
             Finish::Plastic,
         ));
-        let header = Block::new(HEADER).translated(
-            board
-                .top_spot(spots.header)
-                .with_y(board.min().y - HEADER.y),
-        );
+        device.spawn((board(), face));
         device.spawn((
             Header,
             Clickable {
                 prompt: "click-plug-in",
             },
-            Shape::cuboid(&header, HEADER_BLACK),
+            Shape::cuboid(&layout.header, BoardLayout::header_color()),
             Finish::Plastic,
         ));
+        for (part, color) in &layout.parts {
+            device.spawn((Shape::cuboid(part, *color), Finish::Plastic));
+        }
         Self::new(spots.screws.len(), height)
     }
 

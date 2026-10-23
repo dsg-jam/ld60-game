@@ -5,6 +5,7 @@ use bevy::{input::keyboard::Key, prelude::*};
 use ld60_core::parts::keypad::KeyBinding::{Named, Typed};
 use ld60_core::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use ld60_core::parts::lcd;
+use ld60_core::parts::pcb::PcbMaterial;
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::parts::sticker::{Sticker, StickerMaterial};
 use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
@@ -14,6 +15,7 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
+use super::board::BoardLayout;
 use super::casing::{COVER, Casing, CasingSpots};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
@@ -256,6 +258,7 @@ impl Handheld {
         }
     }
 
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn on_add(
         add: On<Add<Handheld>>,
         units: Query<&Handheld>,
@@ -264,6 +267,7 @@ impl Handheld {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
         mut stickers: ResMut<Assets<StickerMaterial>>,
+        mut pcbs: ResMut<Assets<PcbMaterial>>,
     ) {
         let Ok(unit) = units.get(add.entity) else {
             return;
@@ -294,6 +298,15 @@ impl Handheld {
         let shell = Block::new(model.body_size.with_y(model.body_size.y - COVER))
             .translated(Vec3::Y * COVER);
         let height = model.body_size.y + STYLE.key_size.y;
+        let board = BoardLayout::new(
+            &shell,
+            COVER,
+            model.casing.header,
+            model.casing.screws,
+            sticker_seed,
+        );
+        let name = format!("PCB {}", level.board().name());
+        let face = board.face(&name, sticker_seed, &mut meshes, &mut images, &mut pcbs);
         let unlit = |texture: Handle<Image>| StandardMaterial {
             base_color_texture: Some(texture),
             unlit: true,
@@ -341,6 +354,8 @@ impl Handheld {
                 model.body,
                 &model.casing,
                 sticker,
+                &board,
+                face,
                 height,
             ));
         });
