@@ -98,10 +98,6 @@ impl Casing {
         !self.open && !self.loose.contains(&true)
     }
 
-    pub(crate) fn open(&self) -> bool {
-        self.open
-    }
-
     /// Spawns the cover with `sticker` on it, the board and the header into
     /// `device`, below `shell`. Returns the casing of a device `height` tall.
     pub(super) fn spawn(
@@ -404,7 +400,7 @@ mod tests {
         assert!(!casing.lift_cover());
         assert!(casing.turn_screw(1));
         assert!(casing.lift_cover());
-        assert!(casing.open());
+        assert!(casing.open);
         assert!(!casing.turn_screw(0));
     }
 

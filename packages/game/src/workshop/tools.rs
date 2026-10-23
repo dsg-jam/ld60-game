@@ -13,8 +13,9 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use super::job::{HandIn, Job};
+use super::job::{HandIn, Job, JobItem};
 use super::ticket::{JobTicket, Landing};
+use crate::device::Casing;
 
 pub(super) const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
 const STAMP_PAD_SIZE: Vec3 = Vec3::new(0.058, 0.005, 0.038);
@@ -40,7 +41,7 @@ pub(crate) struct ToolsPlugin;
 
 impl Plugin for ToolsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, Press::animate)
+        app.add_systems(Update, (Press::animate, Tool::arm))
             .add_observer(Tool::on_add)
             .add_observer(Tool::use_on_press);
     }
@@ -64,11 +65,13 @@ impl Tool {
         }
     }
 
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn use_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
         tools: Query<(&Tool, &Transform, Has<Press>)>,
         landings: Query<(), With<Landing>>,
+        casings: Query<&Casing, With<JobItem>>,
         job: Option<ResMut<Job>>,
         mut tickets: Query<(Entity, &mut Paper), With<JobTicket>>,
         mut commands: Commands,
@@ -100,10 +103,25 @@ impl Tool {
             }
             Self::Bell => {
                 commands.trigger(Play(Sound::Ding));
-                if job.is_some_and(|job| job.stamped) && landings.is_empty() {
+                // Nobody takes a gadget home in pieces.
+                if !casings.iter().all(Casing::sealed) {
+                    commands.trigger(Play(Sound::Refuse));
+                } else if job.is_some_and(|job| job.stamped) && landings.is_empty() {
                     commands.trigger(HandIn);
                 }
             }
+        }
+    }
+
+    /// The bell says when the device must be closed up first.
+    fn arm(casings: Query<&Casing, With<JobItem>>, mut tools: Query<(&Tool, &mut Clickable)>) {
+        let sealed = casings.iter().all(Casing::sealed);
+        for (&tool, mut clickable) in &mut tools {
+            let prompt = match tool {
+                Self::Bell if !sealed => "click-bell-open",
+                _ => tool.prompt(),
+            };
+            clickable.set_if_neq(Clickable { prompt });
         }
     }
 
