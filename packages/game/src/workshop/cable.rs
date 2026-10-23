@@ -21,15 +21,27 @@ const BOOT: Vec3 = Vec3::new(0.007, 0.007, 0.014);
 /// How high the port for the cable sits on the side of the monitor.
 const PORT_HEIGHT: f32 = 0.025;
 const RADIUS: f32 = 0.0016;
-const SEGMENTS: usize = 32;
-/// How far the cable sags below its curve, per meter between its ends.
-const SAG: f32 = 0.12;
+/// Long enough to reach a device held up to the eyes.
+const LENGTH: f32 = 0.8;
+/// The cable is a chain of this many points.
+const POINTS: usize = 48;
+/// Steps of the simulation per frame. Small steps keep it stiff and calm.
+const SUBSTEPS: usize = 12;
+const FRAME: f32 = 1.0 / 60.0;
+/// How soft the cable bends, in meters per newton. Zero would be a rod.
+const BEND_COMPLIANCE: f32 = 2e-7;
+/// How much of its speed the cable loses per second.
+const DAMPING: f32 = 8.0;
+/// How much of its sliding a point on the counter keeps per step.
+const FRICTION: f32 = 0.3;
+/// A point on the counter slower than this, in meters per second, stops.
+const STICK: f32 = 0.05;
+/// The cable sleeps once no point moves farther than this in a frame.
+const SLEEP: f32 = 5e-5;
 /// How far before the edge of the mat the cable starts to rise onto it, so
 /// it drapes over the edge.
-const MAT_MARGIN: f32 = 0.012;
-/// How far the cable goes straight out of the boot and the plug before it
-/// bends, at most.
-const STRAIGHT: f32 = 0.035;
+const MAT_MARGIN: f32 = 0.006;
+const GRAVITY: f32 = 9.81;
 const PLUG_BLACK: Color = Color::srgb_u8(0x22, 0x22, 0x24);
 const CABLE_GRAY: Color = Color::srgb_u8(0x3a, 0x3c, 0x40);
 
@@ -44,6 +56,11 @@ impl Plugin for CablePlugin {
 
 /// The debug cable from the computer to a device, or to its plug on the
 /// counter.
+///
+/// It is a chain of points that keep their distance and resist bending, as
+/// in Macklin et al., "XPBD" (2016) and "Small Steps in Physics Simulation"
+/// (2019). The points stay out of the device, the computer and the counter.
+/// The boot and the plug hold both ends straight.
 #[derive(Component, Debug)]
 struct Cable {
     /// Where it leaves the boot on the monitor.
@@ -54,6 +71,13 @@ struct Cable {
     floor: f32,
     /// The mat on the counter, which the cable lies on where it crosses it.
     mat: Block,
+    /// Boxes the cable stays out of, with where they are.
+    solids: Vec<(Affine3A, Block)>,
+    points: Vec<Vec3>,
+    /// Where the points were a step ago, which gives their speed.
+    previous: Vec<Vec3>,
+    /// Where the plug end was when the cable went to sleep.
+    asleep: Option<Vec3>,
 }
 
 /// The end of the cable that goes onto the [`Header`] of a device.
@@ -66,6 +90,14 @@ struct Plug {
 #[derive(Component, Debug)]
 struct Segment(usize);
 
+/// Where the cable ends at the plug, the way it leaves the plug, and the
+/// box of the device it is plugged into.
+struct Ends {
+    end: Vec3,
+    exit: Vec3,
+    device: Option<(Affine3A, Block)>,
+}
+
 impl Cable {
     fn spawn(
         mut commands: Commands,
@@ -77,7 +109,8 @@ impl Cable {
         let rest = rest.with_translation(rest.translation + Vec3::Y * PLUG.y / 2.0);
         // A port low on the side of the monitor that faces the mat.
         let computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW);
-        let monitor = ComputerLayout::new().monitor_body();
+        let layout = ComputerLayout::new();
+        let monitor = layout.monitor_body();
         let port = computer.transform_point(Vec3::new(
             monitor.min().x,
             monitor.min().y + PORT_HEIGHT,
@@ -101,23 +134,34 @@ impl Cable {
             MeshMaterial3d(plug_black),
             Pickable::IGNORE,
         ));
+        let at_computer = computer.compute_affine();
+        let mut cable = Self {
+            socket: port + out * (BOOT.z - 0.002),
+            out,
+            floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
+            mat: counter.mat,
+            solids: vec![
+                (at_computer, monitor),
+                (at_computer, layout.keyboard_placement),
+            ],
+            points: Vec::new(),
+            previous: Vec::new(),
+            asleep: None,
+        };
+        let exit = rest.rotation * Vec3::Z;
+        cable.lay(rest.translation + exit * (PLUG.z / 2.0));
         // Each piece is a little longer than its stretch, so the bends close.
         let mesh = meshes.add(Cylinder::new(0.5, 1.0));
         let material = materials.add(CABLE_GRAY);
         commands
             .spawn((
                 Name::new("debug cable"),
-                Cable {
-                    socket: port + out * (BOOT.z - 0.002),
-                    out,
-                    floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
-                    mat: counter.mat,
-                },
+                cable,
                 Transform::IDENTITY,
                 Visibility::Inherited,
             ))
             .with_children(|cable| {
-                for index in 0..SEGMENTS {
+                for index in 0..POINTS - 1 {
                     cable.spawn((
                         Segment(index),
                         Mesh3d(mesh.clone()),
@@ -130,11 +174,11 @@ impl Cable {
     }
 
     /// Puts the plug on the header of the plugged in device, or back on the
-    /// counter, and hangs the cable between it and the computer.
+    /// counter, and lets the cable move to it.
     fn follow(
         headers: Query<(&GlobalTransform, &ChildOf), With<Header>>,
         plugged: Query<(&GlobalTransform, &Casing), With<Connected>>,
-        cable: Single<&Cable>,
+        mut cable: Single<&mut Cable>,
         mut plug: Single<(&Plug, &mut Transform), Without<Segment>>,
         mut segments: Query<(&Segment, &mut Transform), Without<Plug>>,
     ) {
@@ -144,7 +188,7 @@ impl Cable {
         let (rest, transform) = &mut *plug;
         **transform = match header {
             // The plug stands straight up off the board, so the cable leaves
-            // the device and does not run along it.
+            // the device and not along it.
             Some((header, _)) => {
                 let (_, rotation, center) = header.to_scale_rotation_translation();
                 let away = rotation * Vec3::NEG_Y;
@@ -154,13 +198,18 @@ impl Cable {
             None => rest.rest,
         };
         let exit = transform.rotation * Vec3::Z;
-        let end = transform.translation + exit * (PLUG.z / 2.0);
-        let device = header
-            .and_then(|(_, parent)| plugged.get(parent.parent()).ok())
-            .map(|(device, casing)| (device.affine(), *casing.bounds()));
-        let points = cable.points(end, exit, device);
+        let ends = Ends {
+            end: transform.translation + exit * (PLUG.z / 2.0),
+            exit,
+            device: header
+                .and_then(|(_, parent)| plugged.get(parent.parent()).ok())
+                .map(|(device, casing)| (device.affine(), *casing.bounds())),
+        };
+        if !cable.frame(&ends) {
+            return;
+        }
         for (segment, mut transform) in &mut segments {
-            let (from, to) = (points[segment.0], points[segment.0 + 1]);
+            let (from, to) = (cable.points[segment.0], cable.points[segment.0 + 1]);
             let along = to - from;
             *transform = Transform::from_translation((from + to) / 2.0)
                 .with_rotation(Quat::from_rotation_arc(
@@ -175,41 +224,135 @@ impl Cable {
         }
     }
 
-    /// Points along the cable from the computer to `end`, which it reaches
-    /// going against `exit`. It leaves both ends straight, sags in between,
-    /// goes around `device`, and stays on the counter and the mat.
-    fn points(
-        &self,
-        end: Vec3,
-        exit: Vec3,
-        device: Option<(Affine3A, Block)>,
-    ) -> [Vec3; SEGMENTS + 1] {
-        let span = self.socket.distance(end);
-        let straight = STRAIGHT.min(span / 3.0);
-        let controls = [
-            self.socket,
-            self.socket + self.out * straight,
-            end + exit * straight,
-            end,
-        ];
-        let sag = SAG * span;
-        std::array::from_fn(|index| {
-            let t = index as f32 / SEGMENTS as f32;
-            let s = 1.0 - t;
-            let curve = controls[0] * s * s * s
-                + controls[1] * 3.0 * s * s * t
-                + controls[2] * 3.0 * s * t * t
-                + controls[3] * t * t * t;
-            // Flat at both ends, so the cable leaves them straight.
-            let mut point = curve - Vec3::Y * sag * 16.0 * t * t * s * s;
-            if let Some((transform, bounds)) = device {
-                point = Self::around(point, transform, &bounds);
-            }
-            point.with_y(point.y.max(self.floor_at(point)))
-        })
+    /// Lays the cable out straight from the computer to `end` to fall into
+    /// place from.
+    fn lay(&mut self, end: Vec3) {
+        self.points = (0..POINTS)
+            .map(|index| {
+                let t = index as f32 / (POINTS - 1) as f32;
+                let point = self.socket.lerp(end, t);
+                point.with_y(point.y.max(self.floor_at(point)))
+            })
+            .collect();
+        self.previous = self.points.clone();
     }
 
-    /// `point`, moved out of `bounds` of a device at `transform` through the
+    /// Moves the cable on by one frame, unless it sleeps and the plug has
+    /// not moved. Returns whether it moved.
+    fn frame(&mut self, ends: &Ends) -> bool {
+        if self
+            .asleep
+            .is_some_and(|end| end.distance(ends.end) < SLEEP)
+        {
+            return false;
+        }
+        let before = self.points.clone();
+        for _ in 0..SUBSTEPS {
+            self.step(FRAME / SUBSTEPS as f32, ends);
+        }
+        let moved = before
+            .iter()
+            .zip(&self.points)
+            .map(|(a, b)| a.distance(*b))
+            .fold(0.0, f32::max);
+        self.asleep = (moved < SLEEP).then_some(ends.end);
+        true
+    }
+
+    /// One small step of `dt` seconds.
+    fn step(&mut self, dt: f32, ends: &Ends) {
+        let last = POINTS - 1;
+        let spacing = LENGTH / last as f32;
+        let free = 2..last - 1;
+        let keep = (1.0 - DAMPING * dt).max(0.0);
+        for index in free.clone() {
+            let point = self.points[index];
+            let speed = (point - self.previous[index]) * keep;
+            self.previous[index] = point;
+            self.points[index] = point + speed + Vec3::NEG_Y * GRAVITY * dt * dt;
+        }
+        let pinned = [
+            (0, self.socket),
+            (1, self.socket + self.out * spacing),
+            (last - 1, ends.end + ends.exit * spacing),
+            (last, ends.end),
+        ];
+        for (index, at) in pinned {
+            self.previous[index] = self.points[index];
+            self.points[index] = at;
+        }
+        let weight = |index: usize| if free.contains(&index) { 1.0 } else { 0.0 };
+        for index in 0..last {
+            self.stretch(index, spacing, weight(index), weight(index + 1));
+        }
+        let bend = BEND_COMPLIANCE / (dt * dt);
+        for index in 1..last {
+            self.bend(
+                index,
+                bend,
+                [weight(index - 1), weight(index), weight(index + 1)],
+            );
+        }
+        for index in free {
+            let mut point = self.keep_out(self.points[index], ends.device);
+            if point.y <= self.floor_at(point) + 1e-5 {
+                let previous = &mut self.previous[index];
+                let slide = (point - *previous).with_y(0.0);
+                // Static friction holds a point that barely moves, the rest
+                // slides on and slows down.
+                if slide.length() < STICK * dt {
+                    point = previous.with_y(point.y);
+                } else {
+                    *previous = point - slide * FRICTION;
+                }
+                previous.y = point.y;
+            }
+            self.points[index] = point;
+        }
+    }
+
+    /// Keeps the points `index` and the next one `spacing` apart.
+    fn stretch(&mut self, index: usize, spacing: f32, a: f32, b: f32) {
+        if a + b == 0.0 {
+            return;
+        }
+        let off = self.points[index + 1] - self.points[index];
+        let length = off.length();
+        if length < 1e-7 {
+            return;
+        }
+        let fix = off / length * (length - spacing) / (a + b);
+        self.points[index] += fix * a;
+        self.points[index + 1] -= fix * b;
+    }
+
+    /// Straightens the bend at `index` against its neighbours, as far as
+    /// `compliance` lets it.
+    fn bend(&mut self, index: usize, compliance: f32, [a, b, c]: [f32; 3]) {
+        let curve = self.points[index - 1] - 2.0 * self.points[index] + self.points[index + 1];
+        let length = curve.length();
+        let weights = a + 4.0 * b + c;
+        if length < 1e-7 || weights == 0.0 {
+            return;
+        }
+        let normal = curve / length;
+        let lambda = -length / (weights + compliance);
+        self.points[index - 1] += normal * lambda * a;
+        self.points[index] -= normal * lambda * 2.0 * b;
+        self.points[index + 1] += normal * lambda * c;
+    }
+
+    /// `point`, moved out of the device and the computer, and onto the
+    /// counter.
+    fn keep_out(&self, point: Vec3, device: Option<(Affine3A, Block)>) -> Vec3 {
+        let mut point = point;
+        for (transform, block) in device.iter().chain(&self.solids) {
+            point = Self::around(point, *transform, block);
+        }
+        point.with_y(point.y.max(self.floor_at(point)))
+    }
+
+    /// `point`, moved out of `bounds` of a thing at `transform` through the
     /// nearest side, if it is inside.
     fn around(point: Vec3, transform: Affine3A, bounds: &Block) -> Vec3 {
         let local = transform.inverse().transform_point3(point) - bounds.center;
@@ -241,43 +384,77 @@ impl Cable {
 mod tests {
     use super::*;
 
-    fn cable() -> Cable {
-        Cable {
+    fn cable(end: Vec3) -> Cable {
+        let mut cable = Cable {
             socket: Vec3::new(0.0, 1.05, 0.0),
             out: Vec3::NEG_X,
             floor: 1.0,
             mat: Block::new(Vec3::new(0.2, 0.004, 0.2)).translated(Vec3::new(-0.3, 1.0, 0.0)),
+            solids: Vec::new(),
+            points: Vec::new(),
+            previous: Vec::new(),
+            asleep: None,
+        };
+        cable.lay(end);
+        cable
+    }
+
+    fn settle(cable: &mut Cable, ends: &Ends) {
+        for _ in 0..600 {
+            cable.frame(ends);
         }
     }
 
     #[test]
-    fn the_cable_runs_between_its_ends_above_the_counter() {
-        let cable = cable();
-        let end = Vec3::new(-0.4, 1.2, 0.1);
-        let points = cable.points(end, Vec3::Y, None);
-        assert_eq!(points[0], cable.socket);
-        assert!(points[SEGMENTS].distance(end) < 1e-6);
-        assert!(points.iter().all(|point| point.y >= cable.floor_at(*point)));
-        assert!(cable.floor_at(Vec3::new(-0.3, 0.0, 0.0)) > cable.mat.max().y);
+    fn the_cable_comes_to_rest_on_the_counter() {
+        let ends = Ends {
+            end: Vec3::new(-0.4, 1.01, 0.1),
+            exit: Vec3::X,
+            device: None,
+        };
+        let mut cable = cable(ends.end);
+        settle(&mut cable, &ends);
+        assert!(cable.asleep.is_some());
+        assert_eq!(cable.points[0], cable.socket);
+        assert_eq!(cable.points[POINTS - 1], ends.end);
+        for point in &cable.points {
+            assert!(point.y >= cable.floor_at(*point) - 1e-4, "{point}");
+        }
     }
 
     #[test]
-    fn the_cable_leaves_both_ends_straight() {
-        let cable = cable();
-        let end = Vec3::new(-0.4, 1.2, 0.1);
-        let points = cable.points(end, Vec3::Y, None);
-        let first = (points[1] - points[0]).normalize();
-        let last = (points[SEGMENTS - 1] - points[SEGMENTS]).normalize();
-        assert!(first.dot(cable.out) > 0.7, "{first}");
-        assert!(last.dot(Vec3::Y) > 0.7, "{last}");
+    fn the_cable_stays_out_of_the_device_in_any_turn() {
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        for step in 0..8 {
+            let turn = Quat::from_euler(
+                EulerRot::XYZ,
+                step as f32 * 0.7,
+                step as f32 * 1.3,
+                step as f32 * 0.4,
+            );
+            let transform = Affine3A::from_rotation_translation(turn, Vec3::new(-0.25, 1.25, 0.15));
+            let exit = turn * Vec3::NEG_Y;
+            let end = transform.transform_point3(bounds.center.with_y(0.0)) + exit * 0.016;
+            let ends = Ends {
+                end,
+                exit,
+                device: Some((transform, bounds)),
+            };
+            let mut cable = cable(end);
+            settle(&mut cable, &ends);
+            for point in &cable.points[2..POINTS - 2] {
+                let local = transform.inverse().transform_point3(*point) - bounds.center;
+                let inside = (local.abs() - bounds.size / 2.0).max_element() < 0.0;
+                assert!(!inside, "turn {step}: {point}");
+            }
+        }
     }
 
     #[test]
-    fn the_cable_goes_around_the_device() {
+    fn a_point_inside_moves_out_the_nearest_side() {
         let bounds = Block::new(Vec3::new(0.1, 0.02, 0.1));
         let transform = Affine3A::from_translation(Vec3::new(1.0, 2.0, 3.0));
-        let inside = Vec3::new(1.0, 2.018, 3.0);
-        let moved = Cable::around(inside, transform, &bounds);
+        let moved = Cable::around(Vec3::new(1.0, 2.018, 3.0), transform, &bounds);
         assert!(moved.y >= 2.02 + RADIUS - 1e-6, "{moved}");
         let outside = Vec3::new(1.2, 2.0, 3.0);
         assert_eq!(Cable::around(outside, transform, &bounds), outside);
