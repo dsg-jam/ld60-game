@@ -7,6 +7,7 @@ pub mod latch_button;
 pub mod lcd;
 pub mod liquid;
 pub mod paper;
+pub mod pcb;
 pub mod screen;
 pub mod script;
 pub mod steam;
@@ -29,6 +30,7 @@ impl Plugin for PartsPlugin {
             lcd::LcdPlugin,
             liquid::LiquidPlugin,
             paper::PaperPlugin,
+            pcb::PcbPlugin,
             screen::ScreenPlugin,
             steam::SteamPlugin,
             sticker::StickerPlugin,

@@ -11,7 +11,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::frame::Frame;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
-use self::font::GLYPHS;
+pub(crate) use self::font::GLYPHS;
 
 /// Glyph rows. Matches `dot_matrix.wesl`.
 const ROWS: u32 = 7;
