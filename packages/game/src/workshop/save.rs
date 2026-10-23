@@ -1,11 +1,11 @@
 use bevy::prelude::*;
+use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
 use super::clock::Clock;
 use super::job::{Bench, Job};
 use super::run::Run;
 use super::salvage::SalvageCrate;
-use crate::store::{Slot, Store};
 
 pub(crate) struct SavePlugin;
 

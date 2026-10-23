@@ -66,10 +66,10 @@ impl Store {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Store {
     /// A store in a new, empty folder for the test `name`.
-    pub(crate) fn in_temp(name: &str) -> Self {
+    pub fn in_temp(name: &str) -> Self {
         let dir = env::temp_dir().join(format!("ld60-store-{}-{name}", std::process::id()));
         if dir.exists() {
             fs::remove_dir_all(&dir).unwrap();
