@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use super::breakpoints::Breakpoints;
 use super::listing::Listing;
 use super::trace::TraceView;
-use crate::device::Emulator;
+use crate::device::{Connected, Emulator};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
 /// Lines the chip ran recently.
@@ -83,7 +83,7 @@ impl Shades {
         view: Res<TraceView>,
         listing: Res<Listing>,
         breakpoints: Res<Breakpoints>,
-        emulators: Query<&Emulator>,
+        emulators: Query<&Emulator, With<Connected>>,
         mut shades: ResMut<Shades>,
     ) {
         let emulator = emulators.single().ok();
