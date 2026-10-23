@@ -14,7 +14,8 @@ use bevy::{
 };
 
 use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook, lens::Lens};
-use crate::menu::{AppState, Settings};
+use crate::settings::Settings;
+use crate::state::AppState;
 
 pub(super) const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.

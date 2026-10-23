@@ -33,7 +33,6 @@ use super::job::{Job, JobId};
 use super::run::Run;
 use super::tutorial::{FirstNote, TutorialNote};
 use crate::audio::{Play, Sound};
-use crate::menu::AppState;
 use crate::parts::paper::{
     Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
     Wrinkles,
@@ -42,6 +41,7 @@ use crate::parts::screen::{ScreenSurface, UiCanvas};
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use crate::player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use crate::state::AppState;
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;

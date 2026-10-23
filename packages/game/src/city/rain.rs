@@ -12,8 +12,8 @@ use rand::RngExt;
 use super::weather::{WIND, Weather};
 use super::{FACADES, rng};
 use crate::layout::shop;
-use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
+use crate::settings::Settings;
 
 const SEED: u64 = 5;
 const STREAKS: usize = 6000;

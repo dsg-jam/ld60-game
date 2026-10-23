@@ -12,8 +12,8 @@ use bevy::{
 };
 use serde_json::{Value, json};
 
-use crate::menu::AppState;
 use crate::player::focus::Focus;
+use crate::state::AppState;
 
 const PORT_VARIABLE: &str = "LD60_DEBUG_PORT";
 

@@ -5,10 +5,10 @@ use super::chore::PlanetSet;
 use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
 use crate::layout::counter::CounterLayout;
-use crate::menu::AppState;
 use crate::parts::paper::{Paper, Press, Stock};
 use crate::parts::screen::UiCanvas;
 use crate::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
+use crate::state::AppState;
 
 /// Next to the receipt, a little closer to the player.
 pub(super) const SPOT: Vec2 = Vec2::new(-0.6, -0.06);

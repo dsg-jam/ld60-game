@@ -15,7 +15,7 @@ use bevy::{
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
-use crate::menu::AppState;
+use crate::state::AppState;
 
 pub(crate) use self::crt::{CrtGlass, CrtLight, CrtMaterial};
 

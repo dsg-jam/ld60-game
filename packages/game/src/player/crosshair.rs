@@ -7,7 +7,7 @@ use super::{
     hints::{Caption, ClickHint, Icon, IconFont},
     look::Gaze,
 };
-use crate::menu::Settings;
+use crate::settings::Settings;
 
 pub(super) struct CrosshairPlugin;
 
