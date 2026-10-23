@@ -9,7 +9,10 @@ mod silhouette;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
-    picking::{events::PointerDrag, pointer::PointerButton},
+    picking::{
+        events::{PointerDrag, PointerPress},
+        pointer::PointerButton,
+    },
     prelude::*,
 };
 use ld60_core::parts::keypad::PressableKey;
@@ -60,8 +63,10 @@ impl Plugin for DevicePlugin {
                 OnExit(Focus::Device),
                 (Holdable::reset_spin, DeviceButton::activate::<false>),
             )
+            .init_resource::<Turned>()
             .add_observer(Holdable::on_add)
-            .add_observer(Holdable::spin_on_drag);
+            .add_observer(Holdable::spin_on_drag)
+            .add_observer(Turned::reset);
     }
 }
 
@@ -83,6 +88,24 @@ impl DeviceKey {
                 if key.pressed { "down" } else { "up" }
             );
         }
+    }
+}
+
+/// How far the pointer was dragged to turn the held device since it was last
+/// pressed, in pixels. A click at the end of a turn does nothing else.
+#[derive(Resource, Debug, Default)]
+pub(crate) struct Turned(f32);
+
+impl Turned {
+    /// Further than this, a press and release is a turn, not a click.
+    const CLICK: f32 = 4.0;
+
+    pub(crate) fn clicked(&self) -> bool {
+        self.0 <= Self::CLICK
+    }
+
+    fn reset(_: On<PointerPress>, mut turned: ResMut<Self>) {
+        turned.0 = 0.0;
     }
 }
 
@@ -194,6 +217,7 @@ impl Holdable {
         drag: On<PointerDrag>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
+        mut turned: ResMut<Turned>,
         mut holdables: Query<&mut Holdable>,
     ) {
         if drag.button != PointerButton::Primary
@@ -203,6 +227,7 @@ impl Holdable {
             return;
         }
         if let Ok(mut holdable) = holdables.get_mut(drag.entity) {
+            turned.0 += drag.delta.length();
             let delta = drag.delta * DRAG_SPEED;
             holdable.spin =
                 Quat::from_rotation_y(delta.x) * Quat::from_rotation_x(delta.y) * holdable.spin;
