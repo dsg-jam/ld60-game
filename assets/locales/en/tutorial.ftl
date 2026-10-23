@@ -7,10 +7,12 @@ tutorial-1 =
     .label = FIRST JOB
     .welcome = The locals bring us old human gadgets. They pay well to have them fixed.
     .ticket = 1. Read the job ticket. It says what the gadget does wrong.
-    .computer = 2. Use the computer. Find the wrong line and change it.
-    .flash = 3. Press F6 FLASH to put your fix into the gadget.
-    .try = 4. Use "{ click-device }" and try its buttons.
-    .finish = 5. If it works, stamp the ticket and ring the bell.
+    .open = 2. Use "{ click-device }" and turn it over. Take out the screws and lift off the back cover.
+    .cable = 3. Click the black header on the board to plug in the computer's cable. Without it the computer says NO DEVICE CONNECTED.
+    .computer = 4. Use the computer. Find the wrong line and change it.
+    .flash = 5. Press F6 FLASH to put your fix into the gadget.
+    .try = 6. Use "{ click-device }" and try its buttons.
+    .finish = 7. If it works, pull the cable, put the cover and the screws back, stamp the ticket and ring the bell.
 
 tutorial-2 =
     .title = About the chip
