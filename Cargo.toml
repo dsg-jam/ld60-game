@@ -19,6 +19,7 @@ ld60-devices = { path = "packages/devices" }
 ld60-dsl = { path = "packages/dsl" }
 ld60-levels = { path = "packages/levels" }
 ld60-machine = { path = "packages/machine" }
+ld60-store = { path = "packages/store" }
 
 bevy = { version = "0.20.0", default-features = false }
 fluent-bundle = { version = "0.16.0", default-features = false }

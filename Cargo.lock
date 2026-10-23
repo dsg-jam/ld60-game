@@ -3613,6 +3613,7 @@ dependencies = [
  "ld60-devices",
  "ld60-levels",
  "ld60-machine",
+ "ld60-store",
  "rand",
  "ron",
  "serde",
@@ -3640,6 +3641,16 @@ name = "ld60-machine"
 version = "0.2.2"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "ld60-store"
+version = "0.2.2"
+dependencies = [
+ "bevy",
+ "ron",
+ "serde",
+ "web-sys",
 ]
 
 [[package]]

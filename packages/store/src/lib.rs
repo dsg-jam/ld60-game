@@ -1,3 +1,9 @@
+//! Keeps saves between sessions.
+//!
+//! # Features
+//!
+//! - `test-support`: adds `Store::in_temp` for tests in other crates.
+
 #[cfg(target_arch = "wasm32")]
 mod browser;
 #[cfg(not(target_arch = "wasm32"))]
@@ -21,7 +27,7 @@ use self::error::StoreError;
 /// runs without it.
 #[derive(Resource, Debug)]
 #[cfg_attr(target_arch = "wasm32", derive(Default))]
-pub(crate) struct Store {
+pub struct Store {
     /// No folder means the game does not save.
     #[cfg(not(target_arch = "wasm32"))]
     dir: Option<PathBuf>,
@@ -29,7 +35,7 @@ pub(crate) struct Store {
 
 /// What a save holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Slot {
+pub enum Slot {
     /// The run of the shop.
     Shop,
     Settings,
@@ -40,7 +46,7 @@ impl Store {
     ///
     /// A save that does not decode is kept as a copy next to it, so the next
     /// save does not lose it.
-    pub(crate) fn load<T: DeserializeOwned>(&self, slot: Slot) -> Option<T> {
+    pub fn load<T: DeserializeOwned>(&self, slot: Slot) -> Option<T> {
         let loaded = self.read(slot.key()).and_then(|text| {
             let Some(text) = text else {
                 return Ok(None);
@@ -64,7 +70,7 @@ impl Store {
     }
 
     /// Puts `value` in `slot`, over what was there.
-    pub(crate) fn save<T: Serialize>(&self, slot: Slot, value: &T) {
+    pub fn save<T: Serialize>(&self, slot: Slot, value: &T) {
         let written = ron::to_string(value)
             .map_err(StoreError::Encode)
             .and_then(|text| self.write(slot.key(), &text));

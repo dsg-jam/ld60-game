@@ -16,7 +16,6 @@ mod locale;
 mod menu;
 mod parts;
 mod player;
-mod store;
 mod typeface;
 mod workshop;
 
