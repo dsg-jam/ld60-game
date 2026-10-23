@@ -180,7 +180,6 @@ impl ComputerLayout {
         }
     }
 
-    #[cfg(test)]
     pub(super) fn monitor_body(&self) -> Block {
         self.monitor.body
     }
