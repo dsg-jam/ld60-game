@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use bevy::{asset::LoadState, audio::Volume, prelude::*};
 use ld60_core::audio::{Mixer, Sound, Takes};
+use ld60_core::state::AppState;
 
 use self::pan::{Pan, Panned};
 use self::program::OnAir;
@@ -58,7 +59,9 @@ impl Plugin for BroadcastPlugin {
             .insert_resource(StaticTakes(Takes::new(Sound::Static.sources(), 0)))
             .add_systems(
                 Update,
-                (Tuner::tune, Broadcast::start, Broadcast::set_volume).chain(),
+                (Tuner::tune, Broadcast::start, Broadcast::set_volume)
+                    .chain()
+                    .run_if(not(in_state(AppState::Loading))),
             );
     }
 }

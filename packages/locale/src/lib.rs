@@ -85,6 +85,11 @@ impl FromWorld for Locale {
 }
 
 impl Locale {
+    /// Whether all files are loaded, so messages have their text.
+    pub fn is_ready(&self) -> bool {
+        self.bundle.is_some()
+    }
+
     /// The text in the player's language. A message is empty until the
     /// messages are loaded, and shows its ID if there is no such message.
     pub fn text(&self, localized: &Localized) -> String {
