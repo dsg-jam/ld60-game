@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT};
+use ld60_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_devices::DeviceKind;
 use ld60_geometry::block::Block;
 
@@ -198,5 +198,42 @@ fn screws_taken_out_lie_clear_of_everything() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn the_open_manuals_lie_clear_of_the_device_and_its_screws() {
+    let counter = CounterLayout::new();
+    let open = Footprint::new(
+        "open shop manuals",
+        counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0),
+        Block::new(ShopManuals::OPEN),
+    );
+    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    // The closed file stands elsewhere while it lies open, and paper notes
+    // lie flat under it.
+    let mut others: Vec<_> = counter_props(&counter)
+        .into_iter()
+        .filter(|prop| !matches!(prop.name, "shop manuals" | "note"))
+        .collect();
+    others.extend(Clutter::screw_footprints(&counter));
+    for kind in DeviceKind::ALL {
+        let bounds = Block::new(Handheld::body_size(kind));
+        for index in 0..Handheld::screw_count(kind) {
+            let at = Casing::aside_at(&bounds, index, &rest);
+            let area = Block::new(Vec3::splat(0.012));
+            others.push(Footprint::new(
+                "screw aside",
+                at.with_rotation(rest.rotation),
+                area,
+            ));
+        }
+    }
+    for other in &others {
+        assert!(
+            !open.overlaps(other),
+            "the open file overlaps {}",
+            other.name
+        );
     }
 }

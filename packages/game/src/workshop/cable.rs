@@ -7,6 +7,7 @@ use ld60_geometry::block::Block;
 
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
+use super::manuals::{Pose, ShopManuals};
 use crate::device::{Casing, Connected, Header};
 
 /// Where the plug of the debug cable lies while it is out, see
@@ -109,6 +110,8 @@ struct Ends {
     end: Vec3,
     exit: Vec3,
     device: Option<(Affine3A, Block)>,
+    /// The manuals file while it lies open.
+    file: Option<(Affine3A, Block)>,
 }
 
 impl Ends {
@@ -129,6 +132,7 @@ impl Ends {
             end: self.end.lerp(other.end, t),
             exit: self.exit.lerp(other.exit, t).normalize_or(other.exit),
             device,
+            file: other.file,
         }
     }
 }
@@ -216,6 +220,7 @@ impl Cable {
         headers: Query<(&GlobalTransform, &ChildOf), With<Header>>,
         plugged: Query<(&GlobalTransform, &Casing), With<Connected>>,
         mut cable: Single<&mut Cable>,
+        files: Query<(&ShopManuals, &Pose)>,
         mut plug: Single<(&Plug, &mut Transform), Without<Segment>>,
         mut segments: Query<(&Segment, &mut Transform), Without<Plug>>,
     ) {
@@ -241,6 +246,10 @@ impl Cable {
             device: header
                 .and_then(|(_, parent)| plugged.get(parent.parent()).ok())
                 .map(|(device, casing)| (device.affine(), *casing.bounds())),
+            file: files
+                .iter()
+                .find(|(_, pose)| pose.lying() > 0.5)
+                .map(|(file, _)| (file.open_at.compute_affine(), Block::new(ShopManuals::OPEN))),
         };
         if !cable.frame(&ends) {
             return;
@@ -345,7 +354,7 @@ impl Cable {
             );
         }
         for index in free {
-            let mut point = self.keep_out(self.points[index], ends.device);
+            let mut point = self.keep_out(self.points[index], ends);
             if point.y <= self.floor_at(point) + 1e-5 {
                 let previous = &mut self.previous[index];
                 let slide = (point - *previous).with_y(0.0);
@@ -395,9 +404,10 @@ impl Cable {
 
     /// `point`, moved out of the device and the computer, and onto the
     /// counter.
-    fn keep_out(&self, point: Vec3, device: Option<(Affine3A, Block)>) -> Vec3 {
+    fn keep_out(&self, point: Vec3, ends: &Ends) -> Vec3 {
         let mut point = point;
-        for (transform, block) in device.iter().chain(&self.solids) {
+        let moving = ends.device.iter().chain(&ends.file);
+        for (transform, block) in moving.chain(&self.solids) {
             point = Self::around(point, *transform, block);
         }
         point.with_y(point.y.max(self.floor_at(point)))
@@ -464,6 +474,7 @@ mod tests {
             end: Vec3::new(-0.4, 1.01, 0.1),
             exit: Vec3::X,
             device: None,
+            file: None,
         };
         let mut cable = cable(ends.end);
         settle(&mut cable, &ends);
@@ -492,6 +503,7 @@ mod tests {
                 end,
                 exit,
                 device: Some((transform, bounds)),
+                file: None,
             };
             let mut cable = cable(end);
             settle(&mut cable, &ends);

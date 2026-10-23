@@ -25,7 +25,7 @@ const LIFT: f32 = 0.06;
 /// how far its covers lean in when shut, see
 /// [`Stack::lean`](super::stack::Stack::lean).
 #[derive(Component, Debug, Default)]
-pub(super) struct Pose {
+pub(crate) struct Pose {
     time: f32,
     lean: f32,
 }
@@ -59,7 +59,7 @@ impl Pose {
     }
 
     /// From 0 standing to 1 lying.
-    fn lying(&self) -> f32 {
+    pub(crate) fn lying(&self) -> f32 {
         smoothstep(self.time / LIE_TIME)
     }
 

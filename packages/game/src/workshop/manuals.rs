@@ -37,7 +37,7 @@ use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
 use self::moves::SheetMoves;
 pub(crate) use self::moves::{MoveSheet, RailSlot};
 pub(crate) use self::pins::{Pins, Sheet};
-use self::pose::Pose;
+pub(crate) use self::pose::Pose;
 use self::stack::Stack;
 use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
@@ -127,6 +127,10 @@ struct Filed {
 }
 
 impl ShopManuals {
+    /// The file lying open, as a box around both covers and the spine.
+    pub(crate) const OPEN: Vec3 =
+        Vec3::new(2.0 * model::COVER.x + model::SPINE, 0.012, model::COVER.y);
+
     fn on_add(
         add: On<Add<ShopManuals>>,
         files: Query<(&ShopManuals, &Transform)>,
