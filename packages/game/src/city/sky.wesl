@@ -2,7 +2,7 @@ import bevy_pbr::render::{
     forward_io::VertexOutput,
     mesh_view_bindings::{globals, view},
 };
-import package::geometry::noise::{hash, noise};
+import ld60_geometry::noise::{hash, noise};
 
 struct Sky {
     horizon: vec3<f32>,

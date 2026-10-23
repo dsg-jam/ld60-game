@@ -6,7 +6,7 @@
 /// `pixel` is the size of a pixel on the surface in meters. Detail finer
 /// than that fades to its average, so highlights don't sparkle.
 
-import package::geometry::noise::{noise, specks, visible};
+import package::noise::{noise, specks, visible};
 
 /// Bare steel showing where plating wore through.
 const BARE_STEEL: vec3<f32> = vec3<f32>(0.53, 0.51, 0.49);

@@ -13,7 +13,7 @@ import bevy_pbr::render::{
 @if(PREPASS_PIPELINE)
 import bevy_render::globals::Globals;
 import package::city::walls::{cladding_color, cladding_height, stains};
-import package::geometry::{
+import ld60_geometry::{
     bump::bumped,
     noise::{hash, noise},
 };

@@ -1,9 +1,9 @@
 use bevy::{input::keyboard::NativeKeyCode, prelude::*};
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::{CASE, CASE_DARK};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::keypad::KeyBinding::Code;
 use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 

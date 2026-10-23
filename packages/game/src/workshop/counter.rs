@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::shop::{FRONT, PILLAR, PLATFORM, SIZE};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 
 /// Height of the counter top above the shop floor.
 const HEIGHT: f32 = 0.75;

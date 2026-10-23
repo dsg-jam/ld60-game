@@ -3,7 +3,7 @@
 /// page as the camera moves, and fade out where they get smaller than a
 /// pixel.
 
-import package::geometry::noise::{hash, hash1, noise, specks, visible};
+import ld60_geometry::noise::{hash, hash1, noise, specks, visible};
 
 /// Matches `Press` in `press.rs`.
 const DOT_MATRIX: u32 = 0u;

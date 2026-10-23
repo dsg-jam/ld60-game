@@ -2,7 +2,7 @@ import bevy_pbr::render::{
     mesh_view_bindings::{globals, view},
     view_transformations::position_world_to_clip,
 };
-import package::geometry::{
+import ld60_geometry::{
     noise::hash1,
     streak::{across, streak},
 };

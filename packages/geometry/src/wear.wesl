@@ -5,7 +5,7 @@
 /// `pixel` is the size of a pixel on the surface in meters. Marks finer
 /// than that fade out, so they don't sparkle as the camera moves.
 
-import package::geometry::noise::{TAU, hash, noise, visible};
+import package::noise::{TAU, hash, noise, visible};
 
 /// Clusters of scratches where things were rubbed, each with its own
 /// direction. Returns how scratched the point is.

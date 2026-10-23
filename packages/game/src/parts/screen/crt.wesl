@@ -1,5 +1,5 @@
 import bevy_pbr::render::forward_io::VertexOutput;
-import package::geometry::noise::{TAU, hash, noise};
+import ld60_geometry::noise::{TAU, hash, noise};
 
 /// Cells across the screen, each with a chance of a speck of dust.
 const SPECKS: f32 = 120.0;

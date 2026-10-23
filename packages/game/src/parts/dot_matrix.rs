@@ -7,11 +7,11 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::frame::Frame;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
 use self::font::GLYPHS;
-use crate::geometry::block::Block;
-use crate::geometry::frame::Frame;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 
 /// Glyph rows. Matches `dot_matrix.wesl`.
 const ROWS: u32 = 7;

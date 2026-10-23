@@ -5,6 +5,8 @@ mod rows;
 use std::ops::Range;
 
 use bevy::{prelude::*, shader::load_shader_library};
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 pub(super) use self::facade::{Facade, FacadeMaterial, WindowGrid};
@@ -13,8 +15,6 @@ use super::additions::Additions;
 use super::drips::{DripEdge, DripEdges};
 use super::market::{MARKET_HEIGHT, STALL_DEPTH, Stock};
 use super::{Kit, NEON, Pick, glow, rng};
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::workshop::shop;
 
 const SEED: u64 = 2;

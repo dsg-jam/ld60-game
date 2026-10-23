@@ -8,11 +8,11 @@ use bevy::{
     post_process::bloom::Bloom,
     prelude::*,
 };
+use ld60_geometry::block::Block;
 
 use self::height_fog::HeightFog;
 use super::FACADES;
 use super::weather::Weather;
-use crate::geometry::block::Block;
 use crate::menu::Settings;
 use crate::player::camera::PlayerCamera;
 use crate::player::focus::Focus;

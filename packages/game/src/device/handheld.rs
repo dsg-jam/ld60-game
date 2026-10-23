@@ -3,15 +3,15 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{input::keyboard::Key, prelude::*};
 use ld60_devices::{AnyDevice, ChipSpec, DeviceKind};
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
 use super::{DeviceButton, DeviceName, Holdable};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 use crate::parts::keypad::KeyBinding::{Named, Typed};
 use crate::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use crate::parts::lcd;

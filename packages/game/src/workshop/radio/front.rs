@@ -1,10 +1,10 @@
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::frame::Frame;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
 use super::CASE;
-use crate::geometry::block::Block;
-use crate::geometry::frame::Frame;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::parts::dot_matrix::DotMatrix;
 
 /// Wood shows around the front panel.

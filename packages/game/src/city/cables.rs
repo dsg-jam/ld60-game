@@ -4,13 +4,13 @@ use bevy::{
     prelude::*,
     shape::{Aabb3d, BoundingVolume},
 };
+use ld60_geometry::bar::Bar;
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 use super::signs::{Sign, SignBounds};
 use super::{FACADES, Kit, Pick, Segment, rng};
-use crate::geometry::bar::Bar;
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, SurfaceMaterial};
 use crate::parts::bulb::Bulb;
 use crate::workshop::shop;
 

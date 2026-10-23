@@ -22,11 +22,10 @@ use bevy::{
     prelude::*,
     shape::{Aabb3d, RayCast3d},
 };
+use ld60_geometry::bar::Bar;
+use ld60_geometry::block::Block;
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt, SeedableRng};
-
-use crate::geometry::bar::Bar;
-use crate::geometry::block::Block;
 
 /// Curb on the shop side of the road.
 const NEAR_CURB: f32 = -4.0;

@@ -3610,6 +3610,7 @@ dependencies = [
  "bevy",
  "ld60-calco",
  "ld60-devices",
+ "ld60-geometry",
  "ld60-levels",
  "ld60-locale",
  "ld60-machine",
@@ -3620,6 +3621,13 @@ dependencies = [
  "serde_json",
  "web-sys",
  "winit",
+]
+
+[[package]]
+name = "ld60-geometry"
+version = "0.2.2"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]

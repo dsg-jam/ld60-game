@@ -1,4 +1,4 @@
-import package::geometry::noise::{TAU, hash1, noise, specks, visible};
+import package::noise::{TAU, hash1, noise, specks, visible};
 
 const PLANK_WIDTH: f32 = 0.14;
 const PLANK_LENGTH: f32 = 1.1;

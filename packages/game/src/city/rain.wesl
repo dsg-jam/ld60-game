@@ -2,7 +2,7 @@ import bevy_pbr::render::{
     mesh_view_bindings::{globals, view},
     view_transformations::position_world_to_clip,
 };
-import package::geometry::streak::{across, streak};
+import ld60_geometry::streak::{across, streak};
 
 struct Rain {
     /// Corner of the box the rain falls in.

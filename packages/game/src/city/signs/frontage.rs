@@ -2,12 +2,12 @@ use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 
 use super::{GLYPHS, NEON, PANEL_DEPTH, Sign};
 use crate::city::buildings::FacadeMaterial;
 use crate::city::market::{AWNING_ABOVE, MARKET_HEIGHT};
-use crate::geometry::block::Block;
 use crate::parts::script::Word;
 
 const SHOP_SIGN_CHANCE: f64 = 0.8;

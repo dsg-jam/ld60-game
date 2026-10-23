@@ -1,9 +1,9 @@
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use super::rug::{self, Rug};
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::Finish;
 
 /// Z of the open front towards the street, which lies towards -Z.
 pub(crate) const FRONT: f32 = -0.6;

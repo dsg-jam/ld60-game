@@ -7,7 +7,7 @@ use super::surface::{Finish, Form, SurfaceMaterial, SurfacePlugin};
 /// Shapes get one of this many seeds, which vary their surfaces.
 const SEEDS: u32 = 997;
 
-pub(crate) struct ShapePlugin;
+pub struct ShapePlugin;
 
 impl Plugin for ShapePlugin {
     fn build(&self, app: &mut App) {
@@ -20,7 +20,7 @@ impl Plugin for ShapePlugin {
 /// Add a [`Finish`] next to it for anything other than paint.
 #[derive(Component, Clone, Debug)]
 #[require(Transform)]
-pub(crate) struct Shape {
+pub struct Shape {
     kind: Kind,
     size: Vec3,
     color: Color,
@@ -46,12 +46,12 @@ enum Kind {
 }
 
 impl Shape {
-    pub(crate) fn cuboid(block: &Block, color: Color) -> impl Bundle {
+    pub fn cuboid(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Cuboid, block, color)
     }
 
     /// A cuboid filling `bar`.
-    pub(crate) fn bar(bar: &Bar, color: Color) -> impl Bundle {
+    pub fn bar(bar: &Bar, color: Color) -> impl Bundle {
         (
             Self {
                 kind: Kind::Cuboid,
@@ -63,20 +63,16 @@ impl Shape {
         )
     }
 
-    pub(crate) fn cylinder(block: &Block, color: Color) -> impl Bundle {
+    pub fn cylinder(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Cylinder, block, color)
     }
 
-    pub(crate) fn capsule(block: &Block, color: Color) -> impl Bundle {
+    pub fn capsule(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Capsule, block, color)
     }
 
     /// A cuboid with `region` of `image` on its top face.
-    pub(crate) fn textured_cuboid(
-        block: &Block,
-        image: Handle<Image>,
-        region: Rect,
-    ) -> impl Bundle {
+    pub fn textured_cuboid(block: &Block, image: Handle<Image>, region: Rect) -> impl Bundle {
         (
             Self {
                 kind: Kind::Cuboid,

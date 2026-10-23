@@ -10,14 +10,14 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::{Localized, Message};
 
 use super::cloth;
 use super::mechanism::Mechanism;
 use super::top_sheet::TopSheet;
-use crate::geometry::block::Block;
-use crate::geometry::shape::Shape;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::parts::paper::{INK, PAPER, Paper};
 use crate::parts::screen::UiCanvas;
 

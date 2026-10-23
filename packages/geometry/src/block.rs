@@ -11,14 +11,14 @@ use bevy::prelude::*;
 /// assert_eq!(body.min().y, stand.max().y);
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Block {
-    pub(crate) center: Vec3,
-    pub(crate) size: Vec3,
+pub struct Block {
+    pub center: Vec3,
+    pub size: Vec3,
 }
 
 impl Block {
     /// A block resting on the ground (y = 0), centered on the other axes.
-    pub(crate) fn new(size: Vec3) -> Self {
+    pub fn new(size: Vec3) -> Self {
         Self {
             center: Vec3::Y * size.y / 2.0,
             size,
@@ -26,30 +26,30 @@ impl Block {
     }
 
     /// The block spanning two opposite corners.
-    pub(crate) fn between(a: Vec3, b: Vec3) -> Self {
+    pub fn between(a: Vec3, b: Vec3) -> Self {
         Self {
             center: (a + b) / 2.0,
             size: (b - a).abs(),
         }
     }
 
-    pub(crate) fn min(&self) -> Vec3 {
+    pub fn min(&self) -> Vec3 {
         self.center - self.size / 2.0
     }
 
-    pub(crate) fn max(&self) -> Vec3 {
+    pub fn max(&self) -> Vec3 {
         self.center + self.size / 2.0
     }
 
     /// Center of the bottom face.
-    pub(crate) fn bottom(&self) -> Vec3 {
+    pub fn bottom(&self) -> Vec3 {
         self.center.with_y(self.min().y)
     }
 
     /// A point on the top face.
     ///
     /// `spot` goes from -1 to 1 along x and along z (back to front).
-    pub(crate) fn top_spot(&self, spot: Vec2) -> Vec3 {
+    pub fn top_spot(&self, spot: Vec2) -> Vec3 {
         let offset = spot * self.size.xz() / 2.0;
         Vec3::new(
             self.center.x + offset.x,
@@ -58,59 +58,59 @@ impl Block {
         )
     }
 
-    pub(crate) fn transform(&self) -> Transform {
+    pub fn transform(&self) -> Transform {
         Transform::from_translation(self.center)
     }
 
     /// Moves the center onto the center of `other`.
-    pub(crate) fn centered_on(self, other: &Block) -> Self {
+    pub fn centered_on(self, other: &Block) -> Self {
         Self {
             center: other.center,
             ..self
         }
     }
 
-    pub(crate) fn on_top_of(self, other: &Block) -> Self {
+    pub fn on_top_of(self, other: &Block) -> Self {
         self.with_y(other.max().y + self.size.y / 2.0)
     }
 
     /// Rests the block on the top face of `other` at `spot`, see
     /// [`Block::top_spot`].
-    pub(crate) fn resting_on(self, other: &Block, spot: Vec2) -> Self {
+    pub fn resting_on(self, other: &Block, spot: Vec2) -> Self {
         self.standing_at(other.top_spot(spot))
     }
 
     /// Places the block so the center of its bottom face is at `point`.
-    pub(crate) fn standing_at(self, point: Vec3) -> Self {
+    pub fn standing_at(self, point: Vec3) -> Self {
         Self {
             center: point + Vec3::Y * self.size.y / 2.0,
             ..self
         }
     }
 
-    pub(crate) fn below(self, other: &Block) -> Self {
+    pub fn below(self, other: &Block) -> Self {
         self.with_y(other.min().y - self.size.y / 2.0)
     }
 
-    pub(crate) fn left_of(self, other: &Block) -> Self {
+    pub fn left_of(self, other: &Block) -> Self {
         self.with_x(other.min().x - self.size.x / 2.0)
     }
 
-    pub(crate) fn right_of(self, other: &Block) -> Self {
+    pub fn right_of(self, other: &Block) -> Self {
         self.with_x(other.max().x + self.size.x / 2.0)
     }
 
     /// Places the block against the front face of `other`.
-    pub(crate) fn in_front_of(self, other: &Block) -> Self {
+    pub fn in_front_of(self, other: &Block) -> Self {
         self.with_z(other.max().z + self.size.z / 2.0)
     }
 
     /// Places the block against the back face of `other`.
-    pub(crate) fn behind(self, other: &Block) -> Self {
+    pub fn behind(self, other: &Block) -> Self {
         self.with_z(other.min().z - self.size.z / 2.0)
     }
 
-    pub(crate) fn translated(self, offset: Vec3) -> Self {
+    pub fn translated(self, offset: Vec3) -> Self {
         Self {
             center: self.center + offset,
             ..self

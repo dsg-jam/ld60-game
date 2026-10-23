@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use ld60_geometry::block::Block;
 
-use crate::geometry::block::Block;
 use crate::workshop::shop::{PILLAR, ShopLayout};
 
 /// Meters per second.

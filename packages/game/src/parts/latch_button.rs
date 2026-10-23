@@ -4,10 +4,10 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_geometry::block::Block;
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
 use crate::audio::{Play, Sound};
-use crate::geometry::block::Block;
-use crate::geometry::surface::{Finish, Form, SurfaceMaterial};
 use crate::player::focus::Focused;
 
 const CAP_RADIUS: f32 = 0.006;
