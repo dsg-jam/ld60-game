@@ -14,6 +14,7 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
+use super::casing::{COVER, Casing, CasingSpots};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
 use super::{Connected, DeviceButton, DeviceName, Holdable};
@@ -82,6 +83,15 @@ const SUMMA6: Model = Model {
     keypad_spot: Vec2::new(0.0, 0.3),
     sticker_size: Vec2::new(0.06, 0.035),
     sticker_spot: Vec2::new(0.0, 0.2),
+    casing: CasingSpots {
+        screws: &[
+            Vec2::new(-0.8, -0.85),
+            Vec2::new(0.8, -0.85),
+            Vec2::new(-0.8, 0.85),
+            Vec2::new(0.8, 0.85),
+        ],
+        header: Vec2::new(0.0, -0.6),
+    },
     words: false,
 };
 
@@ -94,6 +104,14 @@ const LOCK4: Model = Model {
     keypad_spot: Vec2::new(0.0, 0.25),
     sticker_size: Vec2::new(0.055, 0.032),
     sticker_spot: Vec2::new(0.0, 0.2),
+    casing: CasingSpots {
+        screws: &[
+            Vec2::new(-0.75, -0.85),
+            Vec2::new(0.75, -0.85),
+            Vec2::new(0.0, 0.88),
+        ],
+        header: Vec2::new(0.0, -0.6),
+    },
     words: true,
 };
 
@@ -135,6 +153,10 @@ const TALLY2: Model = Model {
     keypad_spot: Vec2::new(0.0, 0.45),
     sticker_size: Vec2::new(0.05, 0.029),
     sticker_spot: Vec2::ZERO,
+    casing: CasingSpots {
+        screws: &[Vec2::new(-0.82, -0.8), Vec2::new(0.82, 0.8)],
+        header: Vec2::new(0.0, -0.65),
+    },
     words: false,
 };
 
@@ -152,6 +174,7 @@ pub(super) struct Model {
     sticker_size: Vec2,
     /// Where the sticker sits on the underside, see [`Block::top_spot`].
     sticker_spot: Vec2,
+    casing: CasingSpots,
     /// Whether the LCD prints the OPEN and SHUT lamps.
     words: bool,
 }
@@ -266,6 +289,11 @@ impl Handheld {
         let sticker_spot = body
             .top_spot(model.sticker_spot)
             .with_y(body.min().y - STICKER_GAP);
+        // The cover is the bottom of the body. Under it are the board and
+        // the header, inside the cover.
+        let shell = Block::new(model.body_size.with_y(model.body_size.y - COVER))
+            .translated(Vec3::Y * COVER);
+        let height = model.body_size.y + STYLE.key_size.y;
         let unlit = |texture: Handle<Image>| StandardMaterial {
             base_color_texture: Some(texture),
             unlit: true,
@@ -282,8 +310,9 @@ impl Handheld {
                 "device for {} does not build", level.id
             ),
         }
+        let mut casing = None;
         entity.with_children(|device| {
-            device.spawn((Shape::cuboid(&body, model.body), Finish::Plastic));
+            device.spawn((Shape::cuboid(&shell, model.body), Finish::Plastic));
             device.spawn((Shape::cuboid(&window, WINDOW), Finish::Plastic));
             device.spawn((
                 Mesh3d(meshes.add(Rectangle::from_size(lcd_size))),
@@ -293,7 +322,7 @@ impl Handheld {
                     .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
             ));
             keypad.spawn_keys(device, &labels, false, |key| DeviceButton::new(key.key));
-            device.spawn((
+            let sticker = (
                 Mesh3d(meshes.add(Sticker::mesh(model.sticker_size, sticker_seed))),
                 MeshMaterial3d(stickers.add(Sticker::material(
                     sticker,
@@ -305,8 +334,19 @@ impl Handheld {
                 // sideways.
                 Transform::from_translation(sticker_spot)
                     .with_rotation(Quat::from_rotation_x(FRAC_PI_2) * Quat::from_rotation_z(PI)),
+            );
+            casing = Some(Casing::spawn(
+                device,
+                &shell,
+                model.body,
+                &model.casing,
+                sticker,
+                height,
             ));
         });
+        if let Some(casing) = casing {
+            entity.insert(casing);
+        }
     }
 
     fn build_device(&self) -> Result<AnyDevice, LevelError> {
