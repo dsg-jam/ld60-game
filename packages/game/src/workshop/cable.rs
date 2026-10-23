@@ -1,13 +1,13 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::prelude::*;
+use bevy::{math::Affine3A, prelude::*};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::COMPUTER_SPOT;
 use ld60_geometry::block::Block;
 
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
-use crate::device::{Connected, Header};
+use crate::device::{Casing, Connected, Header};
 
 /// Where the plug of the debug cable lies while it is out, see
 /// [`CounterLayout::place`].
@@ -133,7 +133,7 @@ impl Cable {
     /// counter, and hangs the cable between it and the computer.
     fn follow(
         headers: Query<(&GlobalTransform, &ChildOf), With<Header>>,
-        plugged: Query<(), With<Connected>>,
+        plugged: Query<(&GlobalTransform, &Casing), With<Connected>>,
         cable: Single<&Cable>,
         mut plug: Single<(&Plug, &mut Transform), Without<Segment>>,
         mut segments: Query<(&Segment, &mut Transform), Without<Plug>>,
@@ -155,7 +155,10 @@ impl Cable {
         };
         let exit = transform.rotation * Vec3::Z;
         let end = transform.translation + exit * (PLUG.z / 2.0);
-        let points = cable.points(end, exit);
+        let device = header
+            .and_then(|(_, parent)| plugged.get(parent.parent()).ok())
+            .map(|(device, casing)| (device.affine(), *casing.bounds()));
+        let points = cable.points(end, exit, device);
         for (segment, mut transform) in &mut segments {
             let (from, to) = (points[segment.0], points[segment.0 + 1]);
             let along = to - from;
@@ -174,8 +177,13 @@ impl Cable {
 
     /// Points along the cable from the computer to `end`, which it reaches
     /// going against `exit`. It leaves both ends straight, sags in between,
-    /// and stays on the counter and the mat.
-    fn points(&self, end: Vec3, exit: Vec3) -> [Vec3; SEGMENTS + 1] {
+    /// goes around `device`, and stays on the counter and the mat.
+    fn points(
+        &self,
+        end: Vec3,
+        exit: Vec3,
+        device: Option<(Affine3A, Block)>,
+    ) -> [Vec3; SEGMENTS + 1] {
         let span = self.socket.distance(end);
         let straight = STRAIGHT.min(span / 3.0);
         let controls = [
@@ -193,9 +201,26 @@ impl Cable {
                 + controls[2] * 3.0 * s * t * t
                 + controls[3] * t * t * t;
             // Flat at both ends, so the cable leaves them straight.
-            let point = curve - Vec3::Y * sag * 16.0 * t * t * s * s;
+            let mut point = curve - Vec3::Y * sag * 16.0 * t * t * s * s;
+            if let Some((transform, bounds)) = device {
+                point = Self::around(point, transform, &bounds);
+            }
             point.with_y(point.y.max(self.floor_at(point)))
         })
+    }
+
+    /// `point`, moved out of `bounds` of a device at `transform` through the
+    /// nearest side, if it is inside.
+    fn around(point: Vec3, transform: Affine3A, bounds: &Block) -> Vec3 {
+        let local = transform.inverse().transform_point3(point) - bounds.center;
+        let room = bounds.size / 2.0 + RADIUS - local.abs();
+        if room.min_element() <= 0.0 {
+            return point;
+        }
+        let mut moved = local;
+        let axis = room.min_position();
+        moved[axis] += room[axis] * local[axis].signum();
+        transform.transform_point3(moved + bounds.center)
     }
 
     /// The lowest the middle of the cable gets at `point`: on the mat where
@@ -229,7 +254,7 @@ mod tests {
     fn the_cable_runs_between_its_ends_above_the_counter() {
         let cable = cable();
         let end = Vec3::new(-0.4, 1.2, 0.1);
-        let points = cable.points(end, Vec3::Y);
+        let points = cable.points(end, Vec3::Y, None);
         assert_eq!(points[0], cable.socket);
         assert!(points[SEGMENTS].distance(end) < 1e-6);
         assert!(points.iter().all(|point| point.y >= cable.floor_at(*point)));
@@ -240,10 +265,21 @@ mod tests {
     fn the_cable_leaves_both_ends_straight() {
         let cable = cable();
         let end = Vec3::new(-0.4, 1.2, 0.1);
-        let points = cable.points(end, Vec3::Y);
+        let points = cable.points(end, Vec3::Y, None);
         let first = (points[1] - points[0]).normalize();
         let last = (points[SEGMENTS - 1] - points[SEGMENTS]).normalize();
         assert!(first.dot(cable.out) > 0.7, "{first}");
         assert!(last.dot(Vec3::Y) > 0.7, "{last}");
+    }
+
+    #[test]
+    fn the_cable_goes_around_the_device() {
+        let bounds = Block::new(Vec3::new(0.1, 0.02, 0.1));
+        let transform = Affine3A::from_translation(Vec3::new(1.0, 2.0, 3.0));
+        let inside = Vec3::new(1.0, 2.018, 3.0);
+        let moved = Cable::around(inside, transform, &bounds);
+        assert!(moved.y >= 2.02 + RADIUS - 1e-6, "{moved}");
+        let outside = Vec3::new(1.2, 2.0, 3.0);
+        assert_eq!(Cable::around(outside, transform, &bounds), outside);
     }
 }
