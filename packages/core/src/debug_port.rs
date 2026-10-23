@@ -40,6 +40,7 @@ impl Plugin for DebugPortPlugin {
         ))
         .add_debug_method("ld60.screenshot", screenshot)
         .add_debug_method("ld60.state", state)
+        .add_debug_method("ld60.where", place)
         .add_debug_method("ld60.input", input::input)
         .add_debug_method("ld60.diagnostics", profile::diagnostics)
         .add_debug_method("ld60.vsync", profile::vsync);
@@ -74,6 +75,26 @@ impl DebugMethods for App {
 
 /// `ld60.state` returns the game state, the focus, whether the window has
 /// focus and the cursor grab mode.
+/// `ld60.where { "name": "bell" }` returns where in the world each entity
+/// whose name contains `name` is, by name. Without a name, every named
+/// entity.
+fn place(In(params): In<Option<Value>>, entities: Query<(&Name, &GlobalTransform)>) -> BrpResult {
+    let filter = params
+        .as_ref()
+        .and_then(|params| params.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let places: serde_json::Map<_, _> = entities
+        .iter()
+        .filter(|(name, _)| name.as_str().contains(filter))
+        .map(|(name, transform)| {
+            let at = transform.translation();
+            (name.to_string(), json!([at.x, at.y, at.z]))
+        })
+        .collect();
+    Ok(places.into())
+}
+
 fn state(
     In(_): In<Option<Value>>,
     app_state: Res<State<AppState>>,
