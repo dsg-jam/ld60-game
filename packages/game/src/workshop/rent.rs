@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_locale::{Localized, Message};
 
-use super::clock::PlanetSet;
+use super::chore::PlanetSet;
 use super::run::{Rent, Run};
 use crate::audio::{Play, Sound};
 use crate::layout::counter::CounterLayout;

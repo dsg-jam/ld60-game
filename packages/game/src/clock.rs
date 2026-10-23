@@ -3,14 +3,11 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::job::Job;
-use super::run::Origin;
-
 /// Ticks from planet rise to planet set.
-const CYCLE: u32 = 40;
+pub(crate) const CYCLE: u32 = 40;
 /// Ticks into the cycle when a run starts, so the shop opens with the planet
 /// well up.
-const OPENING: u32 = CYCLE / 4;
+pub(crate) const OPENING: u32 = CYCLE / 4;
 /// How far the planet swings to each side of straight across the street, in
 /// radians. At the ends it is behind the buildings next to the low ones
 /// across the street.
@@ -34,8 +31,7 @@ pub(crate) struct ClockPlugin;
 impl Plugin for ClockPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Clock>()
-            .add_systems(Update, Clock::glide)
-            .add_observer(Clock::pass);
+            .add_systems(Update, Clock::glide);
     }
 }
 
@@ -55,25 +51,6 @@ pub(crate) struct Clock {
     /// How far the glide has come, from 0 to 1.
     glided: f32,
 }
-
-/// The shop spends time on `0`. Tutorial jobs take no time.
-#[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Busy(pub(crate) Chore);
-
-/// Work that takes time.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Chore {
-    /// Burning firmware into a device.
-    Flash,
-    /// A customer coming to try a device and take it home.
-    HandIn,
-    /// A customer coming to try a device and handing it back.
-    Return,
-}
-
-/// The planet went down, so the rent is due.
-#[derive(Event, Debug)]
-pub(crate) struct PlanetSet;
 
 impl Default for Clock {
     fn default() -> Self {
@@ -96,16 +73,6 @@ impl From<u32> for Clock {
 impl From<Clock> for u32 {
     fn from(clock: Clock) -> Self {
         clock.ticks
-    }
-}
-
-impl Chore {
-    pub(crate) const fn ticks(self) -> u32 {
-        match self {
-            Self::Flash => 2,
-            Self::HandIn => 4,
-            Self::Return => 4,
-        }
     }
 }
 
@@ -153,20 +120,6 @@ impl Clock {
         self.shown = self.from + (self.ticks as f32 - self.from) * eased;
     }
 
-    fn pass(
-        busy: On<Busy>,
-        job: Option<Res<Job>>,
-        mut clock: ResMut<Clock>,
-        mut commands: Commands,
-    ) {
-        if job.is_some_and(|job| matches!(job.origin, Origin::Lesson { .. })) {
-            return;
-        }
-        for _ in 0..clock.advance(busy.0.ticks()) {
-            commands.trigger(PlanetSet);
-        }
-    }
-
     fn glide(time: Res<Time>, mut clock: ResMut<Clock>) {
         if clock.glided < 1.0 {
             clock.glide_by(time.delta_secs());
@@ -177,11 +130,6 @@ impl Clock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::run::Run;
-
-    #[derive(Resource, Default)]
-    struct Sets(u32);
 
     #[test]
     fn planet_sets_once_per_cycle() {
@@ -191,44 +139,6 @@ mod tests {
         assert_eq!(clock.ticks, CYCLE);
         assert_eq!(clock.advance(2 * CYCLE + 3), 2);
         assert_eq!(clock.ticks % CYCLE, 3);
-    }
-
-    #[test]
-    fn each_chore_triggers_the_set_it_reaches() {
-        let mut world = World::new();
-        world.init_resource::<Clock>();
-        world.add_observer(Clock::pass);
-        world.init_resource::<Sets>();
-        world.add_observer(|_: On<PlanetSet>, mut sets: ResMut<Sets>| sets.0 += 1);
-        let chores = (CYCLE - OPENING).div_ceil(Chore::HandIn.ticks());
-        for _ in 0..chores - 1 {
-            world.trigger(Busy(Chore::HandIn));
-        }
-        world.flush();
-        assert_eq!(world.resource::<Sets>().0, 0);
-        world.trigger(Busy(Chore::HandIn));
-        world.flush();
-        assert_eq!(world.resource::<Sets>().0, 1);
-    }
-
-    #[test]
-    fn tutorial_jobs_take_no_time() {
-        let mut world = World::new();
-        world.init_resource::<Clock>();
-        world.add_observer(Clock::pass);
-        let levels = Levels::on_disk();
-        let run = Run::default();
-        world.insert_resource(Job::new(run.pick(&levels), &run, &levels).unwrap());
-        world.trigger(Busy(Chore::Flash));
-        world.flush();
-        assert_eq!(world.resource::<Clock>().ticks, OPENING);
-        world.remove_resource::<Job>();
-        world.trigger(Busy(Chore::Flash));
-        world.flush();
-        assert_eq!(
-            world.resource::<Clock>().ticks,
-            OPENING + Chore::Flash.ticks()
-        );
     }
 
     #[test]
@@ -267,7 +177,7 @@ mod tests {
     #[test]
     fn planet_glides_to_the_time_in_one_go() {
         let mut clock = Clock::default();
-        clock.advance(Chore::HandIn.ticks());
+        clock.advance(4);
         clock.glide_by(GLIDE_TIME / 2.0);
         let goal = clock.ticks as f32;
         let halfway = (OPENING as f32 + goal) / 2.0;

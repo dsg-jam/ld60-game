@@ -1,4 +1,4 @@
-pub(crate) mod clock;
+mod chore;
 mod clutter;
 mod computer;
 mod counter;
@@ -79,7 +79,7 @@ impl Plugin for WorkshopPlugin {
             computer::ComputerPlugin,
         ))
         .add_plugins((
-            clock::ClockPlugin,
+            chore::ChorePlugin,
             dial::DialPlugin,
             reflections::ReflectionsPlugin,
             rent::RentPlugin,

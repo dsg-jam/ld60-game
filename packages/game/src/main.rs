@@ -8,6 +8,7 @@
 
 mod audio;
 mod city;
+mod clock;
 #[cfg(feature = "debug_port")]
 mod debug_port;
 mod device;
@@ -48,6 +49,7 @@ fn main() -> AppExit {
         MeshPickingPlugin,
         audio::AudioPlugin,
         city::CityPlugin,
+        clock::ClockPlugin,
         ld60_geometry::GeometryPlugin,
         ld60_locale::LocalePlugin,
         menu::MenuPlugin,

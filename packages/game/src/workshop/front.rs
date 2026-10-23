@@ -207,8 +207,8 @@ impl Front {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clock::{Clock, PLANET_SIZE};
     use crate::layout::counter::CounterLayout;
-    use crate::workshop::clock::{Clock, PLANET_SIZE};
 
     #[test]
     fn the_whole_planet_shows_under_the_noren() {
