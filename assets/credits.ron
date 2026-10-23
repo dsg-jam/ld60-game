@@ -72,7 +72,7 @@
             author: "The X Window System",
             url: None,
             license: "Public domain",
-            files: ["packages/game/src/parts/dot_matrix/font.rs"],
+            files: ["packages/core/src/parts/dot_matrix/font.rs"],
         ),
     ],
     research: [
@@ -82,7 +82,7 @@
             url: "https://arxiv.org/abs/1511.04224",
             published: "2015",
             technique: "Growth rings, pores and the fiber highlight of solid wood",
-            used_in: ["packages/game/src/geometry/wood.wesl"],
+            used_in: ["packages/geometry/src/wood.wesl"],
         ),
         (
             authors: "Morten S. Mikkelsen",
@@ -90,7 +90,7 @@
             url: "https://mmikk.github.io/papers3d/mm_sfgrad_bump.pdf",
             published: "2010",
             technique: "Bump mapping from screen space derivatives, without tangents",
-            used_in: ["packages/game/src/geometry/bump.wesl"],
+            used_in: ["packages/geometry/src/bump.wesl"],
         ),
         (
             authors: "Mark Jarzynski, Marc Olano",
@@ -98,7 +98,7 @@
             url: "https://jcgt.org/published/0009/03/02/",
             published: "Journal of Computer Graphics Techniques, 2020",
             technique: "The PCG hash for random numbers",
-            used_in: ["packages/game/src/geometry/noise.wesl"],
+            used_in: ["packages/geometry/src/noise.wesl"],
         ),
         (
             authors: "Kees van den Doel, Paul G. Kry, Dinesh K. Pai",
@@ -106,7 +106,7 @@
             url: "https://www.cs.mcgill.ca/~kry/pubs/foleyautomatic/foleyautomatic.pdf",
             published: "SIGGRAPH 2001",
             technique: "Contact sounds from short hits ringing banks of damped modes",
-            used_in: ["packages/game/src/audio/synth.rs"],
+            used_in: ["packages/core/src/audio/synth.rs"],
         ),
         (
             authors: "Joost van Dongen",
@@ -114,7 +114,7 @@
             url: "http://interiormapping.oogst3d.net/",
             published: "CGI 2008",
             technique: "Rooms behind the windows, by following the view ray into a box",
-            used_in: ["packages/game/src/city/facade.wesl"],
+            used_in: ["packages/city/src/buildings/facade.wesl"],
         ),
         (
             authors: "Iñigo Quilez",
@@ -122,7 +122,7 @@
             url: "https://iquilezles.org/articles/fog/",
             published: "2010",
             technique: "Haze that thins out with height, integrated along each view ray",
-            used_in: ["packages/game/src/city/atmosphere/height_fog.wesl"],
+            used_in: ["packages/city/src/atmosphere/height_fog.wesl"],
         ),
         (
             authors: "Andrew Schneider",
@@ -130,7 +130,7 @@
             url: "https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn",
             published: "SIGGRAPH 2015",
             technique: "Clouds ray marched through a layer of billowy noise worn away by finer noise",
-            used_in: ["packages/game/src/city/sky.wesl", "packages/game/src/city/sky/clouds.rs"],
+            used_in: ["packages/city/src/sky.wesl", "packages/city/src/sky/clouds.rs"],
         ),
         (
             authors: "Magnus Wrenninge, Chris Kulla, Viktor Lundqvist",
@@ -138,7 +138,7 @@
             url: "https://dl.acm.org/doi/10.1145/2504459.2504518",
             published: "SIGGRAPH 2013 Talks",
             technique: "Light that scatters several times inside a cloud, as a second, weaker term",
-            used_in: ["packages/game/src/city/sky.wesl"],
+            used_in: ["packages/city/src/sky.wesl"],
         ),
         (
             authors: "Jorge Jimenez",
@@ -146,7 +146,7 @@
             url: "https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/",
             published: "SIGGRAPH 2014",
             technique: "Interleaved gradient noise to start each pixel's ray march at a different point",
-            used_in: ["packages/game/src/city/sky.wesl"],
+            used_in: ["packages/city/src/sky.wesl"],
         ),
         (
             authors: "Emil Persson",
@@ -154,7 +154,7 @@
             url: "https://geeks3d.com/?p=8334",
             published: "2012",
             technique: "Streaks thinner than a pixel drawn a pixel wide and fainter instead",
-            used_in: ["packages/game/src/geometry/streak.wesl"],
+            used_in: ["packages/geometry/src/streak.wesl"],
         ),
         (
             authors: "H. Norman Abramson (ed.)",
@@ -162,7 +162,7 @@
             url: "https://ntrs.nasa.gov/citations/19670006555",
             published: "NASA SP-106, 1966",
             technique: "Sloshing modes of a liquid in a round container, and how fast each one swings",
-            used_in: ["packages/game/src/parts/liquid.rs"],
+            used_in: ["packages/core/src/parts/liquid.rs"],
         ),
         (
             authors: "Dominic Vella, L. Mahadevan",
@@ -170,7 +170,7 @@
             url: "https://arxiv.org/abs/cond-mat/0411688",
             published: "American Journal of Physics, 2005",
             technique: "Floating bubbles gather along the wall and in rafts",
-            used_in: ["packages/game/src/parts/liquid.wesl"],
+            used_in: ["packages/core/src/parts/liquid.wesl"],
         ),
         (
             authors: "Alban Sauret, François Boulogne, Jean Cappello, Emilie Dressaire, Howard A. Stone",
@@ -178,7 +178,7 @@
             url: "https://arxiv.org/abs/1411.6542",
             published: "Physics of Fluids, 2015",
             technique: "Foam along the wall damps the waves",
-            used_in: ["packages/game/src/parts/liquid.rs"],
+            used_in: ["packages/core/src/parts/liquid.rs"],
         ),
         (
             authors: "B. R. Morton, G. I. Taylor, J. S. Turner",
@@ -186,7 +186,7 @@
             url: "https://doi.org/10.1098/rspa.1956.0011",
             published: "Proceedings of the Royal Society A, 1956",
             technique: "A plume that widens at a steady rate as it rises and takes in the air around it",
-            used_in: ["packages/game/src/parts/steam.rs"],
+            used_in: ["packages/core/src/parts/steam.rs"],
         ),
         (
             authors: "Iñigo Quilez",
@@ -194,7 +194,23 @@
             url: "https://iquilezles.org/articles/warp/",
             published: "2002",
             technique: "Wisps from noise looked up at a point that other noise pushes around",
-            used_in: ["packages/game/src/parts/steam.rs"],
+            used_in: ["packages/core/src/parts/steam.rs"],
+        ),
+        (
+            authors: "Miles Macklin, Matthias Müller, Nuttapong Chentanez",
+            title: "XPBD: Position-Based Simulation of Compliant Constrained Dynamics",
+            url: "https://doi.org/10.1145/2994258.2994272",
+            published: "Motion in Games 2016",
+            technique: "Constraints with a stiffness that does not change with the time step",
+            used_in: ["packages/game/src/workshop/cable.rs"],
+        ),
+        (
+            authors: "Miles Macklin, Kier Storey, Michelle Lu, Pierre Terdiman, Nuttapong Chentanez, Stefan Jeschke, Matthias Müller",
+            title: "Small Steps in Physics Simulation",
+            url: "https://doi.org/10.1145/3309486.3340247",
+            published: "SCA 2019",
+            technique: "Many small steps with one round of constraints each, for a stiff cable that settles",
+            used_in: ["packages/game/src/workshop/cable.rs"],
         ),
     ],
 )
