@@ -9,7 +9,7 @@ use super::computer::ComputerLayout;
 use super::manuals::ShopManuals;
 use super::{
     BELL_SPOT, COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW,
-    STAMP_SPOT, STAMP_YAW, job, lamp, radio, receipt, rent, salvage, ticket, tools,
+    STAMP_SPOT, STAMP_YAW, cable, job, lamp, radio, receipt, rent, salvage, ticket, tools,
 };
 use crate::device::Handheld;
 
@@ -121,6 +121,11 @@ fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
             "job ticket",
             counter.place(job::TICKET_SPOT, job::TICKET_YAW),
             Block::new(ticket::BOARD_SIZE),
+        ),
+        Footprint::new(
+            "debug cable plug",
+            counter.place(cable::PLUG_SPOT, cable::PLUG_YAW),
+            Block::new(cable::PLUG),
         ),
         Footprint::new(
             "device",

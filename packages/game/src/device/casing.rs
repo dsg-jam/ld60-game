@@ -23,6 +23,14 @@ const BOARD: Color = Color::srgb_u8(0x3c, 0x7c, 0x4c);
 const HEADER_BLACK: Color = Color::srgb_u8(0x1a, 0x1a, 0x1c);
 const SCREW_METAL: Color = Color::srgb_u8(0x9a, 0x9c, 0xa0);
 
+/// The parts of a casing whose click prompt changes.
+type Prompted<'a> = (
+    &'a mut Clickable,
+    Option<&'a Screw>,
+    Has<CoverPlate>,
+    Has<Header>,
+);
+
 pub(super) struct CasingPlugin;
 
 impl Plugin for CasingPlugin {
@@ -30,7 +38,8 @@ impl Plugin for CasingPlugin {
         app.add_systems(Update, Casing::show)
             .add_observer(Screw::press)
             .add_observer(CoverPlate::press)
-            .add_observer(Board::press);
+            .add_observer(Board::press)
+            .add_observer(Header::press);
     }
 }
 
@@ -153,6 +162,9 @@ impl Casing {
         );
         device.spawn((
             Header,
+            Clickable {
+                prompt: "click-plug-in",
+            },
             Shape::cuboid(&header, HEADER_BLACK),
             Finish::Plastic,
         ));
@@ -191,7 +203,7 @@ impl Casing {
         children: Query<&Children>,
         mut covers: Query<&mut Visibility, With<Cover>>,
         mut screws: Query<(&Screw, &mut Transform)>,
-        mut parts: Query<(&mut Clickable, Option<&Screw>, Has<CoverPlate>)>,
+        mut parts: Query<Prompted>,
     ) {
         for (device, casing, plugged) in &casings {
             let all_loose = casing.loose.iter().all(|loose| *loose);
@@ -209,14 +221,16 @@ impl Casing {
                     transform.translation.y =
                         screw.rest - if loose(screw) { SCREW_OUT } else { 0.0 };
                 }
-                if let Ok((mut clickable, screw, plate)) = parts.get_mut(part) {
-                    clickable.prompt = match (screw, plate) {
-                        (Some(screw), _) if loose(screw) => "click-screw-in",
-                        (Some(_), _) => "click-unscrew",
-                        (None, true) if all_loose => "click-cover-off",
-                        (None, true) => "click-cover-screwed",
-                        (None, false) if plugged => "click-cover-plugged",
-                        (None, false) => "click-cover-on",
+                if let Ok((mut clickable, screw, plate, header)) = parts.get_mut(part) {
+                    clickable.prompt = match (screw, plate, header) {
+                        (Some(screw), ..) if loose(screw) => "click-screw-in",
+                        (Some(_), ..) => "click-unscrew",
+                        (None, true, _) if all_loose => "click-cover-off",
+                        (None, true, _) => "click-cover-screwed",
+                        (None, false, true) if plugged => "click-unplug",
+                        (None, false, true) => "click-plug-in",
+                        (None, false, false) if plugged => "click-cover-plugged",
+                        (None, false, false) => "click-cover-on",
                     };
                 }
             }
@@ -229,7 +243,7 @@ impl Casing {
         focused: &Focused,
         parents: &Query<&ChildOf>,
         casings: &'a mut Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-    ) -> Option<(Mut<'a, Casing>, Mut<'a, Holdable>, bool)> {
+    ) -> Option<(Entity, Mut<'a, Casing>, Mut<'a, Holdable>, bool)> {
         if !focused.holds(part, parents) {
             return None;
         }
@@ -237,7 +251,7 @@ impl Casing {
             .iter_ancestors(part)
             .find(|ancestor| casings.contains(*ancestor))?;
         let (_, casing, holdable, plugged) = casings.get_mut(device).ok()?;
-        Some((casing, holdable, plugged))
+        Some((device, casing, holdable, plugged))
     }
 }
 
@@ -256,7 +270,8 @@ impl Screw {
         if press.button != PointerButton::Primary {
             return;
         }
-        let Some((mut casing, ..)) = Casing::held(press.entity, &focused, &parents, &mut casings)
+        let Some((_, mut casing, ..)) =
+            Casing::held(press.entity, &focused, &parents, &mut casings)
         else {
             return;
         };
@@ -282,7 +297,7 @@ impl CoverPlate {
         if !plates.contains(press.entity) || press.button != PointerButton::Primary {
             return;
         }
-        let Some((mut casing, mut holdable, _)) =
+        let Some((_, mut casing, mut holdable, _)) =
             Casing::held(press.entity, &focused, &parents, &mut casings)
         else {
             return;
@@ -310,7 +325,7 @@ impl Board {
         if !boards.contains(press.entity) || press.button != PointerButton::Primary {
             return;
         }
-        let Some((mut casing, mut holdable, plugged)) =
+        let Some((_, mut casing, mut holdable, plugged)) =
             Casing::held(press.entity, &focused, &parents, &mut casings)
         else {
             return;
@@ -323,6 +338,37 @@ impl Board {
             Sound::Refuse
         };
         commands.trigger(Play(sound));
+    }
+}
+
+impl Header {
+    /// Plugs the debug cable in, or pulls it out.
+    fn press(
+        mut press: On<PointerPress>,
+        focused: Res<Focused>,
+        parents: Query<&ChildOf>,
+        headers: Query<(), With<Header>>,
+        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
+        mut commands: Commands,
+    ) {
+        if !headers.contains(press.entity) || press.button != PointerButton::Primary {
+            return;
+        }
+        let Some((device, casing, _, plugged)) =
+            Casing::held(press.entity, &focused, &parents, &mut casings)
+        else {
+            return;
+        };
+        press.propagate(false);
+        if !casing.open {
+            commands.trigger(Play(Sound::Refuse));
+        } else if plugged {
+            commands.entity(device).remove::<Connected>();
+            commands.trigger(Play(Sound::Unlatch));
+        } else {
+            commands.entity(device).insert(Connected);
+            commands.trigger(Play(Sound::Latch));
+        }
     }
 }
 
@@ -342,6 +388,8 @@ mod tests {
                 "click-cover-screwed",
                 "click-cover-on",
                 "click-cover-plugged",
+                "click-plug-in",
+                "click-unplug",
             ]
             .map(Message::new),
         );

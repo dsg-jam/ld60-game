@@ -1,3 +1,4 @@
+mod cable;
 mod chore;
 mod clutter;
 mod computer;
@@ -79,6 +80,7 @@ impl Plugin for WorkshopPlugin {
             computer::ComputerPlugin,
         ))
         .add_plugins((
+            cable::CablePlugin,
             chore::ChorePlugin,
             dial::DialPlugin,
             reflections::ReflectionsPlugin,
