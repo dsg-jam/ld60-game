@@ -163,8 +163,8 @@ impl Casing {
             Shape::cuboid(&layout.header, BoardLayout::header_color()),
             Finish::Plastic,
         ));
-        for (part, color) in &layout.parts {
-            device.spawn((Shape::cuboid(part, *color), Finish::Plastic));
+        for (part, color) in layout.parts() {
+            device.spawn((Shape::cuboid(part, color), Finish::Plastic));
         }
         Self::new(spots.screws.len(), Block::new(shell.size.with_y(height)))
     }

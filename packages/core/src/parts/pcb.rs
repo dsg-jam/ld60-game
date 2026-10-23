@@ -1,3 +1,5 @@
+mod router;
+
 use bevy::{
     asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path},
     image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor},
@@ -7,6 +9,7 @@ use bevy::{
     shader::ShaderRef,
 };
 
+pub use self::router::{Pad, Router};
 use super::dot_matrix::GLYPHS;
 
 /// Mask texels per meter of board.
