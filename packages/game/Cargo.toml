@@ -10,7 +10,12 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [features]
-debug_port = ["bevy/bevy_remote", "dep:serde_json", "ld60-city/debug_port", "ld60-core/debug_port"]
+debug_port = [
+  "bevy/bevy_remote",
+  "dep:serde_json",
+  "ld60-city/debug_port",
+  "ld60-core/debug_port",
+]
 
 [dependencies]
 ld60-calco = { workspace = true, features = ["serde"] }
