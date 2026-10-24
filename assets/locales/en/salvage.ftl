@@ -14,3 +14,5 @@ salvage-note-device = Dead. Comes with its human paper.
 salvage-note-tool = For your big box with the glass face.
 salvage-note-errata = Found next to a little black brain marked { $revision }.
 salvage-note-datasheet = Was lying around here for years. Marked { $revision }.
+salvage-guess-deed = The paper that says who owns this building
+salvage-note-deed = Vresk left it with me. He wants to go live by the warm sea.

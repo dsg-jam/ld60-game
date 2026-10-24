@@ -28,6 +28,8 @@ use super::tutorial::TutorialNote;
 const RENT: u32 = 6;
 /// How much more the landlord takes each time after that.
 const RENT_RISE: u32 = 6;
+/// The landlord offers the building from this many paid rents on.
+const DEED_FROM: u32 = 3;
 /// A special job that can come takes one in this many jobs.
 const SPECIAL_ODDS: u32 = 2;
 /// Keeps the seeds of one run away from those of the next.
@@ -87,6 +89,9 @@ pub(crate) struct Run {
     /// How far the stories of the regulars got.
     #[serde(default)]
     regulars: Regulars,
+    /// Whether the player bought the building, so no rent is due.
+    #[serde(default)]
+    owned: bool,
     stats: Stats,
 }
 
@@ -123,10 +128,16 @@ pub(crate) enum Origin {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Rent {
     /// The landlord took `amount` from the till and comes for `next` the
-    /// next time.
-    Paid { amount: u32, next: u32 },
+    /// next time. He sells the building for `deed`, if he offers it.
+    Paid {
+        amount: u32,
+        next: u32,
+        deed: Option<u32>,
+    },
     /// The till held only `till` of `amount`, so the shop closes.
     Short { amount: u32, till: u32 },
+    /// The player owns the building, so the landlord takes nothing.
+    Owned,
 }
 
 /// Starts a new run.
@@ -156,6 +167,7 @@ impl Default for Run {
             specials: Vec::new(),
             boards: Vec::new(),
             regulars: Regulars::default(),
+            owned: false,
             stats: Stats::default(),
         }
     }
@@ -318,7 +330,13 @@ impl Run {
             Find::Tool(tool) => self.has(tool),
             Find::Errata(revision) => self.errata.contains(&revision),
             Find::Datasheet(revision) => self.datasheets.contains(&revision),
+            Find::Deed => self.owned,
         }
+    }
+
+    /// Whether the landlord sells the building.
+    fn sells_deed(&self) -> bool {
+        self.stats.cycles >= DEED_FROM
     }
 
     /// Whether the scrap trader can offer `find`. The shop must not own it
@@ -330,6 +348,7 @@ impl Run {
                 .needs()
                 .is_none_or(|needed| self.tools.contains(&needed)),
             Find::Errata(revision) => self.datasheets.contains(&revision),
+            Find::Deed => self.sells_deed(),
         };
         usable && !self.owns(find)
     }
@@ -351,6 +370,7 @@ impl Run {
             Find::Tool(tool) => self.tools.push(tool),
             Find::Errata(revision) => self.errata.push(revision),
             Find::Datasheet(revision) => self.datasheets.push(revision),
+            Find::Deed => self.owned = true,
         }
         true
     }
@@ -461,6 +481,11 @@ impl Run {
 
     /// The landlord takes the rent from the till, if it holds enough.
     pub(crate) fn pay_rent(&mut self) -> Rent {
+        if self.owned {
+            self.stats.cycles += 1;
+            self.demand.recover();
+            return Rent::Owned;
+        }
         let amount = self.rent();
         if self.till < amount {
             return Rent::Short {
@@ -475,6 +500,7 @@ impl Run {
         Rent::Paid {
             amount,
             next: self.rent(),
+            deed: self.sells_deed().then_some(Find::Deed.price()),
         }
     }
 
@@ -506,6 +532,15 @@ impl Run {
 impl Run {
     pub(crate) fn add_till(&mut self, amount: u32) {
         self.till += amount;
+    }
+
+    pub(crate) fn owned(&self) -> bool {
+        self.owned
+    }
+
+    /// A run whose landlord sells the building.
+    pub(crate) fn offer_deed(&mut self) {
+        self.stats.cycles = DEED_FROM;
     }
 
     /// A run whose shop computer has every tool.
@@ -960,14 +995,16 @@ mod tests {
             run.pay_rent(),
             Rent::Paid {
                 amount: RENT,
-                next: RENT + RENT_RISE
+                next: RENT + RENT_RISE,
+                deed: None,
             }
         );
         assert_eq!(
             run.pay_rent(),
             Rent::Paid {
                 amount: RENT + RENT_RISE,
-                next: RENT + 2 * RENT_RISE
+                next: RENT + 2 * RENT_RISE,
+                deed: None,
             }
         );
         assert_eq!(run.till, 100 - 2 * RENT - RENT_RISE);
@@ -975,6 +1012,31 @@ mod tests {
             (run.stats.cycles, run.stats.rent),
             (2, 2 * RENT + RENT_RISE)
         );
+    }
+
+    #[test]
+    fn the_landlord_sells_the_building_and_then_takes_no_rent() {
+        let mut run = Run {
+            till: 1000,
+            ..Run::default()
+        };
+        assert!(!run.wants(Find::Deed));
+        for _ in 0..DEED_FROM {
+            run.pay_rent();
+        }
+        assert!(matches!(
+            run.pay_rent(),
+            Rent::Paid {
+                deed: Some(price),
+                ..
+            } if price == Find::Deed.price()
+        ));
+        assert!(run.wants(Find::Deed));
+        assert!(run.buy(Find::Deed));
+        assert!(run.owned() && !run.wants(Find::Deed));
+        let (till, cycles) = (run.till, run.stats.cycles);
+        assert_eq!(run.pay_rent(), Rent::Owned);
+        assert_eq!((run.till, run.stats.cycles), (till, cycles + 1));
     }
 
     #[test]

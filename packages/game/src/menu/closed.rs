@@ -17,11 +17,20 @@ pub(super) const ENTRIES: &[(Action, &str)] = &[
     (Action::Quit, "menu-quit"),
 ];
 
+/// The entries of the screen after the player bought the building.
+pub(super) const OWNED_ENTRIES: &[(Action, &str)] = &[
+    (Action::Resume, "menu-keep-open"),
+    (Action::NewRun, "menu-new-shop"),
+    #[cfg(not(target_arch = "wasm32"))]
+    (Action::Quit, "menu-quit"),
+];
+
 pub(super) struct ClosedPlugin;
 
 impl Plugin for ClosedPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Closed), spawn);
+        app.add_systems(OnEnter(AppState::Closed), spawn_closed)
+            .add_systems(OnEnter(AppState::Owned), spawn_owned);
     }
 }
 
@@ -56,21 +65,29 @@ impl StatsPage {
         )
     }
 
-    pub(super) fn with_entries(stats: Stats) -> impl Bundle {
+    pub(super) fn with_entries(stats: Stats, entries: &'static [(Action, &str)]) -> impl Bundle {
         (
             Node {
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            children![Self::bundle(stats), Entries::bundle(ENTRIES)],
+            children![Self::bundle(stats), Entries::bundle(entries)],
         )
     }
 }
 
-/// Darkens the shop behind the screen and shows the closed sign.
-fn spawn(mut commands: Commands) {
+fn spawn_closed(mut commands: Commands) {
+    spawn(&mut commands, AppState::Closed, "menu-closed");
+}
+
+fn spawn_owned(mut commands: Commands) {
+    spawn(&mut commands, AppState::Owned, "menu-owned");
+}
+
+/// Darkens the shop behind the screen and shows `heading`.
+fn spawn(commands: &mut Commands, state: AppState, heading: &'static str) {
     commands.spawn((
-        DespawnOnExit(AppState::Closed),
+        DespawnOnExit(state),
         Node {
             width: percent(100),
             height: percent(100),
@@ -78,8 +95,5 @@ fn spawn(mut commands: Commands) {
         },
         BackgroundColor(SHADE),
     ));
-    commands.spawn(Column::screen(
-        AppState::Closed,
-        Message::new("menu-closed"),
-    ));
+    commands.spawn(Column::screen(state, Message::new(heading)));
 }
