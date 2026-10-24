@@ -1,4 +1,5 @@
 mod demand;
+mod per_device;
 mod served;
 mod tools;
 
@@ -13,6 +14,7 @@ use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 pub(crate) use self::demand::Demand;
+use self::per_device::PerDevice;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
 use super::job::{Job, JobItem};
