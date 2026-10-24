@@ -6,15 +6,15 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use bevy::prelude::*;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_devices::DeviceKind;
-use ld60_levels::{Difficulty, Generated, Level, LevelSource, Variant};
+use ld60_devices::{DeviceKind, Rom};
+use ld60_levels::{Difficulty, Generated, Level, LevelSource, Measure, Variant};
 use ld60_machine::Isa;
 
 pub(crate) use self::bench::Bench;
 pub(crate) use self::error::JobError;
 use super::chore::{Busy, Chore};
 use super::levels::Levels;
-use super::pickup::{Complaint, Pickup, TRIES};
+use super::pickup::{Complaint, Payment, Pickup, TRIES};
 use super::receipt::Receipt;
 use super::run::{Origin, Run};
 use super::ticket::JobTicket;
@@ -49,6 +49,8 @@ pub(crate) struct Job {
     pub(crate) level: Level,
     /// The firmware the device comes in with.
     pub(crate) buggy: String,
+    /// The factory fix, as the bench measures it.
+    par: Option<Measure>,
     /// Set once firmware was burned into the device.
     pub(crate) flashed: bool,
     /// Set once the ticket carries the shop stamp.
@@ -106,7 +108,9 @@ impl Job {
             }
         };
         let Variant {
-            mut level, buggy, ..
+            mut level,
+            buggy,
+            fixed,
         } = variant;
         if !matches!(origin, Origin::Lesson { .. }) {
             level.reward = run.demand().pay(level.device, level.reward);
@@ -114,11 +118,15 @@ impl Job {
         if let Origin::Generated { device, number } = origin {
             level.id = Self::generated_id(device, number);
         }
+        let par = Measure::par(&level, &buggy, &fixed)
+            .inspect_err(|err| warn!(error = err as &dyn Error, "factory fix does not measure"))
+            .ok();
         Ok(Self {
             id: JobId::next(),
             origin,
             level,
             buggy,
+            par,
             flashed: false,
             stamped: false,
             returns: 0,
@@ -147,6 +155,17 @@ impl Job {
         (self.level.reward * self.tries_left() + TRIES / 2) / TRIES
     }
 
+    /// Runs the customer's tests on `rom` and measures the repair if they
+    /// pass.
+    fn try_out(&self, rom: &Rom) -> Result<Measure, Complaint> {
+        if let Some(complaint) = Complaint::find(&self.level, rom) {
+            return Err(complaint);
+        }
+        Ok(Measure::new(&self.level, &self.buggy, rom)
+            .inspect_err(|err| warn!(error = err as &dyn Error, "repair does not measure"))
+            .unwrap_or_default())
+    }
+
     /// Puts the current job of the run on the bench.
     pub(crate) fn start(run: Res<Run>, levels: Option<Res<Levels>>, mut commands: Commands) {
         let Some(levels) = levels else {
@@ -164,13 +183,21 @@ impl Job {
         }
     }
 
-    /// The customer tries the device and finds `complaint`, if any. The
-    /// steps start over either way.
-    fn pick_up(&mut self, complaint: Option<Complaint>) -> Pickup {
+    /// The customer tries the device. It either works as `measure` says or
+    /// shows a complaint. The steps start over either way.
+    fn pick_up(&mut self, tried: Result<Measure, Complaint>) -> Pickup {
         self.flashed = false;
         self.stamped = false;
-        let Some(complaint) = complaint else {
-            return Pickup::Paid(self.reward());
+        let complaint = match tried {
+            Ok(measure) => {
+                return Pickup::Paid(Payment {
+                    fee: self.reward(),
+                    returns: self.returns,
+                    measure,
+                    par: self.par,
+                });
+            }
+            Err(complaint) => complaint,
         };
         self.returns += 1;
         match self.tries_left() {
@@ -257,11 +284,11 @@ impl HandIn {
         let Some(mut job) = job.filter(|job| job.stamped) else {
             return;
         };
-        let complaint = match emulators.single() {
-            Ok(emulator) => Complaint::find(&job.level, emulator.rom()),
-            Err(_) => Some(Complaint::Dead),
+        let tried = match emulators.single() {
+            Ok(emulator) => job.try_out(emulator.rom()),
+            Err(_) => Err(Complaint::Dead),
         };
-        let pickup = job.pick_up(complaint);
+        let pickup = job.pick_up(tried);
         run.settle(&job, &pickup);
         let ends_job = pickup.ends_job();
         Receipt::new(&job.level, pickup, run.till()).hand_out(receipts, &mut commands);
@@ -307,6 +334,7 @@ mod tests {
     use ld60_levels::{Catalog, GAME_SEED, assemble, burn, initial_rom};
 
     use super::*;
+    use crate::workshop::pickup::TIP;
 
     fn job(index: usize) -> Job {
         Job::load(&Levels::on_disk(), index).unwrap().unwrap()
@@ -368,12 +396,15 @@ mod tests {
                 .map(|returns| {
                     let mut job = paying(base);
                     for _ in 0..returns {
-                        job.pick_up(Some(Complaint::Dead));
+                        job.pick_up(Err(Complaint::Dead));
                     }
-                    job.pick_up(None)
+                    match job.pick_up(Ok(Measure::default())) {
+                        Pickup::Paid(payment) => payment.fee,
+                        pickup => panic!("{pickup:?}"),
+                    }
                 })
                 .collect();
-            assert_eq!(paid, rewards.map(Pickup::Paid), "base {base}");
+            assert_eq!(paid, rewards, "base {base}");
         }
     }
 
@@ -381,7 +412,7 @@ mod tests {
     fn third_return_ends_the_job_unpaid() {
         let mut job = job(0);
         let pickups: Vec<_> = (0..TRIES)
-            .map(|_| job.pick_up(Some(Complaint::Dead)))
+            .map(|_| job.pick_up(Err(Complaint::Dead)))
             .collect();
         let handed_back = |tries_left| Pickup::HandedBack {
             complaint: Complaint::Dead,
@@ -403,7 +434,7 @@ mod tests {
         let mut job = job(0);
         job.flashed = true;
         job.stamped = true;
-        job.pick_up(Some(Complaint::Dead));
+        job.pick_up(Err(Complaint::Dead));
         assert!(!job.flashed);
         assert!(!job.stamped);
         assert_eq!(job.returns, 1);
@@ -416,7 +447,7 @@ mod tests {
         world.trigger(HandIn);
         world.trigger(HandIn);
         world.flush();
-        assert_eq!(world.resource::<Run>().till(), reward);
+        assert_eq!(world.resource::<Run>().till(), reward + 2 * TIP);
         assert_eq!(step(&world), Some(1));
     }
 
@@ -486,7 +517,7 @@ mod tests {
             if let Origin::Generated { number, .. } = job.origin {
                 assert_eq!(job.level.id, format!("tally2-{:03}", number + 1));
             }
-            run.settle(&job, &Pickup::Paid(job.level.reward));
+            run.settle(&job, &Pickup::Paid(Payment::example(job.level.reward)));
         }
     }
 

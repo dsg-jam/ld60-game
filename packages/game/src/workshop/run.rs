@@ -394,9 +394,9 @@ impl Run {
     /// Takes in what the customer paid for `job`. Once the device leaves
     /// the shop, the run moves on to the next job.
     pub(crate) fn settle(&mut self, job: &Job, pickup: &Pickup) {
-        if let Pickup::Paid(amount) = pickup {
-            self.till += amount;
-            self.stats.earned += amount;
+        if let Pickup::Paid(payment) = pickup {
+            self.till += payment.amount();
+            self.stats.earned += payment.amount();
         }
         if !pickup.ends_job() {
             return;
@@ -508,7 +508,7 @@ mod tests {
     use super::*;
     use crate::workshop::levels::Levels;
     use crate::workshop::manuals::Sheet;
-    use crate::workshop::pickup::Complaint;
+    use crate::workshop::pickup::{Complaint, Payment};
     use crate::workshop::salvage::Find;
 
     fn job(run: &Run) -> Job {
@@ -541,7 +541,7 @@ mod tests {
     #[test]
     fn tutorial_notes_stay_filed() {
         let mut run = Run::default();
-        run.settle(&job(&run), &Pickup::Paid(4));
+        run.settle(&job(&run), &Pickup::Paid(Payment::example(4)));
         assert_eq!(run.notes(), [0]);
         assert_eq!(run.next().notes(), [0]);
     }
@@ -579,7 +579,7 @@ mod tests {
     fn a_run_is_underway_after_the_first_job() {
         let mut run = Run::default();
         assert!(!run.underway());
-        run.settle(&job(&run), &Pickup::Paid(4));
+        run.settle(&job(&run), &Pickup::Paid(Payment::example(4)));
         assert!(run.underway());
         assert!(Run::default().next().underway());
     }
@@ -662,7 +662,7 @@ mod tests {
             };
             assert!(!seen.contains(&source.path), "{}", source.path);
             seen.push(source.path.clone());
-            run.settle(&job(&run), &Pickup::Paid(1));
+            run.settle(&job(&run), &Pickup::Paid(Payment::example(1)));
         }
         assert_eq!(seen.len(), levels.specials().count());
     }
@@ -803,7 +803,7 @@ mod tests {
         };
         run.settle(&job, &handed_back);
         assert_eq!((run.job, run.till), (0, 0));
-        run.settle(&job, &Pickup::Paid(4));
+        run.settle(&job, &Pickup::Paid(Payment::example(4)));
         assert_eq!((run.job, run.till), (1, 4));
         run.settle(&job, &Pickup::Left(Complaint::Dead));
         assert_eq!(
@@ -822,7 +822,7 @@ mod tests {
     #[test]
     fn the_tutorial_leaves_demand_alone() {
         let mut run = Run::default();
-        run.settle(&job(&run), &Pickup::Paid(4));
+        run.settle(&job(&run), &Pickup::Paid(Payment::example(4)));
         assert_eq!((run.job, run.stats.fixed), (1, 1));
         assert_eq!(run.demand, Demand::default());
         assert_eq!(run.served, Served::default());
@@ -863,7 +863,7 @@ mod tests {
         for _ in 0..16 {
             let job = Job::for_run(&run, &levels).unwrap();
             boards.push(job.level.board);
-            run.settle(&job, &Pickup::Paid(job.level.reward));
+            run.settle(&job, &Pickup::Paid(Payment::example(job.level.reward)));
         }
         assert!(
             boards

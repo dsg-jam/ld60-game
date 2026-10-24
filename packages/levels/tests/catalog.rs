@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use ld60_calco::{ChipInfo, Revision};
 use ld60_devices::{ChipSpec, DeviceKind};
 use ld60_dsl::{Target, compile_pair};
-use ld60_levels::{Catalog, TEST_SEEDS, Variant, initial_rom, run_line_tests};
+use ld60_levels::{Catalog, Measure, TEST_SEEDS, Variant, initial_rom, run_line_tests};
 
 const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
 static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
@@ -142,4 +142,19 @@ fn every_level_is_a_tutorial_or_a_special_job() {
         CATALOG.levels().len()
     );
     assert!(specials.is_sorted(), "{specials:?}");
+}
+
+#[test]
+fn every_fix_changes_some_words_and_untouched_firmware_none() {
+    for source in CATALOG.levels() {
+        let original = Variant::original(source).unwrap();
+        let level = &original.level;
+        let par = Measure::par(level, &original.buggy, &original.fixed).unwrap();
+        assert!(par.words > 0, "{}", level.id);
+        assert!(par.cycles > 0, "{}", level.id);
+        let untouched = initial_rom(level, &original.buggy).unwrap();
+        let measure = Measure::new(level, &original.buggy, &untouched).unwrap();
+        assert_eq!(measure.words, 0, "{}", level.id);
+        assert!(par.neat(par) && par.quick(par));
+    }
 }

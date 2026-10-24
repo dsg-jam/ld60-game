@@ -4,17 +4,22 @@ use std::error::Error;
 
 use bevy::prelude::*;
 use ld60_devices::Rom;
-use ld60_levels::{Level, Outcome, TEST_SEEDS};
+use ld60_levels::{Level, Measure, Outcome, TEST_SEEDS};
 use ld60_locale::Message;
 
 /// How often a customer tries the device before they take it home broken.
 pub(crate) const TRIES: u32 = 3;
+/// What the customer adds for a repair as small or as fast as the factory
+/// fix.
+pub(crate) const TIP: u32 = 1;
+/// How many ways a customer has to say thanks.
+const THANKS: u32 = 3;
 
 /// What the customer did after trying the device.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Pickup {
-    /// Everything worked and the customer paid this much.
-    Paid(u32),
+    /// Everything worked and the customer paid.
+    Paid(Payment),
     /// The customer found a fault and handed the device back. They try it
     /// `tries_left` more times.
     HandedBack {
@@ -24,6 +29,19 @@ pub(crate) enum Pickup {
     /// The customer found a fault on the last try and took the device home
     /// without paying.
     Left(Complaint),
+}
+
+/// What the customer paid for a working device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Payment {
+    /// The reward, less a share for each return.
+    pub(crate) fee: u32,
+    /// How often the customer handed the device back first.
+    pub(crate) returns: u32,
+    /// The repair as the bench measured it.
+    pub(crate) measure: Measure,
+    /// The factory fix, if the bench could measure it.
+    pub(crate) par: Option<Measure>,
 }
 
 /// The first fault the customer found.
@@ -43,16 +61,65 @@ pub(crate) enum Complaint {
     Froze { keys: String },
 }
 
+impl Payment {
+    /// All the customer paid.
+    pub(crate) fn amount(&self) -> u32 {
+        self.fee + self.tip()
+    }
+
+    /// Whether the repair changed no more words than the factory fix.
+    pub(crate) fn neat(&self) -> bool {
+        self.par.is_some_and(|par| self.measure.neat(par))
+    }
+
+    /// Whether the repaired device runs as fast as the factory fix.
+    pub(crate) fn quick(&self) -> bool {
+        self.par.is_some_and(|par| self.measure.quick(par))
+    }
+
+    /// What the customer adds for a neat or quick repair.
+    pub(crate) fn tip(&self) -> u32 {
+        TIP * (u32::from(self.neat()) + u32::from(self.quick()))
+    }
+
+    fn note(&self, pick: u32) -> Message {
+        let id = if self.returns == 0 {
+            "receipt-thanks-first"
+        } else {
+            "receipt-thanks-late"
+        };
+        let thanks = Message::new(id).with("pick", pick % THANKS);
+        let tip = match (self.neat(), self.quick()) {
+            (true, true) => "receipt-tip-neat-quick",
+            (true, false) => "receipt-tip-neat",
+            (false, true) => "receipt-tip-quick",
+            (false, false) => return thanks,
+        };
+        let words = self.measure.words;
+        let par = self.par.map_or(words, |par| par.words);
+        Message::new("receipt-note-paid")
+            .with("thanks", thanks)
+            .with(
+                "tip",
+                Message::new(tip)
+                    .with("words", words)
+                    .with("par", par)
+                    .with("tip", self.tip()),
+            )
+    }
+}
+
 impl Pickup {
     /// Whether the device left the shop with the customer.
     pub(crate) fn ends_job(&self) -> bool {
         !matches!(self, Self::HandedBack { .. })
     }
 
-    /// What the customer writes on the note if they are not happy.
-    pub(crate) fn note(&self) -> Option<Message> {
+    /// What the customer writes on the note. `pick` picks one of the ways
+    /// they put it.
+    pub(crate) fn note(&self, pick: u32) -> Message {
         let (complaint, reaction) = match self {
-            Self::Paid(_) => return None,
+            Self::Paid(payment) => return payment.note(pick),
             Self::HandedBack {
                 complaint,
                 tries_left,
@@ -65,11 +132,9 @@ impl Pickup {
                 Message::new("receipt-note-gave-up").with("tries", TRIES),
             ),
         };
-        Some(
-            Message::new("receipt-note")
-                .with("complaint", complaint.note())
-                .with("reaction", reaction),
-        )
+        Message::new("receipt-note")
+            .with("complaint", complaint.note())
+            .with("reaction", reaction)
     }
 }
 
@@ -117,6 +182,33 @@ impl Complaint {
                 Message::new("receipt-note-pressed-froze").with("keys", keys.as_str())
             }
         }
+    }
+}
+
+#[cfg(test)]
+impl Payment {
+    /// A first-try payment of `fee` for a repair bigger and slower than the
+    /// factory fix, so without a tip.
+    pub(crate) fn example(fee: u32) -> Self {
+        Self {
+            fee,
+            returns: 0,
+            measure: Measure {
+                words: 3,
+                cycles: 120,
+            },
+            par: Some(Measure {
+                words: 2,
+                cycles: 100,
+            }),
+        }
+    }
+
+    /// Like [`Payment::example`], but as small and fast as the factory fix.
+    pub(crate) fn tipped(fee: u32) -> Self {
+        let mut payment = Self::example(fee);
+        payment.measure = payment.par.unwrap();
+        payment
     }
 }
 
@@ -207,6 +299,18 @@ mod tests {
     }
 
     #[test]
+    fn neat_and_quick_repairs_earn_a_tip() {
+        let mut payment = Payment::tipped(5);
+        assert_eq!(payment.amount(), 5 + 2 * TIP);
+        payment.measure.words += 1;
+        assert_eq!(payment.amount(), 5 + TIP);
+        payment.measure.cycles += 1;
+        assert_eq!(payment.amount(), 5);
+        payment.par = None;
+        assert!(!payment.neat() && !payment.quick());
+    }
+
+    #[test]
     fn notes_pick_the_sentence() {
         let wrong = Complaint::Wrong {
             keys: "12+34=".into(),
@@ -246,18 +350,15 @@ mod tests {
             complaint: Complaint::Dead,
             tries_left: 2,
         }
-        .note();
+        .note(0);
         assert_eq!(
             note,
-            Some(
-                Message::new("receipt-note")
-                    .with("complaint", Message::new("receipt-note-dead"))
-                    .with(
-                        "reaction",
-                        Message::new("receipt-note-tries-left").with("tries", 2_u32)
-                    )
-            )
+            Message::new("receipt-note")
+                .with("complaint", Message::new("receipt-note-dead"))
+                .with(
+                    "reaction",
+                    Message::new("receipt-note-tries-left").with("tries", 2_u32)
+                )
         );
-        assert_eq!(Pickup::Paid(10).note(), None);
     }
 }
