@@ -8,7 +8,7 @@ use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::levels::Levels;
-use super::pickup::Pickup;
+use super::pickup::{Payment, Pickup, TRIES};
 use super::ticket::JobTicket;
 
 pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
@@ -19,6 +19,7 @@ const CANVAS_SIZE: UVec2 = UVec2::new(560, 760);
 const SHEET_GAP: f32 = 0.0025;
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 344.0;
+const MEASURE_WIDTH: f32 = 172.0;
 
 pub(crate) struct ReceiptPlugin;
 
@@ -28,8 +29,9 @@ impl Plugin for ReceiptPlugin {
     }
 }
 
-/// The slip left on the counter after a pickup. It says whether the customer
-/// paid and quotes their note if they did not.
+/// The slip left on the counter after a pickup. It says what the customer
+/// paid, what the bench measured on a working device and what the customer
+/// wrote.
 #[derive(Component, Clone, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Receipt {
@@ -38,6 +40,8 @@ pub(crate) struct Receipt {
     pickup: Pickup,
     /// Money in the till after the pickup.
     till: u32,
+    /// Picks one of the ways the customer puts their note.
+    pick: u32,
 }
 
 impl Receipt {
@@ -47,6 +51,7 @@ impl Receipt {
             customer: Levels::text(level, Level::CUSTOMER),
             pickup,
             till,
+            pick: level.serial().bytes().map(u32::from).sum(),
         }
     }
 
@@ -117,7 +122,7 @@ impl Receipt {
 
     fn write(&self, page: &mut ChildSpawnerCommands) {
         let (title, paid) = match &self.pickup {
-            Pickup::Paid(amount) => ("receipt-title-paid", *amount),
+            Pickup::Paid(payment) => ("receipt-title-paid", payment.fee),
             Pickup::HandedBack { .. } => ("receipt-title-handed-back", 0),
             Pickup::Left(_) => ("receipt-title-left", 0),
         };
@@ -136,14 +141,81 @@ impl Receipt {
                 (value, VALUE_WIDTH),
             ]));
         }
-        if let Some(note) = self.pickup.note() {
-            page.spawn(Paper::heading(Message::new("receipt-note-heading")));
-            page.spawn(Paper::text(Message::new("paper-quote").with("text", note)));
+        if let Pickup::Paid(payment) = &self.pickup
+            && payment.tip() > 0
+        {
+            page.spawn(Paper::row([
+                (Message::new("receipt-tip").into(), LABEL_WIDTH),
+                (
+                    Message::new("receipt-amount")
+                        .with("amount", payment.tip())
+                        .into(),
+                    VALUE_WIDTH,
+                ),
+            ]));
         }
+        if let Pickup::Paid(payment) = &self.pickup {
+            Self::write_measure(page, payment);
+        }
+        page.spawn(Paper::heading(Message::new("receipt-note-heading")));
+        page.spawn(Paper::text(
+            Message::new("paper-quote").with("text", self.pickup.note(self.pick)),
+        ));
         page.spawn(Paper::heading(Message::new("receipt-till")));
         page.spawn(Paper::text(
             Message::new("receipt-till-total").with("amount", self.till),
         ));
+    }
+}
+
+impl Receipt {
+    /// The bench log: the repair next to the factory fix, and the tries.
+    fn write_measure(page: &mut ChildSpawnerCommands, payment: &Payment) {
+        page.spawn(Paper::heading(Message::new("receipt-bench")));
+        page.spawn(Paper::row([
+            (Message::new("receipt-measure").into(), LABEL_WIDTH),
+            (Message::new("receipt-this-fix").into(), MEASURE_WIDTH),
+            (Message::new("receipt-factory-fix").into(), MEASURE_WIDTH),
+        ]));
+        let par = payment.par;
+        let rows = [
+            (
+                "receipt-words",
+                "receipt-words-met",
+                payment.measure.words,
+                par.map(|par| par.words),
+                payment.neat(),
+            ),
+            (
+                "receipt-cycles",
+                "receipt-cycles-met",
+                payment.measure.cycles,
+                par.map(|par| par.cycles),
+                payment.quick(),
+            ),
+        ];
+        for (label, met_id, mine, par, met) in rows {
+            let id = if met { met_id } else { "receipt-value" };
+            let par = par.map_or_else(
+                || Message::new("receipt-unknown"),
+                |par| Message::new("receipt-value").with("value", par),
+            );
+            page.spawn(Paper::row([
+                (Message::new(label).into(), LABEL_WIDTH),
+                (Message::new(id).with("value", mine).into(), MEASURE_WIDTH),
+                (par.into(), MEASURE_WIDTH),
+            ]));
+        }
+        page.spawn(Paper::row([
+            (Message::new("receipt-tries").into(), LABEL_WIDTH),
+            (
+                Message::new("receipt-tries-used")
+                    .with("tries", payment.returns + 1)
+                    .with("of", TRIES)
+                    .into(),
+                VALUE_WIDTH,
+            ),
+        ]));
     }
 }
 
@@ -159,7 +231,22 @@ mod tests {
     fn every_receipt_formats() {
         let locale = Locale::on_disk();
         let level = Levels::on_disk().levels()[0].load().unwrap();
-        let mut pickups = vec![Pickup::Paid(10)];
+        let mut late = Payment::tipped(10);
+        late.returns = 2;
+        late.measure.words += 1;
+        let mut slow = Payment::tipped(10);
+        slow.measure.cycles += 1;
+        let mut unknown = Payment::example(10);
+        unknown.par = None;
+        let mut pickups = [
+            Payment::example(10),
+            Payment::tipped(10),
+            late,
+            slow,
+            unknown,
+        ]
+        .map(Pickup::Paid)
+        .to_vec();
         for complaint in Complaint::examples() {
             pickups.push(Pickup::HandedBack {
                 complaint: complaint.clone(),
@@ -168,8 +255,11 @@ mod tests {
             pickups.push(Pickup::Left(complaint));
         }
         for pickup in pickups {
-            let receipt = Receipt::new(&level, pickup, 10);
-            locale.assert_formats(Localized::spawned_by(|page| receipt.write(page)));
+            for pick in 0..3 {
+                let mut receipt = Receipt::new(&level, pickup.clone(), 10);
+                receipt.pick = pick;
+                locale.assert_formats(Localized::spawned_by(|page| receipt.write(page)));
+            }
         }
     }
 }

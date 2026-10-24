@@ -6,6 +6,7 @@ mod error;
 mod generate;
 mod job_text;
 mod level;
+mod measure;
 mod mutate;
 mod variant;
 
@@ -17,5 +18,6 @@ pub use error::{GenerateError, LevelError, VerifyError};
 pub use generate::{Bug, Generated, Reference, Symptom};
 pub use job_text::JobText;
 pub use level::{FirmwareSource, Level, RomSpec, TestCase};
+pub use measure::Measure;
 pub use mutate::Operator;
 pub use variant::{GAME_SEED, Variant};
