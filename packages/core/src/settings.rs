@@ -1,3 +1,4 @@
+mod frame_rate;
 mod quality;
 
 use bevy::prelude::*;
@@ -7,6 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::audio::Mixer;
 
+use self::frame_rate::FrameEnd;
+pub use self::frame_rate::FrameRate;
 use self::quality::Quality;
 
 const VOLUME_STEPS: u8 = 10;
@@ -25,7 +28,9 @@ impl Plugin for SettingsPlugin {
             .map(Settings::checked)
             .unwrap_or_default();
         app.insert_resource(settings)
+            .init_resource::<FrameEnd>()
             .add_systems(Update, Settings::apply.run_if(resource_changed::<Settings>))
+            .add_systems(Last, FrameEnd::wait)
             .add_systems(Last, Settings::save.run_if(resource_changed::<Settings>))
             .add_observer(Adjust::apply);
     }
@@ -41,6 +46,8 @@ pub struct Settings {
     /// Whether the mouse buttons and keys to use are shown.
     hints: bool,
     quality: Quality,
+    #[serde(default)]
+    frame_rate: FrameRate,
 }
 
 /// One of the [`Settings`].
@@ -50,6 +57,7 @@ pub enum Setting {
     Sensitivity,
     Hints,
     Quality,
+    FrameRate,
 }
 
 /// Steps a [`Setting`] up or down.
@@ -68,6 +76,7 @@ impl Default for Settings {
             sensitivity: 4,
             hints: true,
             quality: Quality::default(),
+            frame_rate: FrameRate::default(),
         }
     }
 }
@@ -130,12 +139,19 @@ impl Settings {
             Setting::Hints if self.hints => Message::new("settings-on"),
             Setting::Hints => Message::new("settings-off"),
             Setting::Quality => Message::new(self.quality.label()),
+            Setting::FrameRate => Message::new(self.frame_rate.label()),
         }
     }
 }
 
 impl Setting {
-    pub const ALL: [Self; 4] = [Self::Volume, Self::Sensitivity, Self::Hints, Self::Quality];
+    pub const ALL: [Self; 5] = [
+        Self::Volume,
+        Self::Sensitivity,
+        Self::Hints,
+        Self::Quality,
+        Self::FrameRate,
+    ];
 
     pub const fn label(self) -> &'static str {
         match self {
@@ -143,6 +159,7 @@ impl Setting {
             Self::Sensitivity => "settings-sensitivity",
             Self::Hints => "settings-hints",
             Self::Quality => "settings-quality",
+            Self::FrameRate => "settings-frame-rate",
         }
     }
 }
@@ -175,6 +192,15 @@ impl Adjust {
                 let index = step(u8::try_from(index).unwrap_or_default(), 0, levels);
                 settings.quality = Quality::ALL[usize::from(index)];
             }
+            Setting::FrameRate => {
+                let levels = FrameRate::ALL.len() as u8 - 1;
+                let index = FrameRate::ALL
+                    .iter()
+                    .position(|rate| *rate == settings.frame_rate)
+                    .unwrap_or_default();
+                let index = step(u8::try_from(index).unwrap_or_default(), 0, levels);
+                settings.frame_rate = FrameRate::ALL[usize::from(index)];
+            }
         }
     }
 }
@@ -182,6 +208,14 @@ impl Adjust {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn settings_from_before_the_frame_rate_load_at_60() {
+        let old = "(volume:8,sensitivity:4,hints:true,quality:Low)";
+        let settings: Settings = ron::from_str(old).unwrap();
+        assert_eq!(settings.frame_rate, FrameRate::Sixty);
+        assert_eq!(settings.quality, Quality::Low);
+    }
 
     #[test]
     fn a_change_saves_the_settings() {

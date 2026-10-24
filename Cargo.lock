@@ -3606,6 +3606,7 @@ dependencies = [
  "ld60-locale",
  "ld60-store",
  "rand",
+ "ron",
  "serde",
  "serde_json",
  "web-sys",

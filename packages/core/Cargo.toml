@@ -48,6 +48,7 @@ features = [
 [dev-dependencies]
 ld60-locale = { workspace = true, features = ["test-support"] }
 ld60-store = { workspace = true, features = ["test-support"] }
+ron = { workspace = true, features = ["std"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 workspace = true
