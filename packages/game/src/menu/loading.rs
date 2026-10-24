@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use ld60_core::pipelines::Pipelines;
+use ld60_core::player::camera::PlayerCamera;
 use ld60_core::player::hints::IconFont;
 use ld60_core::state::AppState;
 use ld60_locale::Locale;
@@ -18,6 +19,11 @@ const GAP: f32 = 32.0;
 /// Frames in a row with nothing left to load before the title screen shows.
 /// More pipelines come up as the scene comes into view.
 const SETTLE_FRAMES: u32 = 30;
+/// Frames at the start with the scene camera off, so the first frames only
+/// need the shaders of the loading screen. On macOS and the web, Bevy
+/// compiles shaders on the render thread and draws nothing until all queued
+/// ones are done.
+const HOLD_FRAMES: u32 = 3;
 /// Seconds after which the title screen shows even if something never
 /// finishes.
 const GIVE_UP_SECS: f32 = 60.0;
@@ -50,13 +56,25 @@ struct Progress {
     shown: f32,
     /// Frames in a row with nothing left to load.
     settled: u32,
+    frames: u32,
 }
 
 impl LoadingScreen {
     fn spawn(mut commands: Commands) {
+        let camera = commands
+            .spawn((
+                Camera2d,
+                Camera {
+                    order: 1,
+                    ..default()
+                },
+                DespawnOnExit(AppState::Loading),
+            ))
+            .id();
         commands.spawn((
             LoadingScreen,
             DespawnOnExit(AppState::Loading),
+            UiTargetCamera(camera),
             Node {
                 width: percent(100),
                 height: percent(100),
@@ -107,6 +125,7 @@ impl LoadingScreen {
         icons: Res<IconFont>,
         assets: Res<AssetServer>,
         pipelines: Res<Pipelines>,
+        mut cameras: Query<&mut Camera, With<PlayerCamera>>,
         mut fill: Single<&mut Node, With<Fill>>,
         mut progress: Local<Progress>,
         mut next: ResMut<NextState<AppState>>,
@@ -116,7 +135,15 @@ impl LoadingScreen {
             levels.is_some(),
             icons.is_loaded(&assets),
         ];
-        let ready = progress.update(&loaded, &pipelines);
+        progress.frames += 1;
+        let held = progress.frames <= HOLD_FRAMES;
+        for mut camera in &mut cameras {
+            if camera.is_active == held {
+                camera.is_active = !held;
+            }
+        }
+        let none = Pipelines::default();
+        let ready = progress.update(&loaded, if held { &none } else { &pipelines });
         fill.width = percent(progress.shown * 100.0);
         if ready {
             next.set(AppState::Title);
