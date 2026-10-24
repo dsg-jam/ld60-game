@@ -17,6 +17,7 @@ ticket-rom-no-blank = EPROM, no blank. Burn over it.
 ticket-rom-mask = Mask ROM, cannot be burned
 
 ticket-complaint = COMPLAINT
+ticket-complaint-visit = { $story } { $complaint }
 ticket-remarks = REMARKS
 ticket-status = STATUS
 ticket-status-open = Open

@@ -16,6 +16,7 @@ use super::chore::{Busy, Chore};
 use super::levels::Levels;
 use super::pickup::{Complaint, Payment, Pickup, TRIES};
 use super::receipt::Receipt;
+use super::regulars::Visit;
 use super::run::{Origin, Run};
 use super::ticket::JobTicket;
 use crate::device::{Emulator, Handheld};
@@ -51,6 +52,8 @@ pub(crate) struct Job {
     pub(crate) buggy: String,
     /// The factory fix, as the bench measures it.
     par: Option<Measure>,
+    /// The regular who brought the device, if a regular did.
+    pub(crate) visit: Option<Visit>,
     /// Set once firmware was burned into the device.
     pub(crate) flashed: bool,
     /// Set once the ticket carries the shop stamp.
@@ -115,8 +118,13 @@ impl Job {
         if !matches!(origin, Origin::Lesson { .. }) {
             level.reward = run.demand().pay(level.device, level.reward);
         }
+        let mut visit = None;
         if let Origin::Generated { device, number } = origin {
             level.id = Self::generated_id(device, number);
+            visit = run.regulars().pick(run.job(), seed);
+            if let (Some(visit), Some(text)) = (visit, &mut level.text) {
+                text.customer = visit.regular.id().into();
+            }
         }
         let par = Measure::par(&level, &buggy, &fixed)
             .inspect_err(|err| warn!(error = err as &dyn Error, "factory fix does not measure"))
@@ -127,6 +135,7 @@ impl Job {
             level,
             buggy,
             par,
+            visit,
             flashed: false,
             stamped: false,
             returns: 0,
@@ -195,6 +204,7 @@ impl Job {
                     returns: self.returns,
                     measure,
                     par: self.par,
+                    visit: self.visit,
                 });
             }
             Err(complaint) => complaint,
@@ -265,7 +275,7 @@ impl Job {
         commands.spawn((
             Name::new("job ticket"),
             JobItem,
-            JobTicket::for_level(&job.level),
+            JobTicket::new(&job.level, job.visit),
             counter.place(TICKET_SPOT, TICKET_YAW),
         ));
     }

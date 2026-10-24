@@ -19,6 +19,7 @@ use super::job::{Job, JobItem};
 use super::manuals::Pins;
 use super::pickup::Pickup;
 use super::receipt::Receipt;
+use super::regulars::Regulars;
 use super::rent::RentNote;
 use super::salvage::{Find, SalvageCrate};
 use super::tutorial::TutorialNote;
@@ -83,6 +84,9 @@ pub(crate) struct Run {
     /// The boards of the last jobs, newest last.
     #[serde(default)]
     boards: Vec<BoardRev>,
+    /// How far the stories of the regulars got.
+    #[serde(default)]
+    regulars: Regulars,
     stats: Stats,
 }
 
@@ -151,6 +155,7 @@ impl Default for Run {
             served: Served::default(),
             specials: Vec::new(),
             boards: Vec::new(),
+            regulars: Regulars::default(),
             stats: Stats::default(),
         }
     }
@@ -189,6 +194,15 @@ impl Run {
 
     pub(crate) fn stats(&self) -> Stats {
         self.stats
+    }
+
+    pub(crate) fn regulars(&self) -> &Regulars {
+        &self.regulars
+    }
+
+    /// The current job, counted from 0.
+    pub(crate) fn job(&self) -> u32 {
+        self.job
     }
 
     pub(crate) fn demand(&self) -> &Demand {
@@ -401,6 +415,9 @@ impl Run {
         if !pickup.ends_job() {
             return;
         }
+        if let Some(visit) = job.visit {
+            self.regulars.record(visit, self.job);
+        }
         self.job += 1;
         self.boards.push(job.level.board);
         if self.boards.len() > SAME_BOARDS {
@@ -509,6 +526,7 @@ mod tests {
     use crate::workshop::levels::Levels;
     use crate::workshop::manuals::Sheet;
     use crate::workshop::pickup::{Complaint, Payment};
+    use crate::workshop::regulars::Regular;
     use crate::workshop::salvage::Find;
 
     fn job(run: &Run) -> Job {
@@ -853,6 +871,25 @@ mod tests {
             *world.resource::<NextState<Focus>>(),
             NextState::Pending(Focus::Desk)
         ));
+    }
+
+    #[test]
+    fn regulars_come_back_until_their_story_is_told() {
+        let levels = Levels::on_disk();
+        let mut run = Run::default().next();
+        let mut visits = Vec::new();
+        for _ in 0..60 {
+            let job = Job::for_run(&run, &levels).unwrap();
+            if let Some(visit) = job.visit {
+                let customer = job.level.text.as_ref().map(|text| text.customer.as_str());
+                assert_eq!(customer, Some(visit.regular.id()));
+                visits.push(visit);
+            }
+            run.settle(&job, &Pickup::Paid(Payment::example(job.level.reward)));
+        }
+        let last = visits.iter().filter(|visit| visit.gift() > 0).count();
+        assert!(last >= 2, "{visits:?}");
+        assert!(visits.iter().all(|visit| visit.number <= Regular::VISITS));
     }
 
     #[test]

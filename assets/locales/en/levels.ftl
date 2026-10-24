@@ -106,6 +106,10 @@ job-customer =
     .hosk = Hosk, mud brick maker
     .nibbet = Nibbet, school helper
     .throm = Throm, ferry driver
+    .pell = Pell, young courier (regular)
+    .ommi = Old Ommi, sky counter (regular)
+    .vosh = Inspector Vosh, city office (regular)
+    .krell = Krell and Krull, twins (regular)
 
 job-complaint-wrong-digit =
     .take-1 = I pressed { $keys } and the little window lied to me. It should say { $expected }.
@@ -154,3 +158,40 @@ job-remarks =
     .remark-also-no-response = Customer says a button sometimes does nothing.
     .remark-also-freeze = Customer says it sometimes freezes stiff too.
     .remark-also-wrong-after-clear = Customer says the C button does not always wipe it clean.
+
+# Regulars come back three times in a run. Each visit tells a little more of
+# their story. The ticket puts the visit in front of the complaint. The
+# receipt prints the thanks when the device works. The last visit brings a
+# gift.
+
+regular-pell =
+    .visit-1 = My boss gave me this box on my first day as a courier. I broke it on my first day too. Please do not tell him.
+    .thanks-1 = My boss did not notice anything! I owe you a favor, human.
+    .visit-2 = Boss made me head runner. Now I carry three boxes at once. One of them is sick again.
+    .thanks-2 = The other runners ask where I get my boxes fixed. I tell them only the human knows.
+    .visit-3 = Boss went to live by the warm sea. The courier shop is mine now. So is this broken box.
+    .thanks-3 = A shop owner pays like a shop owner. The extra is for my first day.
+
+regular-ommi =
+    .visit-1 = I count the stars every night with this box. Last night it said there were fewer. That cannot be right.
+    .thanks-1 = The stars are all back. Thank you, small human.
+    .visit-2 = My grandson borrowed the box to count beetles. Now it counts wrong. Beetles are bad for boxes.
+    .thanks-2 = It counts right again. I hid it from my grandson.
+    .visit-3 = My eyes are old now. My grandson counts the stars for me. He sent me with this box and a little extra.
+    .thanks-3 = We found a new star last night. We named it after you. The extra is from my grandson.
+
+regular-vosh =
+    .visit-1 = The city sent me to see if a human can really fix things. Fix this box. I will watch.
+    .thanks-1 = It works. That proves nothing. I will be back.
+    .visit-2 = Another box. A harder one, maybe. The city is still not sure about you.
+    .thanks-2 = It works again. I wrote a good word about you in my report. Only one word.
+    .visit-3 = This is my own box, not the city's. Please do not tell the office.
+    .thanks-3 = The office says your shop may stay. I told Vresk to be nice to you. He laughed. The extra is from me.
+
+regular-krell =
+    .visit-1 = Krell: Krull says this box is his. It is mine. He dropped it. Fix it for me, not for him.
+    .thanks-1 = Krell: It works! Krull: Because I brought it here.
+    .visit-2 = Krell: We each have our own box now. Krull already broke his. This is his. Do not tell him I said so.
+    .thanks-2 = Krull says thank you. Krell says Krull should be more careful.
+    .visit-3 = Krell: We share one box again. It is easier to break only one. Krull: We broke it together.
+    .thanks-3 = We agree on one thing now. The human is good. The extra is from both of us.

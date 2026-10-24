@@ -16,6 +16,7 @@ mod pickup;
 mod radio;
 mod receipt;
 mod reflections;
+mod regulars;
 mod rent;
 mod rug;
 pub(crate) mod run;
