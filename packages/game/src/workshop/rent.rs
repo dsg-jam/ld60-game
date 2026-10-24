@@ -130,14 +130,21 @@ impl RentNote {
     fn write(self, page: &mut ChildSpawnerCommands) {
         page.spawn(Paper::title(Message::new("rent-title")));
         let text = match self.0 {
-            Rent::Paid { amount, next } => Message::new("rent-paid")
+            Rent::Paid { amount, next, .. } => Message::new("rent-paid")
                 .with("amount", amount)
                 .with("next", next),
+            Rent::Owned => Message::new("rent-owned"),
             Rent::Short { amount, till } => Message::new("rent-short")
                 .with("amount", amount)
                 .with("till", till),
         };
         page.spawn(Paper::text(text));
+        if let Rent::Paid {
+            deed: Some(price), ..
+        } = self.0
+        {
+            page.spawn(Paper::text(Message::new("rent-offer").with("price", price)));
+        }
         page.spawn(Paper::faded(Localized::from(Message::new("rent-signed"))));
     }
 }
@@ -155,7 +162,14 @@ mod tests {
             Rent::Paid {
                 amount: 10,
                 next: 16,
+                deed: None,
             },
+            Rent::Paid {
+                amount: 10,
+                next: 16,
+                deed: Some(150),
+            },
+            Rent::Owned,
             Rent::Short {
                 amount: 10,
                 till: 1,

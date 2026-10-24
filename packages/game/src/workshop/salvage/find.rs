@@ -17,6 +17,9 @@ pub(crate) enum Find {
     Errata(Revision),
     /// A loose datasheet for one chip revision.
     Datasheet(Revision),
+    /// The paper that makes the shop's building the player's. The landlord
+    /// left it with the trader.
+    Deed,
 }
 
 impl Find {
@@ -33,7 +36,11 @@ impl Find {
             })
             .map(Self::Errata);
         let datasheets = Revision::ALL.into_iter().map(Self::Datasheet);
-        devices.chain(tools).chain(errata).chain(datasheets)
+        devices
+            .chain(tools)
+            .chain(errata)
+            .chain(datasheets)
+            .chain([Self::Deed])
     }
 
     /// The chip revision whose datasheet buying this files.
@@ -41,7 +48,7 @@ impl Find {
         match self {
             Self::Device(device) => Some(Run::shipped_chip(device)),
             Self::Datasheet(revision) => Some(revision),
-            Self::Tool(_) | Self::Errata(_) => None,
+            Self::Tool(_) | Self::Errata(_) | Self::Deed => None,
         }
     }
 
@@ -56,6 +63,7 @@ impl Find {
             Self::Tool(ComputerTool::Breakpoints) => 10,
             Self::Errata(_) => 6,
             Self::Datasheet(_) => 8,
+            Self::Deed => 150,
         }
     }
 
@@ -71,6 +79,7 @@ impl Find {
             Self::Tool(ComputerTool::Breakpoints) => "salvage-guess-breakpoints",
             Self::Errata(_) => "salvage-guess-errata",
             Self::Datasheet(_) => "salvage-guess-datasheet",
+            Self::Deed => "salvage-guess-deed",
         })
     }
 
@@ -79,6 +88,7 @@ impl Find {
         match self {
             Self::Device(_) => Message::new("salvage-note-device"),
             Self::Tool(_) => Message::new("salvage-note-tool"),
+            Self::Deed => Message::new("salvage-note-deed"),
             Self::Errata(revision) => {
                 Message::new("salvage-note-errata").with("revision", revision.to_string())
             }

@@ -62,7 +62,7 @@ impl Plugin for MenuPlugin {
 
 /// The page a menu shows.
 #[derive(SubStates, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[source(AppState = AppState::Title | AppState::Paused | AppState::Closed)]
+#[source(AppState = AppState::Title | AppState::Paused | AppState::Closed | AppState::Owned)]
 pub(crate) enum Page {
     #[default]
     Entries,
@@ -146,7 +146,13 @@ impl Column {
             (AppState::Closed, Page::Entries) => {
                 column.with_child((
                     DespawnOnExit(Page::Entries),
-                    StatsPage::with_entries(run.stats()),
+                    StatsPage::with_entries(run.stats(), closed::ENTRIES),
+                ));
+            }
+            (AppState::Owned, Page::Entries) => {
+                column.with_child((
+                    DespawnOnExit(Page::Entries),
+                    StatsPage::with_entries(run.stats(), closed::OWNED_ENTRIES),
                 ));
             }
             (AppState::Paused, Page::Entries) => {
@@ -240,7 +246,10 @@ mod tests {
                 AppState::Closed,
                 Message::new("menu-closed"),
             ));
-            menu.spawn(StatsPage::with_entries(Run::default().stats()));
+            menu.spawn(Column::screen(AppState::Owned, Message::new("menu-owned")));
+            for entries in [closed::ENTRIES, closed::OWNED_ENTRIES] {
+                menu.spawn(StatsPage::with_entries(Run::default().stats(), entries));
+            }
             for entries in [
                 title::START_ENTRIES,
                 title::CONTINUE_ENTRIES,

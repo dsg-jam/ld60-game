@@ -13,4 +13,6 @@ pub enum AppState {
     Paused,
     /// The landlord closed the shop, so the run is over.
     Closed,
+    /// The player bought the building, so the run is won.
+    Owned,
 }

@@ -9,6 +9,7 @@ use ld60_core::layout::counter::CounterLayout;
 use ld60_core::parts::paper::{INK_FADED, PAPER, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
+use ld60_core::state::AppState;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -102,6 +103,10 @@ impl SalvageCrate {
         {
             finds.swap(0, device);
         }
+        if let Some(deed) = finds.iter().position(|&find| find == Find::Deed) {
+            let deed = finds.remove(deed);
+            finds.insert(finds.len().min(1), deed);
+        }
         let size = rng.random_range(FEWEST..=MOST);
         let mut packed: Vec<Find> = Vec::new();
         for find in finds {
@@ -128,7 +133,7 @@ impl SalvageCrate {
         let Ok(note) = notes.get(add.entity) else {
             return;
         };
-        if !matches!(note.rent(), Rent::Paid { .. }) {
+        if matches!(note.rent(), Rent::Short { .. }) {
             return;
         }
         for old in &crates {
@@ -318,7 +323,9 @@ impl ForSale {
 
 impl Buy {
     /// Takes the money from the till and the find out of the crate, if the
-    /// till holds enough. The empty crate goes away.
+    /// till holds enough. The empty crate goes away. Buying the deed wins
+    /// the run.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn sell(
         buy: On<Buy>,
         mut focused: ResMut<Focused>,
@@ -326,6 +333,7 @@ impl Buy {
         offers: Query<(&ForSale, &ChildOf)>,
         mut crates: Query<&mut SalvageCrate>,
         mut run: ResMut<Run>,
+        mut app_state: ResMut<NextState<AppState>>,
         mut commands: Commands,
     ) {
         let Ok((&ForSale(find), parent)) = offers.get(buy.entity) else {
@@ -337,6 +345,9 @@ impl Buy {
         }
         commands.trigger(Play(Sound::Chime));
         commands.entity(buy.entity).despawn();
+        if find == Find::Deed {
+            app_state.set(AppState::Owned);
+        }
         let salvage = parent.parent();
         let Ok(mut salvage_crate) = crates.get_mut(salvage) else {
             return;
@@ -415,6 +426,36 @@ mod tests {
     }
 
     #[test]
+    fn every_crate_holds_the_deed_once_the_landlord_sells() {
+        let mut run = Run::default().next();
+        for _ in 0..10 {
+            paid_rent(&mut run);
+            let salvage = SalvageCrate::pack(&run).unwrap();
+            assert_eq!(
+                salvage.finds.contains(&Find::Deed),
+                run.wants(Find::Deed),
+                "{:?}",
+                salvage.finds
+            );
+        }
+        assert!(run.wants(Find::Deed));
+    }
+
+    #[test]
+    fn buying_the_deed_wins_the_run() {
+        let (mut world, salvage, _) = crate_world(Find::Deed.price());
+        world.resource_mut::<Run>().offer_deed();
+        let deed = world.spawn((ForSale(Find::Deed), ChildOf(salvage))).id();
+        world.trigger(Buy { entity: deed });
+        world.flush();
+        assert!(world.resource::<Run>().owned());
+        assert!(matches!(
+            *world.resource::<NextState<AppState>>(),
+            NextState::Pending(AppState::Owned)
+        ));
+    }
+
+    #[test]
     fn no_two_finds_bring_the_same_datasheet() {
         let mut run = Run::default().next();
         for _ in 0..30 {
@@ -471,6 +512,7 @@ mod tests {
         world.insert_resource(run);
         world.init_resource::<Focused>();
         world.init_resource::<NextState<Focus>>();
+        world.init_resource::<NextState<AppState>>();
         world.add_observer(Buy::sell);
         world.add_observer(FocusOn::apply);
         let find = Find::Device(DeviceKind::Summa6);
