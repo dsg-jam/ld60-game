@@ -20,6 +20,7 @@ receipt-unknown = -
 receipt-tries-used = { $tries } of { $of }
 receipt-note-heading = NOTE FROM THE CUSTOMER
 receipt-till = TILL
+till-label = TILL
 receipt-till-total = ${ $amount } in the till.
 
 receipt-note = { $complaint } { $reaction }

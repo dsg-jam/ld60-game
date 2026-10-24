@@ -24,6 +24,7 @@ mod save;
 mod service;
 mod shop;
 mod ticket;
+mod till;
 mod tools;
 mod tutorial;
 
@@ -43,6 +44,7 @@ use self::lamp::Lamp;
 use self::manuals::ShopManuals;
 use self::radio::Radio;
 use self::shop::Shop;
+use self::till::Till;
 use self::tools::Tool;
 
 const COMPUTER_YAW: f32 = -0.4;
@@ -88,6 +90,7 @@ impl Plugin for WorkshopPlugin {
             run::RunPlugin,
             salvage::SalvagePlugin,
             save::SavePlugin,
+            till::TillPlugin,
             tutorial::TutorialPlugin,
         ))
         .add_systems(Startup, spawn_stage);
@@ -121,6 +124,11 @@ fn spawn_stage(mut commands: Commands) {
         counter.place(STAMP_SPOT, STAMP_YAW),
     ));
     commands.spawn((Name::new("bell"), Tool::Bell, counter.place(BELL_SPOT, 0.0)));
+    commands.spawn((
+        Name::new("till"),
+        Till::default(),
+        counter.place(till::SPOT, till::YAW),
+    ));
     commands.spawn((
         Name::new("shop manuals"),
         ShopManuals {
