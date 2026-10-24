@@ -80,9 +80,18 @@ impl Default for Lamp {
     }
 }
 
-/// The light of a [`Lamp`], hidden while it is off.
+/// A light of a [`Lamp`], at no intensity while it is off. Hiding it instead
+/// garbles the lighting on Metal.
 #[derive(Component, Debug)]
-struct LampLight;
+struct LampLight {
+    full: f32,
+}
+
+impl LampLight {
+    fn intensity(&self, on: bool) -> f32 {
+        if on { self.full } else { 0.0 }
+    }
+}
 
 impl Lamp {
     pub(super) fn is_on(&self) -> bool {
@@ -118,11 +127,14 @@ impl Lamp {
             return;
         };
         let (on, clickable) = (lamp.on, lamp.clickable());
-        let light = if on {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+        let (fill, spot) = (
+            LampLight {
+                full: FILL_INTENSITY,
+            },
+            LampLight {
+                full: LIGHT_INTENSITY,
+            },
+        );
 
         commands
             .entity(add.entity)
@@ -156,25 +168,22 @@ impl Lamp {
                     Transform::from_translation(bulb),
                 ));
                 lamp.spawn((
-                    LampLight,
-                    light,
                     PointLight {
                         color: SHADE.mix(&LIGHT_COLOR, 0.5),
-                        intensity: FILL_INTENSITY,
+                        intensity: fill.intensity(on),
                         range: LIGHT_RANGE,
                         ..default()
                     },
+                    fill,
                     Transform::from_translation(bulb),
                 ));
                 // Out of the bottom of the shade, as far as its rim lets it.
                 let rim = SHADE_HEIGHT - BULB_DROP;
                 let cone = (SHADE_BOTTOM / rim).atan();
                 lamp.spawn((
-                    LampLight,
-                    light,
                     SpotLight {
                         color: LIGHT_COLOR,
-                        intensity: LIGHT_INTENSITY,
+                        intensity: spot.intensity(on),
                         range: LIGHT_RANGE,
                         radius: BULB_RADIUS,
                         shadow_maps_enabled: true,
@@ -184,6 +193,7 @@ impl Lamp {
                         inner_angle: cone * SOFT_EDGE,
                         ..default()
                     },
+                    spot,
                     VolumetricLight,
                     Transform::from_translation(bulb).looking_to(Vec3::NEG_Y, Vec3::X),
                 ));
@@ -253,7 +263,8 @@ impl Lamp {
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
         mut lamps: Query<(&mut Lamp, &mut Clickable, &Children, &GlobalTransform)>,
-        mut lights: Query<&mut Visibility, With<LampLight>>,
+        mut fills: Query<(&LampLight, &mut PointLight)>,
+        mut spots: Query<(&LampLight, &mut SpotLight)>,
         mut bulbs: Query<&mut Bulb>,
         mut commands: Commands,
     ) {
@@ -267,8 +278,11 @@ impl Lamp {
         lamp.on = !lamp.on;
         *clickable = lamp.clickable();
         for &child in children {
-            if let Ok(mut visibility) = lights.get_mut(child) {
-                visibility.toggle_inherited_hidden();
+            if let Ok((light, mut fill)) = fills.get_mut(child) {
+                fill.intensity = light.intensity(lamp.on);
+            }
+            if let Ok((light, mut spot)) = spots.get_mut(child) {
+                spot.intensity = light.intensity(lamp.on);
             }
             if let Ok(mut bulb) = bulbs.get_mut(child) {
                 bulb.on = lamp.on;
