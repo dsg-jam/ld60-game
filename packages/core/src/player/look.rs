@@ -1,4 +1,5 @@
 use std::f32::consts::{PI, TAU};
+use std::mem;
 
 use bevy::{
     camera::RenderTarget,
@@ -10,7 +11,7 @@ use bevy::{
         pointer::{Location, PointerAction, PointerId, PointerInput},
     },
     prelude::*,
-    window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowRef},
+    window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowFocused, WindowRef},
 };
 
 use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook, lens::Lens};
@@ -29,7 +30,7 @@ impl Plugin for LookPlugin {
             .init_resource::<CursorLock>()
             .add_systems(
                 Update,
-                (LookAngles::update, update_cursor)
+                (LookAngles::update, reshow_cursor, update_cursor)
                     .chain()
                     .after(FreeLook::update),
             )
@@ -217,6 +218,30 @@ fn update_cursor(
         if cursor.visible != visible {
             cursor.visible = visible;
         }
+    }
+}
+
+/// Hides and shows a free cursor again when the window comes back into focus.
+///
+/// macOS only applies a change to the cursor while the window has focus. A
+/// cursor freed while the window was in the background stays hidden
+/// otherwise.
+fn reshow_cursor(
+    mut events: MessageReader<WindowFocused>,
+    cursor: Single<(Entity, &mut CursorOptions), With<PrimaryWindow>>,
+    mut hidden: Local<bool>,
+) {
+    let (window, mut cursor) = cursor.into_inner();
+    let back = events
+        .read()
+        .any(|event| event.focused && event.window == window);
+    if mem::take(&mut *hidden) {
+        if cursor.grab_mode == CursorGrabMode::None {
+            cursor.visible = true;
+        }
+    } else if back && cursor.visible {
+        cursor.visible = false;
+        *hidden = true;
     }
 }
 
