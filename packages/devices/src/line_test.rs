@@ -25,6 +25,17 @@ const LOCK4_TESTS: [LineTest; 8] = [
     LineTest::new("C #*", "0000 OPEN SHUT"),
     LineTest::new("C #*42# 42#", "0042 OPEN"),
 ];
+const SCORE5_TESTS: [LineTest; 9] = [
+    LineTest::new("", "00100"),
+    LineTest::new("C H", "01100"),
+    LineTest::new("C GG", "00102"),
+    LineTest::new("C 3H 2G", "03102"),
+    LineTest::new("C 2HH", "03100"),
+    LineTest::new("C 5G 5G", "00110"),
+    LineTest::new("C 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H", "99100"),
+    LineTest::new("C PP", "00300"),
+    LineTest::new("C PPPPP", "00400"),
+];
 
 /// A check from the factory checklist of a device model.
 ///
@@ -62,6 +73,7 @@ impl DeviceKind {
             Self::Tally2 => &TALLY2_TESTS,
             Self::Summa6 => &SUMMA6_TESTS,
             Self::Lock4 => &LOCK4_TESTS,
+            Self::Score5 => &SCORE5_TESTS,
         }
     }
 }

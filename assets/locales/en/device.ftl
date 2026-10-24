@@ -7,6 +7,9 @@ device-summa6 = Summa 6 adding machine
 device-lock4 = Lock 4 door lock
     .model = LOCK 4
     .plate = LOCK 4 DOOR LOCK
+device-score5 = Score 5 scoreboard
+    .model = SCORE 5
+    .plate = SCORE 5 SCOREBOARD
 
 device-chip-calco = CALCO REV { $revision } { $date-code }
 device-sticker =

@@ -1,6 +1,6 @@
 mod common;
 
-use common::{LOCK, SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
+use common::{LOCK, SCORE, SUMMA, TALLY_0_9, TALLY_1_0, build, tally};
 use ld60_calco::{ChipInfo, DateCode, Revision};
 use ld60_devices::{Annunciator, BoardRev, ChipSpec, DeviceKind};
 use ld60_dsl::{Flavor, Selection, Target, compile};
@@ -42,6 +42,7 @@ fn every_switch_assembles_on_every_supported_revision() {
         (TALLY_0_9, DeviceKind::Tally2, &Revision::ALL[..]),
         (TALLY_1_0, DeviceKind::Tally2, &Revision::ALL[..]),
         (LOCK, DeviceKind::Lock4, &[Revision::C][..]),
+        (SCORE, DeviceKind::Score5, &[Revision::B, Revision::C][..]),
     ] {
         for &revision in revisions {
             let output = build(source, revision, device, Flavor::Fixed, &[]).unwrap();

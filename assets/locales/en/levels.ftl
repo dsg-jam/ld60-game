@@ -85,6 +85,21 @@ lock4-04 =
     .remark-sun = Sat in a sunny shop window for years. The sticker over the little glass window on its black brain peeled off.
     .remark-factory = Thinking is the factory version 1.0. Nobody changed it.
 
+score5-01 =
+    .customer = Brog, ball game judge
+    .complaint = The home side had 99 points. They scored once more and the board went back to almost nothing. The home side cried. The guest side danced.
+    .remark-scratches = Many scratches on the H key. Somebody pressed it a lot.
+
+score5-02 =
+    .customer = Yelli, hoop game coach
+    .complaint = My player threw from far away and got 3 points. Then she threw from close by and got 3 again. Close throws give 1!
+    .remark-three-pointer = Coach says the board was fine before the big tournament.
+
+score5-03 =
+    .customer = Dunt, stadium keeper
+    .complaint = The guests score and the home side gets the points. The guests are very angry with me.
+    .remark-grumpy-guests = Small bite marks on the case. Customer says it was a guest.
+
 # Generated jobs share the messages below. The complaint is about the first
 # test of the job. { $keys } are the keys it presses, { $key } is the last of
 # them and { $expected } is what the display should show.

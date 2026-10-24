@@ -16,6 +16,8 @@ pub(crate) const SUMMA: &str =
     include_str!(concat!(env!("LD60_ASSETS"), "/levels/summa6/firmware.fw"));
 pub(crate) const LOCK: &str =
     include_str!(concat!(env!("LD60_ASSETS"), "/levels/lock4/firmware.fw"));
+pub(crate) const SCORE: &str =
+    include_str!(concat!(env!("LD60_ASSETS"), "/levels/score5/firmware.fw"));
 
 pub(crate) fn target(revision: Revision, device: DeviceKind) -> Target {
     let chip = ChipSpec::Calco(ChipInfo {

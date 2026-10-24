@@ -1,0 +1,16 @@
+(
+    id: "score5-02",
+    title: "Sticky points",
+    device: Score5,
+    chip: Calco((revision: B, date_code: 7703)),
+    unit: "01044",
+    remarks: ["three-pointer"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "C 3H H", display: "04100"),
+        (keys: "C 2H 1G H", display: "03101"),
+        (keys: "C GG", display: "00102"),
+    ],
+    reward: 18,
+    firmware: Some((source: "score5/firmware.fw", switches: ["sticky-points"])),
+)

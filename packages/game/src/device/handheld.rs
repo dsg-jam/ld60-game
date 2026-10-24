@@ -146,6 +146,52 @@ const LOCK4_ROWS: &[&[KeyDef<char>]] = &[
     )],
 ];
 
+const SCORE5_ROWS: &[&[KeyDef<char>]] = &[
+    &[
+        KeyDef::unit("1", '1', &[Typed("1")]),
+        KeyDef::unit("2", '2', &[Typed("2")]),
+        KeyDef::unit("3", '3', &[Typed("3")]),
+        KeyDef::unit("C", 'C', &[Typed("c"), Typed("C"), Named(Key::Delete)]),
+    ],
+    &[
+        KeyDef::unit("4", '4', &[Typed("4")]),
+        KeyDef::unit("5", '5', &[Typed("5")]),
+        KeyDef::unit("6", '6', &[Typed("6")]),
+        KeyDef::unit("P", 'P', &[Typed("p"), Typed("P")]),
+    ],
+    &[
+        KeyDef::unit("7", '7', &[Typed("7")]),
+        KeyDef::unit("8", '8', &[Typed("8")]),
+        KeyDef::unit("9", '9', &[Typed("9")]),
+        KeyDef::unit("0", '0', &[Typed("0")]),
+    ],
+    &[
+        KeyDef::wide("H", 'H', &[Typed("h"), Typed("H")], 2.0),
+        KeyDef::wide("G", 'G', &[Typed("g"), Typed("G")], 2.0),
+    ],
+];
+
+const SCORE5: Model = Model {
+    body_size: Vec3::new(0.1, 0.02, 0.14),
+    body: Color::srgb_u8(0x2e, 0x46, 0x6e),
+    lcd_width: 0.08,
+    window_spot: Vec2::new(0.0, -0.66),
+    rows: SCORE5_ROWS,
+    keypad_spot: Vec2::new(0.0, 0.3),
+    sticker_size: Vec2::new(0.06, 0.035),
+    sticker_spot: Vec2::new(0.0, 0.1),
+    casing: CasingSpots {
+        screws: &[
+            Vec2::new(-0.82, -0.86),
+            Vec2::new(0.82, -0.86),
+            Vec2::new(-0.82, 0.86),
+            Vec2::new(0.82, 0.86),
+        ],
+        header: Vec2::new(0.0, -0.1),
+    },
+    words: false,
+};
+
 const TALLY2: Model = Model {
     body_size: Vec3::new(0.065, 0.02, 0.085),
     body: Color::srgb_u8(0x8a, 0x3b, 0x2e),
@@ -187,6 +233,7 @@ impl Model {
             DeviceKind::Tally2 => &TALLY2,
             DeviceKind::Summa6 => &SUMMA6,
             DeviceKind::Lock4 => &LOCK4,
+            DeviceKind::Score5 => &SCORE5,
         }
     }
 

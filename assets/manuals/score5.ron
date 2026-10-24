@@ -1,0 +1,40 @@
+(
+    print: (press: Offset, stock: Cream),
+    footer: "service-footer",
+    board_page: Some((
+        heading: Some("service-board"),
+        blocks: [
+            Title("service-title"),
+            Faded("service-summary-score5"),
+            Heading("service-key-codes"),
+            KeyTable,
+            Heading("service-display"),
+            DisplayCells,
+            Text("service-display-broken"),
+            Text("service-display-score5"),
+            Heading("service-board"),
+            Text("service-board-chip"),
+            Text("service-board-ram"),
+            Heading("service-known-faults"),
+            Bullet("service-fault-liquid"),
+            Bullet("service-fault-eprom"),
+        ],
+    )),
+    pages: [
+        (
+            heading: Some("service-line-tests-short"),
+            blocks: [
+                Title("service-line-tests"),
+                Faded("service-line-tests-factory"),
+                Text("service-line-tests-how"),
+                Text("service-line-tests-spaces"),
+                LineTests,
+                Faded("service-line-tests-flash"),
+                Heading("service-use"),
+                Text("service-use-score5-score"),
+                Text("service-use-score5-points"),
+                Text("service-use-score5-period"),
+            ],
+        ),
+    ],
+)

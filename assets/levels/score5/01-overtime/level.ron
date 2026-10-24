@@ -1,0 +1,16 @@
+(
+    id: "score5-01",
+    title: "Overtime",
+    device: Score5,
+    chip: Calco((revision: C, date_code: 7712)),
+    unit: "00731",
+    remarks: ["scratches"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "C 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H", display: "99100"),
+        (keys: "C 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 5H", display: "99100"),
+        (keys: "C 3H 2G P", display: "03202"),
+    ],
+    reward: 16,
+    firmware: Some((source: "score5/firmware.fw", switches: ["no-cap"])),
+)

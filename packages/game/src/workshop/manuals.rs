@@ -527,6 +527,8 @@ mod tests {
         let mut run = Run::default();
         run.add_till(1000);
         assert!(run.buy(Find::Device(DeviceKind::Summa6)));
+        assert!(run.buy(Find::Device(DeviceKind::Lock4)));
+        assert!(run.buy(Find::Device(DeviceKind::Score5)));
         assert!(run.buy(Find::Errata(Revision::B)));
         run.file_note(1);
         run.file_note(0);
