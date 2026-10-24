@@ -7,6 +7,8 @@ use ld60_devices::Rom;
 use ld60_levels::{Level, Measure, Outcome, TEST_SEEDS};
 use ld60_locale::Message;
 
+use super::regulars::Visit;
+
 /// How often a customer tries the device before they take it home broken.
 pub(crate) const TRIES: u32 = 3;
 /// What the customer adds for a repair as small or as fast as the factory
@@ -42,6 +44,8 @@ pub(crate) struct Payment {
     pub(crate) measure: Measure,
     /// The factory fix, if the bench could measure it.
     pub(crate) par: Option<Measure>,
+    /// The regular who brought the device, if a regular did.
+    pub(crate) visit: Option<Visit>,
 }
 
 /// The first fault the customer found.
@@ -64,7 +68,12 @@ pub(crate) enum Complaint {
 impl Payment {
     /// All the customer paid.
     pub(crate) fn amount(&self) -> u32 {
-        self.fee + self.tip()
+        self.fee + self.tip() + self.gift()
+    }
+
+    /// What a regular adds on their last visit.
+    pub(crate) fn gift(&self) -> u32 {
+        self.visit.map_or(0, Visit::gift)
     }
 
     /// Whether the repair changed no more words than the factory fix.
@@ -88,7 +97,10 @@ impl Payment {
         } else {
             "receipt-thanks-late"
         };
-        let thanks = Message::new(id).with("pick", pick % THANKS);
+        let thanks = match self.visit {
+            Some(visit) => visit.thanks(),
+            None => Message::new(id).with("pick", pick % THANKS),
+        };
         let tip = match (self.neat(), self.quick()) {
             (true, true) => "receipt-tip-neat-quick",
             (true, false) => "receipt-tip-neat",
@@ -201,6 +213,7 @@ impl Payment {
                 words: 2,
                 cycles: 100,
             }),
+            visit: None,
         }
     }
 

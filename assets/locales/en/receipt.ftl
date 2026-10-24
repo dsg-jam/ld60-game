@@ -4,6 +4,7 @@ receipt-title-left = NOT REPAIRED
 
 receipt-paid = PAID
 receipt-tip = TIP
+receipt-gift = GIFT
 receipt-amount = ${ $amount }
 
 receipt-bench = BENCH LOG

@@ -12,6 +12,7 @@ use ld60_locale::{Localized, Message};
 
 use super::job::Job;
 use super::levels::Levels;
+use super::regulars::Visit;
 use crate::device::DeviceName;
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
@@ -60,12 +61,15 @@ impl Plugin for TicketPlugin {
 #[require(Transform, Visibility)]
 pub(crate) struct JobTicket {
     level: Level,
+    /// The regular who brought the device, if a regular did.
+    visit: Option<Visit>,
 }
 
 impl JobTicket {
-    pub(crate) fn for_level(level: &Level) -> Self {
+    pub(crate) fn new(level: &Level, visit: Option<Visit>) -> Self {
         Self {
             level: level.clone(),
+            visit,
         }
     }
 
@@ -79,14 +83,14 @@ impl JobTicket {
         let Ok(ticket) = tickets.get(add.entity) else {
             return;
         };
-        let level = &ticket.level;
+        let (level, visit) = (&ticket.level, ticket.visit);
         let canvas = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let page = Paper::spawn_page(
             &mut commands,
             &canvas,
             (1, 1),
             Message::new("ticket-footer"),
-            |page| Self::write(page, level),
+            |page| Self::write(page, level, visit),
         );
         let board = Block::new(BOARD_SIZE);
         let spring = Block::new(SPRING)
@@ -141,7 +145,7 @@ impl JobTicket {
         ])
     }
 
-    fn write(page: &mut ChildSpawnerCommands, level: &Level) {
+    fn write(page: &mut ChildSpawnerCommands, level: &Level, visit: Option<Visit>) {
         let chip = match level.chip {
             ChipSpec::Calco(info) => Message::new("ticket-chip-calco")
                 .with("revision", info.revision.to_string())
@@ -174,8 +178,15 @@ impl JobTicket {
             Self::row("ticket-reward", TicketPays::text(level.reward)),
         ));
         page.spawn(Paper::heading(Message::new("ticket-complaint")));
+        let complaint = Levels::text(level, Level::COMPLAINT);
+        let complaint = match visit {
+            Some(visit) => Message::new("ticket-complaint-visit")
+                .with("story", visit.story())
+                .with("complaint", complaint),
+            None => complaint,
+        };
         page.spawn(Paper::text(
-            Message::new("paper-quote").with("text", Levels::text(level, Level::COMPLAINT)),
+            Message::new("paper-quote").with("text", complaint),
         ));
         page.spawn(Paper::heading(Message::new("ticket-remarks")));
         for remark in &level.remarks {
@@ -355,6 +366,7 @@ mod tests {
 
     use super::*;
     use crate::workshop::levels::Levels;
+    use crate::workshop::regulars::Regular;
 
     #[test]
     fn every_page_formats() {
@@ -362,9 +374,17 @@ mod tests {
         for source in Levels::on_disk().levels() {
             let level = source.load().unwrap();
             locale.assert_formats(Localized::spawned_by(|page| {
-                JobTicket::write(page, &level);
+                JobTicket::write(page, &level, None);
             }));
         }
+        let level = Levels::on_disk().levels()[0].load().unwrap();
+        let visit = Visit {
+            regular: Regular::Vosh,
+            number: 2,
+        };
+        locale.assert_formats(Localized::spawned_by(|page| {
+            JobTicket::write(page, &level, Some(visit));
+        }));
         locale.assert_formats([Message::new("ticket-footer")]);
     }
 

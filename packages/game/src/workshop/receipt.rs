@@ -141,18 +141,21 @@ impl Receipt {
                 (value, VALUE_WIDTH),
             ]));
         }
-        if let Pickup::Paid(payment) = &self.pickup
-            && payment.tip() > 0
-        {
-            page.spawn(Paper::row([
-                (Message::new("receipt-tip").into(), LABEL_WIDTH),
-                (
-                    Message::new("receipt-amount")
-                        .with("amount", payment.tip())
-                        .into(),
-                    VALUE_WIDTH,
-                ),
-            ]));
+        if let Pickup::Paid(payment) = &self.pickup {
+            for (label, amount) in [
+                ("receipt-tip", payment.tip()),
+                ("receipt-gift", payment.gift()),
+            ] {
+                if amount > 0 {
+                    page.spawn(Paper::row([
+                        (Message::new(label).into(), LABEL_WIDTH),
+                        (
+                            Message::new("receipt-amount").with("amount", amount).into(),
+                            VALUE_WIDTH,
+                        ),
+                    ]));
+                }
+            }
         }
         if let Pickup::Paid(payment) = &self.pickup {
             Self::write_measure(page, payment);
