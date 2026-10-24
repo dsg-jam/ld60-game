@@ -52,6 +52,19 @@ impl Firmware {
             .collect()
     }
 
+    /// Cells that instructions name directly, like `M3` in `LD M3`.
+    pub(crate) fn direct_cells(&self) -> Vec<usize> {
+        let mut cells: Vec<usize> = self
+            .lines()
+            .flat_map(|line| line.operands())
+            .filter_map(super::line::cell)
+            .map(usize::from)
+            .collect();
+        cells.sort_unstable();
+        cells.dedup();
+        cells
+    }
+
     /// Renames the RAM cells in code and comments.
     pub(crate) fn remap_ram(&mut self, map: &RamMap) {
         for text in &mut self.0 {

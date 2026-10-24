@@ -21,6 +21,10 @@ pub enum Operator {
     /// A key check with the code of another key of the board, like
     /// `CPI 0x0B` for `CPI 0x0C`.
     WrongKey,
+    /// Working firmware on a board with a stuck RAM bit in a cell it uses.
+    /// The fix moves that cell to a free one. It is not in
+    /// [`Operator::ALL`], since it changes no line of its own.
+    MovedCell,
 }
 
 /// One operator applied at one place in the firmware.

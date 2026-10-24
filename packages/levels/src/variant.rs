@@ -127,6 +127,20 @@ impl Variant {
         })
     }
 
+    /// The fixed firmware with RAM cells `a` and `b` swapped.
+    pub(crate) fn swap_cells(&self, a: u8, b: u8) -> String {
+        let mut firmware = Firmware::new(&self.fixed);
+        firmware.remap_ram(&RamMap::swap(a, b));
+        firmware.to_string()
+    }
+
+    /// The cells the fixed firmware uses: the ones it names directly, and
+    /// the ones `[B+n]` can reach.
+    pub(crate) fn used_cells(&self) -> (Vec<usize>, Vec<usize>) {
+        let firmware = Firmware::new(&self.fixed);
+        (firmware.direct_cells(), firmware.indexed_cells())
+    }
+
     /// Checks that the buggy firmware fails a test and the fixed one passes all,
     /// including the end of line tests of the device.
     pub fn verify(&self) -> Result<(), VerifyError> {

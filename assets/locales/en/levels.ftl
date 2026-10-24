@@ -168,6 +168,7 @@ job-complaint-wrong-after-clear =
 
 job-remarks =
     .remark-sticky = Something sticky dried on the board, on the part that remembers numbers. It did not come off. The box still acts the same.
+    .remark-spill = Customer spilled hot soup on it. Something sticky dried on the part that remembers numbers. It did not come off. The box acts strange since then.
     .remark-also-wrong-digit = Customer says other numbers come out wrong too.
     .remark-also-wrong-annunciator = Customer says the little marks are sometimes wrong too.
     .remark-also-no-response = Customer says a button sometimes does nothing.

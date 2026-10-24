@@ -24,6 +24,9 @@ impl JobText {
     pub const CUSTOMER_MESSAGE: &str = "job-customer";
     /// The remark on a board with a stuck RAM bit.
     pub const FAULT_REMARK: &str = "sticky";
+    /// The remark on a board with a stuck RAM bit that the firmware has to
+    /// work around.
+    pub const SPILL_REMARK: &str = "spill";
     /// Holds every remark of generated jobs.
     pub const REMARK_MESSAGE: &str = "job-remarks";
     /// The ways each complaint message has to describe its symptom.

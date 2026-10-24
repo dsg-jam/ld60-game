@@ -38,6 +38,7 @@ pub struct Difficulty {
     weights: [u32; Operator::ALL.len()],
     chip: ChipSpec,
     fault_chance: u32,
+    stuck_chance: u32,
     symptom_keys: RangeInclusive<usize>,
 }
 
@@ -87,6 +88,7 @@ impl Difficulty {
             ],
             chip: Self::pick_chip(job, device, datasheets, errata),
             fault_chance: (job.saturating_sub(4) * 5).min(30),
+            stuck_chance: (job.saturating_sub(7) * 4).min(20),
             symptom_keys: (n / 8).min(2)..=(2 + n / 2).min(MAX_SYMPTOM_KEYS),
         }
     }
@@ -110,6 +112,12 @@ impl Difficulty {
     /// does not notice.
     pub fn fault_chance(&self) -> u32 {
         self.fault_chance
+    }
+
+    /// The chance in percent of a job whose only bug is a stuck RAM bit in
+    /// a cell the working firmware uses.
+    pub fn stuck_chance(&self) -> u32 {
+        self.stuck_chance
     }
 
     /// How many keys the shortest test that shows the first bug may have.
