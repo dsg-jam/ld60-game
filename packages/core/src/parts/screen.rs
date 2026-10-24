@@ -12,6 +12,8 @@ use bevy::{
     },
     prelude::*,
     render::render_resource::{TextureFormat, TextureUsages},
+    text::TextLayoutInfo,
+    ui::{ComputedUiTargetCamera, UiSystems},
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
@@ -25,6 +27,19 @@ const CANVAS_LAYER: usize = 1;
 /// Texels per UI pixel of a [`UiCanvas::spawn_print`] canvas. Read up close,
 /// a sheet covers more screen pixels than its canvas has UI pixels.
 const PRINT_SCALE: f32 = 2.0;
+/// Frames a canvas keeps drawing after its UI changed.
+const AWAKE_FRAMES: u8 = 3;
+
+/// A UI node whose look changed since the last frame.
+type Redrawn = Or<(
+    Changed<ComputedNode>,
+    Changed<BackgroundColor>,
+    Changed<BorderColor>,
+    Changed<TextColor>,
+    Changed<TextLayoutInfo>,
+    Changed<ImageNode>,
+    Changed<InheritedVisibility>,
+)>;
 
 pub struct ScreenPlugin;
 
@@ -35,6 +50,7 @@ impl Plugin for ScreenPlugin {
                 First,
                 ScreenSurface::drive_pointers.in_set(PickingSystems::Input),
             )
+            .add_systems(PostUpdate, Awake::update.after(UiSystems::Stack))
             .add_observer(ScreenSurface::add_pointer)
             .add_observer(ScreenSurface::keep_ui_focus);
     }
@@ -49,6 +65,13 @@ pub struct CanvasOf(Entity);
 #[derive(Component, Debug, Default)]
 #[relationship_target(relationship = CanvasOf, linked_spawn)]
 pub struct Canvases(Vec<Entity>);
+
+/// Keeps a canvas camera drawing for this many more frames.
+///
+/// Most canvases show the same for many frames. A sleeping camera draws
+/// nothing and its image keeps the last picture.
+#[derive(Component, Debug)]
+struct Awake(u8);
 
 /// An offscreen UI that renders into an image, shown by `owner`.
 pub struct UiCanvas {
@@ -133,6 +156,7 @@ impl UiCanvas {
                 }),
                 RenderLayers::layer(CANVAS_LAYER),
                 CanvasOf(owner),
+                Awake(AWAKE_FRAMES),
             ))
             .id();
         Self {
@@ -147,6 +171,41 @@ impl UiCanvas {
     /// Makes a UI root draw into this canvas.
     pub fn target(&self) -> impl Bundle {
         (UiTargetCamera(self.camera), CanvasOf(self.owner))
+    }
+}
+
+impl Awake {
+    /// Wakes the canvases whose UI changed and lets the others sleep.
+    ///
+    /// A removed node or a loaded image may change any canvas, so both wake
+    /// all of them.
+    fn update(
+        changed: Query<&ComputedUiTargetCamera, Redrawn>,
+        removed: RemovedComponents<Node>,
+        mut images: MessageReader<AssetEvent<Image>>,
+        mut cameras: Query<(&mut Camera, &mut Awake)>,
+    ) {
+        let all = !removed.is_empty()
+            || images
+                .read()
+                .any(|event| matches!(event, AssetEvent::LoadedWithDependencies { .. }));
+        for target in &changed {
+            if let Some(camera) = target.get()
+                && let Ok((_, mut awake)) = cameras.get_mut(camera)
+            {
+                awake.0 = AWAKE_FRAMES;
+            }
+        }
+        for (mut camera, mut awake) in &mut cameras {
+            if all {
+                awake.0 = AWAKE_FRAMES;
+            }
+            let active = awake.0 > 0;
+            if camera.is_active != active {
+                camera.is_active = active;
+            }
+            awake.0 = awake.0.saturating_sub(1);
+        }
     }
 }
 
