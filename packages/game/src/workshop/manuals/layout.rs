@@ -28,6 +28,7 @@ const FILES: Files = Files {
         layout_file!("tally2"),
         layout_file!("summa6"),
         layout_file!("lock4"),
+        layout_file!("score5"),
     ],
     datasheet: layout_file!("calco"),
     errata: layout_file!("errata"),
@@ -41,7 +42,7 @@ type File = (&'static str, &'static str);
 
 struct Files {
     /// In the order of [`DeviceKind::ALL`].
-    manuals: [File; 3],
+    manuals: [File; DeviceKind::ALL.len()],
     datasheet: File,
     errata: File,
 }
@@ -50,7 +51,7 @@ struct Files {
 #[derive(Debug)]
 pub(super) struct Layouts {
     /// In the order of [`DeviceKind::ALL`].
-    manuals: [ManualFile; 3],
+    manuals: [ManualFile; DeviceKind::ALL.len()],
     datasheet: ManualFile,
     errata: ManualFile,
 }
@@ -152,9 +153,9 @@ impl Layouts {
 
     fn parse() -> Result<Self, LayoutError> {
         let manuals = FILES.manuals.map(|file| ManualFile::parse(file, true));
-        let [tally2, summa6, lock4] = manuals;
+        let [tally2, summa6, lock4, score5] = manuals;
         Ok(Self {
-            manuals: [tally2?, summa6?, lock4?],
+            manuals: [tally2?, summa6?, lock4?, score5?],
             datasheet: ManualFile::parse(FILES.datasheet, false)?,
             errata: ManualFile::parse(FILES.errata, false)?,
         })

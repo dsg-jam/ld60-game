@@ -1,0 +1,104 @@
+firmware "Score-5 firmware 1.0" for score5
+
+cells home[2] at M1     ; display, home score, M2 is the ones digit
+cell  period at M3      ; period, 1 to 4
+cells guest[2] at M4    ; guest score, M5 is the ones digit
+cell  points at M6      ; points for the next score
+
+const LAST_PERIOD = 4
+
+entry reset {
+    a = 0
+    home[1] = a
+    home[2] = a
+    guest[1] = a
+    guest[2] = a
+    a = 1
+    period = a
+}
+
+block one {
+    a = 1
+    points = a
+}
+
+block main {
+    wait
+    a = KEY
+    match a {
+        0 to 9 => goto digit
+        'H' => goto homekey
+        'G' => goto guestkey
+        'P' => goto nextkey
+        'C' => goto reset
+    }
+    goto main
+}
+
+block digit {
+    points = a
+    goto main
+}
+
+block nextkey {
+    a = period
+    if a >= LAST_PERIOD goto main
+    a += 1
+    period = a
+    goto main
+}
+
+block homekey {
+    carry = 0
+    a = bcd_add(home[2], points)
+    home[2] = a
+    bug "sticky-points" {
+        fixed {
+            if !carry goto one
+        }
+        buggy {
+            if !carry goto main
+        }
+    }
+    a = home[1] + 1
+    bug "no-cap" {
+        fixed {
+            if a >= 10 goto homecap
+        }
+        buggy {
+            if a >= 10 {
+                a = 0
+            }
+        }
+    }
+    home[1] = a
+    goto one
+homecap:
+    a = 9
+    home[1] = a
+    home[2] = a
+    goto one
+}
+
+block guestkey {
+    carry = 0
+    a = bcd_add(guest[2], points)
+    bug "crossed" {
+        fixed {
+            guest[2] = a
+        }
+        buggy {
+            home[2] = a
+        }
+    }
+    if !carry goto one
+    a = guest[1] + 1
+    if a >= 10 goto guestcap
+    guest[1] = a
+    goto one
+guestcap:
+    a = 9
+    guest[1] = a
+    guest[2] = a
+    goto one
+}

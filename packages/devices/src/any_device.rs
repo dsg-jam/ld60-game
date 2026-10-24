@@ -112,6 +112,30 @@ const LOCK4_BOARDS: [Board; 3] = [
     },
 ];
 
+const SCORE5_BOARDS: [Board; 3] = [
+    Board {
+        kind: DeviceKind::Score5,
+        rev: BoardRev::A,
+        display: 1,
+        keys: &score5_keys([0x0A, 0x0B, 0x0C, 0x0D]),
+        annunciators: &[],
+    },
+    Board {
+        kind: DeviceKind::Score5,
+        rev: BoardRev::B,
+        display: 9,
+        keys: &score5_keys([0x0D, 0x0F, 0x0E, 0x0C]),
+        annunciators: &[],
+    },
+    Board {
+        kind: DeviceKind::Score5,
+        rev: BoardRev::C,
+        display: 4,
+        keys: &score5_keys([0x0C, 0x0A, 0x0F, 0x0B]),
+        annunciators: &[],
+    },
+];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DeviceKind {
@@ -121,10 +145,12 @@ pub enum DeviceKind {
     Summa6,
     /// Door lock with a 4-digit code.
     Lock4,
+    /// Scoreboard with two 2-digit scores and the period between them.
+    Score5,
 }
 
 impl DeviceKind {
-    pub const ALL: [Self; 3] = [Self::Tally2, Self::Summa6, Self::Lock4];
+    pub const ALL: [Self; 4] = [Self::Tally2, Self::Summa6, Self::Lock4, Self::Score5];
 
     pub fn board(self, rev: BoardRev) -> &'static Board {
         &self.boards()[rev as usize]
@@ -136,6 +162,7 @@ impl DeviceKind {
             Self::Tally2 => "2",
             Self::Summa6 => "6",
             Self::Lock4 => "4",
+            Self::Score5 => "5",
         }
     }
 
@@ -145,6 +172,7 @@ impl DeviceKind {
             Self::Tally2 => &TALLY2_BOARDS,
             Self::Summa6 => &SUMMA6_BOARDS,
             Self::Lock4 => &LOCK4_BOARDS,
+            Self::Score5 => &SCORE5_BOARDS,
         }
     }
 
@@ -153,12 +181,13 @@ impl DeviceKind {
             Self::Tally2 => 2,
             Self::Summa6 => 6,
             Self::Lock4 => 4,
+            Self::Score5 => 5,
         }
     }
 
     pub fn isa(self) -> IsaKind {
         match self {
-            Self::Tally2 | Self::Summa6 | Self::Lock4 => IsaKind::Calco,
+            Self::Tally2 | Self::Summa6 | Self::Lock4 | Self::Score5 => IsaKind::Calco,
         }
     }
 }
@@ -280,6 +309,27 @@ const fn lock4_keys([enter, change, clear]: [u8; 3]) -> [(char, u8); 13] {
         d9,
         ('#', enter),
         ('*', change),
+        ('C', clear),
+    ]
+}
+
+/// Digits 0 to 9 send their value. The other keys differ per board.
+const fn score5_keys([home, guest, period, clear]: [u8; 4]) -> [(char, u8); 14] {
+    let [d0, d1, d2, d3, d4, d5, d6, d7, d8, d9] = DIGIT_KEYS;
+    [
+        d0,
+        d1,
+        d2,
+        d3,
+        d4,
+        d5,
+        d6,
+        d7,
+        d8,
+        d9,
+        ('H', home),
+        ('G', guest),
+        ('P', period),
         ('C', clear),
     ]
 }

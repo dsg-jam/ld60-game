@@ -127,6 +127,7 @@ impl Difficulty {
             DeviceKind::Tally2 => 6,
             DeviceKind::Summa6 => 10,
             DeviceKind::Lock4 => 14,
+            DeviceKind::Score5 => 12,
         };
         base * bugs as u32 + base * self.job.min(BONUS_JOBS) / BONUS_JOBS
     }
