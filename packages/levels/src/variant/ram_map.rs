@@ -14,6 +14,13 @@ impl RamMap {
         }))
     }
 
+    /// Swaps cells `a` and `b` and keeps the others.
+    pub(crate) fn swap(a: u8, b: u8) -> Self {
+        let mut map: [u8; CELLS] = std::array::from_fn(|c| c as u8);
+        map.swap(usize::from(a) % CELLS, usize::from(b) % CELLS);
+        Self(map)
+    }
+
     /// Shuffles every cell except the `pinned` ones.
     pub(crate) fn shuffle(pinned: impl IntoIterator<Item = usize>, rng: &mut Rng) -> Self {
         let mut free = [true; CELLS];

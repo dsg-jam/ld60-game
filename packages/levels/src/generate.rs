@@ -1,4 +1,5 @@
 mod probe;
+mod stuck;
 mod symptom;
 
 use std::ops::RangeInclusive;
@@ -190,6 +191,14 @@ impl Generated {
     ) -> Result<Self, GenerateError> {
         let working = Self::working(reference, seed, difficulty.fault_chance(), avoid);
         let lengths = [difficulty.symptom_keys().clone(), 0..=MAX_SYMPTOM_KEYS];
+        let mut rng = Rng::new(seed, "stuck");
+        if (rng.below(100) as u32) < difficulty.stuck_chance()
+            && let Some(job) = lengths
+                .iter()
+                .find_map(|keys| Self::stuck(&working, &mut rng, difficulty, keys))
+        {
+            return Ok(job.with_text(seed));
+        }
         let job = (1..=difficulty.bugs())
             .rev()
             .find_map(|bugs| {
@@ -304,25 +313,7 @@ impl Generated {
             .iter()
             .map(|case| Symptom::shown(level, &fixed, &buggy_rom, &case.keys))
             .collect::<Option<_>>()?;
-        let passing = 3 + rng.below(2);
-        let line_tests = level.device.line_tests().iter().map(|t| t.keys.to_owned());
-        let random = (0..RANDOM_TESTS).map(|_| random_keys(level, rng));
-        for keys in line_tests.chain(random.collect::<Vec<_>>()) {
-            if tests.len() == bugs + passing {
-                break;
-            }
-            if tests.iter().any(|t| same_keys(&t.keys, &keys)) {
-                continue;
-            }
-            let Some(case) = TestCase::shown(level, &fixed, &keys) else {
-                continue;
-            };
-            let report = run_cases(level, &buggy_rom, slice::from_ref(&case), TEST_SEEDS);
-            if report.is_ok_and(|r| r.passed()) {
-                tests.push(case);
-            }
-        }
-        if tests.len() < bugs + passing {
+        if !TestCase::add_passing(level, &fixed, &buggy_rom, &mut tests, rng) {
             return None;
         }
         let mut level = level.clone();
@@ -383,6 +374,36 @@ impl TestCase {
         };
         let report = run_cases(level, rom, slice::from_ref(&case), TEST_SEEDS).ok()?;
         report.passed().then_some(case)
+    }
+
+    /// Adds 3 or 4 tests that `fixed` and `buggy` both pass to `tests`.
+    /// Returns whether enough were found.
+    fn add_passing(
+        level: &Level,
+        fixed: &Rom,
+        buggy: &Rom,
+        tests: &mut Vec<Self>,
+        rng: &mut Rng,
+    ) -> bool {
+        let wanted = tests.len() + 3 + rng.below(2);
+        let line_tests = level.device.line_tests().iter().map(|t| t.keys.to_owned());
+        let random = (0..RANDOM_TESTS).map(|_| random_keys(level, rng));
+        for keys in line_tests.chain(random.collect::<Vec<_>>()) {
+            if tests.len() == wanted {
+                break;
+            }
+            if tests.iter().any(|t| same_keys(&t.keys, &keys)) {
+                continue;
+            }
+            let Some(case) = Self::shown(level, fixed, &keys) else {
+                continue;
+            };
+            let report = run_cases(level, buggy, slice::from_ref(&case), TEST_SEEDS);
+            if report.is_ok_and(|r| r.passed()) {
+                tests.push(case);
+            }
+        }
+        tests.len() == wanted
     }
 
     /// Whether `rom` fails this test on every test seed, so the bug always shows.

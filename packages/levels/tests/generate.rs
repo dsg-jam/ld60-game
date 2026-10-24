@@ -5,8 +5,8 @@ use std::sync::LazyLock;
 use ld60_calco::{ChipInfo, DateCode, Revision};
 use ld60_devices::{ChipSpec, DeviceKind, Fault, Rom, RunError};
 use ld60_levels::{
-    Difficulty, GenerateError, Generated, JobText, Level, Operator, Reference, Symptom, TestCase,
-    initial_rom, run,
+    Difficulty, GenerateError, Generated, JobText, Level, Operator, Reference, Symptom, TEST_SEEDS,
+    TestCase, initial_rom, run,
 };
 
 const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
@@ -146,6 +146,7 @@ fn misaligned(job: &Generated) -> Vec<String> {
                     shift += 1;
                 }
             }
+            Operator::MovedCell => {}
         }
     }
     pairs
@@ -173,6 +174,15 @@ fn check(device: DeviceKind, references: &[Reference]) -> HashSet<String> {
         let variant = &job.variant;
         if let Err(error) = variant.verify() {
             failures.push(format!("{name} seed {seed}: {error}"));
+        }
+        if job.bugs[0].operator == Operator::MovedCell {
+            failures.extend(check_moved(
+                &job,
+                &difficulty,
+                &format!("{name} seed {seed}"),
+            ));
+            seen.insert("MovedCell".into());
+            continue;
         }
         let bugs = job.bugs.len();
         if bugs != difficulty.bugs() {
@@ -261,6 +271,63 @@ fn check(device: DeviceKind, references: &[Reference]) -> HashSet<String> {
     }
     assert!(failures.is_empty(), "\n{}", failures.join("\n"));
     seen
+}
+
+/// Checks a job whose only bug is a stuck RAM bit that the fix works around.
+fn check_moved(job: &Generated, difficulty: &Difficulty, name: &str) -> Vec<String> {
+    let mut failures = Vec::new();
+    let level = &job.variant.level;
+    if job.bugs.len() != 1 || level.reward != difficulty.reward(2) {
+        failures.push(format!(
+            "{name}: {} bugs, reward {}",
+            job.bugs.len(),
+            level.reward
+        ));
+    }
+    if !level.remarks.iter().any(|r| r == JobText::SPILL_REMARK) {
+        failures.push(format!("{name}: no spill remark"));
+    }
+    let Some(Fault::StuckRamBit(stuck)) = level.faults.last().copied() else {
+        return vec![format!("{name}: no stuck bit")];
+    };
+    let mut healthy = level.clone();
+    healthy.faults.pop();
+    let rom = initial_rom(&healthy, &job.variant.buggy).unwrap();
+    if !run(&healthy, &rom, TEST_SEEDS).unwrap().passed() {
+        failures.push(format!("{name}: the old firmware fails on a healthy board"));
+    }
+    let cell = format!("M{:X}", stuck.cell);
+    let uses = |firmware: &str| {
+        firmware
+            .lines()
+            .filter_map(|line| line.split(';').next())
+            .any(|code| code.split([' ', ',']).any(|token| token == cell))
+    };
+    if !uses(&job.variant.buggy) || uses(&job.variant.fixed) {
+        failures.push(format!("{name}: the fix does not move {cell}"));
+    }
+    failures
+}
+
+/// The Tally2 keeps nothing outside its display that it reads back.
+#[test]
+fn late_jobs_can_need_a_stuck_cell_moved() {
+    for (device, references) in [
+        (DeviceKind::Summa6, &SUMMA6),
+        (DeviceKind::Lock4, &LOCK4),
+        (DeviceKind::Score5, &SCORE5),
+    ] {
+        let moved = (0..60)
+            .filter(|&seed| {
+                let difficulty = Difficulty::for_job(30, device);
+                let reference = for_chip(references, &difficulty);
+                let job = Generated::new(reference, seed, &difficulty).unwrap();
+                job.bugs[0].operator == Operator::MovedCell
+            })
+            .count();
+        assert!(moved > 0, "{device:?}");
+        assert_eq!(Difficulty::for_job(6, device).stuck_chance(), 0);
+    }
 }
 
 #[test]
