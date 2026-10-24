@@ -2,6 +2,8 @@ use ld60_devices::DeviceKind;
 use rand::{Rng, RngExt};
 use serde::{Deserialize, Serialize};
 
+use super::PerDevice;
+
 /// Each recent repair of a device takes this many percent off what the next
 /// one pays.
 const DROP: u32 = 8;
@@ -15,15 +17,15 @@ const FLOOR: u32 = 40;
 /// repairs.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Demand {
-    /// Recent repairs of each device, in the order of [`DeviceKind::ALL`].
-    recent: [u32; DeviceKind::ALL.len()],
+    /// Recent repairs of each device.
+    recent: PerDevice,
 }
 
 impl Demand {
     /// The share of the full reward that `device` pays now, in percent.
     pub(crate) fn percent(&self, device: DeviceKind) -> u32 {
         100_u32
-            .saturating_sub(DROP * self.recent[Self::index(device)])
+            .saturating_sub(DROP * self.recent[device])
             .max(FLOOR)
     }
 
@@ -51,20 +53,13 @@ impl Demand {
     }
 
     pub(crate) fn fixed(&mut self, device: DeviceKind) {
-        self.recent[Self::index(device)] += 1;
+        self.recent[device] += 1;
     }
 
     pub(crate) fn recover(&mut self) {
-        for recent in &mut self.recent {
+        for recent in self.recent.iter_mut() {
             *recent /= 2;
         }
-    }
-
-    pub(super) fn index(device: DeviceKind) -> usize {
-        DeviceKind::ALL
-            .iter()
-            .position(|&kind| kind == device)
-            .unwrap_or_default()
     }
 }
 
