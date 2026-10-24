@@ -21,18 +21,11 @@ const SCREWS: [(Vec2, f32); 3] = [
     (Vec2::new(0.39, 0.82), -0.9),
 ];
 
-const NOTES: [(Vec2, f32, Color); 2] = [
-    (
-        Vec2::new(-0.04, -0.55),
-        0.2,
-        Color::srgb_u8(0xe8, 0xd4, 0x6a),
-    ),
-    (
-        Vec2::new(-0.03, -0.8),
-        -0.3,
-        Color::srgb_u8(0xe6, 0x9a, 0xa0),
-    ),
-];
+const NOTES: [(Vec2, f32, Color); 1] = [(
+    Vec2::new(-0.02, -0.5),
+    0.2,
+    Color::srgb_u8(0xe8, 0xd4, 0x6a),
+)];
 const NOTE_SIZE: Vec3 = Vec3::new(0.075, 0.002, 0.075);
 
 pub(crate) struct ClutterPlugin;
