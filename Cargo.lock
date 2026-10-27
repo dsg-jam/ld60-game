@@ -3558,14 +3558,14 @@ checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
 name = "ld60-asm"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ld60-machine",
 ]
 
 [[package]]
 name = "ld60-calco"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ld60-asm",
  "ld60-machine",
@@ -3574,7 +3574,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-city"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-core",
@@ -3585,7 +3585,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-cli"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "fluent-bundle",
  "ld60-calco",
@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-core"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-devices",
@@ -3614,7 +3614,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-devices"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ld60-calco",
  "ld60-machine",
@@ -3623,7 +3623,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-dsl"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ld60-calco",
  "ld60-devices",
@@ -3632,7 +3632,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-game"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-calco",
@@ -3652,14 +3652,14 @@ dependencies = [
 
 [[package]]
 name = "ld60-geometry"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
 ]
 
 [[package]]
 name = "ld60-levels"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "ld60-asm",
  "ld60-calco",
@@ -3672,7 +3672,7 @@ dependencies = [
 
 [[package]]
 name = "ld60-locale"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "fluent-bundle",
@@ -3681,14 +3681,14 @@ dependencies = [
 
 [[package]]
 name = "ld60-machine"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "ld60-store"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bevy",
  "ron",
