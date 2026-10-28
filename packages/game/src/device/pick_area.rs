@@ -1,9 +1,10 @@
 use bevy::{light::NotShadowCaster, prelude::*};
+use ld60_core::player::NoShimmer;
 
 /// An invisible box of this size around a small part of a device. It
 /// catches the pointer for the part, so the part is easy to click.
 #[derive(Component, Debug)]
-#[require(Transform, Visibility)]
+#[require(Transform, Visibility, NoShimmer)]
 pub(super) struct PickArea(pub(super) Vec3);
 
 impl PickArea {
