@@ -1,20 +1,18 @@
 //! The rubber stamp and the service bell, for finishing a job.
 
-use std::f32::consts::PI;
-
 use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
 use ld60_core::audio::{Play, Sound};
-use ld60_core::parts::paper::Paper;
-use ld60_core::player::focus::{Clickable, Focus, FocusOn};
+use ld60_core::player::focus::{Clickable, Focus};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use super::job::{HandIn, Job, JobItem};
-use super::ticket::{JobTicket, Landing};
+use super::job::{Flight, HandIn, Job, JobItem};
+use super::printer::Printing;
+use super::ticket::JobTicket;
 use crate::device::Casing;
 
 pub(super) const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
@@ -25,9 +23,24 @@ const STAMP_WOOD: Color = Color::srgb_u8(0x9a, 0x6e, 0x48);
 const STAMP_RUBBER: Color = Color::srgb_u8(0x5a, 0x1c, 0x18);
 const STAMP_HANDLE: Color = Color::srgb_u8(0xb0, 0x2e, 0x24);
 
-/// How far the stamp moves down when pressed, and for how long.
-const PRESS_DEPTH: f32 = 0.012;
-const PRESS_TIME: f32 = 0.2;
+/// Seconds the stamp takes to the ticket and back.
+const STAMP_TIME: f32 = 2.6;
+/// Shares of [`STAMP_TIME`]. The stamp is over the ticket at the first,
+/// hits it at the second, holds until the third and is back over it at the
+/// fourth.
+const OVER: f32 = 0.32;
+const DOWN: f32 = 0.42;
+const HOLD: f32 = 0.55;
+const UP: f32 = 0.65;
+/// How high the stamp waits over the ticket before it comes down.
+const HOVER: f32 = 0.04;
+/// How high the stamp lifts before it moves over, clear of the till next
+/// to it.
+const HOP: f32 = 0.13;
+/// Shares of a hop spent going up and coming down.
+const HOP_UP: f32 = 0.25;
+/// The ticket lies this thick on the counter.
+const TICKET: f32 = 0.001;
 
 pub(super) const BELL_BASE_SIZE: Vec3 = Vec3::new(0.07, 0.012, 0.07);
 const BELL_DOME_RADIUS: f32 = 0.032;
@@ -41,86 +54,101 @@ pub(crate) struct ToolsPlugin;
 
 impl Plugin for ToolsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (Press::animate, Tool::arm))
+        app.add_systems(Update, (Stamping::animate, Tool::arm))
             .add_observer(Tool::on_add)
             .add_observer(Tool::use_on_press);
     }
 }
 
-/// A tool on the counter that finishes a job. It can be used at any time.
+/// A tool on the counter that finishes a job.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 #[require(Transform, Visibility)]
 pub(crate) enum Tool {
-    /// Stamps the ticket of the job.
+    /// Stamps the ticket of the job when the bell rings.
     Stamp,
-    /// Calls the customer for a stamped job.
+    /// Calls the customer for the job. The stamp stamps its ticket first.
     Bell,
 }
 
 impl Tool {
-    const fn prompt(self) -> &'static str {
-        match self {
-            Self::Stamp => "click-stamp",
-            Self::Bell => "click-bell",
-        }
-    }
-
+    /// Ringing the bell sends the stamp onto the ticket, see [`Stamping`].
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn use_on_press(
         mut press: On<PointerPress>,
         state: Res<State<Focus>>,
-        tools: Query<(&Tool, &Transform, Has<Press>)>,
-        landings: Query<(), With<Landing>>,
+        tools: Query<(Entity, &Tool, &Transform, Has<Stamping>)>,
         casings: Query<&Casing, With<JobItem>>,
-        job: Option<ResMut<Job>>,
-        mut tickets: Query<(Entity, &mut Paper), With<JobTicket>>,
+        printing: Query<(&Printing, Has<JobTicket>)>,
+        flights: Query<(), With<Flight>>,
+        job: Option<Res<Job>>,
+        tickets: Query<&GlobalTransform, With<JobTicket>>,
         mut commands: Commands,
     ) {
         if press.button != PointerButton::Primary || *state.get() != Focus::Desk {
             return;
         }
-        let Ok((&tool, &rest, pressed)) = tools.get(press.entity) else {
+        if tools.get(press.entity).map(|(_, tool, ..)| *tool) != Ok(Self::Bell) {
+            return;
+        }
+        press.propagate(false);
+        commands.trigger(Play(Sound::Ding));
+        let stamping = tools.iter().any(|(.., stamping)| stamping);
+        if Self::bell(&casings, &printing, !flights.is_empty() || stamping) != "click-bell" {
+            commands.trigger(Play(Sound::Refuse));
+            return;
+        }
+        let Some(job) = job else {
             return;
         };
-        press.propagate(false);
-        match tool {
-            Self::Stamp => {
-                if !pressed {
-                    commands
-                        .entity(press.entity)
-                        .insert(Press { elapsed: 0.0, rest });
-                }
-                match job {
-                    Some(mut job) if !job.stamped => {
-                        job.stamped = true;
-                        if let Ok((ticket, mut paper)) = tickets.single_mut() {
-                            paper.open_first_page();
-                            commands.trigger(FocusOn { entity: ticket });
-                        }
-                    }
-                    _ => commands.trigger(Play(Sound::Thunk)),
-                }
-            }
-            Self::Bell => {
-                commands.trigger(Play(Sound::Ding));
-                // Nobody takes a gadget home in pieces.
-                if !casings.iter().all(Casing::sealed) {
-                    commands.trigger(Play(Sound::Refuse));
-                } else if job.is_some_and(|job| job.stamped) && landings.is_empty() {
-                    commands.trigger(HandIn);
-                }
-            }
+        if job.stamped {
+            commands.trigger(HandIn);
+            return;
+        }
+        let stamp = tools.iter().find(|(_, tool, ..)| **tool == Self::Stamp);
+        if let (Some((stamp, _, &rest, _)), Ok(ticket)) = (stamp, tickets.single()) {
+            commands.entity(stamp).insert(Stamping {
+                elapsed: 0.0,
+                rest,
+                onto: ticket
+                    .transform_point(JobTicket::stamp_spot())
+                    .with_y(rest.translation.y + TICKET),
+            });
         }
     }
 
-    /// The bell says when the device must be closed up first.
-    fn arm(casings: Query<&Casing, With<JobItem>>, mut tools: Query<(&Tool, &mut Clickable)>) {
-        let sealed = casings.iter().all(Casing::sealed);
-        for (&tool, mut clickable) in &mut tools {
-            let prompt = match tool {
-                Self::Bell if !sealed => "click-bell-open",
-                _ => tool.prompt(),
-            };
+    /// What the bell says a press does. It only calls the customer once the
+    /// device is closed up, the new ticket is on the clipboard and nothing
+    /// is on its way.
+    fn bell(
+        casings: &Query<&Casing, With<JobItem>>,
+        printing: &Query<(&Printing, Has<JobTicket>)>,
+        busy: bool,
+    ) -> &'static str {
+        // Nobody takes a gadget home in pieces.
+        if !casings.iter().all(Casing::sealed) {
+            "click-bell-open"
+        } else if printing
+            .iter()
+            .any(|(printing, ticket)| ticket && printing.waiting())
+        {
+            "click-bell-ticket"
+        } else if busy || !printing.is_empty() {
+            "click-bell-wait"
+        } else {
+            "click-bell"
+        }
+    }
+
+    fn arm(
+        casings: Query<&Casing, With<JobItem>>,
+        printing: Query<(&Printing, Has<JobTicket>)>,
+        flights: Query<(), With<Flight>>,
+        stamps: Query<(), With<Stamping>>,
+        mut bells: Query<&mut Clickable, With<Tool>>,
+    ) {
+        let busy = !flights.is_empty() || !stamps.is_empty();
+        let prompt = Self::bell(&casings, &printing, busy);
+        for mut clickable in &mut bells {
             clickable.set_if_neq(Clickable { prompt });
         }
     }
@@ -136,9 +164,11 @@ impl Tool {
             return;
         };
         let mut entity = commands.entity(add.entity);
-        entity.insert(Clickable {
-            prompt: tool.prompt(),
-        });
+        if tool == Self::Bell {
+            entity.insert(Clickable {
+                prompt: "click-bell",
+            });
+        }
         match tool {
             Self::Stamp => {
                 let pad = Block::new(STAMP_PAD_SIZE);
@@ -188,27 +218,74 @@ impl Tool {
     }
 }
 
-/// A tool moving down and back up once after a click.
+/// The stamp hopping onto the job ticket after the bell rings, stamping it
+/// and hopping back. Then the customer picks the job up.
 #[derive(Component, Debug)]
-struct Press {
+struct Stamping {
     elapsed: f32,
     rest: Transform,
+    /// Where the stamp stands on the ticket.
+    onto: Vec3,
 }
 
-impl Press {
+impl Stamping {
+    /// Where the stamp is `t` of the way, from 0 to 1.
+    fn at(&self, t: f32) -> Vec3 {
+        let home = self.rest.translation;
+        let above = self.onto + Vec3::Y * HOVER;
+        // Up, over at the height of the higher end and down.
+        let hop = |from: Vec3, to: Vec3, t: f32| {
+            let high = from.y.max(to.y) + HOP;
+            let up = from.with_y(high);
+            let down = to.with_y(high);
+            if t < HOP_UP {
+                from.lerp(up, smooth(t / HOP_UP))
+            } else if t < 1.0 - HOP_UP {
+                up.lerp(down, smooth((t - HOP_UP) / (1.0 - 2.0 * HOP_UP)))
+            } else {
+                down.lerp(to, smooth((t - 1.0 + HOP_UP) / HOP_UP))
+            }
+        };
+        if t < OVER {
+            hop(home, above, t / OVER)
+        } else if t < DOWN {
+            // Speeds up as it comes down, like a hand pressing.
+            above.lerp(self.onto, ((t - OVER) / (DOWN - OVER)).powi(2))
+        } else if t < HOLD {
+            self.onto
+        } else if t < UP {
+            self.onto.lerp(above, smooth((t - HOLD) / (UP - HOLD)))
+        } else {
+            hop(above, home, (t - UP) / (1.0 - UP))
+        }
+    }
+
     fn animate(
         time: Res<Time>,
-        mut tools: Query<(Entity, &mut Press, &mut Transform)>,
+        mut job: Option<ResMut<Job>>,
+        mut stamps: Query<(Entity, &mut Stamping, &mut Transform)>,
         mut commands: Commands,
     ) {
-        for (tool, mut press, mut transform) in &mut tools {
-            press.elapsed += time.delta_secs();
-            let t = (press.elapsed / PRESS_TIME).min(1.0);
-            *transform = press.rest;
-            transform.translation.y -= PRESS_DEPTH * (PI * t).sin();
+        for (stamp, mut stamping, mut transform) in &mut stamps {
+            let before = stamping.elapsed / STAMP_TIME;
+            stamping.elapsed += time.delta_secs();
+            let t = (stamping.elapsed / STAMP_TIME).min(1.0);
+            transform.translation = stamping.at(t);
+            if before < DOWN && t >= DOWN {
+                if let Some(job) = job.as_mut() {
+                    job.stamped = true;
+                }
+                commands.trigger(Play(Sound::Thunk));
+            }
             if t >= 1.0 {
-                commands.entity(tool).remove::<Press>();
+                *transform = stamping.rest;
+                commands.entity(stamp).remove::<Stamping>();
+                commands.trigger(HandIn);
             }
         }
     }
+}
+
+fn smooth(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
 }

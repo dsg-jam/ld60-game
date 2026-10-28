@@ -20,6 +20,8 @@ hint-look-screen = Look at screen
 
 click-bell = Ring bell
 click-bell-open = Close up the device first
+click-bell-ticket = Tear off the new ticket first
+click-bell-wait = Wait for the customer
 click-manuals = Open shop manuals
 click-buy = Buy
 click-buy-short = Not enough money in the till
@@ -46,5 +48,5 @@ click-volume = Drag to set volume
 click-tune = Next station
 click-receipt = Inspect receipt
 click-rent = Read rent note
-click-stamp = Stamp ticket
 click-ticket = Inspect ticket
+click-tear-ticket = Tear off ticket
