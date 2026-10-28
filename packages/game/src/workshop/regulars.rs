@@ -15,7 +15,7 @@ const MESSAGE: &str = "regular";
 
 /// A local who comes back with one broken device after another and tells a
 /// little more of their story each time.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) enum Regular {
     Pell,
     Ommi,
