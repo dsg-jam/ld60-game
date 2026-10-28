@@ -196,7 +196,7 @@ impl Holdable {
         }
     }
 
-    fn follow(
+    pub(crate) fn follow(
         time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
