@@ -34,6 +34,8 @@ impl Plugin for PagePlugin {
 pub(super) enum Page {
     #[default]
     Source,
+    /// The firmware coming off the device, before it is in the editor.
+    Dump,
     Notes,
     Versions,
 }
@@ -50,6 +52,7 @@ impl Page {
     pub(super) fn title(self) -> Message {
         Message::new(match self {
             Self::Source => "editor-title-source",
+            Self::Dump => "editor-title-dump",
             Self::Notes => "editor-title-notes",
             Self::Versions => "editor-title-versions",
         })
@@ -59,6 +62,7 @@ impl Page {
     fn command(self) -> Option<Command> {
         match self {
             Self::Source => None,
+            Self::Dump => Some(Command::Dump),
             Self::Notes => Some(Command::Notes),
             Self::Versions => Some(Command::Versions),
         }
@@ -159,7 +163,7 @@ mod tests {
 
     #[test]
     fn every_title_formats() {
-        let titles = [Page::Source, Page::Notes, Page::Versions].map(Page::title);
+        let titles = [Page::Source, Page::Dump, Page::Notes, Page::Versions].map(Page::title);
         Locale::on_disk().assert_formats(titles);
     }
 }
