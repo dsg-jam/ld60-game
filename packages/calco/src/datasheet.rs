@@ -65,7 +65,7 @@ pub const INSTRUCTIONS: &[InstructionDoc] = &[
         c: Cleared,
         group: Some(Math),
         example: "CLC",
-        meaning: "Clear the carry. Do this before ADC.",
+        meaning: "Clear the carry. Do this before ADC or SBC.",
     },
     InstructionDoc {
         op: Op::Sec,
@@ -76,7 +76,7 @@ pub const INSTRUCTIONS: &[InstructionDoc] = &[
         c: Set,
         group: Some(Math),
         example: "SEC",
-        meaning: "Set the carry. Do this before SBC.",
+        meaning: "Set the carry.",
     },
     InstructionDoc {
         op: Op::Inc,
@@ -392,6 +392,10 @@ pub const NOTES: &[NoteDoc] = &[
     note(
         Op::Adc(DIRECT),
         "There is no plain add. Use CLC first, then ADC.",
+    ),
+    note(
+        Op::Sbc(DIRECT),
+        "There is no plain subtract. Use CLC first, then SBC.",
     ),
     note(Op::Djnz(0), "With B at 0, DJNZ goes round 256 times."),
     note(
