@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use ld60_calco::datasheet::{INSTRUCTIONS, NOTES, PORTS};
-use ld60_calco::{Addr, Cond, Erratum, Op, Revision};
+use ld60_calco::datasheet::{EXAMPLE, Group, INSTRUCTIONS, NOTES, PORTS};
+use ld60_calco::{Erratum, Op, Revision};
 use ld60_core::parts::paper::Paper;
 use ld60_locale::{Localized, Message};
 
@@ -16,30 +16,18 @@ impl ChipSheet {
         Self { revision }
     }
 
+    /// What the chip has to work with, in plain words.
     pub(super) fn registers(self, page: &mut ChildSpawnerCommands) {
         for (name, text, op) in [
-            (Localized::verbatim("A"), "datasheet-register-a", None),
-            (
-                Localized::verbatim("B"),
-                "datasheet-register-b",
-                Some(Op::LdiB(0)),
-            ),
-            (Localized::verbatim("PC"), "datasheet-register-pc", None),
-            (
-                Localized::verbatim("Z, C"),
-                "datasheet-register-flags",
-                None,
-            ),
-            (
-                Message::new("datasheet-stack").into(),
-                "datasheet-register-stack",
-                Some(Op::Call(0)),
-            ),
+            ("A", "datasheet-register-a", None),
+            ("B", "datasheet-register-b", Some(Op::LdiB(0))),
+            ("M0-MF", "datasheet-cells", None),
+            ("CALL", "datasheet-register-stack", Some(Op::Call(0))),
         ] {
             if op.is_none_or(|op| self.revision.supports(op)) {
                 page.spawn(Paper::row([
-                    (name, 80.0),
-                    (Message::new(text).into(), 464.0),
+                    (Localized::verbatim(name), 90.0),
+                    (Message::new(text).into(), 454.0),
                 ]));
             }
         }
@@ -47,14 +35,10 @@ impl ChipSheet {
 
     /// What the registers hold after a reset.
     pub(super) fn reset(self, page: &mut ChildSpawnerCommands) {
-        let reset = match (
-            self.revision.supports(Op::LdiB(0)),
-            self.revision.supports(Op::Call(0)),
-        ) {
-            (true, true) => "datasheet-reset-b-stack",
-            (true, false) => "datasheet-reset-b",
-            (false, true) => "datasheet-reset-stack",
-            (false, false) => "datasheet-reset",
+        let reset = if self.revision.supports(Op::LdiB(0)) {
+            "datasheet-reset-b"
+        } else {
+            "datasheet-reset"
         };
         page.spawn(Paper::text(Message::new(reset)));
     }
@@ -108,43 +92,33 @@ impl ChipSheet {
         });
     }
 
-    /// The conditions the jumps of the revision can test.
-    pub(super) fn conditions(self, page: &mut ChildSpawnerCommands) {
-        for cond in Cond::ALL
-            .into_iter()
-            .filter(|&cond| self.revision.supports(Op::Jump(cond, 0)))
-        {
-            page.spawn(Paper::row([
-                (Localized::verbatim(format!("{:X}", cond.code())), 40.0),
-                (Localized::verbatim(cond.mnemonic()), 80.0),
-                (Self::condition(cond).into(), 424.0),
-            ]));
-        }
-    }
-
-    /// How to compare before a jump.
-    pub(super) fn compare(self, page: &mut ChildSpawnerCommands) {
-        let compares = if self.revision.supports(Op::Cmp(Addr::Direct(0))) {
-            "datasheet-compare-cmp"
-        } else {
-            "datasheet-compare-cpi"
-        };
-        page.spawn(Paper::faded(Message::new(compares)));
-    }
-
-    /// The notes on what the revision has, under a heading, if there are any.
-    pub(super) fn notes(self, page: &mut ChildSpawnerCommands) {
-        let notes: Vec<_> = NOTES
+    /// The instructions of `group` the revision has, under a heading, each
+    /// with an example and what it does, and its notes under it.
+    pub(super) fn group(self, group: Group, page: &mut ChildSpawnerCommands) {
+        let docs: Vec<_> = INSTRUCTIONS
             .iter()
-            .filter(|note| self.revision.supports(note.op))
+            .filter(|doc| doc.group == group && self.revision.supports(doc.op))
             .collect();
-        if !notes.is_empty() {
-            page.spawn(Paper::heading(Message::new("datasheet-notes")));
+        if docs.is_empty() {
+            return;
         }
-        for note in notes {
-            page.spawn(Paper::text(
-                Message::new("paper-bullet").with("text", note.text),
-            ));
+        page.spawn(Paper::heading(Message::new(Self::heading(group))));
+        for doc in docs {
+            page.spawn(Paper::row([
+                (Localized::verbatim(doc.example), 130.0),
+                (Localized::verbatim(doc.meaning), 414.0),
+            ]));
+            for note in NOTES.iter().filter(|note| note.op == doc.op) {
+                page.spawn(Paper::faded(Localized::verbatim(note.text)));
+            }
+        }
+    }
+
+    /// A few lines of firmware with the instructions at work.
+    pub(super) fn example(self, page: &mut ChildSpawnerCommands) {
+        page.spawn(Paper::heading(Message::new("datasheet-example")));
+        for line in EXAMPLE {
+            page.spawn(Paper::text(Localized::verbatim(*line)));
         }
     }
 
@@ -170,14 +144,15 @@ impl ChipSheet {
         }
     }
 
-    /// When the jump of `cond` is taken.
-    fn condition(cond: Cond) -> Message {
-        Message::new(match cond {
-            Cond::Always => "datasheet-condition-always",
-            Cond::Zero => "datasheet-condition-zero",
-            Cond::NotZero => "datasheet-condition-not-zero",
-            Cond::Carry => "datasheet-condition-carry",
-            Cond::NoCarry => "datasheet-condition-no-carry",
-        })
+    fn heading(group: Group) -> &'static str {
+        match group {
+            Group::Numbers => "datasheet-group-numbers",
+            Group::Keys => "datasheet-group-keys",
+            Group::Jumps => "datasheet-group-jumps",
+            Group::Math => "datasheet-group-math",
+            Group::Routines => "datasheet-group-routines",
+            Group::Loops => "datasheet-group-loops",
+            Group::Lights => "datasheet-group-lights",
+        }
     }
 }

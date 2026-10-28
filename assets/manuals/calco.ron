@@ -6,30 +6,40 @@
             blocks: [
                 Title("datasheet-title"),
                 Faded("datasheet-subtitle"),
-                Heading("datasheet-registers"),
+                Heading("datasheet-has"),
                 Registers,
-                Heading("datasheet-memory"),
-                Text("datasheet-rom"),
-                Text("datasheet-ram"),
                 Reset,
+                Group(Numbers),
+                Group(Keys),
+            ],
+        ),
+        (
+            blocks: [
+                Group(Jumps),
+                Group(Math),
+                Group(Routines),
+            ],
+        ),
+        (
+            blocks: [
+                Group(Loops),
+                Group(Lights),
+                Example,
+            ],
+        ),
+        (
+            blocks: [
+                Heading("datasheet-experts"),
+                Text("datasheet-flags"),
                 Heading("datasheet-ports"),
                 Ports,
             ],
         ),
         (
             blocks: [
-                Heading("datasheet-instructions"),
                 Instructions,
                 Faded("datasheet-flag-legend"),
                 Faded("datasheet-operand-legend"),
-            ],
-        ),
-        (
-            blocks: [
-                Heading("datasheet-conditions"),
-                Conditions,
-                Compare,
-                ChipNotes,
             ],
         ),
     ],

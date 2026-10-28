@@ -3,6 +3,7 @@ use std::{error, fmt};
 
 use bevy::prelude::*;
 use ld60_calco::Revision;
+use ld60_calco::datasheet::Group;
 use ld60_core::parts::paper::{Paper, Press, Stock};
 use ld60_devices::{Board, DeviceKind};
 use ld60_locale::Message;
@@ -103,9 +104,9 @@ pub(super) enum Block {
     Reset,
     Ports,
     Instructions,
-    Conditions,
-    Compare,
-    ChipNotes,
+    /// The instructions for one purpose, in plain words.
+    Group(Group),
+    Example,
     Errata,
 }
 
@@ -245,9 +246,8 @@ impl Block {
             | Self::Reset
             | Self::Ports
             | Self::Instructions
-            | Self::Conditions
-            | Self::Compare
-            | Self::ChipNotes
+            | Self::Group(_)
+            | Self::Example
             | Self::Errata => matches!(place, Place::Chip),
         }
     }
@@ -286,11 +286,10 @@ impl Block {
             (Self::Instructions, Subject::Chip(revision)) => {
                 ChipSheet::new(revision).instructions(page);
             }
-            (Self::Conditions, Subject::Chip(revision)) => {
-                ChipSheet::new(revision).conditions(page);
+            (&Self::Group(group), Subject::Chip(revision)) => {
+                ChipSheet::new(revision).group(group, page);
             }
-            (Self::Compare, Subject::Chip(revision)) => ChipSheet::new(revision).compare(page),
-            (Self::ChipNotes, Subject::Chip(revision)) => ChipSheet::new(revision).notes(page),
+            (Self::Example, Subject::Chip(revision)) => ChipSheet::new(revision).example(page),
             (Self::Errata, Subject::Chip(revision)) => ChipSheet::new(revision).errata(page),
             // `ManualFile::parse` refuses these.
             _ => {}
@@ -354,7 +353,7 @@ mod tests {
             assert_eq!(Entry::Manual(device).pages().len(), 4, "{device:?}");
         }
         for revision in Revision::ALL {
-            assert_eq!(Entry::Chip(revision).pages().len(), 3);
+            assert_eq!(Entry::Chip(revision).pages().len(), 5);
             assert_eq!(Entry::Errata(revision).pages().len(), 1);
         }
     }
