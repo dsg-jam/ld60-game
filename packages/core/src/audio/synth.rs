@@ -1,5 +1,7 @@
 mod beep;
+mod chirp;
 mod city;
+mod coins;
 mod drops;
 mod fasten;
 mod hinge;
