@@ -6,6 +6,7 @@ mod debugger;
 mod dump;
 mod edits;
 mod errors;
+mod explain;
 mod footer;
 mod highlight;
 mod history;
@@ -43,6 +44,7 @@ use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::debugger::DebugPanel;
 use self::dump::{Dump, DumpPage};
+use self::explain::{Explain, HintLine};
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
 use self::listing::Listing;
@@ -100,6 +102,8 @@ impl Plugin for EditorPlugin {
             (
                 Editor::load_job,
                 DumpPage::stream,
+                Explain::update,
+                HintLine::update,
                 Command::show_labels,
                 Command::show_owned,
                 (
@@ -209,6 +213,22 @@ impl Editor {
                 Notes::bundle(font.clone()),
                 VersionsPage::bundle(font.clone()),
                 DebugPanel::bundle(font.clone()),
+                (
+                    HintLine,
+                    Node {
+                        display: Display::None,
+                        ..default()
+                    },
+                    Localized::verbatim(""),
+                    font.clone(),
+                    TextColor(PHOSPHOR)
+                ),
+                (
+                    Explain,
+                    Localized::verbatim(""),
+                    font.clone(),
+                    TextColor(PHOSPHOR_DIM)
+                ),
                 (
                     Status,
                     Localized::verbatim(""),

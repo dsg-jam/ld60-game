@@ -15,7 +15,7 @@ use super::page::Page;
 use super::trace::TraceView;
 use crate::device::{Connected, Emulator};
 use crate::workshop::job::Job;
-use crate::workshop::run::{ComputerTool, Run as ShopRun};
+use crate::workshop::run::{ComputerTool, Origin, Run as ShopRun};
 
 /// A command in the footer below the editor.
 ///
@@ -83,12 +83,21 @@ impl Command {
     }
 
     /// Whether the command can run: [`Command::Dump`] until the source is in
-    /// the editor, then the others whose tool the shop has.
-    pub(super) fn available(self, shop: &ShopRun, dump: Dump) -> bool {
+    /// the editor, then the others whose tool the shop has. The test bench
+    /// is lent for the jobs of the tutorial.
+    pub(super) fn available(self, shop: &ShopRun, dump: Dump, lesson: bool) -> bool {
         if self == Self::Dump {
             return dump != Dump::Source;
         }
-        dump == Dump::Source && self.tool().is_none_or(|tool| shop.has(tool))
+        dump == Dump::Source
+            && self
+                .tool()
+                .is_none_or(|tool| shop.has(tool) || (lesson && tool == ComputerTool::TestBench))
+    }
+
+    /// Whether the job is one of the tutorial.
+    fn lesson(job: Option<&Job>) -> bool {
+        job.is_some_and(|job| matches!(job.origin, Origin::Lesson { .. }))
     }
 
     /// The label of [`Command::Trace`] says whether the trace is on, and the
@@ -127,13 +136,16 @@ impl Command {
     pub(super) fn show_owned(
         shop: Res<ShopRun>,
         dump: Res<Dump>,
+        job: Option<Res<Job>>,
         mut labels: Query<(Ref<Command>, &mut Node)>,
     ) {
+        let job_changed = job.as_ref().is_some_and(Res::is_changed);
+        let lesson = Self::lesson(job.as_deref());
         for (command, mut node) in &mut labels {
-            if !shop.is_changed() && !dump.is_changed() && !command.is_added() {
+            if !shop.is_changed() && !dump.is_changed() && !job_changed && !command.is_added() {
                 continue;
             }
-            let display = if command.available(&shop, *dump) {
+            let display = if command.available(&shop, *dump, lesson) {
                 Display::Flex
             } else {
                 Display::None
@@ -149,14 +161,16 @@ impl Command {
         pages: Query<(), With<Page>>,
         shop: Res<ShopRun>,
         dump: Res<Dump>,
+        job: Option<Res<Job>>,
         mut commands: Commands,
     ) {
+        let lesson = Self::lesson(job.as_deref());
         if !pages.contains(input.focused_entity) {
             return;
         }
         let Some(command) = Self::ALL
             .into_iter()
-            .filter(|&command| command.available(&shop, *dump))
+            .filter(|&command| command.available(&shop, *dump, lesson))
             .find(|command| command.key() == input.input.key_code)
         else {
             return;

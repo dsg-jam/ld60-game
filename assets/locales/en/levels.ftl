@@ -2,34 +2,40 @@
 # the job, like 6A.
 
 tally2-t1 =
+    .hint = LDI A, 5 puts 5 in A, and ST M2 shows A on the right digit.
     .customer = Grell, soup kitchen
     .complaint = Every morning it starts at 05. I had no guests yet!
     .remark-first-thinking = Still has its first thinking, version 0.1.
 
 tally2-t2 =
+    .hint = Each key press runs the lines from count down to JMP once.
     .customer = Ploof, seat finder
     .complaint = My counter says 40 guests. We have 20 chairs.
     .remark-works-fine = Both buttons and the little window work fine.
     .remark-first-thinking = Still has its first thinking, version 0.2.
 
 tally2-t3 =
+    .hint = JMP start goes back to start, and the lines there set the display to 00.
     .customer = Mott, ferry ramp
     .complaint = I press and press. It stays at 00.
     .remark-first-thinking = Still has its first thinking, version 0.3.
 
 tally2-t4 =
+    .hint = Look up the code of the C key in the Tally-2 manual.
     .customer = Drob, door guard
     .complaint = C should clear it. It counts one more instead.
     .remark-tingle = C button poked with the tingle stick. Tingles fine.
     .remark-first-thinking = Still has its first thinking, version 0.4.
 
 tally2-t5 =
+    .hint = Job 4 had the two lines that check for the C key.
     .customer = Vee, lantern shop
     .complaint = The C key counts like +. It should set it back to 00.
     .remark-tingle = C button poked with the tingle stick. Tingles fine.
     .remark-first-thinking = Still has its first thinking, version 0.5.
 
 tally2-t6 =
+    .hint = After CPI 11, JC jumps if A is lower than 11. A digit only goes up to 9.
     .customer = Hubb, bridge toll
     .complaint = After 09 it shows an angry squiggle. Then it says 10.
     .remark-first-thinking = Still has its first thinking, version 0.6.
@@ -47,6 +53,7 @@ tally2-02 =
     .remark-first-thinking = Still has its first thinking, version 1.0.
 
 tally2-03 =
+    .hint = The right digit already does this. Copy its check for the left one.
     .customer = Hubb, bridge toll
     .complaint = Busy day. After 99 carts the left number turned into an angry squiggle.
     .remark-line-tests = Passes every factory test on the checklist.
