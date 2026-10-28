@@ -50,6 +50,10 @@ pub enum Sound {
     LampOff,
     /// A customer paid for a repair.
     Chime,
+    /// A coin dropping into the till as it counts up.
+    Coin,
+    /// The printer having news, before it prints a receipt.
+    Chirp,
     /// The rubber stamp hitting the ticket, or a device put down hard.
     Thunk,
     /// The service bell for the customer.
@@ -114,10 +118,12 @@ pub enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 24] = [
+    const ALL: [Self; 26] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
+        Self::Coin,
+        Self::Chirp,
         Self::Thunk,
         Self::Ding,
         Self::Detent,
@@ -155,6 +161,7 @@ impl Sound {
         match self {
             Self::LampOn
             | Self::LampOff
+            | Self::Coin
             | Self::Detent
             | Self::Ratchet
             | Self::Latch
@@ -180,7 +187,7 @@ impl Sound {
             | Self::PuddleRain
             | Self::AwningRain
             | Self::RoofRain => 2,
-            Self::Chime | Self::Thunk | Self::Ding | Self::Refuse => 1,
+            Self::Chime | Self::Chirp | Self::Thunk | Self::Ding | Self::Refuse => 1,
         }
     }
 
@@ -189,6 +196,8 @@ impl Sound {
             Self::LampOn => Samples::lamp_switch(take, true),
             Self::LampOff => Samples::lamp_switch(take, false),
             Self::Chime => Samples::chime(),
+            Self::Coin => Samples::coin(take),
+            Self::Chirp => Samples::chirp(),
             Self::Thunk => Samples::thunk(),
             Self::Ding => Samples::ding(),
             Self::Detent => Samples::detent(take),
@@ -225,6 +234,8 @@ impl Sound {
         match self {
             Self::LampOn | Self::LampOff => 0.22,
             Self::Chime => 0.4,
+            Self::Coin => 0.25,
+            Self::Chirp => 0.3,
             Self::Thunk => 0.6,
             Self::Ding => 0.45,
             Self::Detent => 0.5,
