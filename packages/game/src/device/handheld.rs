@@ -337,6 +337,7 @@ impl Handheld {
     fn on_add(
         add: On<Add<Handheld>>,
         units: Query<&Handheld>,
+        mut holdables: Query<&mut Holdable>,
         mut commands: Commands,
         mut images: ResMut<Assets<Image>>,
         mut meshes: ResMut<Assets<Mesh>>,
@@ -373,6 +374,9 @@ impl Handheld {
         let shell = Block::new(model.body_size.with_y(model.body_size.y - COVER))
             .translated(Vec3::Y * COVER);
         let height = model.body_size.y + STYLE.key_size.y;
+        if let Ok(mut holdable) = holdables.get_mut(add.entity) {
+            holdable.pivot = Vec3::Y * height / 2.0;
+        }
         let plate = Block::new(shell.size.with_y(COVER));
         let screws: Vec<_> = model
             .casing

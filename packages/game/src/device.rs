@@ -125,6 +125,9 @@ pub(crate) struct Holdable {
     rest: Transform,
     /// Rotation applied by dragging, in camera space.
     spin: Quat,
+    /// The middle of the device in its own space. It turns around this
+    /// point and stays put when it is turned over.
+    pivot: Vec3,
 }
 
 impl Holdable {
@@ -162,8 +165,8 @@ impl Holdable {
         let center = self.held_center();
         let towards = (seat.translation - center).normalize() + Vec3::Y * TILT_UP;
         let facing = Transform::from_translation(center + towards).looking_at(center, Vec3::Y);
-        let face_up = Quat::from_rotation_x(FRAC_PI_2);
-        Transform::from_translation(center).with_rotation(facing.rotation * self.spin * face_up)
+        let rotation = facing.rotation * self.spin * Quat::from_rotation_x(FRAC_PI_2);
+        Transform::from_translation(center - rotation * self.pivot).with_rotation(rotation)
     }
 
     /// Where it rests on the counter.
@@ -179,7 +182,7 @@ impl Holdable {
     }
 
     fn held_center(&self) -> Vec3 {
-        self.rest.translation + Vec3::Y * LIFT
+        self.rest.transform_point(self.pivot) + Vec3::Y * LIFT
     }
 
     /// The player leans in from the seat to look at the held device.
@@ -299,5 +302,29 @@ impl DeviceButton {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_held_device_turns_around_its_middle_and_stays_put_when_turned_over() {
+        let height = 0.03;
+        let mut holdable = Holdable {
+            rest: Transform::from_xyz(0.1, 1.0, -0.2).with_rotation(Quat::from_rotation_y(0.4)),
+            spin: Quat::IDENTITY,
+            pivot: Vec3::Y * height / 2.0,
+        };
+        let seat = Transform::from_xyz(0.0, 1.4, 0.5);
+        let middle = holdable.held_center();
+        for turn in 0..8 {
+            holdable.spin = Quat::from_euler(EulerRot::XYZ, turn as f32, turn as f32 * 0.7, 0.3);
+            let pose = holdable.held_pose(seat);
+            assert!(pose.transform_point(holdable.pivot).distance(middle) < 1e-5);
+        }
+        holdable.turn_over(height);
+        assert!(holdable.held_center().distance(middle) < 1e-5);
     }
 }
