@@ -1,30 +1,42 @@
 mod bench;
+mod drone;
 mod error;
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use bevy::prelude::*;
+use bevy::{platform::hash::fixed_hash_one, prelude::*};
 use ld60_core::layout::counter::CounterLayout;
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::player::focus::Focus;
 use ld60_devices::{DeviceKind, Rom};
 use ld60_levels::{Difficulty, Generated, Level, LevelSource, Measure, Variant};
 use ld60_machine::Isa;
 
 pub(crate) use self::bench::Bench;
+pub(super) use self::drone::Flight;
+use self::drone::{Drone, Tether};
 pub(crate) use self::error::JobError;
 use super::chore::{Busy, Chore};
 use super::levels::Levels;
 use super::pickup::{Complaint, Payment, Pickup, TRIES};
+use super::printer::Printing;
 use super::receipt::Receipt;
 use super::regulars::Visit;
 use super::run::{Origin, Run};
 use super::ticket::JobTicket;
-use crate::device::{Emulator, Handheld};
+use super::tutorial::{FirstNote, TutorialNote};
+use crate::device::{Carried, Emulator, Handheld};
 
 pub(super) const DEVICE_SPOT: Vec2 = Vec2::new(0.03, 0.3);
 pub(super) const DEVICE_YAW: f32 = 0.15;
 pub(super) const TICKET_SPOT: Vec2 = Vec2::new(-0.85, 0.5);
 pub(super) const TICKET_YAW: f32 = 0.12;
+/// Seconds from the drone setting a device down, or leaving, until the next
+/// sheet prints.
+const AFTER_LANDING: f32 = 0.4;
+/// Seconds from the drone leaving with a job until it brings the next.
+const NEXT_JOB: f32 = 0.8;
 
 pub(crate) struct JobPlugin;
 
@@ -32,16 +44,22 @@ impl Plugin for JobPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            Job::follow_levels.run_if(resource_exists_and_changed::<Levels>),
+            (
+                Job::follow_levels.run_if(resource_exists_and_changed::<Levels>),
+                (Flight::fly, Tether::follow).chain(),
+                Drone::spin,
+                Job::deliver_first.run_if(resource_exists::<FirstDelivery>),
+            ),
         )
-        .add_observer(HandIn::pick_up);
+        .add_observer(HandIn::pick_up)
+        .add_observer(Drone::on_add);
     }
 }
 
 /// The repair job on the bench.
 ///
-/// A job is done in three steps: flash new firmware, stamp the ticket, then
-/// ring the bell to hand it in. The customer tests the device at pickup. If
+/// A job is done in two steps: flash new firmware, then ring the bell. The
+/// stamp stamps the ticket and the customer picks the device up. The customer tests the device at pickup. If
 /// it fails, they hand it back and the steps start over.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {
@@ -68,6 +86,23 @@ pub(crate) struct Job {
 /// the same level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct JobId(u32);
+
+/// The device and ticket of the first job of a run. They come once the
+/// player sat down and read the first note.
+#[derive(Resource, Debug)]
+struct FirstDelivery {
+    device: Entity,
+    ticket: Entity,
+}
+
+/// A job item the drone may carry: where it rests, if anywhere, and whether
+/// it is the ticket.
+type Carryable<'a> = (Entity, Option<&'a Transform>, Has<JobTicket>);
+
+/// The items of the next job come in with the drone after this many seconds,
+/// instead of being on the counter at once.
+#[derive(Resource, Debug)]
+struct Arrive(f32);
 
 /// The device, ticket and notes of the current [`Job`]. They leave the desk
 /// when the customer takes the device home.
@@ -261,22 +296,96 @@ impl Job {
         }
     }
 
-    fn spawn_items(job: Option<Res<Job>>, mut commands: Commands) {
+    /// Puts the device and the ticket of the job on the counter. After a
+    /// pickup they come in, see [`Arrive`].
+    fn spawn_items(
+        job: Option<Res<Job>>,
+        arrive: Option<Res<Arrive>>,
+        run: Res<Run>,
+        mut commands: Commands,
+    ) {
         let Some(job) = job else {
             return;
         };
         let counter = CounterLayout::new();
-        commands.spawn((
-            Name::new("device"),
-            JobItem,
-            Handheld::for_job(&job.level, &job.buggy),
+        let items = [
+            commands
+                .spawn((
+                    Name::new("device"),
+                    JobItem,
+                    Handheld::for_job(&job.level, &job.buggy),
+                    counter.place(DEVICE_SPOT, DEVICE_YAW),
+                ))
+                .id(),
+            commands
+                .spawn((
+                    Name::new("job ticket"),
+                    JobItem,
+                    JobTicket::new(&job.level, job.visit),
+                    counter.place(TICKET_SPOT, TICKET_YAW),
+                ))
+                .id(),
+        ];
+        // A new run starts with an empty counter.
+        let first = TutorialNote::for_job(&job)
+            .is_some_and(|note| note.0 == 0 && !run.notes().contains(&0));
+        if first {
+            let [device, ticket] = items;
+            commands
+                .entity(device)
+                .insert((Carried, Visibility::Hidden));
+            commands.entity(ticket).insert(Visibility::Hidden);
+            commands.insert_resource(FirstDelivery { device, ticket });
+            return;
+        }
+        // The drone brings the device, then the ticket comes out of the
+        // printer.
+        if let Some(arrive) = arrive {
+            commands.remove_resource::<Arrive>();
+            let [device, ticket] = items;
+            let rest = counter.place(DEVICE_SPOT, DEVICE_YAW);
+            let (flight, landed) = Flight::bring(job.customer(), device, rest, arrive.0);
+            flight.spawn(job.customer(), &mut commands);
+            commands.entity(device).insert(Carried);
+            commands.entity(ticket).insert(Printing::ticket(
+                counter.place(TICKET_SPOT, TICKET_YAW),
+                landed + AFTER_LANDING,
+            ));
+        }
+    }
+}
+
+impl Job {
+    /// Sends the first job once the player is back at the desk from the
+    /// first note.
+    fn deliver_first(
+        delivery: Res<FirstDelivery>,
+        job: Res<Job>,
+        first_note: Option<Res<FirstNote>>,
+        state: Res<State<Focus>>,
+        camera: Single<(&PlayerCamera, &Transform)>,
+        mut tickets: Query<&mut Visibility, With<JobTicket>>,
+        mut commands: Commands,
+    ) {
+        let (camera, at) = *camera;
+        if first_note.is_some() || *state.get() != Focus::Desk || !camera.seated(at) {
+            return;
+        }
+        commands.remove_resource::<FirstDelivery>();
+        let counter = CounterLayout::new();
+        let (flight, landed) = Flight::bring(
+            job.customer(),
+            delivery.device,
             counter.place(DEVICE_SPOT, DEVICE_YAW),
-        ));
-        commands.spawn((
-            Name::new("job ticket"),
-            JobItem,
-            JobTicket::new(&job.level, job.visit),
+            NEXT_JOB,
+        );
+        flight.spawn(job.customer(), &mut commands);
+        if let Ok(mut shown) = tickets.get_mut(delivery.ticket) {
+            *shown = Visibility::Inherited;
+        }
+        commands.entity(delivery.ticket).insert(Printing::ticket(
             counter.place(TICKET_SPOT, TICKET_YAW),
+            landed + AFTER_LANDING,
         ));
     }
 }
@@ -285,7 +394,7 @@ impl HandIn {
     fn pick_up(
         _: On<HandIn>,
         job: Option<ResMut<Job>>,
-        items: Query<Entity, With<JobItem>>,
+        items: Query<Carryable, With<JobItem>>,
         emulators: Query<&Emulator, With<JobItem>>,
         receipts: Query<Entity, With<Receipt>>,
         mut run: ResMut<Run>,
@@ -301,24 +410,61 @@ impl HandIn {
         let pickup = job.pick_up(tried);
         run.settle(&job, &pickup);
         let ends_job = pickup.ends_job();
-        Receipt::new(&job.level, pickup, run.till()).hand_out(receipts, &mut commands);
+        let receipt = Receipt::new(&job.level, pickup, run.till());
         let chore = if ends_job {
             Chore::HandIn
         } else {
             Chore::Return
         };
         commands.trigger(Busy(chore));
+        // The drone takes the ticket and the device to the customer.
+        let mut carried: Vec<_> = items
+            .iter()
+            .filter_map(|(item, rest, ticket)| Some((item, *rest?, ticket)))
+            .collect();
         if !ends_job {
+            // They try it and send it back.
+            let back = carried
+                .iter()
+                .find(|(.., ticket)| !ticket)
+                .map(|&(device, rest, _)| {
+                    let (flight, landed) = Flight::try_out(job.customer(), device, rest);
+                    flight.spawn(job.customer(), &mut commands);
+                    landed
+                });
+            receipt.hand_out(receipts, back.unwrap_or(0.0) + AFTER_LANDING, &mut commands);
             return;
         }
-        for item in &items {
-            commands.entity(item).despawn();
+        // Items that are nowhere go at once.
+        for (item, rest, _) in &items {
+            if rest.is_none() {
+                commands.entity(item).despawn();
+            }
         }
+        // The ticket first, it lies on the way.
+        carried.sort_by_key(|&(.., ticket)| !ticket);
+        for &(item, ..) in &carried {
+            commands.entity(item).remove::<JobItem>();
+        }
+        let take = Flight::take(job.customer(), &carried);
+        let gone = take.duration();
+        take.spawn(job.customer(), &mut commands);
+        receipt.hand_out(receipts, gone + AFTER_LANDING, &mut commands);
+        commands.insert_resource(Arrive(gone + NEXT_JOB));
         commands.run_system_cached(Job::start);
     }
 }
 
 impl Job {
+    /// Stands for the customer, so each has their own drone. A regular
+    /// keeps theirs.
+    fn customer(&self) -> u64 {
+        match self.visit {
+            Some(visit) => fixed_hash_one(visit.regular),
+            None => fixed_hash_one(&self.level.id),
+        }
+    }
+
     /// The job number of the generated job `number` for `device`, like
     /// `tally2-005`. Three digits keep it apart from the special jobs.
     fn generated_id(device: DeviceKind, number: u32) -> String {
