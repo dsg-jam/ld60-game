@@ -1,0 +1,20 @@
+(
+    id: "summa6-i3",
+    title: "Two at a time",
+    device: Summa6,
+    boards: [A],
+    keep_layout: true,
+    before_line_tests: true,
+    chip: Calco((revision: B, date_code: 7630)),
+    unit: "00258",
+    remarks: ["first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "", display: "000000"),
+        (keys: "+", display: "000001"),
+        (keys: "+++", display: "000003"),
+        (keys: "++++++++++++", display: "000012"),
+    ],
+    reward: 7,
+    firmware: Some((source: "summa6/intro-0.3.fw", switches: ["set-carry"])),
+)
