@@ -247,7 +247,7 @@ impl Sound {
             Self::Refuse => 0.12,
             Self::ScrewOut | Self::ScrewIn => 0.7,
             Self::PlugIn | Self::PlugOut => 0.35,
-            Self::CoverOff | Self::CoverOn => 0.35,
+            Self::CoverOff | Self::CoverOn => 0.55,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,
