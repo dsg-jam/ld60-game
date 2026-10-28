@@ -9,11 +9,11 @@ use ld60_locale::{Localized, Message};
 
 use super::Editor;
 use super::breakpoints::Breakpoints;
+use super::dump::Dump;
 use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
 use crate::device::{Connected, Emulator};
-use crate::workshop::chore::{Busy, Chore};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
 
@@ -24,6 +24,9 @@ use crate::workshop::run::{ComputerTool, Run as ShopRun};
 /// The commands of a [`ComputerTool`] only show once the shop owns it.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Command {
+    /// Reads the firmware off the device, then disassembles it, see
+    /// [`Dump`].
+    Dump,
     Notes,
     Versions,
     Test,
@@ -40,7 +43,8 @@ pub(super) enum Command {
 pub(super) struct Status;
 
 impl Command {
-    pub(super) const ALL: [Self; 9] = [
+    pub(super) const ALL: [Self; 10] = [
+        Self::Dump,
         Self::Notes,
         Self::Versions,
         Self::Test,
@@ -60,6 +64,7 @@ impl Command {
             Self::Assemble => KeyCode::F5,
             Self::Flash => KeyCode::F6,
             Self::Trace => KeyCode::F7,
+            Self::Dump => KeyCode::F8,
             Self::Break => KeyCode::F9,
             Self::Step => KeyCode::F10,
             Self::Go => KeyCode::F11,
@@ -73,18 +78,25 @@ impl Command {
             Self::Trace => Some(ComputerTool::Trace),
             Self::Break => Some(ComputerTool::Breakpoints),
             Self::Step | Self::Go => Some(ComputerTool::Debugger),
-            Self::Notes | Self::Versions | Self::Assemble | Self::Flash => None,
+            Self::Dump | Self::Notes | Self::Versions | Self::Assemble | Self::Flash => None,
         }
     }
 
-    /// Whether the shop has what the command needs.
-    pub(super) fn available(self, shop: &ShopRun) -> bool {
-        self.tool().is_none_or(|tool| shop.has(tool))
+    /// Whether the command can run: [`Command::Dump`] until the source is in
+    /// the editor, then the others whose tool the shop has.
+    pub(super) fn available(self, shop: &ShopRun, dump: Dump) -> bool {
+        if self == Self::Dump {
+            return dump != Dump::Source;
+        }
+        dump == Dump::Source && self.tool().is_none_or(|tool| shop.has(tool))
     }
 
-    /// The label of [`Command::Trace`] says whether the trace is on.
-    pub(super) fn label(self, trace: bool) -> Message {
+    /// The label of [`Command::Trace`] says whether the trace is on, and the
+    /// one of [`Command::Dump`] what it does next.
+    pub(super) fn label(self, trace: bool, dump: Dump) -> Message {
         Message::new(match self {
+            Self::Dump if dump == Dump::Empty => "editor-command-dump",
+            Self::Dump => "editor-command-disassemble",
             Self::Notes => "editor-command-notes",
             Self::Versions => "editor-command-versions",
             Self::Test => "editor-command-test",
@@ -101,22 +113,27 @@ impl Command {
     /// Labels new commands and follows the settings they show.
     pub(super) fn show_labels(
         trace: Res<TraceView>,
+        dump: Res<Dump>,
         mut labels: Query<(Ref<Command>, &mut Localized)>,
     ) {
         for (command, mut label) in &mut labels {
-            if trace.is_changed() || command.is_added() {
-                label.set_if_neq(command.label(trace.0).into());
+            if trace.is_changed() || dump.is_changed() || command.is_added() {
+                label.set_if_neq(command.label(trace.0, *dump).into());
             }
         }
     }
 
     /// Shows the commands of the tools the shop owns.
-    pub(super) fn show_owned(shop: Res<ShopRun>, mut labels: Query<(Ref<Command>, &mut Node)>) {
+    pub(super) fn show_owned(
+        shop: Res<ShopRun>,
+        dump: Res<Dump>,
+        mut labels: Query<(Ref<Command>, &mut Node)>,
+    ) {
         for (command, mut node) in &mut labels {
-            if !shop.is_changed() && !command.is_added() {
+            if !shop.is_changed() && !dump.is_changed() && !command.is_added() {
                 continue;
             }
-            let display = if command.available(&shop) {
+            let display = if command.available(&shop, *dump) {
                 Display::Flex
             } else {
                 Display::None
@@ -131,6 +148,7 @@ impl Command {
         mut input: On<FocusedInput<KeyboardInput>>,
         pages: Query<(), With<Page>>,
         shop: Res<ShopRun>,
+        dump: Res<Dump>,
         mut commands: Commands,
     ) {
         if !pages.contains(input.focused_entity) {
@@ -138,7 +156,7 @@ impl Command {
         }
         let Some(command) = Self::ALL
             .into_iter()
-            .filter(|&command| command.available(&shop))
+            .filter(|&command| command.available(&shop, *dump))
             .find(|command| command.key() == input.input.key_code)
         else {
             return;
@@ -193,7 +211,8 @@ impl Run {
         let source = editor.value().to_string();
         let message = match (run.0, job) {
             (
-                Command::Notes
+                Command::Dump
+                | Command::Notes
                 | Command::Versions
                 | Command::Test
                 | Command::Trace
@@ -246,7 +265,6 @@ impl Run {
         emulator.set_breakpoints(addresses);
         emulator.restart(device);
         commands.trigger(Flashed(source.into()));
-        commands.trigger(Busy(Chore::Flash));
         if !job.flashed {
             job.flashed = true;
         }
@@ -260,6 +278,7 @@ mod tests {
     use ld60_locale::Locale;
 
     use super::*;
+    use crate::workshop::computer::editor::page::ActivePage;
     use crate::workshop::computer::editor::undo::Undo;
     use crate::workshop::levels::Levels;
 
@@ -298,6 +317,8 @@ mod tests {
         ];
 
         let mut world = World::new();
+        world.init_resource::<Dump>();
+        world.init_resource::<ActivePage>();
         world.spawn((Editor, EditableText::default(), Undo::default()));
         let line = world.spawn((Status, Localized::verbatim(""))).id();
         let load_job = world.register_system(Editor::load_job);
@@ -315,9 +336,10 @@ mod tests {
 
     #[test]
     fn every_label_formats() {
-        let labels = Command::ALL
-            .into_iter()
-            .flat_map(|command| [true, false].map(|trace| command.label(trace)));
+        let labels = Command::ALL.into_iter().flat_map(|command| {
+            [(true, Dump::Empty), (false, Dump::Bits)]
+                .map(|(trace, dump)| command.label(trace, dump))
+        });
         Locale::on_disk().assert_formats(labels);
     }
 
@@ -325,6 +347,7 @@ mod tests {
     fn shows_only_the_commands_of_owned_tools() {
         let mut world = World::new();
         world.init_resource::<ShopRun>();
+        world.init_resource::<Dump>();
         let labels: Vec<_> = Command::ALL
             .into_iter()
             .map(|command| world.spawn((command, Node::default())).id())
@@ -338,9 +361,13 @@ mod tests {
                 .collect()
         };
         world.run_system(show).unwrap();
+        assert_eq!(shown(&world), [Command::Dump]);
+        world.insert_resource(Dump::Source);
+        world.run_system(show).unwrap();
         assert!(shown(&world).iter().all(|command| command.tool().is_none()));
+        assert!(!shown(&world).contains(&Command::Dump));
         world.insert_resource(ShopRun::with_all_tools());
         world.run_system(show).unwrap();
-        assert_eq!(shown(&world), Command::ALL);
+        assert_eq!(shown(&world), &Command::ALL[1..]);
     }
 }

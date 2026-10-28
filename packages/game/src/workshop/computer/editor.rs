@@ -3,6 +3,7 @@ mod breakpoints;
 mod chip_title;
 mod clicks;
 mod debugger;
+mod dump;
 mod edits;
 mod errors;
 mod footer;
@@ -41,11 +42,12 @@ use self::breakpoints::Breakpoints;
 use self::chip_title::ChipTitle;
 use self::clicks::Clicks;
 use self::debugger::DebugPanel;
+use self::dump::{Dump, DumpPage};
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
 use self::listing::Listing;
 use self::notes::Notes;
-use self::page::{Page, PageTitle};
+use self::page::{ActivePage, Page, PageTitle};
 use self::shades::Shades;
 use self::trace::TraceView;
 use self::undo::Undo;
@@ -88,6 +90,7 @@ impl Plugin for EditorPlugin {
                 Highlight::place.after(UiSystems::PostLayout),
             ),
         )
+        .init_resource::<Dump>()
         .init_resource::<Listing>()
         .init_resource::<Breakpoints>()
         .init_resource::<TraceView>()
@@ -96,6 +99,7 @@ impl Plugin for EditorPlugin {
             Update,
             (
                 Editor::load_job,
+                DumpPage::stream,
                 Command::show_labels,
                 Command::show_owned,
                 (
@@ -117,6 +121,7 @@ impl Plugin for EditorPlugin {
         .add_observer(Command::run_on_click)
         .add_observer(Command::keep_editor_focus)
         .add_observer(Run::apply)
+        .add_observer(DumpPage::run_on_command)
         .add_observer(Verdict::run_on_command)
         .add_observer(DebugPanel::run_on_command)
         .add_observer(Breakpoints::toggle_on_run)
@@ -200,6 +205,7 @@ impl Editor {
                     Undo::default(),
                     children![Highlight::bundle(font.clone())],
                 ),
+                DumpPage::bundle(font.clone()),
                 Notes::bundle(font.clone()),
                 VersionsPage::bundle(font.clone()),
                 DebugPanel::bundle(font.clone()),
@@ -235,12 +241,15 @@ impl Editor {
         ));
     }
 
-    /// Puts the firmware of a new job into the editor.
+    /// Empties the editor for a new job. Its firmware comes off the device,
+    /// see [`DumpPage`].
     fn load_job(
         job: Option<Res<Job>>,
         mut loaded: Local<Option<JobId>>,
         editor: Single<(&mut EditableText, &mut Undo), With<Editor>>,
         mut status: Single<&mut Localized, With<Status>>,
+        mut dump: ResMut<Dump>,
+        mut active: ResMut<ActivePage>,
     ) {
         let id = job.as_ref().map(|job| job.id);
         if id == *loaded {
@@ -250,13 +259,12 @@ impl Editor {
         let (mut text, mut undo) = editor.into_inner();
         text.clear();
         text.viewport.offset.y = 0.0;
-        match job {
-            Some(job) => {
-                undo.replace(&mut text, &job.buggy);
-                **status = Localized::verbatim("");
-            }
-            None => **status = Message::new("editor-no-more-jobs").into(),
-        }
+        *dump = Dump::Empty;
+        active.0 = Page::Dump;
+        **status = match job {
+            Some(_) => Localized::verbatim(""),
+            None => Message::new("editor-no-more-jobs").into(),
+        };
         undo.reset();
     }
 

@@ -1,7 +1,10 @@
 editor-title-source = FIRMWARE EDITOR
+editor-title-dump = FIRMWARE DUMP
 editor-title-notes = NOTES
 editor-title-versions = FIRMWARE VERSIONS
 
+editor-command-dump = F8 DUMP FIRMWARE
+editor-command-disassemble = F8 DISASSEMBLE
 editor-command-notes = F2 NOTES
 editor-command-versions = F3 VERSIONS
 editor-command-assemble = F5 ASSEMBLE
@@ -16,6 +19,9 @@ editor-assembled =
        *[other] ASSEMBLED, { $bytes } BYTES
     }
 editor-flashed = FLASHED. DEVICE RESTARTED.
+editor-dump-empty = No firmware read yet. Plug the debug cable into the device and press F8.
+editor-dumped = READ { $words } WORDS OFF THE DEVICE. F8 TO DISASSEMBLE.
+editor-disassembled = DISASSEMBLED. FIX IT, THEN F6 TO FLASH.
 
 editor-assembly-failed = ASSEMBLY FAILED
 editor-asm-error = line { $line }: { $message }
