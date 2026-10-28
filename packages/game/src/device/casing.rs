@@ -25,10 +25,11 @@ use super::{Connected, Holdable, Turned};
 pub(super) const WALL: f32 = 0.0015;
 /// Thickness of the back cover, a wall like the others.
 pub(super) const COVER: f32 = WALL;
-/// The posts the screws go through, from the front down to the board and
-/// from the board to the cover.
+/// The posts the board sits on, from the front down to the board. The
+/// screws go through the cover and the board into them.
 const BOSS: f32 = 0.0026;
-const SPACER: f32 = 0.0022;
+/// The hole in the end of a post that takes a screw.
+const PILOT: Vec3 = Vec3::new(0.0018, 0.0002, 0.0018);
 const SCREW: Vec3 = Vec3::new(0.0055, 0.0014, 0.0055);
 const SHANK: Vec3 = Vec3::new(0.0022, 0.008, 0.0022);
 /// The empty hole of a screw that is out.
@@ -225,7 +226,7 @@ impl Casing {
     }
 
     /// Spawns the cover with `sticker` on it into `device`, below `shell`,
-    /// and the board of `layout` with `face` and its parts under the cover.
+    /// and the board of `layout` with `faces` and its parts under the cover.
     /// Returns the casing of a device `height` tall.
     #[expect(clippy::too_many_arguments, reason = "the parts of a casing")]
     pub(super) fn spawn(
@@ -235,7 +236,7 @@ impl Casing {
         spots: &CasingSpots,
         sticker: impl Bundle,
         layout: &BoardLayout,
-        face: impl Bundle,
+        faces: [impl Bundle; 2],
         height: f32,
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
@@ -276,18 +277,20 @@ impl Casing {
                 2.0 * BOSS,
             ))
             .translated(hole.with_y(top));
-            let bottom = layout.board.min().y;
-            let spacer = Block::new(Vec3::new(2.0 * SPACER, bottom - COVER, 2.0 * SPACER))
-                .translated(hole.with_y(COVER));
+            let pilot = Block::new(PILOT).translated(hole.with_y(top - PILOT.y / 2.0));
             device.spawn((Shape::cylinder(&boss, color), Finish::Plastic));
-            device.spawn((Shape::cylinder(&spacer, color), Finish::Plastic));
+            device.spawn((Shape::cylinder(&pilot, HOLE_DARK), Finish::Plastic));
         }
-        device.spawn((
-            Board,
-            Shape::cuboid(&layout.board, BoardLayout::edge()),
-            Finish::Plastic,
-        ));
-        device.spawn((Board, face));
+        for edge in layout.edges() {
+            device.spawn((
+                Board,
+                Shape::cuboid(&edge, BoardLayout::edge()),
+                Finish::Plastic,
+            ));
+        }
+        for face in faces {
+            device.spawn((Board, face));
+        }
         device
             .spawn((
                 Header,

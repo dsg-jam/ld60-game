@@ -18,7 +18,7 @@ import ld60_geometry::bump::bumped;
 const MASK: vec3<f32> = vec3<f32>(0.04, 0.3, 0.1);
 /// Copper seen through the mask: the mask's green over a warm, darker metal.
 const MASK_OVER_COPPER: vec3<f32> = vec3<f32>(0.2, 0.5, 0.08);
-/// Bare glass fiber board, where a hole goes through.
+/// Bare glass fiber board, at the edge of a hole.
 const LAMINATE: vec3<f32> = vec3<f32>(0.32, 0.29, 0.16);
 /// Tinned copper of the open pads.
 const SOLDER: vec3<f32> = vec3<f32>(0.85, 0.84, 0.8);
@@ -35,6 +35,10 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let open = mask.g;
     let silk = mask.b;
     let covered = 1.0 - open;
+    // Bare board with no copper only shows where a hole goes through.
+    if open > 0.5 && copper < 0.5 {
+        discard;
+    }
 
     let under_mask = mix(MASK, MASK_OVER_COPPER, copper);
     let bare = mix(LAMINATE, SOLDER, copper);
