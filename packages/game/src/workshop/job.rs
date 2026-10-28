@@ -14,8 +14,8 @@ use ld60_levels::{Difficulty, Generated, Level, LevelSource, Measure, Variant};
 use ld60_machine::Isa;
 
 pub(crate) use self::bench::Bench;
-pub(super) use self::drone::Flight;
-use self::drone::{Drone, Tether};
+use self::drone::Tether;
+pub(super) use self::drone::{Drone, Flight};
 pub(crate) use self::error::JobError;
 use super::chore::{Busy, Chore};
 use super::levels::Levels;

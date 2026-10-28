@@ -388,7 +388,7 @@ impl Flight {
                             offset: item_at.translation - transform.translation,
                             stowing: stow.then_some(0.0),
                         });
-                        commands.entity(item).insert(Carried);
+                        commands.entity(item).try_insert(Carried);
                     }
                     flight.elapsed = 0.0;
                     flight.steps.pop_front();
@@ -403,14 +403,14 @@ impl Flight {
                     if let Ok((mut item_at, _)) = items.get_mut(item) {
                         *item_at = rest;
                     }
-                    commands.entity(item).remove::<Carried>();
+                    commands.entity(item).try_remove::<Carried>();
                     commands.trigger(Play(Sound::Thunk));
                     flight.elapsed = 0.0;
                     flight.steps.pop_front();
                 }
                 None => {
                     for cargo in &flight.carried {
-                        commands.entity(cargo.item).despawn();
+                        commands.entity(cargo.item).try_despawn();
                     }
                     commands.entity(drone).despawn();
                     continue;

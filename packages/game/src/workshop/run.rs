@@ -17,7 +17,7 @@ pub(crate) use self::demand::Demand;
 use self::per_device::PerDevice;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
-use super::job::{Job, JobItem};
+use super::job::{Drone, Job, JobItem};
 use super::manuals::Pins;
 use super::pickup::Pickup;
 use super::receipt::Receipt;
@@ -42,6 +42,7 @@ const SAME_BOARDS: usize = 2;
 /// What is left on the counter when the shop closes.
 type Leftovers = Or<(
     With<JobItem>,
+    With<Drone>,
     With<Receipt>,
     With<RentNote>,
     With<SalvageCrate>,
