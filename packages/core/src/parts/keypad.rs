@@ -31,6 +31,8 @@ pub struct KeyDef<K> {
     key: K,
     bindings: &'static [KeyBinding],
     width: f32,
+    /// Leaves the space empty instead of placing a key.
+    gap: bool,
 }
 
 /// A keyboard key that presses a [`PressableKey`].
@@ -76,6 +78,18 @@ impl<K> KeyDef<K> {
             key,
             bindings,
             width,
+            gap: false,
+        }
+    }
+
+    /// Empty space as wide as `width` keys. `key` is never used.
+    pub const fn gap(key: K, width: f32) -> Self {
+        Self {
+            label: "",
+            key,
+            bindings: &[],
+            width,
+            gap: true,
         }
     }
 
@@ -167,6 +181,10 @@ impl<K: Copy> Keypad<K> {
             // Left edge of the current key, in units from the left of the area.
             let mut left = (max_units - units) / 2.0;
             for def in *defs {
+                if def.gap {
+                    left += def.width;
+                    continue;
+                }
                 let span = Vec2::new(def.width, 1.0) * style.pitch;
                 let size = style
                     .key_size

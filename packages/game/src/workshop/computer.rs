@@ -35,7 +35,7 @@ const DUST_MOTES: usize = 70;
 const DUST_SEED: u64 = 13;
 
 /// Space between the front of the monitor and the back of the keyboard.
-const KEYBOARD_GAP: f32 = 0.06;
+const KEYBOARD_GAP: f32 = 0.04;
 /// How much of the keyboard the wide view shows, from the back. The rest
 /// would leave less of the window to the screen.
 const KEYBOARD_SHOWN: f32 = 0.6;
