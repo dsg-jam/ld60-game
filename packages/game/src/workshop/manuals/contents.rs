@@ -154,7 +154,18 @@ impl Entry {
                 });
                 boards.chain(laid(file, Subject::Device(device))).collect()
             }
-            Self::Chip(revision) => laid(layouts.datasheet(), Subject::Chip(revision)).collect(),
+            Self::Chip(revision) => {
+                let file = layouts.datasheet();
+                file.pages()
+                    .iter()
+                    .filter(|layout| layout.shows(revision))
+                    .map(|layout| Page::Laid {
+                        file,
+                        layout,
+                        subject: Subject::Chip(revision),
+                    })
+                    .collect()
+            }
             Self::Errata(revision) => laid(layouts.errata(), Subject::Chip(revision)).collect(),
             Self::Note(note) => vec![Page::Note(note)],
         }

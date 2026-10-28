@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_calco::datasheet::{EXAMPLE, Group, INSTRUCTIONS, NOTES, PORTS};
+use ld60_calco::datasheet::{Group, INSTRUCTIONS, InstructionDoc, NOTES, PORTS};
 use ld60_calco::{Erratum, Op, Revision};
 use ld60_core::parts::paper::Paper;
 use ld60_locale::{Localized, Message};
@@ -94,11 +94,13 @@ impl ChipSheet {
 
     /// The instructions of `group` the revision has, under a heading, each
     /// with an example and what it does, and its notes under it.
+    /// Whether the chip has any instruction of `group`.
+    pub(super) fn has(self, group: Group) -> bool {
+        self.docs(group).next().is_some()
+    }
+
     pub(super) fn group(self, group: Group, page: &mut ChildSpawnerCommands) {
-        let docs: Vec<_> = INSTRUCTIONS
-            .iter()
-            .filter(|doc| doc.group == group && self.revision.supports(doc.op))
-            .collect();
+        let docs: Vec<_> = self.docs(group).collect();
         if docs.is_empty() {
             return;
         }
@@ -114,12 +116,10 @@ impl ChipSheet {
         }
     }
 
-    /// A few lines of firmware with the instructions at work.
-    pub(super) fn example(self, page: &mut ChildSpawnerCommands) {
-        page.spawn(Paper::heading(Message::new("datasheet-example")));
-        for line in EXAMPLE {
-            page.spawn(Paper::text(Localized::verbatim(*line)));
-        }
+    fn docs(self, group: Group) -> impl Iterator<Item = &'static InstructionDoc> {
+        INSTRUCTIONS
+            .iter()
+            .filter(move |doc| doc.group == Some(group) && self.revision.supports(doc.op))
     }
 
     /// The known bugs of the revision.
