@@ -22,10 +22,8 @@ use ld60_core::parts::paper::{
     Wrinkles,
 };
 use ld60_core::parts::screen::{ScreenSurface, UiCanvas};
-use ld60_core::player::camera::PlayerCamera;
 use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
-use ld60_core::state::AppState;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::Message;
 
@@ -42,7 +40,7 @@ use self::stack::Stack;
 use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
-use super::tutorial::{FirstNote, TutorialNote};
+use super::tutorial::TutorialNote;
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;
@@ -80,13 +78,6 @@ impl Plugin for ManualsPlugin {
                 )
                     .chain()
                     .after(Leaf::animate),
-            )
-            .add_systems(
-                Update,
-                ShopManuals::open_first_note
-                    .run_if(resource_exists::<FirstNote>)
-                    .run_if(in_state(Focus::Desk))
-                    .run_if(in_state(AppState::Playing)),
             );
     }
 }
@@ -357,23 +348,6 @@ impl ShopManuals {
                 .and_then(|number| filed.in_file.from(number))
         }) {
             paper.open_page(page);
-        }
-    }
-
-    /// Opens the file at the first note once the player sits at the bench,
-    /// so the camera does not swing to it on its way in from the street.
-    fn open_first_note(
-        camera: Single<(&PlayerCamera, &Transform)>,
-        files: Query<Entity, With<ShopManuals>>,
-        mut commands: Commands,
-    ) {
-        let (camera, at) = *camera;
-        if !camera.seated(at) {
-            return;
-        }
-        commands.remove_resource::<FirstNote>();
-        for file in &files {
-            commands.trigger(FocusOn { entity: file });
         }
     }
 

@@ -36,6 +36,11 @@ impl Sheet {
         Self { entry, page }
     }
 
+    /// The page of the tutorial note `note`.
+    pub(crate) fn note(note: TutorialNote) -> Self {
+        Self::new(Entry::Note(note), 0)
+    }
+
     pub(super) fn entry(self) -> Entry {
         self.entry
     }

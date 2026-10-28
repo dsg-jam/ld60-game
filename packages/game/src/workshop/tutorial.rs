@@ -4,6 +4,7 @@ use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
 use super::job::Job;
+use super::manuals::Sheet;
 use super::run::{Origin, Run};
 
 /// The paragraphs of each note, as attributes of its message.
@@ -33,8 +34,8 @@ impl Plugin for TutorialPlugin {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct TutorialNote(pub(crate) usize);
 
-/// The first note was just filed. The manuals file opens at it once the
-/// player sits at the bench, as if it was left open there for them.
+/// The first note was just pinned to the monitor. The player looks at it
+/// once they sit at the bench, as if it was left there for them.
 #[derive(Resource, Debug)]
 pub(crate) struct FirstNote;
 
@@ -99,7 +100,10 @@ impl TutorialNote {
             return;
         }
         run.file_note(note.0);
+        // Pinned at the monitor, the first note also shows how pinning
+        // works.
         if note.0 == 0 {
+            run.pins_mut().pin(Sheet::note(note));
             commands.insert_resource(FirstNote);
         }
     }
@@ -151,6 +155,9 @@ mod tests {
             world.remove_resource::<FirstNote>();
         }
         assert_eq!(world.resource::<Run>().notes(), [0, 1]);
+        let pins = world.resource::<Run>().pins();
+        assert!(pins.contains(Sheet::note(TutorialNote(0))));
+        assert!(!pins.contains(Sheet::note(TutorialNote(1))));
         world.insert_resource(lesson(0));
         world.run_system_cached(TutorialNote::file_for_job).unwrap();
         assert!(!world.contains_resource::<FirstNote>());
