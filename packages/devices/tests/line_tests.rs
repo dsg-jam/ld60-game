@@ -1,5 +1,6 @@
 use ld60_devices::{DeviceKind, LineTest};
 
+const TALLY1_DOC: &str = include_str!("../../../docs/devices/tally1.md");
 const TALLY2_DOC: &str = include_str!("../../../docs/devices/tally2.md");
 const SUMMA6_DOC: &str = include_str!("../../../docs/devices/summa6.md");
 const LOCK4_DOC: &str = include_str!("../../../docs/devices/lock4.md");
@@ -29,6 +30,7 @@ fn docs_list_the_line_tests() {
         (DeviceKind::Summa6, SUMMA6_DOC),
         (DeviceKind::Lock4, LOCK4_DOC),
         (DeviceKind::Score5, SCORE5_DOC),
+        (DeviceKind::Tally1, TALLY1_DOC),
     ] {
         let expected: Vec<_> = kind
             .line_tests()

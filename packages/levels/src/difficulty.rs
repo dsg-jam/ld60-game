@@ -135,6 +135,7 @@ impl Difficulty {
     /// growing after 10 jobs.
     pub fn reward(&self, bugs: usize) -> u32 {
         let base = match self.device {
+            DeviceKind::Tally1 => 4,
             DeviceKind::Tally2 => 6,
             DeviceKind::Summa6 => 10,
             DeviceKind::Lock4 => 14,

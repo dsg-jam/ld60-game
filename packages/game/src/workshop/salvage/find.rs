@@ -25,7 +25,7 @@ pub(crate) enum Find {
 impl Find {
     /// Everything the trader can ever find.
     pub(crate) fn all() -> impl Iterator<Item = Self> {
-        let devices = DeviceKind::ALL.into_iter().map(Self::Device);
+        let devices = DeviceKind::SERVICED.into_iter().map(Self::Device);
         let tools = ComputerTool::ALL.into_iter().map(Self::Tool);
         let errata = Revision::ALL
             .into_iter()
@@ -54,6 +54,7 @@ impl Find {
 
     pub(crate) const fn price(self) -> u32 {
         match self {
+            Self::Device(DeviceKind::Tally1) => 8,
             Self::Device(DeviceKind::Tally2) => 12,
             Self::Device(DeviceKind::Summa6) => 20,
             Self::Device(DeviceKind::Lock4) => 36,
@@ -71,6 +72,7 @@ impl Find {
     /// What the trader thinks it is, as written on its tag.
     pub(crate) fn guess(self) -> Message {
         Message::new(match self {
+            Self::Device(DeviceKind::Tally1) => "salvage-guess-tally1",
             Self::Device(DeviceKind::Tally2) => "salvage-guess-tally2",
             Self::Device(DeviceKind::Summa6) => "salvage-guess-summa6",
             Self::Device(DeviceKind::Lock4) => "salvage-guess-lock4",

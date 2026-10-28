@@ -1,6 +1,7 @@
 service-footer = DSG ELECTRONICS  { $device }
 service-title = { $device }  BOARD { $board }
 
+service-summary-tally1 = 1-digit tally counter. Service sheet for board { $board }.
 service-summary-tally2 = 2-digit tally counter. Service sheet for board { $board }.
 service-summary-summa6 = 6-digit adding machine. Service sheet for board { $board }.
 service-summary-lock4 = Door lock with a 4-digit code. Service sheet for board { $board }.

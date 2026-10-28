@@ -134,7 +134,7 @@ fn display_comment_names_the_board_cells() {
             let variant = Variant::with_board(source, 5, board).unwrap();
             let first = *variant.level.board().display_cells().start();
             for firmware in [&variant.buggy, &variant.fixed] {
-                let text = if source.path.starts_with("tally2") {
+                let text = if source.path.starts_with("tally") {
                     "count"
                 } else {
                     "display"

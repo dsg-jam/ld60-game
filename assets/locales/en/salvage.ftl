@@ -1,5 +1,6 @@
 # The scrap trader's crate. The trader names human things by guessing.
 
+salvage-guess-tally1 = A yellow box that counts to nine and forgets
 salvage-guess-tally2 = A red box that counts with one finger
 salvage-guess-summa6 = A box with sixteen teeth that eats numbers
 salvage-guess-lock4 = A box that keeps a door shut until you tell it a secret

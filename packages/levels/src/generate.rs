@@ -67,6 +67,7 @@ impl Reference {
             DeviceKind::Summa6 => "summa6/firmware.fw",
             DeviceKind::Lock4 => "lock4/firmware.fw",
             DeviceKind::Score5 => "score5/firmware.fw",
+            DeviceKind::Tally1 => "tally1/firmware.fw",
         }
     }
 
@@ -76,7 +77,7 @@ impl Reference {
     /// around the `DS` errata, so it works on every date code.
     pub fn fixes(device: DeviceKind) -> &'static [&'static str] {
         match device {
-            DeviceKind::Tally2 | DeviceKind::Lock4 | DeviceKind::Score5 => &[],
+            DeviceKind::Tally1 | DeviceKind::Tally2 | DeviceKind::Lock4 | DeviceKind::Score5 => &[],
             DeviceKind::Summa6 => &["negative", "ds-errata"],
         }
     }
@@ -87,7 +88,7 @@ impl Reference {
     /// have. The Lock4 also needs `CMP` from Rev C.
     pub fn revisions(device: DeviceKind) -> &'static [Revision] {
         match device {
-            DeviceKind::Tally2 => &Revision::ALL,
+            DeviceKind::Tally1 | DeviceKind::Tally2 => &Revision::ALL,
             DeviceKind::Summa6 | DeviceKind::Score5 => &[Revision::B, Revision::C],
             DeviceKind::Lock4 => &[Revision::C],
         }

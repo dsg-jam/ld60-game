@@ -71,6 +71,13 @@ const SUMMA6_ROWS: &[&[KeyDef<char>]] = &[
     ],
 ];
 
+const TALLY1_ROWS: &[&[KeyDef<char>]] = &[&[KeyDef::wide(
+    "+",
+    '+',
+    &[Typed("+"), Named(Key::Space)],
+    2.0,
+)]];
+
 const TALLY2_ROWS: &[&[KeyDef<char>]] = &[&[
     KeyDef::unit("C", 'C', &[Typed("c"), Typed("C"), Named(Key::Delete)]),
     KeyDef::wide("+", '+', &[Typed("+"), Named(Key::Space)], 2.0),
@@ -208,6 +215,22 @@ const TALLY2: Model = Model {
     words: false,
 };
 
+const TALLY1: Model = Model {
+    body_size: Vec3::new(0.055, 0.02, 0.07),
+    body: Color::srgb_u8(0xb8, 0x8c, 0x2c),
+    lcd_width: 0.018,
+    window_spot: Vec2::new(0.0, -0.45),
+    rows: TALLY1_ROWS,
+    keypad_spot: Vec2::new(0.0, 0.45),
+    sticker_size: Vec2::new(0.045, 0.026),
+    sticker_spot: Vec2::ZERO,
+    casing: CasingSpots {
+        screws: &[Vec2::new(-0.8, -0.8), Vec2::new(0.8, 0.8)],
+        header: Vec2::new(0.0, -0.1),
+    },
+    words: false,
+};
+
 /// Shape and keys of one device kind.
 pub(super) struct Model {
     body_size: Vec3,
@@ -234,6 +257,7 @@ impl Model {
             DeviceKind::Summa6 => &SUMMA6,
             DeviceKind::Lock4 => &LOCK4,
             DeviceKind::Score5 => &SCORE5,
+            DeviceKind::Tally1 => &TALLY1,
         }
     }
 

@@ -30,6 +30,7 @@ const FILES: Files = Files {
         layout_file!("summa6"),
         layout_file!("lock4"),
         layout_file!("score5"),
+        layout_file!("tally1"),
     ],
     datasheet: layout_file!("calco"),
     errata: layout_file!("errata"),
@@ -154,9 +155,9 @@ impl Layouts {
 
     fn parse() -> Result<Self, LayoutError> {
         let manuals = FILES.manuals.map(|file| ManualFile::parse(file, true));
-        let [tally2, summa6, lock4, score5] = manuals;
+        let [tally2, summa6, lock4, score5, tally1] = manuals;
         Ok(Self {
-            manuals: [tally2?, summa6?, lock4?, score5?],
+            manuals: [tally2?, summa6?, lock4?, score5?, tally1?],
             datasheet: ManualFile::parse(FILES.datasheet, false)?,
             errata: ManualFile::parse(FILES.errata, false)?,
         })

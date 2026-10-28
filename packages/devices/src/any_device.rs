@@ -28,6 +28,30 @@ const DIGIT_KEYS: [(char, u8); 10] = [
     ('9', 0x09),
 ];
 
+const TALLY1_BOARDS: [Board; 3] = [
+    Board {
+        kind: DeviceKind::Tally1,
+        rev: BoardRev::A,
+        display: 2,
+        keys: &[('+', 0x0A)],
+        annunciators: &[],
+    },
+    Board {
+        kind: DeviceKind::Tally1,
+        rev: BoardRev::B,
+        display: 5,
+        keys: &[('+', 0x0B)],
+        annunciators: &[],
+    },
+    Board {
+        kind: DeviceKind::Tally1,
+        rev: BoardRev::C,
+        display: 1,
+        keys: &[('+', 0x01)],
+        annunciators: &[],
+    },
+];
+
 const TALLY2_BOARDS: [Board; 3] = [
     Board {
         kind: DeviceKind::Tally2,
@@ -147,10 +171,20 @@ pub enum DeviceKind {
     Lock4,
     /// Scoreboard with two 2-digit scores and the period between them.
     Score5,
+    /// 1-digit tally counter that only appears in the tutorial.
+    Tally1,
 }
 
 impl DeviceKind {
-    pub const ALL: [Self; 4] = [Self::Tally2, Self::Summa6, Self::Lock4, Self::Score5];
+    pub const ALL: [Self; 5] = [
+        Self::Tally2,
+        Self::Summa6,
+        Self::Lock4,
+        Self::Score5,
+        Self::Tally1,
+    ];
+    /// The models that customers bring outside the tutorial.
+    pub const SERVICED: [Self; 4] = [Self::Tally2, Self::Summa6, Self::Lock4, Self::Score5];
 
     pub fn board(self, rev: BoardRev) -> &'static Board {
         &self.boards()[rev as usize]
@@ -163,6 +197,7 @@ impl DeviceKind {
             Self::Summa6 => "6",
             Self::Lock4 => "4",
             Self::Score5 => "5",
+            Self::Tally1 => "1",
         }
     }
 
@@ -173,6 +208,7 @@ impl DeviceKind {
             Self::Summa6 => &SUMMA6_BOARDS,
             Self::Lock4 => &LOCK4_BOARDS,
             Self::Score5 => &SCORE5_BOARDS,
+            Self::Tally1 => &TALLY1_BOARDS,
         }
     }
 
@@ -182,12 +218,15 @@ impl DeviceKind {
             Self::Summa6 => 6,
             Self::Lock4 => 4,
             Self::Score5 => 5,
+            Self::Tally1 => 1,
         }
     }
 
     pub fn isa(self) -> IsaKind {
         match self {
-            Self::Tally2 | Self::Summa6 | Self::Lock4 | Self::Score5 => IsaKind::Calco,
+            Self::Tally1 | Self::Tally2 | Self::Summa6 | Self::Lock4 | Self::Score5 => {
+                IsaKind::Calco
+            }
         }
     }
 }

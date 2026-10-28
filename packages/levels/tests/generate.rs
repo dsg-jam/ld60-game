@@ -431,7 +431,7 @@ fn needs_many_attempts_for_three_bugs() {
 
 #[test]
 fn compiles_for_every_supported_chip() {
-    for device in DeviceKind::ALL {
+    for device in DeviceKind::SERVICED {
         let difficulty = Difficulty::for_job(12, device);
         for &revision in Reference::revisions(device) {
             for date_code in [DateCode::new(76, 12), DateCode::new(76, 30)] {
@@ -460,11 +460,12 @@ fn fails_to_compile_for_other_chips() {
 
 #[test]
 fn first_jobs_show_bugs_with_few_keys_on_the_newest_chip() {
-    for device in DeviceKind::ALL {
+    for device in DeviceKind::SERVICED {
         let difficulty = Difficulty::for_job(0, device);
         let ChipSpec::Calco(chip) = difficulty.chip();
         assert_eq!(Some(&chip.revision), Reference::revisions(device).last());
         let references = match device {
+            DeviceKind::Tally1 => unreachable!("the Tally 1 gets no generated jobs"),
             DeviceKind::Tally2 => &TALLY2,
             DeviceKind::Summa6 => &SUMMA6,
             DeviceKind::Lock4 => &LOCK4,
@@ -496,7 +497,7 @@ fn first_jobs_show_bugs_with_few_keys_on_the_newest_chip() {
 
 #[test]
 fn later_jobs_are_harder_and_pay_more() {
-    for device in DeviceKind::ALL {
+    for device in DeviceKind::SERVICED {
         let jobs: Vec<Difficulty> = (0..40)
             .map(|job| Difficulty::for_job(job, device))
             .collect();
@@ -526,7 +527,7 @@ fn later_jobs_are_harder_and_pay_more() {
 
 #[test]
 fn the_bonus_stops_growing() {
-    for device in DeviceKind::ALL {
+    for device in DeviceKind::SERVICED {
         let tenth = Difficulty::for_job(10, device);
         let late = Difficulty::for_job(39, device);
         assert_eq!(tenth.reward(1), late.reward(1));
