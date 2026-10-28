@@ -87,8 +87,6 @@ impl DebugMethods for App {
     }
 }
 
-/// `ld60.state` returns the game state, the focus, whether the window has
-/// focus and the cursor grab mode.
 /// `ld60.where { "name": "bell" }` returns where in the world each entity
 /// whose name contains `name` is, by name. Without a name, every named
 /// entity.
@@ -109,6 +107,8 @@ fn place(In(params): In<Option<Value>>, entities: Query<(&Name, &GlobalTransform
     Ok(places.into())
 }
 
+/// `ld60.state` returns the game state, the focus, whether the window has
+/// focus and the cursor grab mode.
 fn state(
     In(_): In<Option<Value>>,
     app_state: Res<State<AppState>>,
