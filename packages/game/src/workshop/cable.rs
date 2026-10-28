@@ -1,10 +1,13 @@
+mod rope;
+
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{math::Affine3A, prelude::*};
+use bevy::{camera::visibility::NoFrustumCulling, math::Affine3A, prelude::*};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::COMPUTER_SPOT;
 use ld60_geometry::block::Block;
 
+use self::rope::{Rope, RopeMaterial, RopePlugin};
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
 use super::manuals::{Pose, ShopManuals};
@@ -56,7 +59,8 @@ pub(super) struct CablePlugin;
 
 impl Plugin for CablePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, Cable::spawn)
+        app.add_plugins(RopePlugin)
+            .add_systems(Startup, Cable::spawn)
             .add_systems(Update, Cable::follow);
     }
 }
@@ -99,10 +103,6 @@ struct Plug {
     rest: Transform,
 }
 
-/// One straight piece of the [`Cable`], counted from the computer.
-#[derive(Component, Debug)]
-struct Segment(usize);
-
 /// Where the cable ends at the plug, the way it leaves the plug, and the
 /// box of the device it is plugged into.
 #[derive(Clone, Copy, Debug)]
@@ -142,6 +142,7 @@ impl Cable {
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
+        mut ropes: ResMut<Assets<RopeMaterial>>,
     ) {
         let counter = CounterLayout::new();
         let rest = counter.place(PLUG_SPOT, PLUG_YAW);
@@ -191,27 +192,18 @@ impl Cable {
         };
         let exit = rest.rotation * Vec3::Z;
         cable.lay(rest.translation + exit * (PLUG.z / 2.0));
-        // Each piece is a little longer than its stretch, so the bends close.
-        let mesh = meshes.add(Cylinder::new(0.5, 1.0));
-        let material = materials.add(CABLE_GRAY);
-        commands
-            .spawn((
-                Name::new("debug cable"),
-                cable,
-                Transform::IDENTITY,
-                Visibility::Inherited,
-            ))
-            .with_children(|cable| {
-                for index in 0..POINTS - 1 {
-                    cable.spawn((
-                        Segment(index),
-                        Mesh3d(mesh.clone()),
-                        MeshMaterial3d(material.clone()),
-                        Transform::default(),
-                        Pickable::IGNORE,
-                    ));
-                }
-            });
+        let material = ropes.add(Rope::material(CABLE_GRAY, RADIUS, &cable.points));
+        // The shader moves the tube far from the bounds of its mesh.
+        commands.spawn((
+            Name::new("debug cable"),
+            cable,
+            Mesh3d(meshes.add(Rope::mesh())),
+            MeshMaterial3d(material),
+            Transform::IDENTITY,
+            Visibility::Inherited,
+            NoFrustumCulling,
+            Pickable::IGNORE,
+        ));
     }
 
     /// Puts the plug on the header of the plugged in device, or back on the
@@ -219,11 +211,12 @@ impl Cable {
     fn follow(
         headers: Query<(&GlobalTransform, &ChildOf), With<Header>>,
         plugged: Query<(&GlobalTransform, &Casing), With<Connected>>,
-        mut cable: Single<&mut Cable>,
+        cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
-        mut plug: Single<(&Plug, &mut Transform), Without<Segment>>,
-        mut segments: Query<(&Segment, &mut Transform), Without<Plug>>,
+        mut plug: Single<(&Plug, &mut Transform)>,
+        mut ropes: ResMut<Assets<RopeMaterial>>,
     ) {
+        let (mut cable, material) = cable.into_inner();
         let header = headers
             .iter()
             .find(|(_, parent)| plugged.contains(parent.parent()));
@@ -254,19 +247,8 @@ impl Cable {
         if !cable.frame(&ends) {
             return;
         }
-        for (segment, mut transform) in &mut segments {
-            let (from, to) = (cable.points[segment.0], cable.points[segment.0 + 1]);
-            let along = to - from;
-            *transform = Transform::from_translation((from + to) / 2.0)
-                .with_rotation(Quat::from_rotation_arc(
-                    Vec3::Y,
-                    along.normalize_or(Vec3::Y),
-                ))
-                .with_scale(Vec3::new(
-                    2.0 * RADIUS,
-                    along.length() + RADIUS,
-                    2.0 * RADIUS,
-                ));
+        if let Some(mut rope) = ropes.get_mut(material) {
+            rope.extension.follow(&cable.points);
         }
     }
 
@@ -288,7 +270,12 @@ impl Cable {
     /// not moved. Returns whether it moved.
     fn frame(&mut self, ends: &Ends) -> bool {
         let wanted = Self::length_for(self.socket, ends.end);
+        // Something the cable lies on or around moving wakes it too.
+        let same_solids = self
+            .last
+            .is_some_and(|last| last.device == ends.device && last.file == ends.file);
         if wanted == self.length
+            && same_solids
             && self
                 .asleep
                 .is_some_and(|end| end.distance(ends.end) < SLEEP)
@@ -298,9 +285,11 @@ impl Cable {
         self.length += (wanted - self.length).clamp(-REEL * FRAME, REEL * FRAME);
         let before = self.points.clone();
         let from = self.last.unwrap_or(*ends);
+        let mut previous = from;
         for substep in 1..=SUBSTEPS {
             let between = from.towards(ends, substep as f32 / SUBSTEPS as f32);
-            self.step(FRAME / SUBSTEPS as f32, &between);
+            self.step(FRAME / SUBSTEPS as f32, &between, &previous);
+            previous = between;
         }
         self.last = Some(*ends);
         let moved = before
@@ -317,8 +306,8 @@ impl Cable {
         socket.distance(end) * SLACK + EXTRA
     }
 
-    /// One small step of `dt` seconds.
-    fn step(&mut self, dt: f32, ends: &Ends) {
+    /// One small step of `dt` seconds, from the ends `before` to `ends`.
+    fn step(&mut self, dt: f32, ends: &Ends, before: &Ends) {
         let last = POINTS - 1;
         let spacing = self.length / last as f32;
         let free = 3..last - 2;
@@ -353,8 +342,20 @@ impl Cable {
                 [weight(index - 1), weight(index), weight(index + 1)],
             );
         }
+        // The middle of each piece too, so a piece cannot cut through a thin
+        // thing between its points.
+        for index in 2..last - 2 {
+            let (a, b) = (self.points[index], self.points[index + 1]);
+            let middle = (a + b) / 2.0;
+            let came_from = (self.previous[index] + self.previous[index + 1]) / 2.0;
+            let push = self.keep_out(middle, came_from, ends, before) - middle;
+            let (a, b) = (weight(index), weight(index + 1));
+            self.points[index] += push * 2.0 * a / (a + b);
+            self.points[index + 1] += push * 2.0 * b / (a + b);
+        }
         for index in free {
-            let mut point = self.keep_out(self.points[index], ends);
+            let mut point = self.keep_out(self.points[index], self.previous[index], ends, before);
+            point = point.with_y(point.y.max(self.floor_at(point)));
             if point.y <= self.floor_at(point) + 1e-5 {
                 let previous = &mut self.previous[index];
                 let slide = (point - *previous).with_y(0.0);
@@ -402,29 +403,63 @@ impl Cable {
         self.points[index + 1] += normal * lambda * c;
     }
 
-    /// `point`, moved out of the device and the computer, and onto the
-    /// counter.
-    fn keep_out(&self, point: Vec3, ends: &Ends) -> Vec3 {
-        let mut point = point;
-        let moving = ends.device.iter().chain(&ends.file);
-        for (transform, block) in moving.chain(&self.solids) {
-            point = Self::around(point, *transform, block);
-        }
-        point.with_y(point.y.max(self.floor_at(point)))
+    /// `point`, moved out of the device and the computer. It was at
+    /// `came_from` when the ends were `before`.
+    fn keep_out(&self, point: Vec3, came_from: Vec3, ends: &Ends, before: &Ends) -> Vec3 {
+        let moving = |now: Option<(Affine3A, Block)>, then: Option<(Affine3A, Block)>| {
+            now.map(|(transform, block)| {
+                (transform, then.map_or(transform, |(then, _)| then), block)
+            })
+        };
+        let solids = self
+            .solids
+            .iter()
+            .map(|&(transform, block)| (transform, transform, block));
+        moving(ends.device, before.device)
+            .into_iter()
+            .chain(moving(ends.file, before.file))
+            .chain(solids)
+            .fold(point, |point, (now, then, block)| {
+                let came_from = now.transform_point3(then.inverse().transform_point3(came_from));
+                self.around(point, came_from, now, &block)
+            })
     }
 
-    /// `point`, moved out of `bounds` of a thing at `transform` through the
-    /// nearest side, if it is inside.
-    fn around(point: Vec3, transform: Affine3A, bounds: &Block) -> Vec3 {
-        let local = transform.inverse().transform_point3(point) - bounds.center;
-        let room = bounds.size / 2.0 + RADIUS - local.abs();
+    /// `point`, moved out of `bounds` of a thing at `transform` if it is
+    /// inside. It leaves through the side it came in by from `came_from`,
+    /// or through the nearest side above the counter if it was inside
+    /// already.
+    fn around(&self, point: Vec3, came_from: Vec3, transform: Affine3A, bounds: &Block) -> Vec3 {
+        let inverse = transform.inverse();
+        let half = bounds.size / 2.0 + RADIUS;
+        let local = inverse.transform_point3(point) - bounds.center;
+        let room = half - local.abs();
         if room.min_element() <= 0.0 {
             return point;
         }
-        let mut moved = local;
-        let axis = room.min_position();
-        moved[axis] += room[axis] * local[axis].signum();
-        transform.transform_point3(moved + bounds.center)
+        let through = |axis: usize, side: f32| {
+            let mut moved = local;
+            moved[axis] = half[axis] * side.signum();
+            transform.transform_point3(moved + bounds.center)
+        };
+        let was = inverse.transform_point3(came_from) - bounds.center;
+        let out = was.abs() - half;
+        if out.max_element() > 0.0 {
+            let axis = out.max_position();
+            return through(axis, was[axis]);
+        }
+        (0..3)
+            .flat_map(|axis| [(axis, -1.0), (axis, 1.0)])
+            .map(|(axis, side)| (half[axis] - side * local[axis], through(axis, side)))
+            .filter(|(_, moved)| moved.y >= self.floor_at(*moved) - 1e-4)
+            .min_by(|(a, _), (b, _)| a.total_cmp(b))
+            .map_or_else(
+                || {
+                    let axis = room.min_position();
+                    through(axis, local[axis])
+                },
+                |(_, moved)| moved,
+            )
     }
 
     /// The lowest the middle of the cable gets at `point`: on the mat where
@@ -515,13 +550,107 @@ mod tests {
         }
     }
 
+    /// Whether a point or the middle of a piece of `cable` is inside `bounds`
+    /// at `transform`.
+    fn inside(cable: &Cable, transform: Affine3A, bounds: &Block) -> Option<Vec3> {
+        let middles = cable
+            .points
+            .windows(2)
+            .map(|pair| (pair[0] + pair[1]) / 2.0);
+        cable.points[3..POINTS - 3]
+            .iter()
+            .copied()
+            .chain(middles.skip(3).take(POINTS - 7))
+            .find(|point| {
+                let local = transform.inverse().transform_point3(*point) - bounds.center;
+                (local.abs() - bounds.size / 2.0).max_element() < 0.0
+            })
+    }
+
+    #[test]
+    fn plugging_in_keeps_the_cable_out_of_the_device_at_any_yaw() {
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        let rest = Ends {
+            end: Vec3::new(-0.4, 1.01, 0.1),
+            exit: Vec3::X,
+            device: None,
+            file: None,
+        };
+        for step in 0..12 {
+            let yaw = Quat::from_rotation_y(step as f32 * 0.55);
+            let transform = Affine3A::from_rotation_translation(yaw, Vec3::new(-0.25, 1.014, 0.05));
+            let end = transform.transform_point3(Vec3::new(0.0, 0.01 + 0.008, 0.02));
+            let plugged = Ends {
+                end,
+                exit: Vec3::Y,
+                device: Some((transform, bounds)),
+                file: None,
+            };
+            let mut cable = cable(rest.end);
+            settle(&mut cable, &rest);
+            for frame in 0..600 {
+                cable.frame(&plugged);
+                if let Some(point) = inside(&cable, transform, &bounds) {
+                    panic!("yaw {step}, frame {frame}: {point}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn turning_the_device_fast_keeps_the_cable_out_of_it() {
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        let center = Vec3::new(-0.25, 1.25, 0.15);
+        let at = |angle: f32| {
+            let turn = Quat::from_euler(EulerRot::XYZ, angle, angle * 1.7, angle * 0.6);
+            let transform = Affine3A::from_rotation_translation(turn, center);
+            let exit = turn * Vec3::NEG_Y;
+            Ends {
+                end: transform.transform_point3(bounds.center.with_y(-0.01)) + exit * 0.008,
+                exit,
+                device: Some((transform, bounds)),
+                file: None,
+            }
+        };
+        let mut cable = cable(at(0.0).end);
+        settle(&mut cable, &at(0.0));
+        for frame in 1..240 {
+            let ends = at(frame as f32 * 0.15);
+            cable.frame(&ends);
+            let (transform, _) = ends.device.unwrap();
+            if let Some(point) = inside(&cable, transform, &bounds) {
+                panic!("frame {frame}: {point}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_resting_cable_moves_out_of_a_file_opened_under_it() {
+        let mut ends = Ends {
+            end: Vec3::new(-0.4, 1.01, 0.1),
+            exit: Vec3::X,
+            device: None,
+            file: None,
+        };
+        let mut cable = cable(ends.end);
+        settle(&mut cable, &ends);
+        assert!(cable.asleep.is_some());
+        let file = Block::new(Vec3::new(0.2, 0.012, 0.1));
+        let transform = Affine3A::from_translation(Vec3::new(-0.2, 1.0, 0.05));
+        ends.file = Some((transform, file));
+        settle(&mut cable, &ends);
+        assert_eq!(inside(&cable, transform, &file), None);
+    }
+
     #[test]
     fn a_point_inside_moves_out_the_nearest_side() {
         let bounds = Block::new(Vec3::new(0.1, 0.02, 0.1));
         let transform = Affine3A::from_translation(Vec3::new(1.0, 2.0, 3.0));
-        let moved = Cable::around(Vec3::new(1.0, 2.018, 3.0), transform, &bounds);
+        let inside = Vec3::new(1.0, 2.018, 3.0);
+        let cable = cable(Vec3::ZERO);
+        let moved = cable.around(inside, inside, transform, &bounds);
         assert!(moved.y >= 2.02 + RADIUS - 1e-6, "{moved}");
         let outside = Vec3::new(1.2, 2.0, 3.0);
-        assert_eq!(Cable::around(outside, transform, &bounds), outside);
+        assert_eq!(cable.around(outside, outside, transform, &bounds), outside);
     }
 }
