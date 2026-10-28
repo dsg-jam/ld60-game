@@ -31,16 +31,13 @@ impl ServiceSheet {
         if let (Some((first, low)), Some((last, high))) = (digits.first(), digits.last()) {
             page.spawn(Paper::row([
                 (Self::range(first.to_string(), last.to_string()), KEY_WIDTH),
-                (
-                    Self::range(format!("{low:02X}"), format!("{high:02X}")),
-                    CODE_WIDTH,
-                ),
+                (Self::range(low.to_string(), high.to_string()), CODE_WIDTH),
             ]));
         }
         for (key, code) in others {
             page.spawn(Paper::row([
                 (Localized::verbatim(key.to_string()), KEY_WIDTH),
-                (Localized::verbatim(format!("{code:02X}")), CODE_WIDTH),
+                (Localized::verbatim(code.to_string()), CODE_WIDTH),
             ]));
         }
     }

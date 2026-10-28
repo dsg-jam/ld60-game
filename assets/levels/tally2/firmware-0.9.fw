@@ -14,7 +14,7 @@ block main {
     a = KEY
     last = a
     match a {
-        bug "clear-code" { fixed { 'C' } buggy { 0x0C } } => goto reset
+        bug "clear-code" { fixed { 'C' } buggy { 12 } } => goto reset
         '+' => goto count
     }
     goto main
