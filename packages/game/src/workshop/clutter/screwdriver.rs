@@ -79,7 +79,7 @@ impl Screwdriver {
     }
 
     /// From the space of the screwdriver to the head of a screw: the tip on
-    /// the middle of the head and the blade along +Y, into the screw.
+    /// the middle of the head and the shaft along +Y, into the screw.
     fn rest_to_tip() -> Transform {
         let rotation = Quat::from_rotation_z(FRAC_PI_2);
         Transform::from_translation(-(rotation * Props::screwdriver_tip())).with_rotation(rotation)
