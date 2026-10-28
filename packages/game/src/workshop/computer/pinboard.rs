@@ -9,8 +9,8 @@ use bevy::{
 };
 use ld60_core::parts::paper::Paper;
 use ld60_core::parts::screen::UiCanvas;
-use ld60_core::player::camera::framing;
-use ld60_core::player::focus::{Aside, Clickable, Focus};
+use ld60_core::player::camera::{PlayerCamera, framing};
+use ld60_core::player::focus::{Aside, Clickable, Focus, FocusOn};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -20,6 +20,7 @@ use self::sway::Sway;
 use super::monitor::Monitor;
 use crate::workshop::manuals::{MoveSheet, Pins, RailSlot, Sheet};
 use crate::workshop::run::Run;
+use crate::workshop::tutorial::FirstNote;
 
 /// A page of the manuals file at five eighths of its size, so the sheets
 /// leave the tools behind them in sight.
@@ -295,6 +296,24 @@ impl PinBoard {
             Focus::Computer if boards.iter().any(|aside| !aside.open) => Some(SheetClick::LookAt),
             Focus::Computer => Some(SheetClick::Unpin),
             _ => None,
+        }
+    }
+
+    /// Shows the first note on the rail once the player sits at the bench,
+    /// so the camera does not swing to it on its way in from the street.
+    pub(super) fn show_first_note(
+        camera: Single<(&PlayerCamera, &Transform)>,
+        mut boards: Query<(Entity, &mut Aside), With<PinBoard>>,
+        mut commands: Commands,
+    ) {
+        let (camera, at) = *camera;
+        if !camera.seated(at) {
+            return;
+        }
+        commands.remove_resource::<FirstNote>();
+        for (board, mut aside) in &mut boards {
+            aside.open = true;
+            commands.trigger(FocusOn { entity: board });
         }
     }
 
