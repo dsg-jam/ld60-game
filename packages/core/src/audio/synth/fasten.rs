@@ -18,6 +18,22 @@ const SNAP: [Mode; 2] = [
     Mode::new(2_100.0, 1_400.0, 1.0),
     Mode::new(3_700.0, 1_900.0, 0.5),
 ];
+/// The hook of a plastic clip springing past its ledge: bright and gone
+/// at once.
+const CLICK: [Mode; 3] = [
+    Mode::new(3_300.0, 2_400.0, 1.0),
+    Mode::new(5_400.0, 3_200.0, 1.0),
+    Mode::new(8_100.0, 4_500.0, 0.8),
+];
+/// The hollow case ringing from a click, a short tock.
+const SHELL: [Mode; 2] = [
+    Mode::new(1_250.0, 260.0, 1.0),
+    Mode::new(2_250.0, 420.0, 0.5),
+];
+/// A clip snaps in a contact this short, which reaches the high modes. So
+/// short a contact pushes little, so it pushes harder.
+const CLICK_WIDTH: f32 = 0.00012;
+const CLICK_LEVEL: f32 = 9.0;
 /// A wide plastic part knocking against the case.
 const KNOCK: [Mode; 2] = [
     Mode::new(480.0, 600.0, 1.0),
@@ -35,10 +51,10 @@ const SLIDE: Rub = Rub {
     level: 1.5,
     pulses: 0.0,
 };
-/// A wide plastic part creaking as it bends.
-const CREAK: Rub = Rub {
+/// The cover flexing a little as its clips give.
+const FLEX: Rub = Rub {
     modes: &KNOCK,
-    level: 1.0,
+    level: 0.15,
     pulses: 35.0,
 };
 
@@ -115,37 +131,44 @@ impl Samples {
         )
     }
 
-    /// The back cover lifting off: its catches let go one after the other.
+    /// The back cover lifting off: its two clips let go one after the
+    /// other, each with a click and a tock of the case.
     pub(in crate::audio) fn cover_off(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(160));
-        let second = 0.04 * vary.by(0.3);
+        let first = 0.012 * vary.by(0.3);
+        let second = first + 0.045 * vary.by(0.3);
         Self::fastening(
             seed,
-            second + 0.08,
-            vary.by(0.05),
+            second + 0.07,
+            0.94 * vary.by(0.05),
             &[
-                Hit::new(0.0, 0.0004, 0.8, &SNAP),
-                Hit::new(second, 0.0004, 0.6, &SNAP),
-                Hit::new(second + 0.025, 0.001, 0.5, &KNOCK),
+                Hit::new(first, CLICK_WIDTH, CLICK_LEVEL, &CLICK),
+                Hit::new(first, 0.0003, 0.6, &SHELL),
+                Hit::new(second, CLICK_WIDTH, 0.85 * CLICK_LEVEL, &CLICK),
+                Hit::new(second, 0.0003, 0.5, &SHELL),
             ],
-            &CREAK,
+            &FLEX,
         )
     }
 
-    /// The back cover pressed on: it knocks down and its catches snap shut.
+    /// The back cover pressed on: it lands with a soft knock, then its two
+    /// clips snap shut close together.
     pub(in crate::audio) fn cover_on(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(170));
-        let snap = 0.02 * vary.by(0.3);
+        let snap = 0.025 * vary.by(0.3);
+        let second = snap + 0.014 * vary.by(0.3);
         Self::fastening(
             seed,
-            snap + 0.07,
+            second + 0.07,
             vary.by(0.05),
             &[
-                Hit::new(0.0, 0.001, 0.7, &KNOCK),
-                Hit::new(snap, 0.0004, 1.0, &SNAP),
-                Hit::new(snap + 0.012 * vary.by(0.3), 0.0004, 0.8, &SNAP),
+                Hit::new(0.0, 0.001, 0.15, &KNOCK),
+                Hit::new(snap, CLICK_WIDTH, CLICK_LEVEL, &CLICK),
+                Hit::new(snap, 0.0003, 0.7, &SHELL),
+                Hit::new(second, CLICK_WIDTH, 0.9 * CLICK_LEVEL, &CLICK),
+                Hit::new(second, 0.0003, 0.6, &SHELL),
             ],
-            &CREAK,
+            &FLEX,
         )
     }
 
