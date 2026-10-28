@@ -30,6 +30,7 @@ impl DeviceName for DeviceKind {
             Self::Summa6 => "device-summa6",
             Self::Lock4 => "device-lock4",
             Self::Score5 => "device-score5",
+            Self::Tally1 => "device-tally1",
         })
     }
 }

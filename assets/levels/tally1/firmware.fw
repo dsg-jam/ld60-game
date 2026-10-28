@@ -1,0 +1,22 @@
+firmware "Tally-1 firmware 1.0" for tally1
+
+cell tally at M2        ; count
+
+entry reset {
+    a = 0
+    tally = a
+}
+
+block main {
+    wait
+    a = KEY
+    if a != '+' goto main
+    a = tally + 1
+    if a < 10 goto show
+    a = 0
+}
+
+block show {
+    tally = a
+    goto main
+}

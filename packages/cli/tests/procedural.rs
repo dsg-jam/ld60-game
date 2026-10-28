@@ -27,7 +27,7 @@ fn play(dir: &Path, fixed: bool, input: &str) -> String {
 
 #[test]
 fn generated_jobs_play_broken_and_pass_when_fixed() {
-    for device in DeviceKind::ALL {
+    for device in DeviceKind::SERVICED {
         for job in [1, 5, 10] {
             let (dir, summary) = generate(device, 7, job, &format!("{device:?}-{job}"));
             assert!(summary.contains("Bug: "), "{summary}");

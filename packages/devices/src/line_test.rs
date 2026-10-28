@@ -1,5 +1,11 @@
 use crate::DeviceKind;
 
+const TALLY1_TESTS: [LineTest; 4] = [
+    LineTest::new("", "0"),
+    LineTest::new("+", "1"),
+    LineTest::new("+++", "3"),
+    LineTest::new("+++++ +++++", "0"),
+];
 const TALLY2_TESTS: [LineTest; 4] = [
     LineTest::new("", "00"),
     LineTest::new("C +", "01"),
@@ -74,6 +80,7 @@ impl DeviceKind {
             Self::Summa6 => &SUMMA6_TESTS,
             Self::Lock4 => &LOCK4_TESTS,
             Self::Score5 => &SCORE5_TESTS,
+            Self::Tally1 => &TALLY1_TESTS,
         }
     }
 }
