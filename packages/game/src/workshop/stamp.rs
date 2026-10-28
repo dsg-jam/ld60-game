@@ -62,7 +62,7 @@ pub(crate) struct RubberStamp;
 #[derive(SystemParam)]
 struct Ready<'w, 's> {
     casings: Query<'w, 's, &'static Casing, With<JobItem>>,
-    printing: Query<'w, 's, (&'static Printing, Has<JobTicket>)>,
+    printing: Query<'w, 's, (), With<Printing>>,
     flights: Query<'w, 's, (), With<Flight>>,
 }
 
@@ -72,23 +72,10 @@ impl Ready<'_, '_> {
         self.casings.iter().all(Casing::sealed)
     }
 
-    /// What a press on the stamp does. It only stamps once the device is
-    /// closed up, the new ticket is on the clipboard and nothing is on its
-    /// way.
-    fn prompt(&self, stamping: bool) -> &'static str {
-        if !self.sealed() {
-            "click-stamp-open"
-        } else if self
-            .printing
-            .iter()
-            .any(|(printing, ticket)| ticket && printing.waiting())
-        {
-            "click-stamp-ticket"
-        } else if stamping || !self.flights.is_empty() || !self.printing.is_empty() {
-            "click-stamp-wait"
-        } else {
-            "click-stamp"
-        }
+    /// The stamp only stamps once the device is closed up, the new ticket
+    /// is on the clipboard and nothing is on its way.
+    fn can_stamp(&self, stamping: bool) -> bool {
+        self.sealed() && !stamping && self.flights.is_empty() && self.printing.is_empty()
     }
 }
 
@@ -112,7 +99,7 @@ impl RubberStamp {
         let Ok(ticket) = tickets.single() else {
             return;
         };
-        if ready.prompt(stamping) != "click-stamp" {
+        if !ready.can_stamp(stamping) {
             commands.trigger(Play(Sound::Refuse));
             return;
         }
@@ -125,11 +112,23 @@ impl RubberStamp {
         });
     }
 
-    fn arm(ready: Ready, mut stamps: Query<(&mut Clickable, Has<Stamping>), With<Self>>) {
-        for (mut clickable, stamping) in &mut stamps {
-            clickable.set_if_neq(Clickable {
-                prompt: ready.prompt(stamping),
-            });
+    fn arm(
+        ready: Ready,
+        stamps: Query<(Entity, Has<Clickable>, Has<Stamping>), With<Self>>,
+        mut commands: Commands,
+    ) {
+        for (stamp, armed, stamping) in &stamps {
+            match (ready.can_stamp(stamping), armed) {
+                (true, false) => {
+                    commands.entity(stamp).insert(Clickable {
+                        prompt: "click-stamp",
+                    });
+                }
+                (false, true) => {
+                    commands.entity(stamp).remove::<Clickable>();
+                }
+                _ => {}
+            }
         }
     }
 
@@ -138,17 +137,12 @@ impl RubberStamp {
         let base = Block::new(STAMP_BASE_SIZE).on_top_of(&pad);
         let neck = Block::new(STAMP_NECK_SIZE).on_top_of(&base);
         let knob = Block::new(STAMP_KNOB_SIZE).on_top_of(&neck);
-        commands
-            .entity(add.entity)
-            .insert(Clickable {
-                prompt: "click-stamp",
-            })
-            .with_children(|stamp| {
-                stamp.spawn((Shape::cuboid(&pad, STAMP_RUBBER), Finish::Plastic));
-                stamp.spawn((Shape::cuboid(&base, STAMP_WOOD), Finish::Wood));
-                stamp.spawn((Shape::cylinder(&neck, STAMP_WOOD), Finish::Wood));
-                stamp.spawn((Shape::cylinder(&knob, STAMP_HANDLE), Finish::Plastic));
-            });
+        commands.entity(add.entity).with_children(|stamp| {
+            stamp.spawn((Shape::cuboid(&pad, STAMP_RUBBER), Finish::Plastic));
+            stamp.spawn((Shape::cuboid(&base, STAMP_WOOD), Finish::Wood));
+            stamp.spawn((Shape::cylinder(&neck, STAMP_WOOD), Finish::Wood));
+            stamp.spawn((Shape::cylinder(&knob, STAMP_HANDLE), Finish::Plastic));
+        });
     }
 }
 
