@@ -16,22 +16,38 @@ struct Rope {
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> rope: Rope;
 
-/// Puts each ring of the tube on a Catmull-Rom spline through the points of
-/// the cable. The points are in world space, so the transform of the mesh
+/// The point `k` of the cable, with one more mirrored past each end, so the
+/// curve starts and ends on the end points.
+fn point(k: i32) -> vec3<f32> {
+    let last = i32(POINTS) - 1;
+    if k < 0 {
+        return 2.0 * rope.points[0].xyz - rope.points[1].xyz;
+    }
+    if k > last {
+        return 2.0 * rope.points[last].xyz - rope.points[last - 1].xyz;
+    }
+    return rope.points[k].xyz;
+}
+
+/// Puts each ring of the tube on a uniform cubic B-spline through the
+/// points of the cable. Unlike a Catmull-Rom spline it bends smoothly at the
+/// points and stays between them, so it does not dip into what the cable
+/// lies on. The points are in world space, so the transform of the mesh
 /// does not count.
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     let vertex = decompress_vertex(vertex_in, vertex_in.instance_index);
     let i = min(u32(vertex.uv.x), POINTS - 2u);
     let t = vertex.uv.x - f32(i);
-    let p0 = rope.points[max(i, 1u) - 1u].xyz;
-    let p1 = rope.points[i].xyz;
-    let p2 = rope.points[i + 1u].xyz;
-    let p3 = rope.points[min(i + 2u, POINTS - 1u)].xyz;
-    let a = 2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3;
-    let b = 3.0 * (p1 - p2) + p3 - p0;
-    let center = p1 + 0.5 * t * ((p2 - p0) + t * (a + t * b));
-    let tangent = normalize((p2 - p0) + t * (2.0 * a + 3.0 * t * b));
+    let p0 = point(i32(i) - 1);
+    let p1 = point(i32(i));
+    let p2 = point(i32(i) + 1);
+    let p3 = point(i32(i) + 2);
+    let s = 1.0 - t;
+    let center = (s * s * s * p0 + (3.0 * t * t * t - 6.0 * t * t + 4.0) * p1
+        + (-3.0 * t * t * t + 3.0 * t * t + 3.0 * t + 1.0) * p2 + t * t * t * p3) / 6.0;
+    let tangent = normalize(-s * s * p0 + (3.0 * t * t - 4.0 * t) * p1
+        + (-3.0 * t * t + 2.0 * t + 1.0) * p2 + t * t * p3);
     let turned = mix(rope.normals[i].xyz, rope.normals[i + 1u].xyz, t);
     let normal = normalize(turned - tangent * dot(turned, tangent));
     let angle = vertex.uv.y * TAU;

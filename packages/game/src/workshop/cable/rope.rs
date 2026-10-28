@@ -10,9 +10,9 @@ use bevy::{
 use super::POINTS;
 
 /// Rings of the tube from one point of the cable to the next.
-const RINGS: usize = 4;
+const RINGS: usize = 6;
 /// Vertices around each ring.
-const SIDES: usize = 8;
+const SIDES: usize = 16;
 
 pub(super) struct RopePlugin;
 
@@ -55,7 +55,12 @@ impl Rope {
         };
         rope.follow(points);
         ExtendedMaterial {
-            base: color.into(),
+            base: StandardMaterial {
+                base_color: color,
+                perceptual_roughness: 0.6,
+                reflectance: 0.35,
+                ..default()
+            },
             extension: rope,
         }
     }
