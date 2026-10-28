@@ -2,7 +2,10 @@ mod rope;
 
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{camera::visibility::NoFrustumCulling, math::Affine3A, prelude::*};
+use bevy::{
+    camera::visibility::NoFrustumCulling, math::Affine3A, prelude::*,
+    transform::helper::TransformHelper,
+};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::COMPUTER_SPOT;
 use ld60_geometry::block::Block;
@@ -11,7 +14,7 @@ use self::rope::{Rope, RopeMaterial, RopePlugin};
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
 use super::manuals::{Pose, ShopManuals};
-use crate::device::{Casing, Connected, Header};
+use crate::device::{Casing, Connected, Header, Holdable};
 
 /// Where the plug of the debug cable lies while it is out, see
 /// [`CounterLayout::place`].
@@ -64,7 +67,7 @@ impl Plugin for CablePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(RopePlugin)
             .add_systems(Startup, Cable::spawn)
-            .add_systems(Update, Cable::follow);
+            .add_systems(Update, Cable::follow.after(Holdable::follow));
     }
 }
 
@@ -214,9 +217,14 @@ impl Cable {
 
     /// Puts the plug on the header of the plugged in device, or back on the
     /// counter, and lets the cable move to it.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the cable reads every part it lies on or runs to"
+    )]
     fn follow(
-        headers: Query<(&GlobalTransform, &ChildOf), With<Header>>,
-        plugged: Query<(&GlobalTransform, &Casing), With<Connected>>,
+        headers: Query<(Entity, &ChildOf), With<Header>>,
+        plugged: Query<&Casing, With<Connected>>,
+        places: TransformHelper,
         cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
         mut plug: Single<(&Plug, &mut Transform)>,
@@ -226,12 +234,21 @@ impl Cable {
         let (mut cable, material) = cable.into_inner();
         let header = headers
             .iter()
-            .find(|(_, parent)| plugged.contains(parent.parent()));
+            .find(|(_, parent)| plugged.contains(parent.parent()))
+            .and_then(|(header, parent)| {
+                // The device may have moved this frame, after the last
+                // transform propagation.
+                let at = places.compute_global_transform(header).ok()?;
+                let device = parent.parent();
+                let casing = plugged.get(device).ok()?;
+                let device_at = places.compute_global_transform(device).ok()?;
+                Some((at, device_at.affine(), *casing.bounds()))
+            });
         let (rest, transform) = &mut *plug;
         **transform = match header {
             // The plug stands straight up off the board, so the cable leaves
             // the device and not along it.
-            Some((header, _)) => {
+            Some((header, _, _)) => {
                 let (_, rotation, center) = header.to_scale_rotation_translation();
                 let away = rotation * Vec3::NEG_Y;
                 Transform::from_translation(center + away * PLUG.z / 2.0)
@@ -243,9 +260,7 @@ impl Cable {
         let ends = Ends {
             end: transform.translation + exit * (PLUG.z / 2.0),
             exit,
-            device: header
-                .and_then(|(_, parent)| plugged.get(parent.parent()).ok())
-                .map(|(device, casing)| (device.affine(), *casing.bounds())),
+            device: header.map(|(_, device, bounds)| (device, bounds)),
             file: files
                 .iter()
                 .find(|(_, pose)| pose.lying() > 0.5)
