@@ -188,6 +188,15 @@ impl Flight {
         }
     }
 
+    /// What it carries now or will pick up or set down.
+    pub(crate) fn items(&self) -> impl Iterator<Item = Entity> {
+        let steps = self.steps.iter().filter_map(|step| match *step {
+            Step::Grab { item, .. } | Step::Drop { item, .. } => Some(item),
+            Step::Fly { .. } | Step::Wait(_) => None,
+        });
+        self.carried.iter().map(|cargo| cargo.item).chain(steps)
+    }
+
     /// Seconds from the start until after step `count`, delay included.
     fn time_until(&self, count: usize) -> f32 {
         self.delay + self.steps.iter().take(count).map(Step::time).sum::<f32>()
