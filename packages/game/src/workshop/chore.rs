@@ -16,11 +16,10 @@ impl Plugin for ChorePlugin {
 #[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Busy(pub(crate) Chore);
 
-/// Work that takes time.
+/// Work that takes time. Work at the bench is free, only customers take
+/// time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Chore {
-    /// Burning firmware into a device.
-    Flash,
     /// A customer coming to try a device and take it home.
     HandIn,
     /// A customer coming to try a device and handing it back.
@@ -34,7 +33,6 @@ pub(crate) struct PlanetSet;
 impl Chore {
     pub(crate) const fn ticks(self) -> u32 {
         match self {
-            Self::Flash => 2,
             Self::HandIn => 4,
             Self::Return => 4,
         }
@@ -95,15 +93,15 @@ mod tests {
         let levels = Levels::on_disk();
         let run = Run::default();
         world.insert_resource(Job::new(run.pick(&levels), &run, &levels).unwrap());
-        world.trigger(Busy(Chore::Flash));
+        world.trigger(Busy(Chore::Return));
         world.flush();
         assert_eq!(u32::from(world.resource::<Clock>().clone()), OPENING);
         world.remove_resource::<Job>();
-        world.trigger(Busy(Chore::Flash));
+        world.trigger(Busy(Chore::Return));
         world.flush();
         assert_eq!(
             u32::from(world.resource::<Clock>().clone()),
-            OPENING + Chore::Flash.ticks()
+            OPENING + Chore::Return.ticks()
         );
     }
 }
