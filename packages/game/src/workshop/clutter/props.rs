@@ -33,7 +33,12 @@ const FERRULE_RADIUS: f32 = 0.007;
 const FERRULE_LENGTH: f32 = 0.01;
 const SHAFT_RADIUS: f32 = 0.0028;
 const SHAFT_LENGTH: f32 = 0.075;
-const BLADE_SIZE: Vec3 = Vec3::new(0.008, 0.0055, 0.0018);
+/// The Phillips tip: a cone with two crossed wedges, which make the cross
+/// that fits the screws.
+const TIP_LENGTH: f32 = 0.006;
+const TIP_RADIUS: f32 = 0.0004;
+const TIP_CORE: f32 = 0.0017;
+const FIN: f32 = 0.0008;
 
 const CERAMIC: Color = Color::srgb_u8(0xe8, 0xe0, 0xd0);
 const STRIPE: Color = Color::srgb_u8(0x3a, 0x55, 0x7a);
@@ -86,7 +91,7 @@ impl Props<'_> {
     /// The ground under the screwdriver, from the grip to the tip.
     pub(super) fn screwdriver_area() -> Block {
         let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
-        let tip = grip_end + FERRULE_LENGTH + SHAFT_LENGTH - 0.002 + BLADE_SIZE.x;
+        let tip = grip_end + FERRULE_LENGTH + SHAFT_LENGTH - 0.002 + TIP_LENGTH;
         Block::between(
             Vec3::new(-grip_end, 0.0, -GRIP_RADIUS),
             Vec3::new(tip, 2.0 * GRIP_RADIUS, GRIP_RADIUS),
@@ -148,11 +153,11 @@ impl Props<'_> {
         ));
     }
 
-    /// The tip of the blade of [`Self::screwdriver`].
+    /// The point of the tip of [`Self::screwdriver`].
     pub(super) fn screwdriver_tip() -> Vec3 {
         let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
         let shaft_end = grip_end + FERRULE_LENGTH + SHAFT_LENGTH - 0.002;
-        Vec3::new(shaft_end + BLADE_SIZE.x, GRIP_RADIUS, 0.0)
+        Vec3::new(shaft_end + TIP_LENGTH, GRIP_RADIUS, 0.0)
     }
 
     /// Screwdriver lying along +X, tip first.
@@ -162,7 +167,15 @@ impl Props<'_> {
         let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
         let ferrule = grip_end + FERRULE_LENGTH / 2.0 - 0.002;
         let shaft = grip_end + FERRULE_LENGTH + SHAFT_LENGTH / 2.0 - 0.002;
-        let blade = shaft + SHAFT_LENGTH / 2.0 + BLADE_SIZE.x / 2.0;
+        let tip = shaft + SHAFT_LENGTH / 2.0 + TIP_LENGTH / 2.0;
+        let fin = self.meshes.add(Extrusion::new(
+            Triangle2d::new(
+                Vec2::new(-TIP_LENGTH / 2.0, -SHAFT_RADIUS),
+                Vec2::new(TIP_LENGTH / 2.0, 0.0),
+                Vec2::new(-TIP_LENGTH / 2.0, SHAFT_RADIUS),
+            ),
+            FIN,
+        ));
         let parts = [
             (
                 self.meshes.add(Capsule3d::new(GRIP_RADIUS, GRIP_LENGTH)),
@@ -181,9 +194,24 @@ impl Props<'_> {
                 Transform::from_xyz(shaft, height, 0.0).with_rotation(along_x),
             ),
             (
-                self.meshes.add(Cuboid::from_size(BLADE_SIZE)),
+                self.meshes.add(ConicalFrustum {
+                    radius_top: TIP_RADIUS,
+                    radius_bottom: TIP_CORE,
+                    height: TIP_LENGTH,
+                }),
                 &self.finishes.steel,
-                Transform::from_xyz(blade, height, 0.0),
+                Transform::from_xyz(tip, height, 0.0).with_rotation(along_x),
+            ),
+            (
+                fin.clone(),
+                &self.finishes.steel,
+                Transform::from_xyz(tip, height, 0.0),
+            ),
+            (
+                fin,
+                &self.finishes.steel,
+                Transform::from_xyz(tip, height, 0.0)
+                    .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
             ),
         ];
         Self::spawn(parent, parts);
