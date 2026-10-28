@@ -12,7 +12,7 @@ tutorial-1 =
     .computer = 4. Use the computer. Press F8 to dump the firmware off the gadget, then F8 again to disassemble it.
     .fix = 5. Find the wrong line and change it.
     .flash = 6. Press F6 FLASH to put your fix into the gadget, then use "{ click-device }" and try its buttons.
-    .finish = 7. If it works, pull the cable, put the cover and the screws back, and ring the bell.
+    .finish = 7. If it works, pull the cable, put the cover and the screws back, and stamp the ticket.
     .idea = On this gadget, LDI A, 5 puts 5 in A. ST M2 shows A on its digit.
 
 tutorial-2 =

@@ -56,8 +56,6 @@ pub enum Sound {
     Chirp,
     /// The rubber stamp hitting the ticket, or a device put down hard.
     Thunk,
-    /// The service bell for the customer.
-    Ding,
     /// A knob snapping into its next position.
     Detent,
     /// A smooth knob's soft ratchet, ticking as it turns.
@@ -118,14 +116,13 @@ pub enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 26] = [
+    const ALL: [Self; 25] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
         Self::Coin,
         Self::Chirp,
         Self::Thunk,
-        Self::Ding,
         Self::Detent,
         Self::Ratchet,
         Self::Latch,
@@ -187,7 +184,7 @@ impl Sound {
             | Self::PuddleRain
             | Self::AwningRain
             | Self::RoofRain => 2,
-            Self::Chime | Self::Chirp | Self::Thunk | Self::Ding | Self::Refuse => 1,
+            Self::Chime | Self::Chirp | Self::Thunk | Self::Refuse => 1,
         }
     }
 
@@ -199,7 +196,6 @@ impl Sound {
             Self::Coin => Samples::coin(take),
             Self::Chirp => Samples::chirp(),
             Self::Thunk => Samples::thunk(),
-            Self::Ding => Samples::ding(),
             Self::Detent => Samples::detent(take),
             Self::Ratchet => Samples::ratchet(take),
             Self::Latch => Samples::latch(take),
@@ -237,7 +233,6 @@ impl Sound {
             Self::Coin => 0.25,
             Self::Chirp => 0.3,
             Self::Thunk => 0.6,
-            Self::Ding => 0.45,
             Self::Detent => 0.5,
             Self::Ratchet => 0.12,
             Self::Latch | Self::Unlatch => 0.5,

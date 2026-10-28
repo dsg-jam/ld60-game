@@ -54,19 +54,6 @@ impl Samples {
         .normalized(0.8)
     }
 
-    /// A small brass service bell.
-    pub(super) fn ding() -> Self {
-        const PITCH: f32 = 2_093.0;
-        Self::generate(2.0, |t| {
-            let attack = (t * 800.0).min(1.0);
-            let ring = (TAU * PITCH * t).sin()
-                + 0.4 * (TAU * PITCH * 2.76 * t).sin() * (-t * 2.0).exp()
-                + 0.2 * (TAU * PITCH * 5.4 * t).sin() * (-t * 5.0).exp();
-            ring * attack * (-t * 1.8).exp()
-        })
-        .normalized(0.6)
-    }
-
     /// A knob snapping into its next detent: the spring catching makes a
     /// sharp tick in the small plastic and metal parts, then the knob
     /// settles with a softer one. `seed` varies the parts' pitch and timing.

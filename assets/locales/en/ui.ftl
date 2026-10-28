@@ -18,10 +18,10 @@ hint-scroll = Scroll
 hint-look-pins = Look at pins
 hint-look-screen = Look at screen
 
-click-bell = Ring bell
-click-bell-open = Close up the device first
-click-bell-ticket = Tear off the new ticket first
-click-bell-wait = Wait for the customer
+click-stamp = Stamp ticket
+click-stamp-open = Close up the device first
+click-stamp-ticket = Tear off the new ticket first
+click-stamp-wait = Wait for the customer
 click-manuals = Open shop manuals
 click-buy = Buy
 click-buy-short = Not enough money in the till

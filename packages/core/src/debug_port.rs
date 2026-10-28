@@ -87,7 +87,7 @@ impl DebugMethods for App {
     }
 }
 
-/// `ld60.where { "name": "bell" }` returns where in the world each entity
+/// `ld60.where { "name": "stamp" }` returns where in the world each entity
 /// whose name contains `name` is, by name. Without a name, every named
 /// entity.
 fn place(In(params): In<Option<Value>>, entities: Query<(&Name, &GlobalTransform)>) -> BrpResult {
