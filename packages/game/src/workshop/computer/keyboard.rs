@@ -25,6 +25,24 @@ const STYLE: KeypadStyle = KeypadStyle {
 /// Rows from the back to the front.
 const ROWS: &[&[KeyDef<()>]] = &[
     &[
+        KeyDef::unit("ESC", (), &[Code(KeyCode::Escape)]),
+        KeyDef::gap((), 1.0),
+        KeyDef::unit("F1", (), &[Code(KeyCode::F1)]),
+        KeyDef::unit("F2", (), &[Code(KeyCode::F2)]),
+        KeyDef::unit("F3", (), &[Code(KeyCode::F3)]),
+        KeyDef::unit("F4", (), &[Code(KeyCode::F4)]),
+        KeyDef::gap((), 0.5),
+        KeyDef::unit("F5", (), &[Code(KeyCode::F5)]),
+        KeyDef::unit("F6", (), &[Code(KeyCode::F6)]),
+        KeyDef::unit("F7", (), &[Code(KeyCode::F7)]),
+        KeyDef::unit("F8", (), &[Code(KeyCode::F8)]),
+        KeyDef::gap((), 0.5),
+        KeyDef::unit("F9", (), &[Code(KeyCode::F9)]),
+        KeyDef::unit("F10", (), &[Code(KeyCode::F10)]),
+        KeyDef::unit("F11", (), &[Code(KeyCode::F11)]),
+        KeyDef::unit("F12", (), &[Code(KeyCode::F12)]),
+    ],
+    &[
         KeyDef::unit("`", (), &[Code(KeyCode::Backquote)]),
         KeyDef::unit("1", (), &[Code(KeyCode::Digit1)]),
         KeyDef::unit("2", (), &[Code(KeyCode::Digit2)]),
