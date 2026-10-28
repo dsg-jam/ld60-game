@@ -12,7 +12,7 @@ const HELP: &str = "\
 Commands:
   k <keys>     Press keys, for example: k 12+34=
   s [n]        Step n instructions (default 1)
-  r            Run until HLT or a breakpoint
+  r            Run until WAIT or a breakpoint
   b <addr>     Toggle a breakpoint at an address or label
   l            Show the code around the program counter
   on [seed]    Power on again, with new RAM garbage

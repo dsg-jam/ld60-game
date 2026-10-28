@@ -42,7 +42,7 @@ fn every_board_fits_in_ram_and_has_unique_codes() {
 
 #[test]
 fn board_decides_display_keys_and_annunciators() {
-    let source = "main: HLT\nIN KEY\nST M7\nLDI A, 2\nOUT ANN\nJMP main";
+    let source = "main: WAIT\nIN KEY\nST M7\nLDI A, 2\nOUT ANN\nJMP main";
     let image = CHIP.isa().assemble(source).unwrap().image;
     let board = DeviceKind::Summa6.board(BoardRev::B);
     let mut device = AnyDevice::new(board, CHIP, Rom::new(RomKind::Eprom, image)).unwrap();

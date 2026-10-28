@@ -87,7 +87,7 @@ mod tests {
         for text in [
             "JMP main",
             "RET",
-            "HLT",
+            "WAIT",
             "IN KEY",
             "DJNZ loop",
             "; only a comment",

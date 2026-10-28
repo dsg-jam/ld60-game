@@ -99,7 +99,7 @@ fn change_switches_change_both() {
     for flavor in [Flavor::Buggy, Flavor::Fixed] {
         assert_eq!(
             lines(flavor, &["halt"]),
-            ["main: LDI A, 1", "ST M1", "HLT", "JMP main"]
+            ["main: LDI A, 1", "ST M1", "WAIT", "JMP main"]
         );
     }
 }

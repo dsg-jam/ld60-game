@@ -24,7 +24,7 @@ impl Bus for Board {
         self.rom.get(usize::from(addr)).copied().unwrap_or(0)
     }
 
-    fn wake_requested(&self) -> bool {
+    fn take_wake(&mut self) -> bool {
         !self.keys.is_empty()
     }
 }
@@ -211,7 +211,7 @@ routine s {
     let output = tally(Revision::A, body).unwrap();
     assert_eq!(
         code(&output),
-        "main:\ns:      INC\n        INC\n        INC\n        ST   M1\n        HLT\n        JMP  main\n"
+        "main:\ns:      INC\n        INC\n        INC\n        ST   M1\n        WAIT\n        JMP  main\n"
     );
 }
 
@@ -242,7 +242,7 @@ main:
         INC                 ; second
         INC
         ST   M1
-        HLT
+        WAIT
 "
     );
 }
@@ -699,7 +699,7 @@ main:
         INC
         INC
         ST   M1             ; save
-        HLT
+        WAIT
         JMP  main
 "
     );

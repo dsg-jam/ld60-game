@@ -20,7 +20,7 @@
 //!     switches: &[],
 //! };
 //! let output = compile(source, &target, &selection).unwrap();
-//! assert!(output.asm.contains("main:   HLT"));
+//! assert!(output.asm.contains("main:   WAIT"));
 //! ```
 
 mod ast;

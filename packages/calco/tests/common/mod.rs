@@ -29,7 +29,7 @@ impl Bus for TestBus {
 
     fn port_out(&mut self, _port: u8, _value: u8) {}
 
-    fn wake_requested(&self) -> bool {
+    fn take_wake(&mut self) -> bool {
         self.key.is_some()
     }
 }
@@ -41,7 +41,7 @@ pub(crate) fn assemble(source: &str) -> Image {
     }
 }
 
-/// Runs until `HLT` halts or `max_steps` is reached. Returns the step count.
+/// Runs until `WAIT` halts or `max_steps` is reached. Returns the step count.
 pub(crate) fn run(source: &str, chip: ChipInfo, max_steps: usize) -> (Cpu, usize) {
     let mut bus = TestBus {
         rom: assemble(source),

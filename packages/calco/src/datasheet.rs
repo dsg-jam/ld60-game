@@ -11,7 +11,7 @@ const INDEXED: Addr = Addr::Indexed(0);
 
 pub const INSTRUCTIONS: &[InstructionDoc] = &[
     op(Op::Nop, "00", "NOP", "Nothing", Kept, Kept),
-    op(Op::Hlt, "01", "HLT", "Wait for a key press", Kept, Kept),
+    op(Op::Wait, "01", "WAIT", "Wait for a key press", Kept, Kept),
     op(Op::Ret, "02", "RET", "PC <- pop", Kept, Kept),
     op(Op::Swp, "03", "SWP", "Swap A and B", Kept, Kept),
     op(Op::Clc, "04", "CLC", "C <- 0", Kept, Cleared),
@@ -360,7 +360,7 @@ mod tests {
             rows,
             [
                 "NOP",
-                "HLT",
+                "WAIT",
                 "INC",
                 "LD Mn",
                 "ST Mn",

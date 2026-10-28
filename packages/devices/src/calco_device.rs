@@ -18,6 +18,8 @@ pub struct CalcoDevice {
 struct Circuit {
     rom: Rom,
     key: Option<u8>,
+    /// A key was pressed since the last wait.
+    pressed: bool,
     ann: u8,
 }
 
@@ -39,8 +41,8 @@ impl Bus for Circuit {
         }
     }
 
-    fn wake_requested(&self) -> bool {
-        self.key.is_some()
+    fn take_wake(&mut self) -> bool {
+        std::mem::take(&mut self.pressed)
     }
 }
 
@@ -59,6 +61,7 @@ impl CalcoDevice {
             circuit: Circuit {
                 rom,
                 key: None,
+                pressed: false,
                 ann: 0,
             },
         })
@@ -105,6 +108,7 @@ impl Device for CalcoDevice {
         self.cpu.ram_mut().fill(|| rng.next_u8());
         self.cpu.reset();
         self.circuit.key = None;
+        self.circuit.pressed = false;
         self.circuit.ann = 0;
     }
 
@@ -114,6 +118,7 @@ impl Device for CalcoDevice {
 
     fn press(&mut self, code: u8) {
         self.circuit.key = Some(code);
+        self.circuit.pressed = true;
     }
 
     fn step(&mut self) -> Step {

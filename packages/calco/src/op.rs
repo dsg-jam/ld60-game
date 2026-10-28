@@ -1,6 +1,6 @@
 const MISC: [Op; 10] = [
     Op::Nop,
-    Op::Hlt,
+    Op::Wait,
     Op::Ret,
     Op::Swp,
     Op::Clc,
@@ -57,7 +57,8 @@ impl Cond {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
     Nop,
-    Hlt,
+    /// Waits for a new key press. The assembler also takes `WAIT`.
+    Wait,
     Ret,
     Swp,
     Clc,

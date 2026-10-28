@@ -46,7 +46,7 @@ fn indexed_address_wraps_inside_ram() {
 fn third_call_overwrites_the_oldest_return() {
     let source = "
         CALL f1
-        HLT
+        WAIT
 f1:     CALL f2
         RET
 f2:     CALL f3
@@ -54,7 +54,7 @@ f2:     CALL f3
 f3:     RET
     ";
     let (_, steps) = run(source, LATE, 1000);
-    assert_eq!(steps, 1000, "the program should never reach HLT");
+    assert_eq!(steps, 1000, "the program should never reach WAIT");
 }
 
 #[test]

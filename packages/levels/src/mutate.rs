@@ -95,7 +95,7 @@ impl Operator {
             (Self::WrongCell, "LD" | "ST" | "ADC" | "SBC" | "CMP", [operand]) => {
                 replace_operand(operand, neighbour_cells(operand))
             }
-            (Self::DroppedInstruction, mnemonic, _) if mnemonic != "HLT" => {
+            (Self::DroppedInstruction, mnemonic, _) if mnemonic != "WAIT" => {
                 let label = line.label().map(|_| line.prefix.trim_end().to_owned());
                 vec![replace(label.into_iter().collect())]
             }
@@ -316,22 +316,22 @@ mod tests {
     fn keeps_the_label_of_a_dropped_instruction() {
         assert_eq!(
             mutate(
-                "main: HLT\nloop: INC\n  ST M1\n",
+                "main: WAIT\nloop: INC\n  ST M1\n",
                 Operator::DroppedInstruction
             ),
-            ["main: HLT\nloop:\n  ST M1\n", "main: HLT\nloop: INC\n"]
+            ["main: WAIT\nloop:\n  ST M1\n", "main: WAIT\nloop: INC\n"]
         );
     }
 
     #[test]
     fn jumps_to_other_labels() {
         assert_eq!(
-            mutate("a:  JZ  b\nbb: JMP a\nb:  HLT\n", Operator::WrongTarget),
+            mutate("a:  JZ  b\nbb: JMP a\nb:  WAIT\n", Operator::WrongTarget),
             [
-                "a:  JZ  a\nbb: JMP a\nb:  HLT\n",
-                "a:  JZ  bb\nbb: JMP a\nb:  HLT\n",
-                "a:  JZ  b\nbb: JMP bb\nb:  HLT\n",
-                "a:  JZ  b\nbb: JMP b\nb:  HLT\n",
+                "a:  JZ  a\nbb: JMP a\nb:  WAIT\n",
+                "a:  JZ  bb\nbb: JMP a\nb:  WAIT\n",
+                "a:  JZ  b\nbb: JMP bb\nb:  WAIT\n",
+                "a:  JZ  b\nbb: JMP b\nb:  WAIT\n",
             ]
         );
     }
