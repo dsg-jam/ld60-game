@@ -1,0 +1,36 @@
+firmware "Summa-6 firmware 0.3" for summa6
+
+cells display[6] at M1  ; display, M6 is the rightmost digit
+cell  one at M7         ; always 1
+cell  blank at M8       ; always 0
+
+entry reset {
+    a = 1
+    one = a
+    a = 0
+    blank = a
+    for i = 6 downto 1 as wipe {
+        display[i] = a
+    }
+}
+
+block main {
+    wait
+    a = KEY
+    if a != '+' goto main       ; only the + key counts
+    bug "set-carry" {
+        fixed {
+            carry = 0           ; no carry yet
+        }
+        buggy {
+            carry = 1           ; no carry yet
+        }
+    }
+    a = bcd_add(display[6], one)    ; right digit + 1 + carry
+    display[6] = a
+    for i = 5 downto 1 as up {
+        a = bcd_add(display[i], blank)   ; carry 1 into the next digit
+        display[i] = a
+    }
+    goto main
+}

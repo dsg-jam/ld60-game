@@ -1,0 +1,33 @@
+firmware "Summa-6 firmware 0.2" for summa6
+
+cells display[6] at M1  ; display, M6 is the rightmost digit
+
+entry reset {
+    clear()
+}
+
+block main {
+    wait
+    a = KEY
+    if a >= 10 goto main
+    display[6] = a
+    goto main
+}
+
+routine clear {
+    a = 0
+    bug "five" {
+        fixed {
+            i = 6                           ; 6 digits to clear
+            repeat i as wipe {
+                display[i] = a              ; digit B is 0, B counts down
+            }
+        }
+        buggy {
+            i = 5                           ; 6 digits to clear
+            repeat i as wipe {
+                display[i] = a              ; digit B is 0, B counts down
+            }
+        }
+    }
+}

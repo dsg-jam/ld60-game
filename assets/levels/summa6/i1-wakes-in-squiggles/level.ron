@@ -1,0 +1,18 @@
+(
+    id: "summa6-i1",
+    title: "Wakes in squiggles",
+    device: Summa6,
+    boards: [A],
+    keep_layout: true,
+    before_line_tests: true,
+    chip: Calco((revision: B, date_code: 7630)),
+    unit: "00211",
+    remarks: ["first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "", display: "000000"),
+        (keys: "5", display: "000005"),
+    ],
+    reward: 6,
+    firmware: Some((source: "summa6/intro-0.1.fw", switches: ["no-clear"])),
+)
