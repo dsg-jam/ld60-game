@@ -35,11 +35,6 @@ const SHAFT_RADIUS: f32 = 0.0028;
 const SHAFT_LENGTH: f32 = 0.075;
 const BLADE_SIZE: Vec3 = Vec3::new(0.008, 0.0055, 0.0018);
 
-const SCREW_HEAD_RADIUS: f32 = 0.004;
-const SCREW_HEAD_LENGTH: f32 = 0.0025;
-const SCREW_SHANK_RADIUS: f32 = 0.0015;
-const SCREW_SHANK_LENGTH: f32 = 0.012;
-
 const CERAMIC: Color = Color::srgb_u8(0xe8, 0xe0, 0xd0);
 const STRIPE: Color = Color::srgb_u8(0x3a, 0x55, 0x7a);
 /// Light brown bubbles from brewing.
@@ -86,18 +81,6 @@ impl Props<'_> {
             Vec3::new(-MUG_RADIUS, 0.0, -MUG_RADIUS),
             Vec3::new(handle, MUG_HEIGHT, MUG_RADIUS),
         )
-    }
-
-    /// The ground under a screw lying on its side, head towards -X.
-    #[cfg(test)]
-    pub(super) fn screw_area() -> Block {
-        let length = SCREW_HEAD_LENGTH + SCREW_SHANK_LENGTH;
-        Block::new(Vec3::new(
-            length,
-            2.0 * SCREW_HEAD_RADIUS,
-            2.0 * SCREW_HEAD_RADIUS,
-        ))
-        .translated(Vec3::X * (length / 2.0 - SCREW_HEAD_LENGTH / 2.0))
     }
 
     /// The ground under the screwdriver, from the grip to the tip.
@@ -165,6 +148,13 @@ impl Props<'_> {
         ));
     }
 
+    /// The tip of the blade of [`Self::screwdriver`].
+    pub(super) fn screwdriver_tip() -> Vec3 {
+        let grip_end = GRIP_LENGTH / 2.0 + GRIP_RADIUS;
+        let shaft_end = grip_end + FERRULE_LENGTH + SHAFT_LENGTH - 0.002;
+        Vec3::new(shaft_end + BLADE_SIZE.x, GRIP_RADIUS, 0.0)
+    }
+
     /// Screwdriver lying along +X, tip first.
     pub(super) fn screwdriver(&mut self, parent: &mut ChildSpawnerCommands) {
         let along_x = Quat::from_rotation_z(-FRAC_PI_2);
@@ -194,30 +184,6 @@ impl Props<'_> {
                 self.meshes.add(Cuboid::from_size(BLADE_SIZE)),
                 &self.finishes.steel,
                 Transform::from_xyz(blade, height, 0.0),
-            ),
-        ];
-        Self::spawn(parent, parts);
-    }
-
-    /// Screw lying on its side, head towards -X.
-    pub(super) fn screw(&mut self, parent: &mut ChildSpawnerCommands) {
-        // The shank leans down until its tip touches the ground.
-        let lean = ((SCREW_HEAD_RADIUS - SCREW_SHANK_RADIUS) / SCREW_SHANK_LENGTH).atan();
-        let axis = Quat::from_rotation_z(-FRAC_PI_2 - lean);
-        let shank = axis * Vec3::Y * (SCREW_HEAD_LENGTH + SCREW_SHANK_LENGTH) / 2.0;
-        let parts = [
-            (
-                self.meshes
-                    .add(Cylinder::new(SCREW_HEAD_RADIUS, SCREW_HEAD_LENGTH)),
-                &self.finishes.steel,
-                Transform::from_xyz(0.0, SCREW_HEAD_RADIUS, 0.0).with_rotation(axis),
-            ),
-            (
-                self.meshes
-                    .add(Cylinder::new(SCREW_SHANK_RADIUS, SCREW_SHANK_LENGTH)),
-                &self.finishes.steel,
-                Transform::from_translation(Vec3::Y * SCREW_HEAD_RADIUS + shank)
-                    .with_rotation(axis),
             ),
         ];
         Self::spawn(parent, parts);

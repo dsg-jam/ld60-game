@@ -1,38 +1,26 @@
 mod props;
+mod screwdriver;
 mod sides;
 
 use bevy::prelude::*;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_geometry::block::Block;
-use ld60_geometry::shape::Shape;
-use ld60_geometry::surface::{Finish, SurfaceMaterial};
+use ld60_geometry::surface::SurfaceMaterial;
 
 use self::props::{Finishes, Props};
+use self::screwdriver::Screwdriver;
 #[cfg(test)]
 use super::footprint::Footprint;
 
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);
 const SCREWDRIVER_YAW: f32 = 0.4;
-/// Spots on the mat, see [`CounterLayout::place_on_mat`], and yaws.
-const SCREWS: [(Vec2, f32); 3] = [
-    (Vec2::new(0.47, 0.62), 0.4),
-    (Vec2::new(0.58, 0.74), 2.1),
-    (Vec2::new(0.39, 0.82), -0.9),
-];
-
-const NOTES: [(Vec2, f32, Color); 1] = [(
-    Vec2::new(-0.02, -0.5),
-    0.2,
-    Color::srgb_u8(0xe8, 0xd4, 0x6a),
-)];
-const NOTE_SIZE: Vec3 = Vec3::new(0.075, 0.002, 0.075);
 
 pub(crate) struct ClutterPlugin;
 
 impl Plugin for ClutterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(Clutter::on_add);
+        app.add_systems(Update, Screwdriver::follow)
+            .add_observer(Clutter::on_add);
     }
 }
 
@@ -52,29 +40,8 @@ impl Clutter {
                 Props::screwdriver_area(),
             ),
         ];
-        for (spot, yaw, _) in NOTES {
-            footprints.push(Footprint::new(
-                "note",
-                counter.place(spot, yaw),
-                Block::new(NOTE_SIZE),
-            ));
-        }
         footprints.extend(sides::footprints(counter));
         footprints
-    }
-
-    /// The screws lying on the mat.
-    pub(super) fn screw_footprints(counter: &CounterLayout) -> Vec<Footprint> {
-        SCREWS
-            .iter()
-            .map(|&(spot, yaw)| {
-                Footprint::new(
-                    "screw on the mat",
-                    counter.place_on_mat(spot, yaw),
-                    Props::screw_area(),
-                )
-            })
-            .collect()
     }
 }
 
@@ -96,24 +63,15 @@ impl Clutter {
             clutter
                 .spawn((counter.place(MUG_SPOT, 0.0), Visibility::default()))
                 .with_children(|mug| props.mug(mug));
+            let screwdriver = counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW);
             clutter
                 .spawn((
-                    counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW),
+                    Name::new("screwdriver"),
+                    Screwdriver::new(screwdriver),
+                    screwdriver,
                     Visibility::default(),
                 ))
                 .with_children(|screwdriver| props.screwdriver(screwdriver));
-            for (spot, yaw) in SCREWS {
-                clutter
-                    .spawn((counter.place_on_mat(spot, yaw), Visibility::default()))
-                    .with_children(|screw| props.screw(screw));
-            }
-            for (spot, yaw, color) in NOTES {
-                clutter
-                    .spawn((counter.place(spot, yaw), Visibility::default()))
-                    .with_children(|note| {
-                        note.spawn((Shape::cuboid(&Block::new(NOTE_SIZE), color), Finish::Paper));
-                    });
-            }
             sides::spawn(clutter, props.meshes, &mut materials);
         });
     }
