@@ -9,6 +9,8 @@ use bevy::{
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::COMPUTER_SPOT;
 use ld60_geometry::block::Block;
+use ld60_geometry::shape::Shape;
+use ld60_geometry::surface::Finish;
 
 use self::rope::{Rope, RopeMaterial, RopePlugin};
 use super::COMPUTER_YAW;
@@ -23,8 +25,18 @@ pub(super) const PLUG_YAW: f32 = 0.6;
 /// The cable leaves the plug at its +Z end.
 pub(super) const PLUG: Vec3 = Vec3::new(0.013, 0.0055, 0.016);
 /// The boot around the cable where it leaves the monitor, long along the
-/// cable.
-const BOOT: Vec3 = Vec3::new(0.007, 0.007, 0.014);
+/// cable. It starts this far inside the monitor.
+const BOOT: Vec3 = Vec3::new(0.011, 0.011, 0.014);
+const BOOT_INSIDE: f32 = 0.002;
+/// The flange of the boot on the side of the monitor, along the cable.
+const FLANGE: f32 = 0.0035;
+/// The strain relief of the boot steps down from the first radius to the
+/// second at this distance from the monitor.
+const BOOT_RELIEF: [f32; 2] = [0.003, 0.0023];
+const BOOT_STEP: f32 = 0.0085;
+/// The strain relief at the +Z end of the plug, around the cable.
+const PLUG_RELIEF: f32 = 0.0024;
+const PLUG_RELIEF_LENGTH: f32 = 0.005;
 /// How high the port for the cable sits on the side of the monitor.
 const PORT_HEIGHT: f32 = 0.025;
 const RADIUS: f32 = 0.0016;
@@ -149,7 +161,6 @@ impl Cable {
     fn spawn(
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
     ) {
         let counter = CounterLayout::new();
@@ -165,26 +176,48 @@ impl Cable {
             monitor.center.z,
         ));
         let out = computer.rotation * Vec3::NEG_X;
-        let plug_black = materials.add(PLUG_BLACK);
-        commands.spawn((
-            Name::new("debug cable boot"),
-            Mesh3d(meshes.add(Cuboid::from_size(BOOT))),
-            MeshMaterial3d(plug_black.clone()),
-            Transform::from_translation(port + out * (BOOT.z / 2.0 - 0.002))
-                .looking_to(out, Vec3::Y),
-            Pickable::IGNORE,
-        ));
-        commands.spawn((
-            Name::new("debug cable plug"),
-            Plug { rest },
-            rest,
-            Mesh3d(meshes.add(Cuboid::from_size(PLUG))),
-            MeshMaterial3d(plug_black),
-            Pickable::IGNORE,
-        ));
+        // The boot looks along -Z, out of the monitor.
+        let along = |from: f32, to: f32| (from - BOOT_INSIDE, to - BOOT_INSIDE);
+        commands
+            .spawn((
+                Name::new("debug cable boot"),
+                Transform::from_translation(port).looking_to(out, Vec3::Y),
+                Visibility::default(),
+                Pickable::IGNORE,
+            ))
+            .with_children(|boot| {
+                let (from, to) = along(0.0, FLANGE);
+                let flange = Block::new(BOOT.with_z(to - from)).translated(Vec3::new(
+                    0.0,
+                    -BOOT.y / 2.0,
+                    -(from + to) / 2.0,
+                ));
+                boot.spawn((Shape::cuboid(&flange, PLUG_BLACK), Finish::Plastic));
+                Self::relief(boot, along(FLANGE, BOOT_STEP), BOOT_RELIEF[0], Vec3::NEG_Z);
+                Self::relief(boot, along(BOOT_STEP, BOOT.z), BOOT_RELIEF[1], Vec3::NEG_Z);
+            });
+        let housing = PLUG.z - PLUG_RELIEF_LENGTH;
+        commands
+            .spawn((
+                Name::new("debug cable plug"),
+                Plug { rest },
+                rest,
+                Visibility::default(),
+                Pickable::IGNORE,
+            ))
+            .with_children(|plug| {
+                let body = Block::new(PLUG.with_z(housing)).translated(Vec3::new(
+                    0.0,
+                    -PLUG.y / 2.0,
+                    -PLUG.z / 2.0 + housing / 2.0,
+                ));
+                plug.spawn((Shape::cuboid(&body, PLUG_BLACK), Finish::Plastic));
+                let start = -PLUG.z / 2.0 + housing;
+                Self::relief(plug, (start, PLUG.z / 2.0), PLUG_RELIEF, Vec3::Z);
+            });
         let at_computer = computer.compute_affine();
         let mut cable = Self {
-            socket: port + out * (BOOT.z - 0.002),
+            socket: port + out * (BOOT.z - BOOT_INSIDE),
             out,
             floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
             mat: counter.mat,
@@ -213,6 +246,19 @@ impl Cable {
             NoFrustumCulling,
             Pickable::IGNORE,
         ));
+    }
+
+    /// A round strain relief around the cable, from `from` to `to` along
+    /// `axis`.
+    fn relief(parent: &mut ChildSpawnerCommands, (from, to): (f32, f32), radius: f32, axis: Vec3) {
+        let tube = Block::new(Vec3::new(2.0 * radius, to - from, 2.0 * radius));
+        parent
+            .spawn((
+                Transform::from_translation(axis * from)
+                    .with_rotation(Quat::from_rotation_arc(Vec3::Y, axis)),
+                Visibility::default(),
+            ))
+            .with_child((Shape::cylinder(&tube, PLUG_BLACK), Finish::Plastic));
     }
 
     /// Puts the plug on the header of the plugged in device, or back on the
