@@ -35,9 +35,12 @@ const EXTRA: f32 = 0.05;
 const REEL: f32 = 0.6;
 /// The cable is a chain of this many points.
 const POINTS: usize = 48;
-/// Steps of the simulation per frame. Small steps keep it stiff and calm.
+/// Steps of the simulation per tick. Small steps keep it stiff and calm.
 const SUBSTEPS: usize = 12;
-const FRAME: f32 = 1.0 / 60.0;
+/// The simulation moves on in ticks of this many seconds.
+const TICK: f32 = 1.0 / 60.0;
+/// A slow frame runs at most this many ticks and drops the rest.
+const MAX_TICKS: u32 = 4;
 /// How soft the cable bends, in meters per newton. Zero would be a rod.
 const BEND_COMPLIANCE: f32 = 2e-7;
 /// How much of its speed the cable loses per second.
@@ -46,7 +49,7 @@ const DAMPING: f32 = 8.0;
 const FRICTION: f32 = 0.3;
 /// A point on the counter slower than this, in meters per second, stops.
 const STICK: f32 = 0.05;
-/// The cable sleeps once no point moves farther than this in a frame.
+/// The cable sleeps once no point moves farther than this in a tick.
 const SLEEP: f32 = 5e-5;
 /// How far before the edge of the mat the cable starts to rise onto it, so
 /// it drapes over the edge.
@@ -91,7 +94,9 @@ struct Cable {
     length: f32,
     /// Where the plug end was when the cable went to sleep.
     asleep: Option<Vec3>,
-    /// The ends a frame ago. Each step moves them a little of the way to
+    /// Time the simulation still has to catch up on, less than a [`TICK`].
+    behind: f32,
+    /// The ends a tick ago. Each step moves them a little of the way to
     /// where they are now, so a fast turn of the device does not yank the
     /// cable or sweep through it.
     last: Option<Ends>,
@@ -188,6 +193,7 @@ impl Cable {
             previous: Vec::new(),
             length: 0.0,
             asleep: None,
+            behind: 0.0,
             last: None,
         };
         let exit = rest.rotation * Vec3::Z;
@@ -215,6 +221,7 @@ impl Cable {
         files: Query<(&ShopManuals, &Pose)>,
         mut plug: Single<(&Plug, &mut Transform)>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
+        time: Res<Time>,
     ) {
         let (mut cable, material) = cable.into_inner();
         let header = headers
@@ -244,7 +251,7 @@ impl Cable {
                 .find(|(_, pose)| pose.lying() > 0.5)
                 .map(|(file, _)| (file.open_at.compute_affine(), Block::new(ShopManuals::OPEN))),
         };
-        if !cable.frame(&ends) {
+        if !cable.advance(time.delta_secs(), &ends) {
             return;
         }
         if let Some(mut rope) = ropes.get_mut(material) {
@@ -266,9 +273,22 @@ impl Cable {
         self.previous = self.points.clone();
     }
 
-    /// Moves the cable on by one frame, unless it sleeps and the plug has
-    /// not moved. Returns whether it moved.
-    fn frame(&mut self, ends: &Ends) -> bool {
+    /// Moves the cable on by `dt` seconds in whole ticks. Returns whether it
+    /// moved.
+    fn advance(&mut self, dt: f32, ends: &Ends) -> bool {
+        self.behind += dt;
+        let ticks = (self.behind / TICK) as u32;
+        self.behind -= ticks as f32 * TICK;
+        let mut moved = false;
+        for _ in 0..ticks.min(MAX_TICKS) {
+            moved |= self.tick(ends);
+        }
+        moved
+    }
+
+    /// Moves the cable on by one tick, unless it sleeps and the plug has not
+    /// moved. Returns whether it moved.
+    fn tick(&mut self, ends: &Ends) -> bool {
         let wanted = Self::length_for(self.socket, ends.end);
         // Something the cable lies on or around moving wakes it too.
         let same_solids = self
@@ -282,13 +302,13 @@ impl Cable {
         {
             return false;
         }
-        self.length += (wanted - self.length).clamp(-REEL * FRAME, REEL * FRAME);
+        self.length += (wanted - self.length).clamp(-REEL * TICK, REEL * TICK);
         let before = self.points.clone();
         let from = self.last.unwrap_or(*ends);
         let mut previous = from;
         for substep in 1..=SUBSTEPS {
             let between = from.towards(ends, substep as f32 / SUBSTEPS as f32);
-            self.step(FRAME / SUBSTEPS as f32, &between, &previous);
+            self.step(TICK / SUBSTEPS as f32, &between, &previous);
             previous = between;
         }
         self.last = Some(*ends);
@@ -491,6 +511,7 @@ mod tests {
             previous: Vec::new(),
             length: 0.0,
             asleep: None,
+            behind: 0.0,
             last: None,
         };
         cable.lay(end);
@@ -499,7 +520,7 @@ mod tests {
 
     fn settle(cable: &mut Cable, ends: &Ends) {
         for _ in 0..600 {
-            cable.frame(ends);
+            cable.tick(ends);
         }
     }
 
@@ -519,6 +540,30 @@ mod tests {
         for point in &cable.points {
             assert!(point.y >= cable.floor_at(*point) - 1e-4, "{point}");
         }
+    }
+
+    #[test]
+    fn the_cable_keeps_time_at_any_frame_rate_and_stops_while_paused() {
+        let ends = Ends {
+            end: Vec3::new(-0.4, 1.01, 0.1),
+            exit: Vec3::X,
+            device: None,
+            file: None,
+        };
+        let mut slow = cable(Vec3::new(-0.2, 1.2, 0.1));
+        let mut fast = cable(Vec3::new(-0.2, 1.2, 0.1));
+        for _ in 0..30 {
+            slow.advance(1.0 / 30.0, &ends);
+        }
+        for _ in 0..144 {
+            fast.advance(1.0 / 144.0, &ends);
+        }
+        for (a, b) in slow.points.iter().zip(&fast.points) {
+            assert!(a.distance(*b) < 1e-3, "{a} {b}");
+        }
+        let paused = slow.points.clone();
+        assert!(!slow.advance(0.0, &ends));
+        assert_eq!(slow.points, paused);
     }
 
     #[test]
@@ -588,10 +633,10 @@ mod tests {
             };
             let mut cable = cable(rest.end);
             settle(&mut cable, &rest);
-            for frame in 0..600 {
-                cable.frame(&plugged);
+            for tick in 0..600 {
+                cable.tick(&plugged);
                 if let Some(point) = inside(&cable, transform, &bounds) {
-                    panic!("yaw {step}, frame {frame}: {point}");
+                    panic!("yaw {step}, tick {tick}: {point}");
                 }
             }
         }
@@ -614,12 +659,12 @@ mod tests {
         };
         let mut cable = cable(at(0.0).end);
         settle(&mut cable, &at(0.0));
-        for frame in 1..240 {
-            let ends = at(frame as f32 * 0.15);
-            cable.frame(&ends);
+        for tick in 1..240 {
+            let ends = at(tick as f32 * 0.15);
+            cable.tick(&ends);
             let (transform, _) = ends.device.unwrap();
             if let Some(point) = inside(&cable, transform, &bounds) {
-                panic!("frame {frame}: {point}");
+                panic!("tick {tick}: {point}");
             }
         }
     }
