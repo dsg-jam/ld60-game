@@ -1,27 +1,24 @@
 # Every level has a message named after its ID. { $board } is the board of
 # the job, like 6A.
 
-tally2-t1 =
-    .hint = LDI A, 5 puts 5 in A, and ST M2 shows A on the right digit.
+tally1-t1 =
+    .hint = LDI A, 5 puts 5 in A, and ST M2 shows A on the digit.
     .customer = Grell, soup kitchen
-    .complaint = Every morning it starts at 05. I had no guests yet!
+    .complaint = Every morning it starts at 5. I had no guests yet!
     .remark-first-thinking = Still has its first thinking, version 0.1.
-    .remark-no-clear-yet = The C key does not clear yet. That came in a later version. Any key counts.
 
-tally2-t2 =
+tally1-t2 =
     .hint = Each key press runs the lines from count down to JMP once.
     .customer = Ploof, seat finder
-    .complaint = My counter says 40 guests. We have 20 chairs.
-    .remark-works-fine = Both buttons and the little window work fine.
+    .complaint = My counter says 8 guests. We have 4 chairs.
+    .remark-works-fine = The button and the little window work fine.
     .remark-first-thinking = Still has its first thinking, version 0.2.
-    .remark-no-clear-yet = The C key does not clear yet. That came in a later version. Any key counts.
 
-tally2-t3 =
-    .hint = JMP start goes back to start, and the lines there set the display to 00.
+tally1-t3 =
+    .hint = JMP start goes back to start, and the lines there set the display to 0.
     .customer = Mott, ferry ramp
-    .complaint = I press and press. It stays at 00.
+    .complaint = I press and press. It stays at 0.
     .remark-first-thinking = Still has its first thinking, version 0.3.
-    .remark-no-clear-yet = The C key does not clear yet. That came in a later version. Any key counts.
 
 tally2-t4 =
     .hint = Look up the code of the C key in the Tally-2 manual.

@@ -1,17 +1,21 @@
-firmware "Tally-2 firmware 0.3" for tally2
+firmware "Tally-1 firmware 0.3" for tally1
 
-cells tally[2] at M1    ; count, M2 is the rightmost digit
+cell tally at M2        ; count
 
 entry start {
     a = 0
-    tally[1] = a
-    tally[2] = a        ; the display shows 00
+    tally = a           ; the display shows 0
 }
 
 block count {
     wait
-    a = tally[2] + 1
-    tally[2] = a
+    a = tally + 1
+    if a < 10 goto show
+    a = 0               ; after 9 comes 0
+}
+
+block show {
+    tally = a
     bug "jump-start" {
         fixed {
             goto count  ; wait for the next press

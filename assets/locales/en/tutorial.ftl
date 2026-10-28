@@ -13,7 +13,7 @@ tutorial-1 =
     .fix = 5. Find the wrong line and change it.
     .flash = 6. Press F6 FLASH to put your fix into the gadget, then use "{ click-device }" and try its buttons.
     .finish = 7. If it works, pull the cable, put the cover and the screws back, and ring the bell.
-    .idea = On this gadget, LDI A, 5 puts 5 in A. ST M2 shows A on the right digit.
+    .idea = On this gadget, LDI A, 5 puts 5 in A. ST M2 shows A on its digit.
 
 tutorial-2 =
     .title = Lines
@@ -31,7 +31,7 @@ tutorial-3 =
 tutorial-4 =
     .title = Keys
     .label = KEYS
-    .idea = IN KEY puts the code of the pressed key in A.
+    .idea = This gadget has two keys. IN KEY puts the code of the pressed key in A.
     .manual = The manual of each gadget in the SHOP MANUALS file lists the code of each key.
     .datasheet = The datasheet of the chip, in the same file, says what each line does.
 

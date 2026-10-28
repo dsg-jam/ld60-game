@@ -1,12 +1,14 @@
-; Tally-2 firmware 0.2
+; Tally-1 firmware 0.2
 ;
-; M1-M2  count, M2 is the rightmost digit
+; M2     count
 
 start:  LDI  A, 0
-        ST   M1
         ST   M2
 count:  WAIT                ; wait for a key press
-        LD   M2             ; A = right digit, plus one
+        LD   M2             ; A = the digit, plus one
         INC
-        ST   M2             ; show it
+        CPI  10
+        JC   show
+        LDI  A, 0           ; after 9 comes 0
+show:   ST   M2             ; show it
         JMP  count          ; back up to count
