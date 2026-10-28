@@ -27,9 +27,9 @@ mod salvage;
 mod save;
 mod service;
 mod shop;
+mod stamp;
 mod ticket;
 mod till;
-mod tools;
 mod tutorial;
 
 use std::f32::consts::FRAC_PI_2;
@@ -51,9 +51,9 @@ use self::printer::Printer;
 use self::radio::Radio;
 use self::reminder::Reminder;
 use self::shop::Shop;
+use self::stamp::RubberStamp;
 use self::ticket::Clipboard;
 use self::till::Till;
-use self::tools::Tool;
 
 const COMPUTER_YAW: f32 = -0.4;
 const LAMP_YAW: f32 = -0.7;
@@ -61,7 +61,6 @@ const RADIO_SPOT: Vec2 = Vec2::new(-0.47, -0.62);
 const RADIO_YAW: f32 = 0.25;
 const STAMP_SPOT: Vec2 = Vec2::new(0.17, -0.75);
 const STAMP_YAW: f32 = 0.3;
-const BELL_SPOT: Vec2 = Vec2::new(0.32, -0.75);
 /// Standing at the back, right of the radio.
 const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
@@ -86,7 +85,7 @@ impl Plugin for WorkshopPlugin {
             job::JobPlugin,
             levels::LevelsPlugin,
             receipt::ReceiptPlugin,
-            tools::ToolsPlugin,
+            stamp::StampPlugin,
             computer::ComputerPlugin,
         ))
         .add_plugins((
@@ -131,10 +130,9 @@ fn spawn_stage(mut commands: Commands) {
     ));
     commands.spawn((
         Name::new("stamp"),
-        Tool::Stamp,
+        RubberStamp,
         counter.place(STAMP_SPOT, STAMP_YAW),
     ));
-    commands.spawn((Name::new("bell"), Tool::Bell, counter.place(BELL_SPOT, 0.0)));
     commands.spawn((
         Name::new("clipboard"),
         Clipboard,

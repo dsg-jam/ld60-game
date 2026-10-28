@@ -58,8 +58,8 @@ impl Plugin for JobPlugin {
 
 /// The repair job on the bench.
 ///
-/// A job is done in two steps: flash new firmware, then ring the bell. The
-/// stamp stamps the ticket and the customer picks the device up. The customer tests the device at pickup. If
+/// A job is done in two steps: flash new firmware, then stamp the ticket.
+/// The customer picks the device up. The customer tests the device at pickup. If
 /// it fails, they hand it back and the steps start over.
 #[derive(Resource, Debug)]
 pub(crate) struct Job {

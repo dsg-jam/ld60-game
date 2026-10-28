@@ -21,8 +21,8 @@ ticket-complaint-visit = { $story } { $complaint }
 ticket-remarks = REMARKS
 ticket-status = STATUS
 ticket-status-open = Open
-ticket-status-flashed = Flashed. Ring the bell when it works.
-ticket-status-done = Done. Ring the bell for pickup.
+ticket-status-flashed = Flashed. Stamp the ticket when it works.
+ticket-status-done = Done. The customer is on the way.
 ticket-status-returned = Came back. Tries left: { $tries }.
 
 ticket-stamp-authorized = AUTHORIZED
