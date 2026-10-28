@@ -24,7 +24,7 @@ const SETTLE_FRAMES: u32 = 30;
 /// compiles shaders on the render thread and draws nothing until all queued
 /// ones are done.
 const HOLD_FRAMES: u32 = 3;
-/// Seconds after which the title screen shows even if something never
+/// Real seconds after which the title screen shows even if something never
 /// finishes.
 const GIVE_UP_SECS: f32 = 60.0;
 
@@ -119,7 +119,7 @@ impl LoadingScreen {
         reason = "each check reads its own resource"
     )]
     fn follow(
-        time: Res<Time>,
+        time: Res<Time<Real>>,
         locale: Res<Locale>,
         levels: Option<Res<Levels>>,
         icons: Res<IconFont>,
