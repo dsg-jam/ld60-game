@@ -10,6 +10,7 @@ use ld60_core::parts::paper::{INK_FADED, PAPER, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
 use ld60_core::state::AppState;
+use ld60_devices::DeviceKind;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -27,6 +28,8 @@ use super::run::{Rent, Run};
 pub(super) const SPOT: Vec2 = Vec2::new(1.0, 0.72);
 pub(super) const YAW: f32 = -0.25;
 pub(super) const CRATE_SIZE: Vec3 = Vec3::new(0.24, 0.07, 0.17);
+/// The order the trader offers new devices in.
+const DEVICE_ORDER: [DeviceKind; 3] = [DeviceKind::Score5, DeviceKind::Summa6, DeviceKind::Lock4];
 const WALL: f32 = 0.008;
 /// The packing straw fills the crate up to this height.
 const STRAW_HEIGHT: f32 = 0.045;
@@ -101,7 +104,15 @@ impl SalvageCrate {
     fn pack(run: &Run) -> Option<Self> {
         let seed = run.seed() ^ u64::from(run.stats().cycles).rotate_left(40);
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut finds: Vec<_> = Find::all().filter(|&find| run.wants(find)).collect();
+        // New devices come in a fixed order, each easier to learn after the
+        // one before.
+        let next = DEVICE_ORDER
+            .into_iter()
+            .find(|device| !run.signs().contains(device));
+        let mut finds: Vec<_> = Find::all()
+            .filter(|&find| run.wants(find))
+            .filter(|&find| !matches!(find, Find::Device(device) if Some(device) != next))
+            .collect();
         finds.shuffle(&mut rng);
         if let Some(device) = finds
             .iter()
@@ -467,12 +478,18 @@ mod tests {
     }
 
     #[test]
-    fn the_cheapest_new_device_comes_first() {
+    fn new_devices_come_in_order() {
         let mut run = Run::default().next();
         for _ in 0..10 {
             paid_rent(&mut run);
             let salvage = SalvageCrate::pack(&run).unwrap();
-            assert_eq!(salvage.finds[0], Find::Device(DeviceKind::Summa6));
+            assert_eq!(salvage.finds[0], Find::Device(DeviceKind::Score5));
+            let devices = salvage
+                .finds
+                .iter()
+                .filter(|find| matches!(find, Find::Device(_)))
+                .count();
+            assert_eq!(devices, 1);
         }
     }
 
