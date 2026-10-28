@@ -7,7 +7,7 @@
     before_line_tests: true,
     chip: Calco((revision: A, date_code: 7518)),
     unit: "00074",
-    remarks: ["first-thinking"],
+    remarks: ["first-thinking", "no-clear-yet"],
     rom: (kind: Eprom, blank_available: true),
     tests: [
         (keys: "", display: "00"),
