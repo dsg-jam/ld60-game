@@ -9,6 +9,6 @@ firmware on the shop computer. When you ring the bell, the customer tries the
 device. If it still fails, they hand it back and pay less for each failed try.
 After three failed tries, they take it home broken.
 
-The landlord takes more rent each time the planet sets. If the till is short,
-he closes the shop. After a few paid rents he offers to sell you the building.
-Buy it from the scrap trader's crate and the shop is yours.
+The landlord takes more rent each time the planet sets. If the till is short, he
+closes the shop. After a few paid rents he offers to sell you the building. Buy
+it from the scrap trader's crate and the shop is yours.

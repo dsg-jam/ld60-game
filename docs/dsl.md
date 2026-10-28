@@ -62,7 +62,7 @@ through into a routine, and `goto` cannot jump into a routine. Call it instead.
 | `a = x + y + carry`, `a = x - y - carry`     | `LD x` and `ADC y` or `SBC y`                             |
 | `a = bcd_add(x, y)`, `a = bcd_sub(x, y)`     | The above, then `DA` or `DS`                              |
 | `carry = 0`, `carry = 1`, `i = 6`            | `CLC`, `SEC`, `LDI B, 6`                                  |
-| `wait`, `da()`, `ds()`, `nop()`              | `WAIT`, `DA`, `DS`, `NOP`                                  |
+| `wait`, `da()`, `ds()`, `nop()`              | `WAIT`, `DA`, `DS`, `NOP`                                 |
 | `repeat i as name { }`                       | Loop body, then `DJNZ name`                               |
 | `for i = 6 downto 1 as name { }`             | `i = 6`, then the loop                                    |
 | `name()`, `return`, `goto x`, `x:`           | `CALL`, `RET`, `JMP`, label                               |

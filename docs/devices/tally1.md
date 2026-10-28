@@ -38,5 +38,4 @@ keys of each line and check the display. Spaces only group the keys.
 | `+++`         | 3       |
 | `+++++ +++++` | 0       |
 
-After 9, the count starts again at 0. The customer can test more than this
-list.
+After 9, the count starts again at 0. The customer can test more than this list.

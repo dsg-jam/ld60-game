@@ -36,9 +36,9 @@ solved and that all its text exists. Use `cli play <folder>` to try it.
 
 `Generated::new` makes jobs from the working firmware of each device.
 `Difficulty::for_job` sets how hard job number `n` is: the number of bugs, the
-kinds of bugs, the chip, harmless RAM faults and how many keys show a bug.
-Later jobs can instead have a single fault: a stuck RAM bit in a cell the
-working firmware uses. The fix moves that cell to a free one.
+kinds of bugs, the chip, harmless RAM faults and how many keys show a bug. Later
+jobs can instead have a single fault: a stuck RAM bit in a cell the working
+firmware uses. The fix moves that cell to a free one.
 
 Generated jobs share their text in `levels.ftl`:
 

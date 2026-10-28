@@ -1,7 +1,8 @@
 # CalCo ISA
 
 CalCo is an 8-bit calculator coprocessor. It drives adding machines, tally
-counters, door locks and scoreboards. It works with decimal digits, one digit per byte.
+counters, door locks and scoreboards. It works with decimal digits, one digit
+per byte.
 
 ## Programmer model
 
@@ -52,7 +53,7 @@ Indexed addresses wrap inside RAM. `[B+3]` with B = 0x0E reads `M1`.
 | Hex   | Mnemonic    | Operation                           | Z | C |
 | ----- | ----------- | ----------------------------------- | - | - |
 | 00    | `NOP`       | Nothing                             | - | - |
-| 01    | `WAIT`       | Wait for a key press, then continue | - | - |
+| 01    | `WAIT`      | Wait for a key press, then continue | - | - |
 | 02    | `RET`       | PC <- pop                           | - | - |
 | 03    | `SWP`       | Swap A and B                        | - | - |
 | 04    | `CLC`       | C <- 0                              | - | 0 |
@@ -127,7 +128,7 @@ instructions they support.
 
 | Revision | `IN REV` | Supported instructions                                                                                                                |
 | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| A        | 0x10     | `NOP`, `WAIT`, `INC`, `LD Mn`, `ST Mn`, `LDI A, ii`, `CPI ii`, `IN p`, `JMP`, `JZ`, `JC`                                               |
+| A        | 0x10     | `NOP`, `WAIT`, `INC`, `LD Mn`, `ST Mn`, `LDI A, ii`, `CPI ii`, `IN p`, `JMP`, `JZ`, `JC`                                              |
 | B        | 0x20     | Rev A, `LDI B, ii`, `LD [B+n]`, `ST [B+n]`, `ADC`, `SBC`, `CLC`, `SEC`, `DEC`, `DA`, `DS`, `OUT`, `JNZ`, `JNC`, `CALL`, `RET`, `DJNZ` |
 | C        | 0x30     | Rev B, `CMP Mn`, `CMP [B+n]`, `SWP`                                                                                                   |
 

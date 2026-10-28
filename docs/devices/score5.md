@@ -1,13 +1,13 @@
 # Score 5
 
-The Score 5 is a scoreboard by DSG Electronics. It keeps the score of two
-sides and the period of the game. It runs a [CalCo](../isa/calco.md) chip with
-the firmware in a 256 byte EPROM socket. The chip is a CalCo Rev B or Rev C.
+The Score 5 is a scoreboard by DSG Electronics. It keeps the score of two sides
+and the period of the game. It runs a [CalCo](../isa/calco.md) chip with the
+firmware in a 256 byte EPROM socket. The chip is a CalCo Rev B or Rev C.
 
 ## Use
 
-The display shows the home score, the period and the guest score, like
-`03204`: home 03, period 2, guest 04.
+The display shows the home score, the period and the guest score, like `03204`:
+home 03, period 2, guest 04.
 
 `H` adds points to the home score and `G` adds them to the guest score. A side
 gets 1 point, unless a digit key was pressed before. Then it gets that many
@@ -21,8 +21,8 @@ goes back to period 1.
 
 The board around the chip comes in three revisions. They wire the display and
 the keys differently. The sticker under the device shows the revision, for
-example `BOARD 5B`. The serial number starts with it too. The service sheet of
-a job lists the I/O of its board.
+example `BOARD 5B`. The serial number starts with it too. The service sheet of a
+job lists the I/O of its board.
 
 | Board | Display   | `H` | `G` | `P` | `C` |
 | ----- | --------- | --- | --- | --- | --- |
@@ -47,25 +47,25 @@ The Score 5 has none.
 
 ## Power on
 
-RAM holds random values after power on. The firmware has to clear the scores
-and set period 1.
+RAM holds random values after power on. The firmware has to clear the scores and
+set period 1.
 
 ## End of line tests
 
 The factory runs these tests on every unit. Power on the device, then press the
 keys of each line and check the display. Spaces only group the keys.
 
-| Keys                                        | Display |
-| ------------------------------------------- | ------- |
-| (power on)                                  | 00100   |
-| `C H`                                       | 01100   |
-| `C GG`                                      | 00102   |
-| `C 3H 2G`                                   | 03102   |
-| `C 2HH`                                     | 03100   |
-| `C 5G 5G`                                   | 00110   |
-| `C 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H`     | 99100   |
-| `C PP`                                      | 00300   |
-| `C PPPPP`                                   | 00400   |
+| Keys                                    | Display |
+| --------------------------------------- | ------- |
+| (power on)                              | 00100   |
+| `C H`                                   | 01100   |
+| `C GG`                                  | 00102   |
+| `C 3H 2G`                               | 03102   |
+| `C 2HH`                                 | 03100   |
+| `C 5G 5G`                               | 00110   |
+| `C 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H 9H` | 99100   |
+| `C PP`                                  | 00300   |
+| `C PPPPP`                               | 00400   |
 
 The customer can test more than this list.
 
