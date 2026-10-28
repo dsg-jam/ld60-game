@@ -9,6 +9,8 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 pub(super) const THICKNESS: f32 = 0.0012;
 /// How far the board stays inside the edges of the body.
 const INSET: f32 = 0.003;
+/// Room between the tallest part on the board and the back cover.
+const CLEARANCE: f32 = 0.001;
 const HEADER: Vec3 = Vec3::new(0.012, 0.0025, 0.005);
 /// Header pins sit this far apart, a tenth of an inch.
 const PIN_PITCH: f32 = 0.00254;
@@ -107,16 +109,16 @@ impl Net {
 }
 
 impl BoardLayout {
-    /// The board inside `shell`, at `top` of the cover. `seed` places the
-    /// small parts and routes the traces, so boards of one revision are
-    /// alike.
-    pub(super) fn new(shell: &Block, top: f32, spots: &BoardSpots, seed: u64) -> Self {
+    /// The board inside `shell`, with its parts towards the inside of the
+    /// cover at `floor`. `seed` places the small parts and routes the
+    /// traces, so boards of one revision are alike.
+    pub(super) fn new(shell: &Block, floor: f32, spots: &BoardSpots, seed: u64) -> Self {
         let board = Block::new(Vec3::new(
             shell.size.x - 2.0 * INSET,
             THICKNESS,
             shell.size.z - 2.0 * INSET,
         ))
-        .translated(Vec3::Y * (top - THICKNESS));
+        .translated(Vec3::Y * (floor + CLEARANCE + HEADER.y));
         let below = |size: Vec3, spot: Vec2| {
             Block::new(size).translated(board.top_spot(spot).with_y(board.min().y - size.y))
         };
@@ -580,20 +582,20 @@ mod tests {
     use super::*;
 
     fn layout() -> BoardLayout {
-        let shell = Block::new(Vec3::new(0.09, 0.009, 0.15)).translated(Vec3::Y * 0.005);
+        let shell = Block::new(Vec3::new(0.09, 0.0125, 0.15)).translated(Vec3::Y * 0.0015);
         let spots = BoardSpots {
             header: Vec2::new(0.0, -0.1),
             display: Vec2::new(0.0, -0.6),
             screws: &[Vec3::new(0.036, 0.0, 0.064)],
         };
-        BoardLayout::new(&shell, 0.005, &spots, 3)
+        BoardLayout::new(&shell, 0.0015, &spots, 3)
     }
 
     #[test]
     fn the_parts_fit_inside_the_cover() {
         let layout = layout();
         for (part, _) in layout.parts().chain([(&layout.header, HEADER_BLACK)]) {
-            assert!(part.min().y > 0.0, "{part:?}");
+            assert!(part.min().y > 0.0015, "{part:?}");
             assert!(part.max().y <= layout.board.min().y + 1e-6);
         }
     }

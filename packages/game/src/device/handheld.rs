@@ -16,7 +16,7 @@ use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
 use super::board::{BoardLayout, BoardSpots};
-use super::casing::{COVER, Casing, CasingSpots};
+use super::casing::{COVER, Casing, CasingSpots, WALL};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
 use super::{DeviceButton, DeviceName, Holdable};
@@ -412,7 +412,9 @@ impl Handheld {
         }
         let mut casing = None;
         entity.with_children(|device| {
-            device.spawn((Shape::cuboid(&shell, model.body), Finish::Plastic));
+            for wall in Self::walls(&shell) {
+                device.spawn((Shape::cuboid(&wall, model.body), Finish::Plastic));
+            }
             device.spawn((Shape::cuboid(&window, WINDOW), Finish::Plastic));
             device.spawn((
                 Mesh3d(meshes.add(Rectangle::from_size(lcd_size))),
@@ -449,6 +451,23 @@ impl Handheld {
         if let Some(casing) = casing {
             entity.insert(casing);
         }
+    }
+
+    /// The front and the four sides of a hollow `shell`. The back cover
+    /// closes it.
+    fn walls(shell: &Block) -> [Block; 5] {
+        let side = shell.size.with_y(shell.size.y - WALL);
+        let x = Block::new(side.with_x(WALL)).translated(Vec3::Y * shell.min().y);
+        let z = Block::new(side.with_x(shell.size.x - 2.0 * WALL).with_z(WALL))
+            .translated(Vec3::Y * shell.min().y);
+        let inset = |size: f32| size / 2.0 - WALL / 2.0;
+        [
+            Block::new(shell.size.with_y(WALL)).translated(Vec3::Y * (shell.max().y - WALL)),
+            x.translated(Vec3::X * -inset(shell.size.x)),
+            x.translated(Vec3::X * inset(shell.size.x)),
+            z.translated(Vec3::Z * -inset(shell.size.z)),
+            z.translated(Vec3::Z * inset(shell.size.z)),
+        ]
     }
 
     fn build_device(&self) -> Result<AnyDevice, LevelError> {

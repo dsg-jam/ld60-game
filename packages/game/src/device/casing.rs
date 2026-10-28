@@ -21,8 +21,14 @@ use super::board::BoardLayout;
 use super::pick_area::PickArea;
 use super::{Connected, Holdable, Turned};
 
-/// Thickness of the back cover. The board and the header fit inside it.
-pub(super) const COVER: f32 = 0.005;
+/// Thickness of the walls of a device.
+pub(super) const WALL: f32 = 0.0015;
+/// Thickness of the back cover, a wall like the others.
+pub(super) const COVER: f32 = WALL;
+/// The posts the screws go through, from the front down to the board and
+/// from the board to the cover.
+const BOSS: f32 = 0.0026;
+const SPACER: f32 = 0.0022;
 const SCREW: Vec3 = Vec3::new(0.0055, 0.0014, 0.0055);
 const SHANK: Vec3 = Vec3::new(0.0022, 0.008, 0.0022);
 /// The empty hole of a screw that is out.
@@ -234,7 +240,7 @@ impl Casing {
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
         let underside = |spot: Vec2| plate.top_spot(spot).with_y(0.0);
-        let holes = spots.screws.iter().map(|&spot| underside(spot)).collect();
+        let holes: Vec<_> = spots.screws.iter().map(|&spot| underside(spot)).collect();
         device
             .spawn((Cover, Transform::IDENTITY, Visibility::Inherited))
             .with_children(|cover| {
@@ -262,6 +268,20 @@ impl Casing {
                 }
                 cover.spawn(sticker);
             });
+        for hole in &holes {
+            let top = layout.board.max().y;
+            let boss = Block::new(Vec3::new(
+                2.0 * BOSS,
+                shell.max().y - WALL - top,
+                2.0 * BOSS,
+            ))
+            .translated(hole.with_y(top));
+            let bottom = layout.board.min().y;
+            let spacer = Block::new(Vec3::new(2.0 * SPACER, bottom - COVER, 2.0 * SPACER))
+                .translated(hole.with_y(COVER));
+            device.spawn((Shape::cylinder(&boss, color), Finish::Plastic));
+            device.spawn((Shape::cylinder(&spacer, color), Finish::Plastic));
+        }
         device.spawn((
             Board,
             Shape::cuboid(&layout.board, BoardLayout::edge()),
