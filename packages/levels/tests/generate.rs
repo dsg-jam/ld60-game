@@ -478,8 +478,15 @@ fn first_jobs_show_bugs_with_few_keys_on_the_newest_chip() {
             assert_eq!(job.bugs.len(), 1);
             assert!(job.variant.level.faults.is_empty());
             for bug in &job.bugs {
+                // Only the kinds of bug the tutorial taught.
                 assert!(
-                    matches!(bug.operator, Operator::OffByOne | Operator::FlippedJump),
+                    matches!(
+                        bug.operator,
+                        Operator::OffByOne
+                            | Operator::DroppedInstruction
+                            | Operator::WrongTarget
+                            | Operator::WrongKey
+                    ),
                     "{bug:?}"
                 );
             }
