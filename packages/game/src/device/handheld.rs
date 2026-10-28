@@ -23,6 +23,8 @@ use super::{DeviceButton, DeviceName, Holdable};
 
 /// Dark frame around the LCD.
 const LCD_BORDER: f32 = 0.003;
+/// Tinned copper inside the holes of a board.
+const PLATING: Color = Color::srgb_u8(0xd8, 0xd6, 0xcc);
 const WINDOW_HEIGHT: f32 = 0.0015;
 /// Keeps the LCD from fighting with the window top.
 const LCD_GAP: f32 = 0.0001;
@@ -393,7 +395,17 @@ impl Handheld {
         let name = format!("PCB {}", level.board().name());
         let artwork = Sticker::seed(&format!("{:?} {name}", level.device));
         let board = BoardLayout::new(&shell, COVER, &spots, artwork);
-        let face = board.face(&name, &mut meshes, &mut images, &mut pcbs);
+        let faces = board.faces(&name, &mut meshes, &mut images, &mut pcbs);
+        let (plating, platings) = board.platings();
+        let plating = (
+            Mesh3d(meshes.add(plating)),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: PLATING,
+                metallic: 1.0,
+                perceptual_roughness: 0.35,
+                ..default()
+            })),
+        );
         let unlit = |texture: Handle<Image>| StandardMaterial {
             base_color_texture: Some(texture),
             unlit: true,
@@ -437,6 +449,14 @@ impl Handheld {
                 Transform::from_translation(sticker_spot)
                     .with_rotation(Quat::from_rotation_x(FRAC_PI_2) * Quat::from_rotation_z(PI)),
             );
+            // The tube of a hole runs along Z.
+            let along_y = Quat::from_rotation_arc(Vec3::Z, Vec3::Y);
+            for center in platings {
+                device.spawn((
+                    plating.clone(),
+                    Transform::from_translation(center).with_rotation(along_y),
+                ));
+            }
             casing = Some(Casing::spawn(
                 device,
                 &shell,
@@ -444,7 +464,7 @@ impl Handheld {
                 &model.casing,
                 sticker,
                 &board,
-                face,
+                faces,
                 height,
             ));
         });

@@ -11,6 +11,14 @@ pub(super) const THICKNESS: f32 = 0.0012;
 const INSET: f32 = 0.003;
 /// Room between the tallest part on the board and the back cover.
 const CLEARANCE: f32 = 0.001;
+/// The plated holes the screws go through.
+const SCREW_RING: f32 = 0.0022;
+pub(super) const SCREW_HOLE: f32 = 0.0012;
+/// The plating inside a hole.
+const PLATING: f32 = 0.00008;
+/// The board is hollow behind its faces, so its holes go through. These
+/// strips close its edges.
+const EDGE_WIDTH: f32 = 0.0004;
 const HEADER: Vec3 = Vec3::new(0.012, 0.0025, 0.005);
 /// Header pins sit this far apart, a tenth of an inch.
 const PIN_PITCH: f32 = 0.00254;
@@ -167,21 +175,57 @@ impl BoardLayout {
     }
 
     /// The face of the board with its copper, mask and print, for a board
-    /// called `name`.
-    pub(super) fn face(
+    /// called `name`, and its back with the same holes.
+    pub(super) fn faces(
         &self,
         name: &str,
         meshes: &mut Assets<Mesh>,
         images: &mut Assets<Image>,
         pcbs: &mut Assets<PcbMaterial>,
-    ) -> impl Bundle {
-        let size = self.board.size.xz();
-        let mask = images.add(self.art(name).image());
-        (
-            Mesh3d(meshes.add(Rectangle::from_size(size))),
-            MeshMaterial3d(pcbs.add(Pcb::material(mask))),
-            self.face,
-        )
+    ) -> [(Mesh3d, MeshMaterial3d<PcbMaterial>, Transform); 2] {
+        let mesh = Mesh3d(meshes.add(Rectangle::from_size(self.board.size.xz())));
+        let material = MeshMaterial3d(pcbs.add(Pcb::material(images.add(self.art(name).image()))));
+        // Faces up, with the art at the same place as on the face.
+        let back =
+            Transform::from_translation(self.board.top_spot(Vec2::ZERO) + Vec3::Y * FACE_GAP)
+                .with_rotation(Quat::from_mat3(&Mat3::from_cols(
+                    Vec3::NEG_X,
+                    Vec3::Z,
+                    Vec3::Y,
+                )));
+        [
+            (mesh.clone(), material.clone(), self.face),
+            (mesh, material, back),
+        ]
+    }
+
+    /// Strips along the edges of the board.
+    pub(super) fn edges(&self) -> [Block; 4] {
+        let size = self.board.size;
+        let x = Block::new(size.with_x(EDGE_WIDTH)).translated(self.board.bottom());
+        let z = Block::new(size.with_z(EDGE_WIDTH)).translated(self.board.bottom());
+        let inset = |size: f32| size / 2.0 - EDGE_WIDTH / 2.0;
+        [
+            x.translated(Vec3::X * -inset(size.x)),
+            x.translated(Vec3::X * inset(size.x)),
+            z.translated(Vec3::Z * -inset(size.z)),
+            z.translated(Vec3::Z * inset(size.z)),
+        ]
+    }
+
+    /// The plating inside each screw hole, as a tube along Y and where it
+    /// sits.
+    pub(super) fn platings(&self) -> (Extrusion<Annulus>, Vec<Vec3>) {
+        let tube = Extrusion::new(
+            Annulus::new(SCREW_HOLE, SCREW_HOLE + PLATING),
+            self.board.size.y,
+        );
+        let centers = self
+            .screws
+            .iter()
+            .map(|screw| screw.with_y(self.board.center.y))
+            .collect();
+        (tube, centers)
     }
 
     pub(super) fn edge() -> Color {
@@ -387,7 +431,7 @@ impl BoardLayout {
         let mut router = Router::new(size, PITCH, 0.0015);
         for &screw in &self.screws {
             router.block(self.to_art(screw), Vec2::splat(0.0055));
-            art.via(self.to_art(screw), 0.0022, 0.0012);
+            art.via(self.to_art(screw), SCREW_RING, SCREW_HOLE);
         }
         let pads = self.pads();
         let routed: Vec<(Pad, Vec2, Vec2, Option<Net>)> = pads
