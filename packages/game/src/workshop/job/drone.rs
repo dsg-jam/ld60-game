@@ -188,6 +188,15 @@ impl Flight {
         }
     }
 
+    /// What it carries now or will pick up or set down.
+    pub(crate) fn items(&self) -> impl Iterator<Item = Entity> {
+        let steps = self.steps.iter().filter_map(|step| match *step {
+            Step::Grab { item, .. } | Step::Drop { item, .. } => Some(item),
+            Step::Fly { .. } | Step::Wait(_) => None,
+        });
+        self.carried.iter().map(|cargo| cargo.item).chain(steps)
+    }
+
     /// Seconds from the start until after step `count`, delay included.
     fn time_until(&self, count: usize) -> f32 {
         self.delay + self.steps.iter().take(count).map(Step::time).sum::<f32>()
@@ -388,7 +397,7 @@ impl Flight {
                             offset: item_at.translation - transform.translation,
                             stowing: stow.then_some(0.0),
                         });
-                        commands.entity(item).insert(Carried);
+                        commands.entity(item).try_insert(Carried);
                     }
                     flight.elapsed = 0.0;
                     flight.steps.pop_front();
@@ -403,14 +412,14 @@ impl Flight {
                     if let Ok((mut item_at, _)) = items.get_mut(item) {
                         *item_at = rest;
                     }
-                    commands.entity(item).remove::<Carried>();
+                    commands.entity(item).try_remove::<Carried>();
                     commands.trigger(Play(Sound::Thunk));
                     flight.elapsed = 0.0;
                     flight.steps.pop_front();
                 }
                 None => {
                     for cargo in &flight.carried {
-                        commands.entity(cargo.item).despawn();
+                        commands.entity(cargo.item).try_despawn();
                     }
                     commands.entity(drone).despawn();
                     continue;

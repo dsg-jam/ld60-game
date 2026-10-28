@@ -17,7 +17,7 @@ pub(crate) use self::demand::Demand;
 use self::per_device::PerDevice;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
-use super::job::{Job, JobItem};
+use super::job::{Drone, Flight, Job, JobItem};
 use super::manuals::Pins;
 use super::pickup::Pickup;
 use super::receipt::Receipt;
@@ -42,6 +42,7 @@ const SAME_BOARDS: usize = 2;
 /// What is left on the counter when the shop closes.
 type Leftovers = Or<(
     With<JobItem>,
+    With<Drone>,
     With<Receipt>,
     With<RentNote>,
     With<SalvageCrate>,
@@ -520,7 +521,7 @@ impl Run {
         mut clock: ResMut<Clock>,
         mut focused: ResMut<Focused>,
         mut focus: ResMut<NextState<Focus>>,
-        leftovers: Query<Entity, Leftovers>,
+        leftovers: Query<(Entity, Option<&Flight>), Leftovers>,
         mut commands: Commands,
     ) {
         *run = match *new_run {
@@ -529,8 +530,12 @@ impl Run {
         };
         *clock = Clock::default();
         focused.leave(&mut focus);
-        for entity in &leftovers {
-            commands.entity(entity).despawn();
+        for (entity, flight) in &leftovers {
+            commands.entity(entity).try_despawn();
+            // Items on their way with a drone are no longer job items.
+            for item in flight.into_iter().flat_map(Flight::items) {
+                commands.entity(item).try_despawn();
+            }
         }
         commands.remove_resource::<Job>();
         commands.run_system_cached(Job::start);
