@@ -77,14 +77,17 @@ impl Difficulty {
             device,
             job,
             bugs: (1 + n / 6).min(3),
+            // The first jobs only have the kinds of bug the tutorial
+            // taught: a wrong number, a line too many or too few, a wrong
+            // label and a wrong key code.
             weights: [
                 4,
-                4,
-                job.min(4),
-                (job / 2).min(4),
+                job.saturating_sub(2).min(4),
+                job.saturating_sub(2).min(4),
+                (1 + job / 2).min(4),
                 (job.saturating_sub(4) / 2).min(4),
-                (job.saturating_sub(6) / 2).min(3),
-                (job.saturating_sub(2) / 2).min(3),
+                (1 + job / 2).min(3),
+                (1 + job / 2).min(3),
             ],
             chip: Self::pick_chip(job, device, datasheets, errata),
             fault_chance: (job.saturating_sub(4) * 5).min(30),
