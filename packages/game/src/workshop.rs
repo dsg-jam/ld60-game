@@ -1,3 +1,4 @@
+mod bin;
 mod cable;
 mod chore;
 mod clutter;
@@ -13,10 +14,12 @@ mod lamp;
 pub(crate) mod levels;
 mod manuals;
 mod pickup;
+mod printer;
 mod radio;
 mod receipt;
 mod reflections;
 mod regulars;
+mod reminder;
 mod rent;
 mod rug;
 pub(crate) mod run;
@@ -36,6 +39,7 @@ use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_core::player::camera::PlayerCamera;
 
+use self::bin::Bin;
 use self::clutter::Clutter;
 use self::computer::Computer;
 use self::counter::Counter;
@@ -43,8 +47,11 @@ use self::dial::Dial;
 use self::front::Front;
 use self::lamp::Lamp;
 use self::manuals::ShopManuals;
+use self::printer::Printer;
 use self::radio::Radio;
+use self::reminder::Reminder;
 use self::shop::Shop;
+use self::ticket::Clipboard;
 use self::till::Till;
 use self::tools::Tool;
 
@@ -52,9 +59,9 @@ const COMPUTER_YAW: f32 = -0.4;
 const LAMP_YAW: f32 = -0.7;
 const RADIO_SPOT: Vec2 = Vec2::new(-0.47, -0.62);
 const RADIO_YAW: f32 = 0.25;
-const STAMP_SPOT: Vec2 = Vec2::new(0.1, -0.75);
+const STAMP_SPOT: Vec2 = Vec2::new(0.17, -0.75);
 const STAMP_YAW: f32 = 0.3;
-const BELL_SPOT: Vec2 = Vec2::new(0.23, -0.75);
+const BELL_SPOT: Vec2 = Vec2::new(0.32, -0.75);
 /// Standing at the back, right of the radio.
 const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
@@ -86,6 +93,9 @@ impl Plugin for WorkshopPlugin {
             cable::CablePlugin,
             chore::ChorePlugin,
             dial::DialPlugin,
+            printer::PrinterPlugin,
+            reminder::ReminderPlugin,
+            bin::BinPlugin,
             reflections::ReflectionsPlugin,
             rent::RentPlugin,
             run::RunPlugin,
@@ -125,6 +135,22 @@ fn spawn_stage(mut commands: Commands) {
         counter.place(STAMP_SPOT, STAMP_YAW),
     ));
     commands.spawn((Name::new("bell"), Tool::Bell, counter.place(BELL_SPOT, 0.0)));
+    commands.spawn((
+        Name::new("clipboard"),
+        Clipboard,
+        counter.place(job::TICKET_SPOT, job::TICKET_YAW),
+    ));
+    commands.spawn((Name::new("paper bin"), Bin, Bin::place()));
+    commands.spawn((
+        Name::new("rent reminder"),
+        Reminder,
+        counter.place(reminder::SPOT, reminder::YAW),
+    ));
+    commands.spawn((
+        Name::new("ticket printer"),
+        Printer,
+        counter.place(printer::SPOT, printer::YAW),
+    ));
     commands.spawn((
         Name::new("till"),
         Till::default(),
