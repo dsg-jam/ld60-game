@@ -1,11 +1,21 @@
-use bevy::{picking::hover::HoverMap, prelude::*, window::PrimaryWindow};
+mod badge;
+
+use bevy::{
+    picking::{
+        hover::HoverMap,
+        pointer::{PointerId, PointerLocation},
+    },
+    prelude::*,
+    window::PrimaryWindow,
+};
 use ld60_locale::{Localized, Message};
 
+use self::badge::ToolBadge;
 use super::{
     cursor,
-    focus::{self, Clickable, Focused},
+    focus::{self, ClickTool, Clickable, Focused},
     hints::{Caption, ClickHint, Icon, IconFont},
-    look::Gaze,
+    look::{Gaze, KeepMouse},
 };
 use crate::settings::Settings;
 
@@ -15,7 +25,10 @@ impl Plugin for CrosshairPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Prompt>()
             .add_systems(Startup, Crosshair::spawn)
-            .add_systems(Update, (Prompt::update, Crosshair::update).chain());
+            .add_systems(
+                Update,
+                (Prompt::update, (Crosshair::update, ToolBadge::update)).chain(),
+            );
     }
 }
 
@@ -77,6 +90,8 @@ impl Crosshair {
                         Pickable::IGNORE,
                     ))
                     .with_children(|prompt| {
+                        ToolBadge::spawn(prompt, ClickTool::Screwdriver);
+                        ToolBadge::spawn(prompt, ClickTool::Plug);
                         Icon::MouseLeft.spawn(prompt, &font);
                         // Hangs below the icon, so the icon stays in the
                         // middle.
@@ -152,6 +167,8 @@ impl Crosshair {
 #[derive(Resource, Debug, Default, PartialEq)]
 pub(crate) struct Prompt {
     message: Option<Message>,
+    /// The tool of the hovered part the message is about, if any.
+    tool: Option<ClickTool>,
     /// Where the free cursor is, in logical pixels, while the prompt shows
     /// there.
     at_cursor: Option<Vec2>,
@@ -173,28 +190,44 @@ impl Prompt {
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
         clickables: Query<&Clickable>,
+        tools: Query<&ClickTool>,
         window: Single<&Window, With<PrimaryWindow>>,
+        keep_mouse: Option<Res<KeepMouse>>,
+        pointers: Query<(&PointerId, &PointerLocation)>,
         mut prompt: ResMut<Prompt>,
     ) {
-        let hovered =
-            || focus::hovered_prompt(&hovers, &parents, &clickables, &focused).map(Message::new);
-        let message = if !settings.hints() {
-            None
-        } else if gaze.focused() {
-            click.0.clone().or_else(hovered)
-        } else if gaze.steering() {
-            hovered()
+        let hovered = focus::hovered_clickable(&hovers, &parents, &clickables, &focused);
+        let from_hover = (settings.hints() && (gaze.steering() || gaze.focused()))
+            .then(|| hovered.and_then(|entity| clickables.get(entity).ok()))
+            .flatten();
+        let (message, tool) = match (settings.hints(), click.0.clone()) {
+            (true, Some(click)) if gaze.focused() => (Some(click), None),
+            _ => (
+                from_hover.map(|clickable| Message::new(clickable.prompt)),
+                hovered
+                    .filter(|_| from_hover.is_some())
+                    .and_then(|entity| tools.get(entity).ok().copied()),
+            ),
+        };
+        // A tool driving the game moves only its pointer, not the cursor.
+        let cursor = if keep_mouse.is_some() {
+            pointers
+                .iter()
+                .find(|(id, _)| id.is_mouse())
+                .and_then(|(_, location)| location.location())
+                .map(|location| location.position)
         } else {
-            None
+            window.cursor_position()
         };
         let at_cursor = if gaze.focused() && !gaze.free_looking() {
-            window.cursor_position()
+            cursor
         } else {
             None
         };
         prompt.set_if_neq(Prompt {
             at_cursor: at_cursor.filter(|_| message.is_some()),
             message,
+            tool,
         });
     }
 }

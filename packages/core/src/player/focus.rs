@@ -55,6 +55,14 @@ pub struct Clickable {
     pub prompt: &'static str,
 }
 
+/// A tool drawn next to the prompt of a [`Clickable`], for a part that is
+/// worked with it.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClickTool {
+    Screwdriver,
+    Plug,
+}
+
 /// Makes an entity focusable from the seated view, and [`Clickable`] with
 /// `prompt`.
 #[derive(Component, Clone, Copy, Debug)]
@@ -258,10 +266,20 @@ pub fn hovered_prompt(
     clickables: &Query<&Clickable>,
     focused: &Focused,
 ) -> Option<&'static str> {
+    hovered_clickable(hovers, parents, clickables, focused)
+        .and_then(|entity| clickables.get(entity).ok())
+        .map(|clickable| clickable.prompt)
+}
+
+/// The [`Clickable`] whose prompt [`hovered_prompt`] shows.
+pub fn hovered_clickable(
+    hovers: &HoverMap,
+    parents: &Query<&ChildOf>,
+    clickables: &Query<&Clickable>,
+    focused: &Focused,
+) -> Option<Entity> {
     let Some(focused) = focused.get() else {
-        return under_mouse(hovers, parents)
-            .find_map(|entity| clickables.get(entity).ok())
-            .map(|clickable| clickable.prompt);
+        return under_mouse(hovers, parents).find(|&entity| clickables.contains(entity));
     };
     hovers
         .get(&PointerId::Mouse)
@@ -279,9 +297,8 @@ pub fn hovered_prompt(
             });
             path.into_iter()
                 .filter(|_| inside)
-                .find_map(|entity| clickables.get(entity).ok())
+                .find(|&entity| clickables.contains(entity))
         })
-        .map(|clickable| clickable.prompt)
 }
 
 /// Entities under the mouse, each followed by its ancestors.
