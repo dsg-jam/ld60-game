@@ -86,6 +86,17 @@ impl CounterLayout {
             .with_rotation(Quat::from_rotation_y(yaw))
     }
 
+    /// A spot on the shop floor under the edge of the top on the player's
+    /// side, `x` along the counter and `back` under the top.
+    pub fn under_top(&self, x: f32, back: f32) -> Transform {
+        Transform::from_xyz(x, self.top.max().y - HEIGHT, self.top.max().z - back)
+    }
+
+    /// The edge of the top on the player's side, `x` along the counter.
+    pub fn front_edge(&self, x: f32) -> Vec3 {
+        Vec3::new(x, self.top.max().y, self.top.max().z)
+    }
+
     /// Camera pose of the seated player.
     pub fn seated_view(&self) -> Transform {
         let eye = Vec3::new(
