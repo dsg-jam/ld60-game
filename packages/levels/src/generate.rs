@@ -143,6 +143,7 @@ impl Reference {
             board: BoardRev::A,
             boards: Vec::new(),
             keep_layout: false,
+            before_line_tests: false,
             chip: self.chip,
             unit: format!("{:05}", Rng::new(seed, "unit").next_u64() % 100_000),
             remarks: Vec::new(),

@@ -1,6 +1,39 @@
 # Every level has a message named after its ID. { $board } is the board of
 # the job, like 6A.
 
+tally2-t1 =
+    .customer = Grell, soup kitchen
+    .complaint = Every morning it starts at 05. I had no guests yet!
+    .remark-first-thinking = Still has its first thinking, version 0.1.
+
+tally2-t2 =
+    .customer = Ploof, seat finder
+    .complaint = My counter says 40 guests. We have 20 chairs.
+    .remark-works-fine = Both buttons and the little window work fine.
+    .remark-first-thinking = Still has its first thinking, version 0.2.
+
+tally2-t3 =
+    .customer = Mott, ferry ramp
+    .complaint = I press and press. It stays at 00.
+    .remark-first-thinking = Still has its first thinking, version 0.3.
+
+tally2-t4 =
+    .customer = Drob, door guard
+    .complaint = C should clear it. It counts one more instead.
+    .remark-tingle = C button poked with the tingle stick. Tingles fine.
+    .remark-first-thinking = Still has its first thinking, version 0.4.
+
+tally2-t5 =
+    .customer = Vee, lantern shop
+    .complaint = The C key counts like +. It should set it back to 00.
+    .remark-tingle = C button poked with the tingle stick. Tingles fine.
+    .remark-first-thinking = Still has its first thinking, version 0.5.
+
+tally2-t6 =
+    .customer = Hubb, bridge toll
+    .complaint = After 09 it shows an angry squiggle. Then it says 10.
+    .remark-first-thinking = Still has its first thinking, version 0.6.
+
 tally2-01 =
     .customer = Drob, door guard
     .complaint = I press C before the doors open, but it keeps counting from last night.

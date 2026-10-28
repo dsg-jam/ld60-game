@@ -1,0 +1,23 @@
+firmware "Tally-2 firmware 0.3" for tally2
+
+cells tally[2] at M1    ; count, M2 is the rightmost digit
+
+entry start {
+    a = 0
+    tally[1] = a
+    tally[2] = a        ; the display shows 00
+}
+
+block count {
+    wait
+    a = tally[2] + 1
+    tally[2] = a
+    bug "jump-start" {
+        fixed {
+            goto count  ; wait for the next press
+        }
+        buggy {
+            goto start  ; wait for the next press
+        }
+    }
+}

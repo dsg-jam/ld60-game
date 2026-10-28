@@ -12,6 +12,7 @@ static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEV
 
 /// Levels whose bug only the customer's tests find.
 const MISSED_BY_LINE_TESTS: &[&str] = &[
+    "tally2-t6",
     "tally2-03",
     "summa6-05",
     "summa6-06",
@@ -65,7 +66,7 @@ fn tutorial_starts_on_the_smallest_chip() {
         .iter()
         .map(|source| source.load().unwrap().chip.isa().name())
         .collect();
-    assert_eq!(chips, ["CalCo Rev A", "CalCo Rev A"]);
+    assert!(chips.iter().all(|chip| *chip == "CalCo Rev A"), "{chips:?}");
 }
 
 #[test]

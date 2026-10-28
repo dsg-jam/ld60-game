@@ -1,11 +1,17 @@
 (
     tutorial: [
-        "tally2/01-clear-key",
-        "tally2/02-double-count",
+        "tally2/t1-starts-at-five",
+        "tally2/t2-counts-by-two",
+        "tally2/t3-stuck-at-zero",
+        "tally2/t4-c-key-counts",
+        "tally2/t5-no-clear-key",
+        "tally2/t6-squiggle-after-nine",
+        "tally2/03-past-99",
     ],
     jobs: [
         (level: "lock4/01-locked-out", from: 0),
-        (level: "tally2/03-past-99", from: 1),
+        (level: "tally2/01-clear-key", from: 1),
+        (level: "tally2/02-double-count", from: 1),
         (level: "summa6/01-strange-symbols", from: 1),
         (level: "score5/01-overtime", from: 1),
         (level: "summa6/02-last-digit", from: 2),

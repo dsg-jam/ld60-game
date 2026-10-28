@@ -612,7 +612,7 @@ mod tests {
         assert_eq!(run.notes(), [0]);
         let mut later = Run::default().next();
         later.file_past_notes();
-        assert_eq!(later.notes(), [0, 1]);
+        assert_eq!(later.notes(), (0..7).collect::<Vec<_>>());
     }
 
     #[test]

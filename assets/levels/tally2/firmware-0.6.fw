@@ -1,0 +1,34 @@
+firmware "Tally-2 firmware 0.6" for tally2
+
+cells tally[2] at M1    ; count, M2 is the rightmost digit
+
+entry start {
+    a = 0
+    tally[1] = a
+    tally[2] = a
+}
+
+block count {
+    wait
+    a = KEY
+    if a == 'C' goto start
+    a = tally[2] + 1    ; one more on the right digit
+    bug "eleven" {
+        fixed {
+            if a < 10 goto ones     ; lower than 10: just show it
+        }
+        buggy {
+            if a < 11 goto ones     ; lower than 11: just show it
+        }
+    }
+    a = 0               ; else the right digit starts at 0
+    tally[2] = a
+    a = tally[1] + 1    ; and the left digit goes up
+    tally[1] = a
+    goto count
+}
+
+block ones {
+    tally[2] = a
+    goto count
+}

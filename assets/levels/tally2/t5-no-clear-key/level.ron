@@ -1,0 +1,18 @@
+(
+    id: "tally2-t5",
+    title: "No clear key",
+    device: Tally2,
+    boards: [A],
+    keep_layout: true,
+    chip: Calco((revision: A, date_code: 7527)),
+    unit: "00103",
+    remarks: ["tingle", "first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "++", display: "02"),
+        (keys: "++C", display: "00"),
+        (keys: "++C+", display: "01"),
+    ],
+    reward: 4,
+    firmware: Some((source: "tally2/firmware-0.5.fw", switches: ["no-clear"])),
+)

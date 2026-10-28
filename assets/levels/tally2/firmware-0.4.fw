@@ -1,0 +1,25 @@
+firmware "Tally-2 firmware 0.4" for tally2
+
+cells tally[2] at M1    ; count, M2 is the rightmost digit
+
+entry start {
+    a = 0
+    tally[1] = a
+    tally[2] = a
+}
+
+block count {
+    wait
+    a = KEY             ; A = code of the key
+    bug "clear-code" {
+        fixed {
+            if a == 13 goto start   ; the C key: back to 00
+        }
+        buggy {
+            if a == 12 goto start   ; the C key: back to 00
+        }
+    }
+    a = tally[2] + 1
+    tally[2] = a
+    goto count
+}

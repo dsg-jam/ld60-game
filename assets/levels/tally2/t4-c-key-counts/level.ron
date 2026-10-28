@@ -1,0 +1,18 @@
+(
+    id: "tally2-t4",
+    title: "C key counts",
+    device: Tally2,
+    boards: [A],
+    keep_layout: true,
+    chip: Calco((revision: A, date_code: 7523)),
+    unit: "00096",
+    remarks: ["tingle", "first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "+++", display: "03"),
+        (keys: "+++C", display: "00"),
+        (keys: "+++C++", display: "02"),
+    ],
+    reward: 3,
+    firmware: Some((source: "tally2/firmware-0.4.fw", switches: ["clear-code"])),
+)

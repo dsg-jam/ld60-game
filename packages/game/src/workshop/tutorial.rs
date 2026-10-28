@@ -8,11 +8,16 @@ use super::manuals::Sheet;
 use super::run::{Origin, Run};
 
 /// The paragraphs of each note, as attributes of its message.
-const LESSONS: [&[&str]; 2] = [
+const LESSONS: [&[&str]; 7] = [
     &[
-        "welcome", "ticket", "open", "cable", "computer", "flash", "try", "finish",
+        "welcome", "ticket", "open", "cable", "computer", "fix", "flash", "finish", "idea",
     ],
-    &["datasheet", "lines", "versions", "rent", "trader"],
+    &["idea", "inc"],
+    &["idea", "jump", "wait"],
+    &["idea", "manual", "datasheet"],
+    &["idea", "jump"],
+    &["idea", "digit"],
+    &["versions", "rent", "trader"],
 ];
 
 pub(crate) struct TutorialPlugin;
@@ -130,7 +135,7 @@ mod tests {
     #[test]
     fn every_tutorial_job_has_a_note() {
         let steps = Levels::on_disk().tutorial().len();
-        assert!((2..=3).contains(&steps));
+        assert_eq!(steps, LESSONS.len());
         assert!((0..steps).all(|step| TutorialNote::new(step).is_some()));
         assert!(TutorialNote::new(steps).is_none());
     }
