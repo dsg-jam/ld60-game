@@ -107,7 +107,6 @@ pub(super) enum Block {
     Instructions,
     /// The instructions for one purpose, in plain words.
     Group(Group),
-    Example,
     Errata,
 }
 
@@ -216,6 +215,15 @@ impl PageLayout {
         self.heading.as_deref()
     }
 
+    /// Whether the page shows anything for `revision`. A page of only
+    /// instruction groups the chip does not have stays out.
+    pub(super) fn shows(&self, revision: Revision) -> bool {
+        self.blocks.iter().any(|block| match *block {
+            Block::Group(group) => ChipSheet::new(revision).has(group),
+            _ => true,
+        })
+    }
+
     pub(super) fn write(&'static self, subject: Subject, page: &mut ChildSpawnerCommands) {
         for block in &self.blocks {
             block.write(subject, page);
@@ -248,7 +256,6 @@ impl Block {
             | Self::Ports
             | Self::Instructions
             | Self::Group(_)
-            | Self::Example
             | Self::Errata => matches!(place, Place::Chip),
         }
     }
@@ -290,7 +297,6 @@ impl Block {
             (&Self::Group(group), Subject::Chip(revision)) => {
                 ChipSheet::new(revision).group(group, page);
             }
-            (Self::Example, Subject::Chip(revision)) => ChipSheet::new(revision).example(page),
             (Self::Errata, Subject::Chip(revision)) => ChipSheet::new(revision).errata(page),
             // `ManualFile::parse` refuses these.
             _ => {}
@@ -354,7 +360,8 @@ mod tests {
             assert_eq!(Entry::Manual(device).pages().len(), 4, "{device:?}");
         }
         for revision in Revision::ALL {
-            assert_eq!(Entry::Chip(revision).pages().len(), 5);
+            let pages = if revision == Revision::A { 4 } else { 5 };
+            assert_eq!(Entry::Chip(revision).pages().len(), pages, "{revision}");
             assert_eq!(Entry::Errata(revision).pages().len(), 1);
         }
     }

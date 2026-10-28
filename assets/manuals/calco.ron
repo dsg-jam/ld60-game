@@ -17,14 +17,13 @@
             blocks: [
                 Group(Jumps),
                 Group(Math),
-                Group(Routines),
             ],
         ),
         (
             blocks: [
+                Group(Routines),
                 Group(Loops),
                 Group(Lights),
-                Example,
             ],
         ),
         (

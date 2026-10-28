@@ -17,7 +17,6 @@ datasheet-group-math = MATH
 datasheet-group-routines = ROUTINES
 datasheet-group-loops = LOOPS
 datasheet-group-lights = LIGHTS
-datasheet-example = EXAMPLE
 
 datasheet-experts = FOR EXPERTS
 datasheet-flags = A compare sets Z if A was equal and C if A was lower. Only compares and math change Z and C.
