@@ -4,6 +4,7 @@ mod emulator;
 mod handheld;
 mod link;
 mod name;
+mod pick_area;
 mod silhouette;
 
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -21,7 +22,7 @@ use ld60_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
-pub(crate) use self::casing::{Casing, Header};
+pub(crate) use self::casing::{Casing, Header, Turning};
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::link::Connected;
@@ -65,6 +66,7 @@ impl Plugin for DevicePlugin {
             )
             .init_resource::<Turned>()
             .add_observer(Holdable::on_add)
+            .add_observer(pick_area::PickArea::on_add)
             .add_observer(Holdable::spin_on_drag)
             .add_observer(Turned::reset);
     }
@@ -108,6 +110,11 @@ impl Turned {
         turned.0 = 0.0;
     }
 }
+
+/// Something else moves the device, so it neither rests nor follows the
+/// player.
+#[derive(Component, Debug, Default)]
+pub(crate) struct Carried;
 
 /// A device the player can pick up, rotate and put back.
 ///
@@ -194,7 +201,7 @@ impl Holdable {
         state: Res<State<Focus>>,
         focused: Res<Focused>,
         camera: Single<&PlayerCamera>,
-        mut holdables: Query<(Entity, &Holdable, &mut Transform)>,
+        mut holdables: Query<(Entity, &Holdable, &mut Transform), Without<Carried>>,
     ) {
         let dt = time.delta_secs();
         for (entity, holdable, mut transform) in &mut holdables {

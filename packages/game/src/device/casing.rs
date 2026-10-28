@@ -1,4 +1,6 @@
-use std::f32::consts::FRAC_PI_2;
+mod travel;
+
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     ecs::{lifecycle::HookContext, world::DeferredWorld},
@@ -9,12 +11,14 @@ use ld60_core::audio::{Play, Sound};
 #[cfg(feature = "debug_port")]
 use ld60_core::debug_port::DebugMethods;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_core::player::focus::{Clickable, Focused};
+use ld60_core::player::focus::{ClickTool, Clickable, Focused};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
+pub(crate) use self::travel::Turning;
 use super::board::BoardLayout;
+use super::pick_area::PickArea;
 use super::{Connected, Holdable, Turned};
 
 /// Thickness of the back cover. The board and the header fit inside it.
@@ -27,25 +31,53 @@ const HOLE: Vec3 = Vec3::new(0.0034, 0.0003, 0.0034);
 /// this far apart.
 const ASIDE: f32 = 0.014;
 const SCREW_GAP: f32 = 0.014;
+/// Gap between the device and its cover lying on the mat.
+const COVER_GAP: f32 = 0.02;
 const SCREW_METAL: Color = Color::srgb_u8(0xc8, 0xca, 0xce);
 const HOLE_DARK: Color = Color::srgb_u8(0x10, 0x10, 0x12);
+/// The area around a screw or its hole that catches the pointer.
+const SCREW_PICK: Vec3 = Vec3::new(0.012, 0.006, 0.012);
+/// How much the area that catches the pointer reaches past the header.
+const HEADER_PICK: Vec3 = Vec3::splat(0.008);
 
-/// The parts of a casing whose click prompt changes.
-type Prompted<'a> = (&'a mut Clickable, Has<CoverPlate>, Has<Header>, Has<Board>);
+/// The parts of a casing that say what a click does while the device is
+/// focused.
+type Prompted<'a> = (
+    Option<&'a Clickable>,
+    Has<CoverPlate>,
+    Has<Header>,
+    Has<Board>,
+    Has<Screw>,
+);
+type Clicked = Or<(
+    With<CoverPlate>,
+    With<Header>,
+    With<Board>,
+    With<Screw>,
+    With<Hole>,
+)>;
 
 /// The parts of a casing that show or hide.
-type Shown = Or<(With<Cover>, With<Screw>, With<Hole>, With<Aside>)>;
+type Shown = Or<(With<Screw>, With<Hole>, With<Aside>)>;
 
 pub(super) struct CasingPlugin;
 
 impl Plugin for CasingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (Casing::lay_out, Casing::show).chain())
-            .add_observer(Screw::press)
-            .add_observer(Hole::press)
-            .add_observer(CoverPlate::press)
-            .add_observer(Board::press)
-            .add_observer(Header::press);
+        app.add_systems(
+            Update,
+            (
+                Casing::lay_out,
+                Casing::travel.after(Holdable::follow),
+                Casing::show,
+            )
+                .chain(),
+        )
+        .add_observer(Screw::press)
+        .add_observer(Hole::press)
+        .add_observer(CoverPlate::press)
+        .add_observer(Board::press)
+        .add_observer(Header::press);
         #[cfg(feature = "debug_port")]
         app.add_debug_method("ld60.device", Casing::debug_device);
     }
@@ -65,6 +97,12 @@ pub(crate) struct Casing {
     /// The screws lying next to the device, one per screw, shown while it
     /// is out.
     aside: Vec<Entity>,
+    /// Where each screw goes in, in the space of the cover. The screw points
+    /// along +Y.
+    holes: Vec<Vec3>,
+    /// How far the cover is on its way from the device to the mat, from 0
+    /// to 1. Unknown until the cover first shows.
+    cover: Option<f32>,
 }
 
 /// Where the screws and the header of a device sit on its underside, see
@@ -88,10 +126,12 @@ struct Screw(usize);
 #[derive(Component, Debug)]
 struct Hole(usize);
 
-/// A screw that is out, lying on the mat next to its device.
+/// A screw that is out, lying on the mat next to its device, or on its way
+/// between there and its hole.
 #[derive(Component, Debug)]
 struct Aside {
-    index: usize,
+    /// How far it is on its way from its hole to the mat, from 0 to 1.
+    progress: f32,
 }
 
 #[derive(Component, Debug)]
@@ -102,12 +142,14 @@ struct Board;
 pub(crate) struct Header;
 
 impl Casing {
-    fn new(screws: usize, bounds: Block) -> Self {
+    fn new(holes: Vec<Vec3>, bounds: Block) -> Self {
         Self {
-            loose: vec![false; screws],
+            loose: vec![false; holes.len()],
             open: false,
             bounds,
             aside: Vec::new(),
+            holes,
+            cover: None,
         }
     }
 
@@ -116,20 +158,42 @@ impl Casing {
     /// counter. Yaw and spot only, so it stays put when the device is turned
     /// over.
     pub(crate) fn aside_at(bounds: &Block, index: usize, rest: &Transform) -> Transform {
-        let along = rest.rotation * Vec3::Z;
-        let yaw = Quat::from_rotation_y(along.x.atan2(along.z));
+        let yaw = Self::yaw(rest);
         let offset = Vec3::new(
             -bounds.size.x / 2.0 - ASIDE,
             0.0,
             -bounds.size.z / 2.0 + SCREW_GAP * (index as f32 + 0.5),
         );
-        let mut at = rest.translation.with_y(0.0) + yaw * offset;
+        let at = rest.translation.with_y(0.0) + yaw * offset;
+        // Lying on its side, with the shank along the row.
+        Transform::from_translation(at.with_y(Self::ground(at) + SCREW.x / 2.0))
+            .with_rotation(yaw * Quat::from_rotation_z(-FRAC_PI_2))
+    }
+
+    /// Where the cover of a device with `bounds` lies while it is off, on
+    /// the left of the device past its screws, with its outside up. Like
+    /// [`Self::aside_at`], it stays put when the device is turned over.
+    pub(crate) fn cover_at(bounds: &Block, rest: &Transform) -> Transform {
+        let yaw = Self::yaw(rest);
+        let at = rest.translation.with_y(0.0)
+            + yaw * Vec3::NEG_X * (bounds.size.x + ASIDE + SCREW.x + COVER_GAP);
+        // The plate reaches from its origin to `COVER` inside, so turned over
+        // it lies below its origin.
+        Transform::from_translation(at.with_y(Self::ground(at) + COVER))
+            .with_rotation(yaw * Quat::from_rotation_z(PI))
+    }
+
+    /// The turn of a device resting at `rest` around the vertical.
+    fn yaw(rest: &Transform) -> Quat {
+        let along = rest.rotation * Vec3::Z;
+        Quat::from_rotation_y(along.x.atan2(along.z))
+    }
+
+    /// The height of the mat at `at` or, off the mat, of the counter.
+    fn ground(at: Vec3) -> f32 {
         let mat = CounterLayout::new().mat;
         let on_mat = (mat.min().xz().cmple(at.xz()) & at.xz().cmple(mat.max().xz())).all();
-        at.y = if on_mat { mat.max().y } else { mat.min().y };
-        // Lying on its side, with the shank along the row.
-        Transform::from_translation(at + Vec3::Y * SCREW.x / 2.0)
-            .with_rotation(yaw * Quat::from_rotation_z(-FRAC_PI_2))
+        if on_mat { mat.max().y } else { mat.min().y }
     }
 
     fn on_remove(mut world: DeferredWorld, context: HookContext) {
@@ -170,66 +234,52 @@ impl Casing {
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
         let underside = |spot: Vec2| plate.top_spot(spot).with_y(0.0);
+        let holes = spots.screws.iter().map(|&spot| underside(spot)).collect();
         device
             .spawn((Cover, Transform::IDENTITY, Visibility::Inherited))
             .with_children(|cover| {
-                cover.spawn((
-                    CoverPlate,
-                    Clickable {
-                        prompt: "click-cover-screwed",
-                    },
-                    Shape::cuboid(&plate, color),
-                    Finish::Plastic,
-                ));
+                cover.spawn((CoverPlate, Shape::cuboid(&plate, color), Finish::Plastic));
                 for (index, &spot) in spots.screws.iter().enumerate() {
                     let head = Block::new(SCREW).translated(underside(spot) - Vec3::Y * SCREW.y);
-                    cover.spawn((
-                        Screw(index),
-                        Clickable {
-                            prompt: "click-unscrew",
-                        },
-                        Shape::cylinder(&head, SCREW_METAL),
-                        Finish::Metal,
-                    ));
+                    cover
+                        .spawn((
+                            Screw(index),
+                            ClickTool::Screwdriver,
+                            Shape::cylinder(&head, SCREW_METAL),
+                            Finish::Metal,
+                        ))
+                        .with_child(PickArea(SCREW_PICK));
                     // Under the head, so it shows once the screw is out.
                     let hole = Block::new(HOLE).translated(underside(spot) - Vec3::Y * HOLE.y);
-                    cover.spawn((
-                        Hole(index),
-                        Clickable {
-                            prompt: "click-screw-in",
-                        },
-                        Shape::cylinder(&hole, HOLE_DARK),
-                        Finish::Plastic,
-                    ));
+                    cover
+                        .spawn((
+                            Hole(index),
+                            ClickTool::Screwdriver,
+                            Shape::cylinder(&hole, HOLE_DARK),
+                            Finish::Plastic,
+                        ))
+                        .with_child(PickArea(SCREW_PICK));
                 }
                 cover.spawn(sticker);
             });
-        let board = || {
-            (
-                Board,
-                Clickable {
-                    prompt: "click-cover-on",
-                },
-            )
-        };
         device.spawn((
-            board(),
+            Board,
             Shape::cuboid(&layout.board, BoardLayout::edge()),
             Finish::Plastic,
         ));
-        device.spawn((board(), face));
-        device.spawn((
-            Header,
-            Clickable {
-                prompt: "click-plug-in",
-            },
-            Shape::cuboid(&layout.header, BoardLayout::header_color()),
-            Finish::Plastic,
-        ));
+        device.spawn((Board, face));
+        device
+            .spawn((
+                Header,
+                ClickTool::Plug,
+                Shape::cuboid(&layout.header, BoardLayout::header_color()),
+                Finish::Plastic,
+            ))
+            .with_child(PickArea(layout.header.size + HEADER_PICK));
         for (part, color) in layout.parts() {
             device.spawn((Shape::cuboid(part, color), Finish::Plastic));
         }
-        Self::new(spots.screws.len(), Block::new(shell.size.with_y(height)))
+        Self::new(holes, Block::new(shell.size.with_y(height)))
     }
 
     /// Turns a screw in or out. Screws only turn while the cover is on.
@@ -265,7 +315,9 @@ impl Casing {
                     commands
                         .spawn((
                             Name::new("screw aside"),
-                            Aside { index },
+                            Aside {
+                                progress: if casing.loose[index] { 1.0 } else { 0.0 },
+                            },
                             Transform::default(),
                             Visibility::Hidden,
                         ))
@@ -282,15 +334,19 @@ impl Casing {
     }
 
     /// Shows the cover and the screws as the casing is, and what a click on
-    /// them does.
+    /// them does. From the desk a click inspects the device, so its parts
+    /// only say so once it is focused.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn show(
-        casings: Query<(Entity, &Casing, &Holdable, Has<Connected>)>,
+        focused: Res<Focused>,
+        casings: Query<(Entity, &Casing, Has<Connected>)>,
         children: Query<&Children>,
         mut shown: Query<&mut Visibility, Shown>,
         screws: Query<&Screw>,
         holes: Query<&Hole>,
-        mut asides: Query<(&Aside, &mut Transform)>,
-        mut parts: Query<Prompted>,
+        asides: Query<&Aside>,
+        parts: Query<Prompted, Clicked>,
+        mut commands: Commands,
     ) {
         let visible = |show: bool| {
             if show {
@@ -299,41 +355,56 @@ impl Casing {
                 Visibility::Hidden
             }
         };
-        for (device, casing, holdable, plugged) in &casings {
+        for (device, casing, plugged) in &casings {
             let all_loose = casing.loose.iter().all(|loose| *loose);
-            let loose = |index: usize| casing.loose.get(index).copied().unwrap_or_default();
+            // A screw shows in its hole once it is all the way in, and the
+            // hole while the screw is out or on its way.
+            let out = |index: usize| {
+                casing.loose.get(index).copied().unwrap_or_default()
+                    || casing
+                        .aside
+                        .get(index)
+                        .and_then(|&aside| asides.get(aside).ok())
+                        .is_some_and(|aside| aside.progress > 0.0)
+            };
             for part in children.iter_descendants(device) {
                 let show = if let Ok(screw) = screws.get(part) {
-                    Some(!loose(screw.0))
-                } else if let Ok(hole) = holes.get(part) {
-                    Some(loose(hole.0))
+                    Some(!out(screw.0))
                 } else {
-                    None
+                    holes.get(part).ok().map(|hole| out(hole.0))
                 };
-                if let Ok(mut visibility) = shown.get_mut(part) {
-                    let show = show.unwrap_or(!casing.open);
+                if let (Some(show), Ok(mut visibility)) = (show, shown.get_mut(part)) {
                     visibility.set_if_neq(visible(show));
                 }
-                if let Ok((mut clickable, plate, header, board)) = parts.get_mut(part) {
-                    let prompt = match (plate, header, board) {
-                        (true, ..) if all_loose => "click-cover-off",
-                        (true, ..) => "click-cover-screwed",
-                        (_, true, _) if plugged => "click-unplug",
-                        (_, true, _) => "click-plug-in",
-                        (.., true) if plugged => "click-cover-plugged",
-                        (.., true) => "click-cover-on",
-                        _ => clickable.prompt,
-                    };
-                    clickable.set_if_neq(Clickable { prompt });
+                if let Ok((clickable, plate, header, board, screw)) = parts.get(part) {
+                    let prompt = (focused.get() == Some(device)).then_some(
+                        match (plate, header, board, screw) {
+                            (true, ..) if casing.open && plugged => "click-cover-plugged",
+                            (true, ..) if casing.open => "click-cover-on",
+                            (true, ..) if all_loose => "click-cover-off",
+                            (true, ..) => "click-cover-screwed",
+                            (_, true, ..) if plugged => "click-unplug",
+                            (_, true, ..) => "click-plug-in",
+                            (_, _, true, _) if plugged => "click-cover-plugged",
+                            (_, _, true, _) => "click-cover-on",
+                            (.., true) => "click-unscrew",
+                            _ => "click-screw-in",
+                        },
+                    );
+                    if clickable.map(|clickable| clickable.prompt) != prompt {
+                        match prompt {
+                            Some(prompt) => commands.entity(part).insert(Clickable { prompt }),
+                            None => commands.entity(part).remove::<Clickable>(),
+                        };
+                    }
                 }
             }
             for &screw in &casing.aside {
-                let Ok((aside, mut transform)) = asides.get_mut(screw) else {
+                let Ok(aside) = asides.get(screw) else {
                     continue;
                 };
-                *transform = Self::aside_at(&casing.bounds, aside.index, holdable.rest());
                 if let Ok(mut visibility) = shown.get_mut(screw) {
-                    visibility.set_if_neq(visible(loose(aside.index)));
+                    visibility.set_if_neq(visible(aside.progress > 0.0));
                 }
             }
         }
@@ -426,7 +497,10 @@ impl Screw {
         };
         press.propagate(false);
         let out = casing.loose.get(screw.0) == Some(&false) && casing.turn_screw(screw.0);
-        commands.trigger(Play(if out { Sound::ScrewOut } else { Sound::Refuse }));
+        // The screwdriver plays the turning, see `Casing::travel`.
+        if !out {
+            commands.trigger(Play(Sound::Refuse));
+        }
     }
 }
 
@@ -454,7 +528,9 @@ impl Hole {
         };
         press.propagate(false);
         let back = casing.loose.get(hole.0) == Some(&true) && casing.turn_screw(hole.0);
-        commands.trigger(Play(if back { Sound::ScrewIn } else { Sound::Refuse }));
+        if !back {
+            commands.trigger(Play(Sound::Refuse));
+        }
     }
 }
 
@@ -474,13 +550,21 @@ impl CoverPlate {
         {
             return;
         }
-        let Some((_, mut casing, mut holdable, _)) =
+        let Some((_, mut casing, mut holdable, plugged)) =
             Casing::held(press.entity, &focused, &parents, &mut casings)
         else {
             return;
         };
         press.propagate(false);
-        let sound = if casing.lift_cover() {
+        // The cover on the mat goes back on, like a click on the board.
+        let sound = if casing.open {
+            if casing.close_cover(plugged) {
+                holdable.turn_over(casing.bounds.size.y);
+                Sound::CoverOn
+            } else {
+                Sound::Refuse
+            }
+        } else if casing.lift_cover() {
             holdable.turn_over(casing.bounds.size.y);
             Sound::CoverOff
         } else {
@@ -582,7 +666,7 @@ mod tests {
 
     #[test]
     fn the_cover_comes_off_only_without_screws() {
-        let mut casing = Casing::new(2, Block::new(Vec3::splat(0.02)));
+        let mut casing = Casing::new(vec![Vec3::ZERO; 2], Block::new(Vec3::splat(0.02)));
         assert!(casing.sealed());
         assert!(!casing.lift_cover());
         assert!(casing.turn_screw(0));
@@ -595,7 +679,7 @@ mod tests {
 
     #[test]
     fn the_cover_stays_off_while_plugged_in() {
-        let mut casing = Casing::new(1, Block::new(Vec3::splat(0.02)));
+        let mut casing = Casing::new(vec![Vec3::ZERO], Block::new(Vec3::splat(0.02)));
         casing.turn_screw(0);
         casing.lift_cover();
         assert!(!casing.close_cover(true));
