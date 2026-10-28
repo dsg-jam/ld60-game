@@ -11,12 +11,15 @@ use bevy::{
 };
 use serde_json::Value;
 
+use crate::player::look::KeepMouse;
+
 /// `ld60.input { "pointer": [x, y], "click": "left", "scroll": -1,
 /// "key": "ArrowRight", "text": "LD M1" }` feeds input into the game as if it
 /// came from the window.
 ///
 /// All fields are optional and apply in that order. `pointer` is in logical
-/// pixels and also moves the system cursor. `click` is `left` or `right`.
+/// pixels and also moves the system cursor, unless the game keeps the mouse
+/// free for the user. `click` is `left` or `right`.
 /// `scroll` turns the wheel by that many lines, negative is down. A list of
 /// numbers scrolls by that many pixels each, like a trackpad.
 /// `key` is a `KeyCode` name, like `ControlLeft` to hold a modifier. `text`
@@ -26,9 +29,11 @@ use serde_json::Value;
 /// `click`, so the click sees what is under it.
 /// Device and computer keys see a key once per frame, so send repeated
 /// presses of the same key in separate calls.
+#[expect(clippy::too_many_arguments, reason = "Bevy system")]
 pub(super) fn input(
     In(params): In<Option<Value>>,
     window: Single<(Entity, &mut Window), With<PrimaryWindow>>,
+    keep_mouse: Option<Res<KeepMouse>>,
     mut window_events: MessageWriter<WindowEvent>,
     mut cursor_moves: MessageWriter<CursorMoved>,
     mut buttons: MessageWriter<MouseButtonInput>,
@@ -54,7 +59,9 @@ pub(super) fn input(
                 ))
             })
             .ok_or_else(|| invalid("`pointer` must be [x, y]"))?;
-        window.set_cursor_position(Some(position));
+        if keep_mouse.is_none() {
+            window.set_cursor_position(Some(position));
+        }
         let moved = CursorMoved {
             window: entity,
             position,

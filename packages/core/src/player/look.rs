@@ -46,6 +46,11 @@ impl Plugin for LookPlugin {
     }
 }
 
+/// Leaves the system mouse to the user while a tool drives the game: the
+/// cursor never locks and losing the window focus does not pause.
+#[derive(Resource, Debug)]
+pub struct KeepMouse;
+
 /// Head rotation of the seated player, relative to looking straight ahead.
 #[derive(Resource, Default, Debug)]
 pub struct LookAngles {
@@ -190,7 +195,9 @@ impl Gaze<'_> {
 /// Browsers only allow the lock after a click, so a click in the desk view
 /// locks it again. Until a browser grants the lock, the pointer stays
 /// visible there to click with. In free look it stays hidden either way.
+#[expect(clippy::too_many_arguments, reason = "Bevy system")]
 fn update_cursor(
+    keep_mouse: Option<Res<KeepMouse>>,
     app_state: Res<State<AppState>>,
     focus: Res<State<Focus>>,
     free_look: Res<FreeLook>,
@@ -204,7 +211,7 @@ fn update_cursor(
     let looking = playing && free_look.looking();
     let changed = app_state.is_changed() || focus.is_changed() || looking != *was_looking;
     *was_looking = looking;
-    let wanted = desk || looking;
+    let wanted = (desk || looking) && keep_mouse.is_none();
     let free = !wanted && changed;
     let lock = wanted && (changed || (desk && mouse.just_pressed(MouseButton::Left)));
     if free {
