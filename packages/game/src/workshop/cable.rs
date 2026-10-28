@@ -217,17 +217,14 @@ impl Cable {
 
     /// Puts the plug on the header of the plugged in device, or back on the
     /// counter, and lets the cable move to it.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the cable reads every part it lies on or runs to"
-    )]
     fn follow(
         headers: Query<(Entity, &ChildOf), With<Header>>,
         plugged: Query<&Casing, With<Connected>>,
-        places: TransformHelper,
+        // The device may have moved this frame, after the last transform
+        // propagation, so its pose comes from the transforms.
+        mut places: ParamSet<(TransformHelper, Single<(&Plug, &mut Transform)>)>,
         cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
-        mut plug: Single<(&Plug, &mut Transform)>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
         time: Res<Time>,
     ) {
@@ -236,14 +233,13 @@ impl Cable {
             .iter()
             .find(|(_, parent)| plugged.contains(parent.parent()))
             .and_then(|(header, parent)| {
-                // The device may have moved this frame, after the last
-                // transform propagation.
-                let at = places.compute_global_transform(header).ok()?;
                 let device = parent.parent();
                 let casing = plugged.get(device).ok()?;
-                let device_at = places.compute_global_transform(device).ok()?;
+                let at = places.p0().compute_global_transform(header).ok()?;
+                let device_at = places.p0().compute_global_transform(device).ok()?;
                 Some((at, device_at.affine(), *casing.bounds()))
             });
+        let mut plug = places.p1();
         let (rest, transform) = &mut *plug;
         **transform = match header {
             // The plug stands straight up off the board, so the cable leaves
