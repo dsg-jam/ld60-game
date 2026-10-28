@@ -9,6 +9,8 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use ld60_locale::{Localized, Message};
 
+use super::printer::Printing;
+use super::receipt::Receipt;
 use super::run::Run;
 
 /// Between the shop manuals and the stamp, where the player sees it.
@@ -34,11 +36,25 @@ const LABEL_PAPER: Color = Color::srgb_u8(0xf2, 0xea, 0xd8);
 const LABEL_INK: Color = Color::srgb_u8(0x2a, 0x26, 0x24);
 const LABEL_WEAR: f32 = 0.6;
 
+/// The front of the cash drawer, set into the box, and its handle.
+const DRAWER: Vec3 = Vec3::new(0.114, 0.026, 0.002);
+const DRAWER_LOW: f32 = 0.004;
+const HANDLE: Vec3 = Vec3::new(0.04, 0.004, 0.006);
+const COIN_SLOT: Vec3 = Vec3::new(0.03, 0.001, 0.004);
+const LOCK: Vec3 = Vec3::new(0.009, 0.002, 0.009);
+
 const PAINT: Color = Color::srgb_u8(0x3e, 0x5a, 0x4c);
+const DRAWER_PAINT: Color = Color::srgb_u8(0x2e, 0x44, 0x38);
+const METAL: Color = Color::srgb_u8(0xb8, 0xbc, 0xc0);
+const BRASS: Color = Color::srgb_u8(0xb0, 0x8a, 0x40);
+const SLOT_DARK: Color = Color::srgb_u8(0x12, 0x12, 0x14);
 const WINDOW: Color = Color::srgb_u8(0x26, 0x2a, 0x30);
 
 /// Seconds between two counts of the display.
 const TICK: f32 = 0.06;
+/// Seconds the display waits before it counts a change, once any receipt
+/// is out.
+const WAIT: f32 = 0.6;
 /// The display counts the change in at most this many steps.
 const STEPS: u32 = 12;
 
@@ -94,9 +110,12 @@ impl Till {
     fn count(
         run: Res<Run>,
         time: Res<Time>,
+        printing: Query<(), (With<Receipt>, With<Printing>)>,
         mut tills: Query<(&mut Till, &mut LcdDisplay, &GlobalTransform)>,
         mut commands: Commands,
     ) {
+        // The money of a pickup goes in once its receipt is out.
+        let waiting = !printing.is_empty();
         for (mut till, mut display, at) in &mut tills {
             let target = run.till();
             let Some(shown) = till.shown else {
@@ -109,8 +128,10 @@ impl Till {
                 till.stride = 0;
                 continue;
             }
-            if till.stride == 0 {
+            if till.stride == 0 || waiting {
                 till.stride = Self::stride(shown, target);
+                till.since = -WAIT;
+                continue;
             }
             till.since += time.delta_secs();
             if till.since < TICK {
@@ -120,7 +141,7 @@ impl Till {
             let next = Self::step(shown, target, till.stride);
             till.shown = Some(next);
             display.digits = Self::digits(next);
-            commands.trigger(PlayAt(Sound::Detent, at.translation()));
+            commands.trigger(PlayAt(Sound::Coin, at.translation()));
         }
     }
 
@@ -148,7 +169,25 @@ impl Till {
         let tilt = Quat::from_rotation_x(-PANEL_TILT);
         let edge = lid.top_spot(Vec2::ZERO) + Vec3::NEG_Z * PANEL_BACK;
         let panel_at = edge + tilt * Vec3::new(0.0, PANEL.y / 2.0, -PANEL.z / 2.0);
-        let label_at = Vec3::new(0.0, body.center.y, body.max().z + GAP);
+        let drawer = Block::new(DRAWER).translated(Vec3::new(
+            0.0,
+            DRAWER_LOW,
+            (BOX_SIZE.z + DRAWER.z) / 2.0,
+        ));
+        let handle = Block::new(HANDLE).translated(Vec3::new(
+            0.0,
+            DRAWER_LOW + 0.003,
+            drawer.max().z + HANDLE.z / 2.0,
+        ));
+        let on_lid = |size: Vec3, x: f32, z: f32| {
+            Block::new(size)
+                .on_top_of(&lid)
+                .translated(Vec3::new(x, 0.0, z))
+        };
+        let coin_slot = on_lid(COIN_SLOT, -0.03, 0.03);
+        let lock = on_lid(LOCK, 0.045, 0.03);
+        // The label sits on the drawer, above the handle.
+        let label_at = Vec3::new(0.0, DRAWER_LOW + DRAWER.y * 0.62, drawer.max().z + GAP);
 
         commands
             .entity(add.entity)
@@ -159,6 +198,10 @@ impl Till {
             .with_children(|till| {
                 till.spawn((Shape::cuboid(&body, PAINT), Finish::Paint));
                 till.spawn((Shape::cuboid(&lid, PAINT), Finish::Paint));
+                till.spawn((Shape::cuboid(&drawer, DRAWER_PAINT), Finish::Paint));
+                till.spawn((Shape::cuboid(&handle, METAL), Finish::Plated));
+                till.spawn((Shape::cuboid(&coin_slot, SLOT_DARK), Finish::Plastic));
+                till.spawn((Shape::cylinder(&lock, BRASS), Finish::Metal));
                 till.spawn((
                     Transform::from_translation(panel_at).with_rotation(tilt),
                     Visibility::default(),

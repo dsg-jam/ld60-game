@@ -476,6 +476,11 @@ impl Run {
         }
     }
 
+    /// Whether the player bought the building, so no rent is due.
+    pub(crate) fn owned(&self) -> bool {
+        self.owned
+    }
+
     /// What the landlord takes the next time the planet sets.
     pub(crate) fn rent(&self) -> u32 {
         RENT + RENT_RISE * self.stats.cycles
@@ -534,10 +539,6 @@ impl Run {
 impl Run {
     pub(crate) fn add_till(&mut self, amount: u32) {
         self.till += amount;
-    }
-
-    pub(crate) fn owned(&self) -> bool {
-        self.owned
     }
 
     /// A run whose landlord sells the building.
