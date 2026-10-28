@@ -544,7 +544,7 @@ impl Resolver<'_> {
             ExprKind::Key(key) => self
                 .target
                 .key_code(*key)
-                .map(|code| Value::Imm(Literal::hex(code)))
+                .map(|code| Value::Imm(Literal::decimal(code)))
                 .ok_or_else(|| {
                     Diagnostic::error(
                         pos,

@@ -14,17 +14,17 @@ reset:  LDI  A, 0
         ST   M3
 one:    LDI  A, 1
         ST   M6
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  10
         JC   digit
-        CPI  0x0A
+        CPI  10
         JZ   homekey
-        CPI  0x0B
+        CPI  11
         JZ   guestkey
-        CPI  0x0C
+        CPI  12
         JZ   nextkey
-        CPI  0x0D
+        CPI  13
         JZ   reset
         JMP  main
 

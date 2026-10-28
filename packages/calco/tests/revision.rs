@@ -48,7 +48,7 @@ fn rev_a_rejects_ops_it_lacks() {
         ("call 0", "CALL"),
         ("JNZ 0", "JNZ"),
         ("OUT ANN", "OUT"),
-        ("LDI B, 5", "LDI B, 0x05"),
+        ("LDI B, 5", "LDI B, 5"),
         ("LD [B+2]", "LD [B+2]"),
         ("st [b]", "ST [B]"),
     ] {
@@ -144,7 +144,7 @@ fn rev_a_has_the_minimal_set() {
     assert_eq!(
         Revision::A.isa().mnemonics(),
         [
-            "NOP", "HLT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC"
+            "NOP", "WAIT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC"
         ]
     );
 }
@@ -163,7 +163,7 @@ fn forms_tell_addressing_modes_apart() {
         forms(Revision::A),
         [
             "NOP",
-            "HLT",
+            "WAIT",
             "INC",
             "LD Mn",
             "ST Mn",
@@ -212,7 +212,7 @@ fn disassembler_agrees_with_the_cpu() {
             .collect()
     };
     assert_eq!(text(Revision::A), [".db 0x31", ".db 0x07", "INC"]);
-    assert_eq!(text(Revision::B), ["LDI B, 0x07", "INC", ".db 0xFF"]);
+    assert_eq!(text(Revision::B), ["LDI B, 7", "INC", ".db 0xFF"]);
 }
 
 #[test]

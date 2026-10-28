@@ -8,7 +8,7 @@ impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Op::Nop => f.write_str("NOP"),
-            Op::Hlt => f.write_str("HLT"),
+            Op::Wait => f.write_str("WAIT"),
             Op::Ret => f.write_str("RET"),
             Op::Swp => f.write_str("SWP"),
             Op::Clc => f.write_str("CLC"),
@@ -22,9 +22,9 @@ impl fmt::Display for Op {
             Op::Adc(a) => write!(f, "ADC {a}"),
             Op::Sbc(a) => write!(f, "SBC {a}"),
             Op::Cmp(a) => write!(f, "CMP {a}"),
-            Op::LdiA(v) => write!(f, "LDI A, 0x{v:02X}"),
-            Op::LdiB(v) => write!(f, "LDI B, 0x{v:02X}"),
-            Op::Cpi(v) => write!(f, "CPI 0x{v:02X}"),
+            Op::LdiA(v) => write!(f, "LDI A, {v}"),
+            Op::LdiB(v) => write!(f, "LDI B, {v}"),
+            Op::Cpi(v) => write!(f, "CPI {v}"),
             Op::In(ports::KEY) => f.write_str("IN KEY"),
             Op::In(ports::REV) => f.write_str("IN REV"),
             Op::In(p) => write!(f, "IN {p}"),

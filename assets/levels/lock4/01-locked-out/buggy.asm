@@ -17,13 +17,13 @@ clrkey: LDI  A, 0
         LDI  A, 2
         OUT  ANN
         CALL blank
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  10
         JC   digit
-        CPI  0x0B
+        CPI  11
         JZ   newkey
-        CPI  0x0C
+        CPI  12
         JZ   clrkey
 enter:  LDI  A, 1
         ST   MB
@@ -51,7 +51,7 @@ bad:    LDI  A, 0
         JC   main
         LDI  A, 6
         OUT  ANN
-jam:    HLT
+jam:    WAIT
         IN   KEY
         JMP  jam
 

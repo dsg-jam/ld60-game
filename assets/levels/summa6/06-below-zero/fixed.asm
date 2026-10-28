@@ -9,15 +9,15 @@
 ; A total with M9 at 5 or more is negative, in ten's complement.
 
 reset:  CALL clear
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  10
         JC   digit
-        CPI  0x0A
+        CPI  10
         JZ   plus
-        CPI  0x0B
+        CPI  11
         JZ   minus
-        CPI  0x0D
+        CPI  13
         JZ   clrkey
 equals: CALL apply
         LDI  A, 0

@@ -102,7 +102,7 @@ here:   NOP ; raw
 }
 
 #[test]
-fn key_literals_print_in_hex_and_numbers_keep_their_radix() {
+fn key_literals_print_in_decimal_and_numbers_keep_their_radix() {
     let source = "\
 firmware \"T\" for tally2
 entry main {
@@ -119,7 +119,7 @@ entry main {
     assert!(
         output
             .asm
-            .contains("CPI  0x0A\n        JZ   main\n        CPI  0x0B\n        JZ   main\n        CPI  11\n        JZ   main\n        CPI  0x0A\n        JC   main\n"),
+            .contains("CPI  10\n        JZ   main\n        CPI  0x0B\n        JZ   main\n        CPI  11\n        JZ   main\n        CPI  0x0A\n        JC   main\n"),
         "{}",
         output.asm
     );
@@ -150,7 +150,7 @@ entry main {
         let output = compile(source, &Target::new(chip, board), &selection).unwrap();
         for key in ['+', 'C'] {
             let code = board.key_code(key).unwrap();
-            let check = format!("CPI  0x{code:02X}\n");
+            let check = format!("CPI  {code}\n");
             assert!(output.asm.contains(&check), "{rev:?} {key}\n{}", output.asm);
         }
     }

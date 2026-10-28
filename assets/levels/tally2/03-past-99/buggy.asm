@@ -6,12 +6,12 @@
 reset:  LDI  A, 0
         ST   M1
         ST   M2
-main:   HLT
+main:   WAIT
         IN   KEY
         ST   M3
-        CPI  0x0D
+        CPI  13
         JZ   reset
-        CPI  0x0A
+        CPI  10
         JZ   count
         JMP  main
 

@@ -39,12 +39,12 @@ fn rev_a_inlines_a_routine_with_one_call() {
 reset:  LDI  A, 0
         ST   M1
         ST   M2
-main:   HLT
+main:   WAIT
         IN   KEY
         ST   M3
-        CPI  0x0D
+        CPI  13
         JZ   reset
-        CPI  0x0A
+        CPI  10
         JZ   count
         JMP  main
 
@@ -89,7 +89,7 @@ entry reset {
 reset:  LDI  A, 0
 clr:    ST   M2
         ST   M1
-        HLT
+        WAIT
 "
     );
     assert_supported(&output, Revision::A);
@@ -155,7 +155,7 @@ entry main {
     assert_eq!(
         code(&output),
         "\
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  0x0A
         JZ   mskip
@@ -214,7 +214,7 @@ bstore: ST   M1
         JC   bstor2
         LDI  A, 0
 bstor2: ST   M1
-        HLT
+        WAIT
         JMP  main
 "
     );
