@@ -44,6 +44,15 @@ const CELLS: [Vec2; MOST] = [
 const FEWEST: usize = 3;
 const MOST: usize = 4;
 const CRATE_WOOD: Color = Color::srgb_u8(0x8a, 0x6a, 0x44);
+const POST_WOOD: Color = Color::srgb_u8(0x6a, 0x4e, 0x30);
+const NAIL: Color = Color::srgb_u8(0x5a, 0x5c, 0x5e);
+/// Each wall is two slats with a gap between them.
+const SLAT_GAP: f32 = 0.007;
+/// The square posts in the corners, a little taller than the walls.
+const POST: Vec3 = Vec3::new(0.014, 0.074, 0.014);
+/// The grips on the short sides.
+const GRIP: Vec3 = Vec3::new(0.008, 0.01, 0.06);
+const NAIL_HEAD: f32 = 0.003;
 const STRAW: Color = Color::srgb_u8(0xc8, 0xb0, 0x6a);
 const FINDS: [Color; 4] = [
     Color::srgb_u8(0x4a, 0x4e, 0x52),
@@ -193,14 +202,56 @@ impl SalvageCrate {
         commands.entity(add.entity).with_children(|salvage| {
             salvage.spawn((Shape::cuboid(&floor, CRATE_WOOD), Finish::Wood));
             salvage.spawn((Shape::cuboid(&straw, STRAW), Finish::Fabric));
+            let slat = (CRATE_SIZE.y - SLAT_GAP) / 2.0;
             for side in [-1.0, 1.0] {
-                let long = Block::new(Vec3::new(CRATE_SIZE.x, CRATE_SIZE.y, WALL))
-                    .translated(Vec3::Z * side * (CRATE_SIZE.z - WALL) / 2.0);
-                let short = Block::new(Vec3::new(WALL, CRATE_SIZE.y, CRATE_SIZE.z - 2.0 * WALL))
-                    .translated(Vec3::X * side * (CRATE_SIZE.x - WALL) / 2.0);
-                for wall in [long, short] {
-                    salvage.spawn((Shape::cuboid(&wall, CRATE_WOOD), Finish::Wood));
+                for low in [0.0, slat + SLAT_GAP] {
+                    let long = Block::new(Vec3::new(CRATE_SIZE.x - 2.0 * POST.x, slat, WALL))
+                        .translated(Vec3::new(0.0, low, side * (CRATE_SIZE.z - WALL) / 2.0));
+                    let short = Block::new(Vec3::new(WALL, slat, CRATE_SIZE.z - 2.0 * POST.z))
+                        .translated(Vec3::new(side * (CRATE_SIZE.x - WALL) / 2.0, low, 0.0));
+                    for wall in [long, short] {
+                        salvage.spawn((Shape::cuboid(&wall, CRATE_WOOD), Finish::Wood));
+                    }
+                    // Nailed to the posts at both ends.
+                    for end in [-1.0, 1.0] {
+                        let nail = Block::new(Vec3::new(NAIL_HEAD, NAIL_HEAD, 0.001)).translated(
+                            Vec3::new(
+                                end * (CRATE_SIZE.x - POST.x) / 2.0,
+                                low + slat / 2.0,
+                                side * CRATE_SIZE.z / 2.0,
+                            ),
+                        );
+                        salvage.spawn((Shape::cuboid(&nail, NAIL), Finish::Metal));
+                    }
                 }
+                for end in [-1.0, 1.0] {
+                    let post = Block::new(POST).translated(Vec3::new(
+                        side * (CRATE_SIZE.x - POST.x) / 2.0,
+                        0.0,
+                        end * (CRATE_SIZE.z - POST.z) / 2.0,
+                    ));
+                    salvage.spawn((Shape::cuboid(&post, POST_WOOD), Finish::Wood));
+                }
+                let grip = Block::new(GRIP).translated(Vec3::new(
+                    side * (CRATE_SIZE.x + GRIP.x) / 2.0,
+                    CRATE_SIZE.y * 0.6,
+                    0.0,
+                ));
+                salvage.spawn((Shape::cuboid(&grip, POST_WOOD), Finish::Wood));
+            }
+            // Loose tufts, so the straw is not flat.
+            for (x, z, height) in [
+                (-0.4, 0.0, 0.006),
+                (0.0, 0.7, 0.004),
+                (0.45, -0.1, 0.007),
+                (0.0, -0.7, 0.005),
+            ] {
+                let tuft = Block::new(Vec3::new(0.05, height, 0.035)).translated(Vec3::new(
+                    x * inside.x / 2.0,
+                    straw.max().y,
+                    z * inside.y / 2.0,
+                ));
+                salvage.spawn((Shape::cuboid(&tuft, STRAW), Finish::Fabric));
             }
             for (index, &find) in finds.iter().enumerate() {
                 let cell = CELLS[index] * inside / 4.0;
