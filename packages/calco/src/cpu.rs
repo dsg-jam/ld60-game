@@ -138,8 +138,8 @@ impl ld60_machine::Cpu for Cpu {
         let mut target = next;
         match op {
             Op::Nop | Op::Reserved(_) => {}
-            Op::Hlt => {
-                if !bus.wake_requested() {
+            Op::Wait => {
+                if !bus.take_wake() {
                     return Step::Halted;
                 }
             }

@@ -222,7 +222,7 @@ impl Backend for CalcoBackend {
                 let (addr, operand) = memory(*place)?;
                 self.emit(out, Op::St(addr), vec![operand])
             }
-            Prim::Wait => self.emit(out, Op::Hlt, Vec::new()),
+            Prim::Wait => self.emit(out, Op::Wait, Vec::new()),
         }
     }
 
@@ -280,7 +280,7 @@ fn memory(place: Place) -> Result<(Addr, Operand), String> {
 fn mnemonic(op: Op) -> &'static str {
     match op {
         Op::Nop | Op::Reserved(_) => "NOP",
-        Op::Hlt => "HLT",
+        Op::Wait => "WAIT",
         Op::Ret => "RET",
         Op::Swp => "SWP",
         Op::Clc => "CLC",

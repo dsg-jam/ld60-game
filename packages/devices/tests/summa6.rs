@@ -32,7 +32,7 @@ clr:    ST   [B]
         DJNZ clr
         LDI  A, 1
         OUT  ANN
-        HLT
+        WAIT
         ",
     );
     d.power_on(7);
@@ -42,7 +42,7 @@ clr:    ST   [B]
 
 #[test]
 fn key_press_wakes_halt_and_reads_once() {
-    let mut d = device("main: HLT\nIN KEY\nST M6\nIN KEY\nST M5\nJMP main");
+    let mut d = device("main: WAIT\nIN KEY\nST M6\nIN KEY\nST M5\nJMP main");
     d.power_on(1);
     d.run_until_halt(MAX_STEPS).unwrap();
     d.press_key('7').unwrap();
@@ -53,7 +53,7 @@ fn key_press_wakes_halt_and_reads_once() {
 
 #[test]
 fn power_on_fills_ram_with_garbage() {
-    let mut d = device("HLT");
+    let mut d = device("WAIT");
     d.power_on(1);
     let first = d.cpu().ram().cells().to_vec();
     d.power_on(2);

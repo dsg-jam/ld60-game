@@ -4,10 +4,10 @@ use crate::encoder::MNEMONICS;
 use crate::{Addr, Calco, Cond, Op};
 
 const REV_A_MNEMONICS: &[&str] = &[
-    "NOP", "HLT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC",
+    "NOP", "WAIT", "INC", "LD", "ST", "LDI", "CPI", "IN", "JMP", "JZ", "JC",
 ];
 const REV_B_MNEMONICS: &[&str] = &[
-    "NOP", "HLT", "RET", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI", "ADC",
+    "NOP", "WAIT", "RET", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI", "ADC",
     "SBC", "IN", "OUT", "JMP", "JZ", "JNZ", "JC", "JNC", "CALL", "DJNZ",
 ];
 
@@ -68,7 +68,7 @@ impl Revision {
             Self::A => matches!(
                 op,
                 Op::Nop
-                    | Op::Hlt
+                    | Op::Wait
                     | Op::Inc
                     | Op::Ld(Addr::Direct(_))
                     | Op::St(Addr::Direct(_))

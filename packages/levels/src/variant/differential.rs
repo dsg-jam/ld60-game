@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn accepts_a_faithful_rewrite() {
         let (original, moved) = moved_to_b(
-            "main: HLT\nIN KEY\nCPI 0x0A\nJZ plus\nJMP main\nplus: LD M2\nINC\nST M2\nJMP main\n",
+            "main: WAIT\nIN KEY\nCPI 0x0A\nJZ plus\nJMP main\nplus: LD M2\nINC\nST M2\nJMP main\n",
         );
         assert!(moved.behaves_like(&original));
     }
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn rejects_a_key_code_that_passes_through_ram() {
         let (original, moved) = moved_to_b(
-            "main: HLT\nIN KEY\nST M7\nLD M7\nCPI 0x0A\nJZ plus\nJMP main\nplus: LD M2\nINC\nST M2\nJMP main\n",
+            "main: WAIT\nIN KEY\nST M7\nLD M7\nCPI 0x0A\nJZ plus\nJMP main\nplus: LD M2\nINC\nST M2\nJMP main\n",
         );
         assert!(!moved.behaves_like(&original));
     }

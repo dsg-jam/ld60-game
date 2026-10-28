@@ -42,7 +42,7 @@ pub(crate) fn stop(out: &mut impl Write, stop: Stop) -> io::Result<()> {
     match stop {
         Stop::Halted => writeln!(out, "Waiting for a key."),
         Stop::Breakpoint(addr) => writeln!(out, "Breakpoint at 0x{addr:02X}."),
-        Stop::Timeout => writeln!(out, "No HLT reached. The firmware may be stuck in a loop."),
+        Stop::Timeout => writeln!(out, "No WAIT reached. The firmware may be stuck in a loop."),
     }
 }
 

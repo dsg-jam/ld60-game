@@ -6,9 +6,12 @@ use ld60_machine::{AsmErrorKind, Isa};
 use crate::{Addr, Cond, Op, ROM_LEN, Revision, ports};
 
 pub(crate) const MNEMONICS: &[&str] = &[
-    "NOP", "HLT", "RET", "SWP", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI",
+    "NOP", "WAIT", "RET", "SWP", "CLC", "SEC", "INC", "DEC", "DA", "DS", "LD", "ST", "LDI", "CPI",
     "ADC", "SBC", "CMP", "IN", "OUT", "JMP", "JZ", "JNZ", "JC", "JNC", "CALL", "DJNZ",
 ];
+
+/// Old names, still assembled so older sources keep working.
+const ALIASES: &[(&str, &str)] = &[("HLT", "WAIT")];
 
 pub(crate) const PORTS: &[&str] = &["KEY", "REV", "ANN"];
 pub(crate) const REGISTERS: &[&str] = &[
@@ -40,7 +43,7 @@ impl Encoder for CalcoEncoder {
     }
 
     fn size(&self, instruction: &Instruction) -> Result<usize, AsmErrorKind> {
-        let m = instruction.mnemonic.as_str();
+        let m = canonical(&instruction.mnemonic);
         if !MNEMONICS.contains(&m) {
             return Err(AsmErrorKind::UnknownMnemonic { mnemonic: m.into() });
         }
@@ -62,13 +65,21 @@ impl Encoder for CalcoEncoder {
     }
 }
 
+/// The current name of mnemonic `m`.
+fn canonical(m: &str) -> &str {
+    ALIASES
+        .iter()
+        .find(|(old, _)| *old == m)
+        .map_or(m, |&(_, new)| new)
+}
+
 fn to_op(instruction: &Instruction, labels: &Labels) -> Result<Op, AsmErrorKind> {
-    let m = instruction.mnemonic.as_str();
+    let m = canonical(&instruction.mnemonic);
     let ops = instruction.operands.as_slice();
     let simple = |op| none(m, ops).map(|()| op);
     match m {
         "NOP" => simple(Op::Nop),
-        "HLT" => simple(Op::Hlt),
+        "WAIT" => simple(Op::Wait),
         "RET" => simple(Op::Ret),
         "SWP" => simple(Op::Swp),
         "CLC" => simple(Op::Clc),

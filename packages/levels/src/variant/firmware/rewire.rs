@@ -71,7 +71,7 @@ impl Firmware {
                 }
                 ("LDI", ["B" | "b", _])
                 | (
-                    "ST" | "JZ" | "JNZ" | "JC" | "JNC" | "DJNZ" | "NOP" | "CLC" | "SEC" | "HLT",
+                    "ST" | "JZ" | "JNZ" | "JC" | "JNC" | "DJNZ" | "NOP" | "CLC" | "SEC" | "WAIT",
                     _,
                 ) => {}
                 ("LD" | "LDI" | "IN" | "JMP" | "RET", _) => reading = false,
@@ -254,7 +254,7 @@ mod tests {
     fn moves_cells_keys_and_annunciators() {
         let source = "\
 ; M1-M6 display, M6 is the rightmost digit
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  10
         JC   digit
@@ -271,7 +271,7 @@ plus:   LDI  A, 1
 ";
         let expected = "\
 ; M2-M7 display, M7 is the rightmost digit
-main:   HLT
+main:   WAIT
         IN   KEY
         CPI  10
         JC   digit
@@ -293,11 +293,11 @@ plus:   LDI  A, 2
 
     #[test]
     fn keeps_a_bound_that_matches_a_key_code() {
-        let source = "IN KEY\nCPI 10\nJC digit\nCPI 0x0A\nJZ plus\ndigit: CPI 0\nplus: HLT\n";
+        let source = "IN KEY\nCPI 10\nJC digit\nCPI 0x0A\nJZ plus\ndigit: CPI 0\nplus: WAIT\n";
         let rewired = rewire(source, DeviceKind::Summa6, BoardRev::C).unwrap();
         assert_eq!(
             rewired,
-            "IN KEY\nCPI 10\nJC digit\nCPI 0x0B\nJZ plus\ndigit: CPI 0\nplus: HLT\n"
+            "IN KEY\nCPI 10\nJC digit\nCPI 0x0B\nJZ plus\ndigit: CPI 0\nplus: WAIT\n"
         );
     }
 

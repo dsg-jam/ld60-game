@@ -164,7 +164,7 @@ low:    CPI  0
         let source = "\
         CPI  0x0A
         JZ   plus
-        HLT
+        WAIT
 plus:   CALL clear
         RET
 clear:  CLC
