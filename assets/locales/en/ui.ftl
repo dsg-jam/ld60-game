@@ -19,17 +19,11 @@ hint-look-pins = Look at pins
 hint-look-screen = Look at screen
 
 click-stamp = Stamp ticket
-click-stamp-open = Close up the device first
-click-stamp-ticket = Tear off the new ticket first
-click-stamp-wait = Wait for the customer
 click-manuals = Open shop manuals
 click-buy = Buy
-click-buy-short = Not enough money in the till
 click-computer = Use computer
 click-cover-off = Take off back cover
 click-cover-on = Put back cover on
-click-cover-plugged = Pull the plug before closing
-click-cover-screwed = Take out the screws first
 click-crate = Look in crate
 click-device = Inspect device
 click-lamp-off = Switch off lamp

@@ -333,8 +333,8 @@ impl ForSale {
         Message::new("receipt-amount").with("amount", find.price())
     }
 
-    /// While the crate is open, each find says whether the till holds
-    /// enough for it.
+    /// While the crate is open, each find the till holds enough for can be
+    /// bought.
     fn arm(
         run: Res<Run>,
         focused: Res<Focused>,
@@ -342,13 +342,10 @@ impl ForSale {
         mut commands: Commands,
     ) {
         for (entity, offer, parent, clickable) in &offers {
-            let wanted = (focused.get() == Some(parent.parent())).then(|| Clickable {
-                prompt: if run.till() >= offer.0.price() {
-                    "click-buy"
-                } else {
-                    "click-buy-short"
-                },
-            });
+            let wanted = (focused.get() == Some(parent.parent()) && run.till() >= offer.0.price())
+                .then_some(Clickable {
+                    prompt: "click-buy",
+                });
             if wanted.as_ref() == clickable {
                 continue;
             }
@@ -456,7 +453,7 @@ mod tests {
                 tags.spawn(ForSale::tag(find));
             }));
         }
-        locale.assert_formats(["click-crate", "click-buy", "click-buy-short"].map(Message::new));
+        locale.assert_formats(["click-crate", "click-buy"].map(Message::new));
     }
 
     #[test]

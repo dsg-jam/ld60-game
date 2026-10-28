@@ -377,20 +377,21 @@ impl Casing {
                     visibility.set_if_neq(visible(show));
                 }
                 if let Ok((clickable, plate, header, board, screw)) = parts.get(part) {
-                    let prompt = (focused.get() == Some(device)).then_some(
-                        match (plate, header, board, screw) {
-                            (true, ..) if casing.open && plugged => "click-cover-plugged",
-                            (true, ..) if casing.open => "click-cover-on",
-                            (true, ..) if all_loose => "click-cover-off",
-                            (true, ..) => "click-cover-screwed",
-                            (_, true, ..) if plugged => "click-unplug",
-                            (_, true, ..) => "click-plug-in",
-                            (_, _, true, _) if plugged => "click-cover-plugged",
-                            (_, _, true, _) => "click-cover-on",
-                            (.., true) => "click-unscrew",
-                            _ => "click-screw-in",
-                        },
-                    );
+                    // A part a click does nothing to shows no prompt.
+                    let prompt = (focused.get() == Some(device))
+                        .then_some(match (plate, header, board, screw) {
+                            (true, ..) if casing.open && plugged => None,
+                            (true, ..) if casing.open => Some("click-cover-on"),
+                            (true, ..) if all_loose => Some("click-cover-off"),
+                            (true, ..) => None,
+                            (_, true, ..) if plugged => Some("click-unplug"),
+                            (_, true, ..) => Some("click-plug-in"),
+                            (_, _, true, _) if plugged => None,
+                            (_, _, true, _) => Some("click-cover-on"),
+                            (.., true) => Some("click-unscrew"),
+                            _ => Some("click-screw-in"),
+                        })
+                        .flatten();
                     if clickable.map(|clickable| clickable.prompt) != prompt {
                         match prompt {
                             Some(prompt) => commands.entity(part).insert(Clickable { prompt }),
@@ -654,9 +655,7 @@ mod tests {
                 "click-unscrew",
                 "click-screw-in",
                 "click-cover-off",
-                "click-cover-screwed",
                 "click-cover-on",
-                "click-cover-plugged",
                 "click-plug-in",
                 "click-unplug",
             ]
