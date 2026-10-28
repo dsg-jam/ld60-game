@@ -1,14 +1,16 @@
 use bevy::prelude::*;
-use ld60_core::audio::{Play, Sound};
+use ld60_core::audio::Sound;
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::parts::paper::Paper;
 use ld60_core::parts::screen::UiCanvas;
-use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, View};
+use ld60_core::player::focus::{Focus, FocusTarget, View};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
+use super::bin::Binned;
 use super::levels::Levels;
 use super::pickup::{Payment, Pickup, TRIES};
+use super::printer::Printing;
 use super::ticket::JobTicket;
 
 pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
@@ -55,31 +57,39 @@ impl Receipt {
         }
     }
 
-    /// Replaces the slip of the last pickup and shows the new one.
-    pub(crate) fn hand_out(self, old: impl IntoIterator<Item = Entity>, commands: &mut Commands) {
+    /// Replaces the slip of the last pickup with the new one, which prints
+    /// after `delay` seconds.
+    pub(crate) fn hand_out(
+        self,
+        old: impl IntoIterator<Item = Entity>,
+        delay: f32,
+        commands: &mut Commands,
+    ) {
+        // The old slip goes into the bin.
         for entity in old {
-            commands.entity(entity).despawn();
+            commands.entity(entity).remove::<Receipt>();
+            Binned::send(entity, commands);
         }
-        match self.pickup {
-            Pickup::Paid(_) => commands.trigger(Play(Sound::Chime)),
-            Pickup::HandedBack { .. } | Pickup::Left(_) => commands.trigger(Play(Sound::Thunk)),
-        }
-        let receipt = commands
-            .spawn((
-                Name::new("receipt"),
-                self,
-                CounterLayout::new().place(SPOT, YAW),
-                FocusTarget {
-                    prompt: "click-receipt",
-                    focus: Focus::Paper,
-                    view: View::Local(Paper::reading_view(Self::sheet_center())),
-                },
-            ))
-            .id();
-        commands.trigger(FocusOn { entity: receipt });
+        let landed = match self.pickup {
+            Pickup::Paid(_) => Sound::Chime,
+            Pickup::HandedBack { .. } | Pickup::Left(_) => Sound::Thunk,
+        };
+        // It comes out of the printer, then lies down at its spot.
+        let rest = CounterLayout::new().place(SPOT, YAW);
+        commands.spawn((
+            Name::new("receipt"),
+            self,
+            rest,
+            Printing::receipt(rest, delay, landed),
+            FocusTarget {
+                prompt: "click-receipt",
+                focus: Focus::Paper,
+                view: View::Local(Paper::reading_view(Self::sheet_center())),
+            },
+        ));
     }
 
-    fn sheet_center() -> Vec3 {
+    pub(super) fn sheet_center() -> Vec3 {
         Vec3::Y * SHEET_GAP
     }
 

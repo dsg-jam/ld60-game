@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use ld60_core::audio::{Play, Sound};
 use ld60_core::parts::paper::{Binding, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Focus, FocusTarget, View};
@@ -31,11 +30,9 @@ const CLIP: Color = Color::srgb_u8(0xa8, 0xac, 0xb0);
 const STAMP_POSITION: Vec2 = Vec2::new(300.0, 520.0);
 /// In degrees, clockwise.
 const STAMP_TILT: f32 = -12.0;
-/// Seconds until the camera reaches the ticket.
-const STAMP_DELAY: f32 = 0.55;
-const STAMP_DROP_TIME: f32 = 0.12;
-/// How big the stamp looks while it is still above the paper.
-const STAMP_START_SCALE: f32 = 1.7;
+/// About the middle of the stamp on the canvas, where the rubber stamp
+/// presses.
+const STAMP_MIDDLE: Vec2 = Vec2::new(440.0, 615.0);
 const STAMP_INK: Color = Color::srgba(0.72, 0.12, 0.1, 0.8);
 const LABEL_WIDTH: f32 = 120.0;
 const VALUE_WIDTH: f32 = 440.0;
@@ -44,19 +41,47 @@ pub(crate) struct TicketPlugin;
 
 impl Plugin for TicketPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(JobTicket::on_add).add_systems(
-            Update,
-            (
+        app.add_observer(JobTicket::on_add)
+            .add_observer(Clipboard::on_add)
+            .add_systems(
+                Update,
                 (TicketStatus::update, TicketPays::update)
                     .run_if(resource_exists_and_changed::<Job>),
-                Landing::animate,
-            )
-                .chain(),
-        );
+            );
     }
 }
 
-/// The job ticket for a device on the bench, on a clipboard.
+/// The clipboard on the counter that holds the [`JobTicket`].
+#[derive(Component, Debug)]
+#[require(Transform, Visibility)]
+pub(crate) struct Clipboard;
+
+impl Clipboard {
+    fn board_and_jaw() -> (Block, Block) {
+        let board = Block::new(BOARD_SIZE);
+        let jaw = Block::new(JAW).on_top_of(&board).translated(Vec3::new(
+            0.0,
+            SHEET_GAP,
+            (JAW.z - BOARD_SIZE.z) / 2.0,
+        ));
+        (board, jaw)
+    }
+
+    fn on_add(add: On<Add<Clipboard>>, mut commands: Commands) {
+        let (board, jaw) = Self::board_and_jaw();
+        let spring = Block::new(SPRING)
+            .on_top_of(&board)
+            .translated(Vec3::Z * (SPRING.z - BOARD_SIZE.z) / 2.0);
+        commands.entity(add.entity).with_children(|clipboard| {
+            clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
+            for clip in [spring, jaw] {
+                clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Plated));
+            }
+        });
+    }
+}
+
+/// The job ticket for a device on the bench, a sheet on the [`Clipboard`].
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct JobTicket {
@@ -92,36 +117,19 @@ impl JobTicket {
             Message::new("ticket-footer"),
             |page| Self::write(page, level, visit),
         );
-        let board = Block::new(BOARD_SIZE);
-        let spring = Block::new(SPRING)
-            .on_top_of(&board)
-            .translated(Vec3::Z * (SPRING.z - BOARD_SIZE.z) / 2.0);
-        let jaw = Block::new(JAW).on_top_of(&board).translated(Vec3::new(
-            0.0,
-            SHEET_GAP,
-            (JAW.z - BOARD_SIZE.z) / 2.0,
-        ));
-        let sheet_center = Vec3::new(
-            0.0,
-            board.max().y + SHEET_GAP,
-            jaw.max().z - SHEET_UNDER_CLIP + SHEET_SIZE.y / 2.0,
-        );
-        let mut sheet = Entity::PLACEHOLDER;
-        commands.entity(add.entity).with_children(|clipboard| {
-            clipboard.spawn((Shape::cuboid(&board, BOARD), Finish::Wood));
-            sheet = clipboard
-                .spawn(Paper::sheet(
+        let sheet_center = Self::sheet_center();
+        let sheet = commands
+            .spawn((
+                Paper::sheet(
                     &canvas,
                     ("ticket", &level.id),
                     SHEET_SIZE,
                     sheet_center,
                     &mut meshes,
-                ))
-                .id();
-            for clip in [spring, jaw] {
-                clipboard.spawn((Shape::cuboid(&clip, CLIP), Finish::Plated));
-            }
-        });
+                ),
+                ChildOf(add.entity),
+            ))
+            .id();
         commands.entity(add.entity).insert((
             Paper::new(sheet, SHEET_SIZE, vec![page]),
             Binding::clip(),
@@ -131,6 +139,26 @@ impl JobTicket {
                 view: View::Local(Paper::reading_view(sheet_center)),
             },
         ));
+    }
+
+    pub(super) const SHEET_SIZE: Vec2 = SHEET_SIZE;
+
+    /// The middle of the sheet, which lies under the clip of the
+    /// [`Clipboard`].
+    pub(super) fn sheet_center() -> Vec3 {
+        let (board, jaw) = Clipboard::board_and_jaw();
+        Vec3::new(
+            0.0,
+            board.max().y + SHEET_GAP,
+            jaw.max().z - SHEET_UNDER_CLIP + SHEET_SIZE.y / 2.0,
+        )
+    }
+
+    /// Where the shop stamp is printed, in the space of the ticket. Down
+    /// the page is towards the player.
+    pub(super) fn stamp_spot() -> Vec3 {
+        let along = STAMP_MIDDLE / CANVAS_SIZE.as_vec2() - 0.5;
+        Self::sheet_center() + Vec3::new(along.x * SHEET_SIZE.x, 0.0, along.y * SHEET_SIZE.y)
     }
 
     /// The job number, as the ticket and the receipt print it.
@@ -220,19 +248,17 @@ impl TicketStatus {
     fn update(
         job: Res<Job>,
         mut texts: Query<&mut Localized, With<TicketStatus>>,
-        mut stamps: Query<(Entity, &mut Visibility, Has<Landing>), With<ShopStamp>>,
-        mut commands: Commands,
+        mut stamps: Query<&mut Visibility, With<ShopStamp>>,
     ) {
         for mut text in &mut texts {
             text.set_if_neq(Self::text(Some(&job)).into());
         }
-        for (stamp, mut visibility, landing) in &mut stamps {
-            if !job.stamped {
-                *visibility = Visibility::Hidden;
-                commands.entity(stamp).remove::<Landing>();
-            } else if *visibility == Visibility::Hidden && !landing {
-                commands.entity(stamp).insert(Landing::default());
-            }
+        for mut visibility in &mut stamps {
+            visibility.set_if_neq(if job.stamped {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            });
         }
     }
 }
@@ -262,39 +288,6 @@ impl TicketPays {
                 .last();
             if let Some(mut text) = amount.and_then(|amount| texts.get_mut(amount).ok()) {
                 text.set_if_neq(pays.clone());
-            }
-        }
-    }
-}
-
-/// The shop stamp coming down onto the ticket.
-///
-/// It waits for the camera to reach the ticket, then drops from above and
-/// thunks when it hits the paper.
-#[derive(Component, Debug, Default)]
-pub(super) struct Landing {
-    elapsed: f32,
-}
-
-impl Landing {
-    fn animate(
-        time: Res<Time>,
-        mut stamps: Query<(Entity, &mut Landing, &mut Visibility, &mut UiTransform)>,
-        mut commands: Commands,
-    ) {
-        for (stamp, mut landing, mut visibility, mut transform) in &mut stamps {
-            landing.elapsed += time.delta_secs();
-            let t = (landing.elapsed - STAMP_DELAY) / STAMP_DROP_TIME;
-            if t < 0.0 {
-                continue;
-            }
-            *visibility = Visibility::Inherited;
-            // Speeds up as it falls, like a hand pressing down.
-            let fall = t.min(1.0).powi(2);
-            transform.scale = Vec2::splat(STAMP_START_SCALE + (1.0 - STAMP_START_SCALE) * fall);
-            if t >= 1.0 {
-                commands.entity(stamp).remove::<Landing>();
-                commands.trigger(Play(Sound::Thunk));
             }
         }
     }
