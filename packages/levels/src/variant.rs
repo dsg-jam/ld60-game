@@ -158,6 +158,9 @@ impl Variant {
         if !report.passed() {
             return Err(VerifyError::FixedFails(report));
         }
+        if level.before_line_tests {
+            return Ok(());
+        }
         let report = run_line_tests(level, &rom, TEST_SEEDS).map_err(VerifyError::Run)?;
         if !report.passed() {
             return Err(VerifyError::FixedFailsLineTests(report));

@@ -1,0 +1,18 @@
+(
+    id: "tally2-t6",
+    title: "Squiggle after 9",
+    device: Tally2,
+    boards: [A],
+    keep_layout: true,
+    chip: Calco((revision: A, date_code: 7531)),
+    unit: "00121",
+    remarks: ["first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "+++++++++", display: "09"),
+        (keys: "++++++++++", display: "10"),
+        (keys: "+++++++++++", display: "11"),
+    ],
+    reward: 4,
+    firmware: Some((source: "tally2/firmware-0.6.fw", switches: ["eleven"])),
+)

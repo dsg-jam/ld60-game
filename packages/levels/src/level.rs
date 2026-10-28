@@ -25,6 +25,10 @@ pub struct Level {
     /// to another board.
     #[serde(default)]
     pub keep_layout: bool,
+    /// The firmware is older than the factory line tests, so its fix need
+    /// not pass them. Early tutorial firmware does not read keys yet.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub before_line_tests: bool,
     pub chip: ChipSpec,
     /// The unit number. [`Level::serial`] puts the board in front of it.
     pub unit: String,

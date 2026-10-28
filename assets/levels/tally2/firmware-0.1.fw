@@ -1,0 +1,24 @@
+firmware "Tally-2 firmware 0.1" for tally2
+
+cells tally[2] at M1    ; count, M2 is the rightmost digit
+
+entry start {
+    a = 0               ; put 0 in A
+    tally[1] = a        ; show it on the left digit
+    bug "start-five" {
+        fixed {
+            a = 0       ; put 0 in A
+        }
+        buggy {
+            a = 5       ; put 5 in A
+        }
+    }
+    tally[2] = a        ; show it on the right digit
+}
+
+block count {
+    wait                ; wait for a key press
+    a = tally[2] + 1    ; one more
+    tally[2] = a
+    goto count
+}

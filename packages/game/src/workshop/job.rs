@@ -697,7 +697,7 @@ mod tests {
         follow(&mut world, Levels::on_disk());
         world.resource_mut::<Job>().returns = 1;
         let edit = |source: &mut LevelSource| {
-            source.level = source.level.replace("reward: 3", "reward: 9");
+            source.level = source.level.replace("reward: 2", "reward: 9");
         };
         follow(&mut world, edited(0, edit));
         let job = world.resource::<Job>();

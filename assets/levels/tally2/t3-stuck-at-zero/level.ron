@@ -1,0 +1,19 @@
+(
+    id: "tally2-t3",
+    title: "Stuck at zero",
+    device: Tally2,
+    boards: [A],
+    keep_layout: true,
+    before_line_tests: true,
+    chip: Calco((revision: A, date_code: 7518)),
+    unit: "00074",
+    remarks: ["first-thinking"],
+    rom: (kind: Eprom, blank_available: true),
+    tests: [
+        (keys: "", display: "00"),
+        (keys: "+", display: "01"),
+        (keys: "+++", display: "03"),
+    ],
+    reward: 3,
+    firmware: Some((source: "tally2/firmware-0.3.fw", switches: ["jump-start"])),
+)

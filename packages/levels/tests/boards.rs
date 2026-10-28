@@ -9,8 +9,18 @@ const LEVELS: &str = concat!(env!("LD60_ASSETS"), "/levels");
 static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEVELS)).unwrap());
 
 const SEEDS: std::ops::Range<u64> = 0..256;
-/// Levels whose buggy firmware checks a wrong key code.
-const WRONG_KEY_CODE: &[&str] = &["tally2/01-clear-key"];
+/// Levels whose buggy firmware checks a wrong key code or misses a check.
+const WRONG_KEY_CODE: &[&str] = &[
+    "tally2/01-clear-key",
+    "tally2/t4-c-key-counts",
+    "tally2/t5-no-clear-key",
+];
+/// Tutorial firmware that only checks for the C key. Any other key counts.
+const ONLY_CLEAR_KEY: &[&str] = &[
+    "tally2/t4-c-key-counts",
+    "tally2/t5-no-clear-key",
+    "tally2/t6-squiggle-after-nine",
+];
 
 fn find(path: &str) -> &'static LevelSource {
     CATALOG.find(path).unwrap()
@@ -30,7 +40,7 @@ fn compares(firmware: &str) -> HashSet<u8> {
     firmware
         .lines()
         .filter_map(|line| {
-            let value = line.trim().strip_prefix("CPI")?.trim();
+            let value = line.trim().strip_prefix("CPI")?.split_whitespace().next()?;
             match value.strip_prefix("0x") {
                 Some(hex) => u8::from_str_radix(hex, 16).ok(),
                 None => value.parse().ok(),
@@ -87,7 +97,12 @@ fn board_choice_is_deterministic_and_uses_every_board() {
 #[test]
 fn key_checks_use_the_board_codes() {
     for source in CATALOG.levels() {
-        for board in source.load().unwrap().allowed_boards() {
+        let level = source.load().unwrap();
+        // Firmware this old does not read keys yet.
+        if level.before_line_tests {
+            continue;
+        }
+        for board in level.allowed_boards() {
             let variant = Variant::with_board(source, 3, board).unwrap();
             let board = variant.level.board();
             let mut firmwares = vec![&variant.fixed];
@@ -96,7 +111,12 @@ fn key_checks_use_the_board_codes() {
             }
             for firmware in firmwares {
                 let checks = compares(firmware);
-                for key in ['+', '*', 'C'] {
+                let keys: &[char] = if ONLY_CLEAR_KEY.contains(&source.path.as_str()) {
+                    &['C']
+                } else {
+                    &['+', '*', 'C']
+                };
+                for &key in keys {
                     let Some(code) = board.key_code(key) else {
                         continue;
                     };
