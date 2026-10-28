@@ -9,7 +9,10 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowFocused},
 };
-use ld60_core::player::{focus::Focus, look::CursorLock};
+use ld60_core::player::{
+    focus::Focus,
+    look::{CursorLock, KeepMouse},
+};
 use ld60_locale::Message;
 
 use super::list::{Action, Navigation};
@@ -73,14 +76,15 @@ fn pause_on_escape(
 }
 
 fn pause_on_blur(
+    keep_mouse: Option<Res<KeepMouse>>,
     mut events: MessageReader<WindowFocused>,
     primary: Query<(), With<PrimaryWindow>>,
     mut next: ResMut<NextState<AppState>>,
 ) {
-    if events
+    let blurred = events
         .read()
-        .any(|event| !event.focused && primary.contains(event.window))
-    {
+        .any(|event| !event.focused && primary.contains(event.window));
+    if blurred && keep_mouse.is_none() {
         next.set(AppState::Paused);
     }
 }

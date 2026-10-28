@@ -13,11 +13,17 @@ use bevy::{
 use serde_json::{Value, json};
 
 use crate::player::focus::Focus;
+use crate::player::look::KeepMouse;
 use crate::state::AppState;
 
 const PORT_VARIABLE: &str = "LD60_DEBUG_PORT";
+const KEEP_MOUSE_VARIABLE: &str = "LD60_KEEP_MOUSE";
 
 /// Serves the Bevy Remote Protocol when `LD60_DEBUG_PORT` is set.
+///
+/// With `LD60_KEEP_MOUSE` also set, the game leaves the system mouse to the
+/// user, see [`KeepMouse`]. Its window opens in the background, and
+/// `ld60.input` only moves the pointer of the game.
 pub struct DebugPortPlugin;
 
 impl Plugin for DebugPortPlugin {
@@ -45,6 +51,14 @@ impl Plugin for DebugPortPlugin {
         .add_debug_method("ld60.diagnostics", profile::diagnostics)
         .add_debug_method("ld60.vsync", profile::vsync);
         info!("Debug port listening on {DEFAULT_ADDR}:{port}");
+        if std::env::var_os(KEEP_MOUSE_VARIABLE).is_some() {
+            let world = app.world_mut();
+            let mut windows = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
+            for mut window in windows.iter_mut(world) {
+                window.focused = false;
+            }
+            app.insert_resource(KeepMouse);
+        }
     }
 }
 
