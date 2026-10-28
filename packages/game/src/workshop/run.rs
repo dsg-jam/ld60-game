@@ -412,8 +412,10 @@ impl Run {
                         && self.explains(level.chip)
                 })
         });
-        if let Some((source, _)) = special
-            && rng.random_ratio(1, SPECIAL_ODDS)
+        // The intro jobs of a device, from its first job on, come first and
+        // always. Later special jobs come now and then.
+        if let Some((source, from)) = special
+            && (from == 0 || rng.random_ratio(1, SPECIAL_ODDS))
         {
             return Origin::Special(source.clone());
         }
@@ -834,19 +836,21 @@ mod tests {
     }
 
     #[test]
-    fn a_new_sign_starts_with_easy_jobs() {
+    fn a_new_sign_starts_with_its_intro_jobs() {
         let mut run = Run::default().next();
         for _ in 0..30 {
             run.served.add(DeviceKind::Tally2);
         }
         run.signs = vec![DeviceKind::Summa6];
-        assert_eq!(
-            run.pick(&Levels::on_disk()),
-            Origin::Generated {
-                device: DeviceKind::Summa6,
-                number: 0
-            }
-        );
+        let Origin::Special(source) = run.pick(&Levels::on_disk()) else {
+            panic!("no intro job");
+        };
+        assert_eq!(source.path, "summa6/i1-wakes-in-squiggles");
+        run.specials.push(source.path);
+        let Origin::Special(source) = run.pick(&Levels::on_disk()) else {
+            panic!("no second intro job");
+        };
+        assert_eq!(source.path, "summa6/i2-right-digit-squiggle");
     }
 
     #[test]
