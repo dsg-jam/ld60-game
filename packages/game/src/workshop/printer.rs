@@ -62,6 +62,7 @@ impl Plugin for PrinterPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, Printing::animate)
             .add_observer(Printer::on_add)
+            .add_observer(Printing::hide)
             .add_observer(Printing::tear_on_press);
     }
 }
@@ -220,17 +221,31 @@ impl Printing {
             * Transform::from_translation(-self.sheet)
     }
 
+    /// A sheet only shows once it comes out of the slot, not where it will
+    /// lie and not inside the printer while it waits.
+    fn hide(insert: On<Insert<Printing>>, mut visibilities: Query<&mut Visibility>) {
+        if let Ok(mut visibility) = visibilities.get_mut(insert.entity) {
+            *visibility = Visibility::Hidden;
+        }
+    }
+
     fn animate(
         time: Res<Time>,
         printers: Query<&Transform, (With<Printer>, Without<Printing>)>,
-        mut sheets: Query<(Entity, &mut Printing, &mut Transform, Option<&FocusTarget>)>,
+        mut sheets: Query<(
+            Entity,
+            &mut Printing,
+            &mut Transform,
+            &mut Visibility,
+            Option<&FocusTarget>,
+        )>,
         mut commands: Commands,
     ) {
         let Some(slot) = printers.iter().next().map(Printer::slot) else {
             return;
         };
         let dt = time.delta_secs();
-        for (entity, mut printing, mut transform, target) in &mut sheets {
+        for (entity, mut printing, mut transform, mut visibility, target) in &mut sheets {
             if let Some(&target) = target {
                 printing.target = Some(target);
                 let mut entity = commands.entity(entity);
@@ -250,6 +265,11 @@ impl Printing {
             ) {
                 commands.trigger(Play(sound));
             }
+            visibility.set_if_neq(if printing.elapsed < delay {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            });
             let t = ((printing.elapsed - delay) / PRINT_TIME).clamp(0.0, 1.0);
             let printed = printing.out_of(slot, PRINTED * printing.length * t);
             let steps = |elapsed: f32| ((elapsed - delay) / STEP_TIME).floor();

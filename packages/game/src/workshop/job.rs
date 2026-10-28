@@ -364,7 +364,6 @@ impl Job {
         first_note: Option<Res<FirstNote>>,
         state: Res<State<Focus>>,
         camera: Single<(&PlayerCamera, &Transform)>,
-        mut tickets: Query<&mut Visibility, With<JobTicket>>,
         mut commands: Commands,
     ) {
         let (camera, at) = *camera;
@@ -380,9 +379,6 @@ impl Job {
             NEXT_JOB,
         );
         flight.spawn(job.customer(), &mut commands);
-        if let Ok(mut shown) = tickets.get_mut(delivery.ticket) {
-            *shown = Visibility::Inherited;
-        }
         commands.entity(delivery.ticket).insert(Printing::ticket(
             counter.place(TICKET_SPOT, TICKET_YAW),
             landed + AFTER_LANDING,
