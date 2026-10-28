@@ -9,7 +9,8 @@ use super::computer::ComputerLayout;
 use super::manuals::ShopManuals;
 use super::{
     BELL_SPOT, COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW,
-    STAMP_SPOT, STAMP_YAW, cable, job, lamp, radio, receipt, rent, salvage, ticket, till, tools,
+    STAMP_SPOT, STAMP_YAW, cable, job, lamp, printer, radio, receipt, reminder, rent, salvage,
+    ticket, till, tools,
 };
 use crate::device::{Casing, Handheld};
 
@@ -128,6 +129,16 @@ fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
             Block::new(ticket::BOARD_SIZE),
         ),
         Footprint::new(
+            "note",
+            counter.place(reminder::SPOT, reminder::YAW),
+            Block::new(reminder::SIZE),
+        ),
+        Footprint::new(
+            "ticket printer",
+            counter.place(printer::SPOT, printer::YAW),
+            Block::new(printer::BODY),
+        ),
+        Footprint::new(
             "debug cable plug",
             counter.place(cable::PLUG_SPOT, cable::PLUG_YAW),
             Block::new(cable::PLUG),
@@ -179,11 +190,10 @@ fn no_two_counter_props_overlap() {
 fn screws_taken_out_lie_clear_of_everything() {
     let counter = CounterLayout::new();
     let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
-    let mut others: Vec<_> = counter_props(&counter)
+    let others: Vec<_> = counter_props(&counter)
         .into_iter()
         .filter(|prop| prop.name != "device")
         .collect();
-    others.extend(Clutter::screw_footprints(&counter));
     for kind in DeviceKind::ALL {
         let bounds = Block::new(Handheld::body_size(kind));
         let device = Footprint::new("device", rest, bounds);
@@ -207,7 +217,33 @@ fn screws_taken_out_lie_clear_of_everything() {
 }
 
 #[test]
-fn the_open_manuals_lie_clear_of_the_device_and_its_screws() {
+fn the_cover_taken_off_lies_clear_of_everything() {
+    let counter = CounterLayout::new();
+    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    let others: Vec<_> = counter_props(&counter)
+        .into_iter()
+        .filter(|prop| prop.name != "device")
+        .collect();
+    for kind in DeviceKind::ALL {
+        let bounds = Block::new(Handheld::body_size(kind));
+        let device = Footprint::new("device", rest, bounds);
+        let cover = Footprint::new(
+            "cover",
+            Casing::cover_at(&bounds, &rest),
+            Block::new(bounds.size.with_y(0.005)),
+        );
+        for other in others.iter().chain([&device]) {
+            assert!(
+                !cover.overlaps(other),
+                "{kind:?} cover overlaps {}",
+                other.name
+            );
+        }
+    }
+}
+
+#[test]
+fn the_open_manuals_lie_clear_of_the_device_its_screws_and_cover() {
     let counter = CounterLayout::new();
     let open = Footprint::new(
         "open shop manuals",
@@ -221,9 +257,13 @@ fn the_open_manuals_lie_clear_of_the_device_and_its_screws() {
         .into_iter()
         .filter(|prop| !matches!(prop.name, "shop manuals" | "note"))
         .collect();
-    others.extend(Clutter::screw_footprints(&counter));
     for kind in DeviceKind::ALL {
         let bounds = Block::new(Handheld::body_size(kind));
+        others.push(Footprint::new(
+            "cover",
+            Casing::cover_at(&bounds, &rest),
+            Block::new(bounds.size.with_y(0.005)),
+        ));
         for index in 0..Handheld::screw_count(kind) {
             let at = Casing::aside_at(&bounds, index, &rest);
             let area = Block::new(Vec3::splat(0.012));
