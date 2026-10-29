@@ -169,10 +169,10 @@ job-customer =
     .hosk = Hosk, mud brick maker
     .nibbet = Nibbet, school helper
     .throm = Throm, ferry driver
-    .pell = Pell, young courier (regular)
-    .ommi = Old Ommi, sky counter (regular)
-    .vosh = Inspector Vosh, city office (regular)
-    .krell = Krell and Krull, twins (regular)
+    .pell = Pell, young courier
+    .ommi = Old Ommi, sky counter
+    .vosh = Inspector Vosh, city office
+    .krell = Krell and Krull, twins
 
 job-complaint-wrong-digit =
     .take-1 = I pressed { $keys } and the little window lied to me. It should say { $expected }.
