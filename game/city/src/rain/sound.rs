@@ -1,5 +1,5 @@
 use bevy::{platform::collections::HashMap, prelude::*};
-use ld60_game_core::audio::{Mixer, Sound};
+use ld60_game_audio::{Mixer, Sound};
 use ld60_game_core::layout::shop;
 
 use super::super::buildings::Skyline;

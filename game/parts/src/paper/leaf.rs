@@ -9,7 +9,7 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use ld60_game_core::audio::{PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 
 use super::sheet::{PaperMaterial, Wrinkles};
 

@@ -7,9 +7,9 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
 };
+use ld60_game_core::settings::Settings;
 
 use self::synth::{Noise, Samples};
-use crate::settings::Settings;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;

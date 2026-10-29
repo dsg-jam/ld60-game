@@ -14,6 +14,7 @@ debug_port = ["bevy/bevy_remote", "dep:serde_json", "ld60-game-core/debug_port"]
 
 [dependencies]
 ld60-devices = { workspace = true }
+ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-geometry = { workspace = true }
 ld60-locale = { workspace = true }

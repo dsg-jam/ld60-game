@@ -13,7 +13,7 @@ const NOTES: [(f32, f32, f32, f32); 3] = [
 impl Samples {
     /// A happy little chirp of three rising notes, like a small machine
     /// that has news.
-    pub(in crate::audio) fn chirp() -> Self {
+    pub(crate) fn chirp() -> Self {
         Self::generate(0.34, |t| {
             NOTES
                 .iter()

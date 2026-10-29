@@ -22,6 +22,7 @@ debug_port = [
 [dependencies]
 ld60-calco = { workspace = true }
 ld60-devices = { workspace = true }
+ld60-game-audio = { workspace = true }
 ld60-game-city = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }

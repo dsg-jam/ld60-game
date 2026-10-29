@@ -8,7 +8,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::audio::{PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 use ld60_game_core::player::focus::{Clickable, Focus};
 use ld60_game_parts::bulb::Bulb;
 use ld60_game_parts::dust::Dust;

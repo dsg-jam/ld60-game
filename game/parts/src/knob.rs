@@ -10,7 +10,7 @@ use bevy::{
     },
     prelude::*,
 };
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::player::focus::Focused;
 use ld60_game_core::player::free_look::MODIFIERS;
 use ld60_geometry::block::Block;

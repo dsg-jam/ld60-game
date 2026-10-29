@@ -1,12 +1,11 @@
-//! The seated player, the sound, and the shop layout, clock, state and
-//! settings that the workshop and the city share.
+//! The seated player, and the shop layout, clock, state and settings that
+//! the workshop and the city share.
 //!
 //! # Features
 //!
 //! - `debug_port`: adds the Bevy Remote Protocol server in [`debug_port`].
 //! - `test-support`: adds helpers for tests in other crates.
 
-pub mod audio;
 pub mod clock;
 #[cfg(feature = "debug_port")]
 pub mod debug_port;

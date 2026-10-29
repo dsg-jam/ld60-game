@@ -83,7 +83,7 @@ struct Rub<'a> {
 impl Samples {
     /// A screw turned out: the thread ticks, quicker as it loosens, and the
     /// screw comes free with a light knock.
-    pub(in crate::audio) fn screw_out(seed: u32) -> Self {
+    pub(crate) fn screw_out(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(110));
         let mut at = 0.0;
         let mut ticks = Vec::with_capacity(TURNS + 1);
@@ -97,7 +97,7 @@ impl Samples {
 
     /// A screw turned in: the thread ticks, slower as it tightens, and it
     /// stops hard against the case.
-    pub(in crate::audio) fn screw_in(seed: u32) -> Self {
+    pub(crate) fn screw_in(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(120));
         let mut at = 0.0;
         let mut ticks = Vec::with_capacity(TURNS + 1);
@@ -113,7 +113,7 @@ impl Samples {
     /// The debug plug pushed onto the header: its spring contacts scrape
     /// down the pins in tiny metal ticks, catch at the end, and the housing
     /// bottoms out with a dull tock.
-    pub(in crate::audio) fn plug_in(seed: u32) -> Self {
+    pub(crate) fn plug_in(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(140));
         let home = 0.035 * vary.by(0.2);
         let mut hits = Self::scrape(&mut vary, 0.0, home, 3.0, false);
@@ -127,7 +127,7 @@ impl Samples {
 
     /// The debug plug pulled off: the contacts let go of the pins with a
     /// light tick, then scrape off them, quicker and quicker.
-    pub(in crate::audio) fn plug_out(seed: u32) -> Self {
+    pub(crate) fn plug_out(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(150));
         let free = 0.004 + 0.028 * vary.by(0.2);
         let mut hits = vec![
@@ -160,7 +160,7 @@ impl Samples {
 
     /// The back cover lifting off: its two clips let go one after the
     /// other, each with a click and a tock of the case.
-    pub(in crate::audio) fn cover_off(seed: u32) -> Self {
+    pub(crate) fn cover_off(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(160));
         let first = 0.012 * vary.by(0.3);
         let second = first + 0.045 * vary.by(0.3);
@@ -180,7 +180,7 @@ impl Samples {
 
     /// The back cover pressed on: it lands with a soft knock, then its two
     /// clips snap shut close together.
-    pub(in crate::audio) fn cover_on(seed: u32) -> Self {
+    pub(crate) fn cover_on(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(170));
         let snap = 0.025 * vary.by(0.3);
         let second = snap + 0.014 * vary.by(0.3);

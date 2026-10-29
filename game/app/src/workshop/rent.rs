@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_game_core::state::AppState;

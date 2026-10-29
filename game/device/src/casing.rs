@@ -7,7 +7,7 @@ use bevy::{
     picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
 use ld60_game_core::layout::counter::CounterLayout;

@@ -1,7 +1,7 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_geometry::block::Block;
 
 use super::{Aside, Casing, Cover, SCREW, SHANK};

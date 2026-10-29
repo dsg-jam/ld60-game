@@ -8,7 +8,7 @@ use std::f32::consts::FRAC_PI_4;
 use std::sync::Arc;
 
 use bevy::{audio::AddAudioSource, math::Affine3A, prelude::*};
-use ld60_game_core::audio::Mixer;
+use ld60_game_audio::Mixer;
 
 use self::fans::Fans;
 use self::motor::Motor;

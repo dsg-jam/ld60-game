@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use bevy::prelude::*;
-use ld60_game_core::audio::{Mixer, Sound, Takes};
+use ld60_game_audio::{Mixer, Sound, Takes};
 use rand::{RngExt, rngs::SmallRng};
 
 use super::super::rng;

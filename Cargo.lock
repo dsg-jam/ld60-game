@@ -3610,6 +3610,7 @@ dependencies = [
  "bevy",
  "ld60-calco",
  "ld60-devices",
+ "ld60-game-audio",
  "ld60-game-city",
  "ld60-game-computer",
  "ld60-game-core",
@@ -3629,10 +3630,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ld60-game-audio"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-game-core",
+ "ld60-geometry",
+]
+
+[[package]]
 name = "ld60-game-city"
 version = "0.3.0"
 dependencies = [
  "bevy",
+ "ld60-game-audio",
  "ld60-game-core",
  "ld60-game-parts",
  "ld60-geometry",
@@ -3647,6 +3658,7 @@ dependencies = [
  "bevy",
  "ld60-calco",
  "ld60-devices",
+ "ld60-game-audio",
  "ld60-game-city",
  "ld60-game-core",
  "ld60-game-device",
@@ -3684,6 +3696,7 @@ version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-devices",
+ "ld60-game-audio",
  "ld60-game-core",
  "ld60-game-parts",
  "ld60-geometry",
@@ -3701,6 +3714,7 @@ dependencies = [
  "bevy",
  "ld60-calco",
  "ld60-devices",
+ "ld60-game-audio",
  "ld60-game-core",
  "ld60-game-device",
  "ld60-game-parts",
@@ -3718,6 +3732,7 @@ version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-devices",
+ "ld60-game-audio",
  "ld60-game-core",
  "ld60-geometry",
  "ld60-locale",

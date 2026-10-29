@@ -1,7 +1,7 @@
+use ld60_game_core::layout::desk::DeskSpots;
 use std::f32::consts::TAU;
 
 use super::{Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::layout::desk::DeskSpots;
 
 /// Meters from the eyes to the manuals file while reading it.
 const REACH: f32 = 0.33;
@@ -23,13 +23,13 @@ const SPRING: f32 = 620.0;
 impl Samples {
     /// The lever of the binder flipping down: the plate knocks, the spring
     /// lets go with a twang and the halves of the rings spring apart.
-    pub(in crate::audio) fn rings_open(seed: u32) -> Self {
+    pub(crate) fn rings_open(seed: u32) -> Self {
         Self::snap(seed, false)
     }
 
     /// The rings of the binder snapping shut: the halves clack together and
     /// the lever and the spring settle.
-    pub(in crate::audio) fn rings_shut(seed: u32) -> Self {
+    pub(crate) fn rings_shut(seed: u32) -> Self {
         Self::snap(seed.wrapping_add(300), true)
     }
 

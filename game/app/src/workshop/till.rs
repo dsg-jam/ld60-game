@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
-use ld60_game_core::audio::{PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 use ld60_game_parts::lcd::{self, LcdDisplay};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_game_parts::sticker::{Sticker, StickerMaterial};

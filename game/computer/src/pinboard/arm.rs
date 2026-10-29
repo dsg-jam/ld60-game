@@ -1,7 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-use ld60_game_core::audio::{PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 use ld60_game_manuals::{MoveSheet, Pins};
 
 /// Seconds for the rod to swing all the way out or back.

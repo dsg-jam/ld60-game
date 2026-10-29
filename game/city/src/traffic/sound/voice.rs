@@ -6,7 +6,7 @@ use bevy::{
     audio::{ChannelCount, Decodable, Sample, SampleRate},
     prelude::*,
 };
-use ld60_game_core::audio::HUSH;
+use ld60_game_audio::HUSH;
 
 use super::dsp::{Glide, one_pole};
 use super::fans::{FanSound, Fans};

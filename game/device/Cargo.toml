@@ -20,6 +20,7 @@ test-support = []
 
 [dependencies]
 ld60-devices = { workspace = true, features = ["serde"] }
+ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-parts = { workspace = true }
 ld60-geometry = { workspace = true }

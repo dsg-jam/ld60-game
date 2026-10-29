@@ -1,5 +1,6 @@
+use ld60_game_core::layout::desk::DeskSpots;
+
 use super::{Lowpass, Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::layout::desk::DeskSpots;
 
 /// All keys share the same caps, plate, case and springs, so they ring at
 /// the same frequencies. Only how a key is hit differs from press to press.
@@ -15,7 +16,7 @@ impl Samples {
     /// taps the keycap, and a few milliseconds later the stem bottoms out.
     /// The hit rings in the hollow keycap and the plate, thumps in the case
     /// and the desk, rattles the cap and pings the spring.
-    pub(in crate::audio) fn key_down(seed: u32) -> Self {
+    pub(crate) fn key_down(seed: u32) -> Self {
         let mut build = Vary::new(KEYBOARD);
         let mut vary = Vary::new(seed);
         let touch = 0.12 * vary.by(1.0);
@@ -63,7 +64,7 @@ impl Samples {
     /// against the top of the housing. The hit is smaller and harder than
     /// the press, so it is quieter, higher and shorter, with little of the
     /// case in it. The keycap rattles once on the stem.
-    pub(in crate::audio) fn key_up(seed: u32) -> Self {
+    pub(crate) fn key_up(seed: u32) -> Self {
         let mut build = Vary::new(KEYBOARD.wrapping_add(1));
         let mut vary = Vary::new(seed.wrapping_add(50));
         let width = 0.00007 * vary.by(0.25);
