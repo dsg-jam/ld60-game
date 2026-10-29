@@ -4,13 +4,11 @@ use std::sync::Arc;
 
 use bevy::{
     audio::{AudioSinkPlayback, SpatialScale, Volume},
-    ecs::entity::EntityHashSet,
     platform::collections::HashMap,
     prelude::*,
 };
 
 use self::synth::{Noise, Samples};
-use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
 use crate::settings::Settings;
 
@@ -281,6 +279,14 @@ pub struct Play(pub Sound);
 #[derive(Event, Debug)]
 pub struct PlayAt(pub Sound, pub Vec3);
 
+/// A key `width` meters wide went down, or came back up, at `at`.
+#[derive(Event, Debug)]
+pub struct KeyClick {
+    pub down: bool,
+    pub at: Vec3,
+    pub width: f32,
+}
+
 impl Default for Mixer {
     fn default() -> Self {
         Self {
@@ -350,13 +356,13 @@ impl Plugin for AudioPlugin {
             .add_systems(
                 Update,
                 (
-                    Sounds::click_keys.run_if(resource_exists::<Sounds>),
                     Mixer::follow_settings.run_if(resource_changed::<Settings>),
                     Held::follow.run_if(resource_changed::<Mixer>),
                 ),
             )
             .add_observer(Sounds::play)
             .add_observer(Sounds::play_at)
+            .add_observer(Sounds::click_key)
             .add_observer(listen);
     }
 }
@@ -453,46 +459,38 @@ impl Sounds {
         Held::start(&mut sound, mixer, volume);
     }
 
-    /// Keys sound from where they are as they go down and as they come
-    /// back up.
-    fn click_keys(
-        mut sounds: ResMut<Sounds>,
+    fn click_key(
+        click: On<KeyClick>,
+        sounds: Option<ResMut<Sounds>>,
         mixer: Res<Mixer>,
-        keys: Query<(Entity, &PressableKey, &GlobalTransform), Changed<PressableKey>>,
-        mut down: Local<EntityHashSet>,
         mut commands: Commands,
     ) {
-        for (entity, key, transform) in &keys {
-            let sound = if key.is_pressed() {
-                if !down.insert(entity) {
-                    continue;
-                }
-                Sound::KeyDown
-            } else {
-                if !down.remove(&entity) {
-                    continue;
-                }
-                Sound::KeyUp
-            };
-            let Some(takes) = sounds.0.get_mut(&sound) else {
-                continue;
-            };
-            let pitch = if key.width() < LONG_KEY {
-                1.0
-            } else {
-                LONG_KEY_PITCH
-            };
-            let volume = sound.volume() * mixer.gain() * takes.nudge(KEY_NUDGE);
-            Self::play_from(
-                &mut commands,
-                &mixer,
-                takes.next().clone(),
-                transform.translation(),
-                PlaybackSettings::DESPAWN
-                    .with_volume(Volume::Linear(volume))
-                    .with_speed(pitch),
-            );
-        }
+        let sound = if click.down {
+            Sound::KeyDown
+        } else {
+            Sound::KeyUp
+        };
+        let Some(mut sounds) = sounds else {
+            return;
+        };
+        let Some(takes) = sounds.0.get_mut(&sound) else {
+            return;
+        };
+        let pitch = if click.width < LONG_KEY {
+            1.0
+        } else {
+            LONG_KEY_PITCH
+        };
+        let volume = sound.volume() * mixer.gain() * takes.nudge(KEY_NUDGE);
+        Self::play_from(
+            &mut commands,
+            &mixer,
+            takes.next().clone(),
+            click.at,
+            PlaybackSettings::DESPAWN
+                .with_volume(Volume::Linear(volume))
+                .with_speed(pitch),
+        );
     }
 }
 

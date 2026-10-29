@@ -10,6 +10,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use self::stroke::Stroke;
+use crate::audio::KeyClick;
 use crate::parts::screen::UiCanvas;
 
 pub struct KeypadPlugin;
@@ -388,9 +389,10 @@ impl PressableKey {
         time: Res<Time>,
         codes: Res<ButtonInput<KeyCode>>,
         keys: Res<ButtonInput<Key>>,
-        mut caps: Query<(&mut PressableKey, &mut Transform)>,
+        mut caps: Query<(&mut PressableKey, &mut Transform, &GlobalTransform)>,
+        mut commands: Commands,
     ) {
-        for (mut cap, mut transform) in &mut caps {
+        for (mut cap, mut transform, placed) in &mut caps {
             let pressed = cap.held_by_pointer
                 || cap.tapped_by_pointer
                 || (cap.active
@@ -403,6 +405,11 @@ impl PressableKey {
             }
             if pressed != cap.pressed {
                 cap.pressed = pressed;
+                commands.trigger(KeyClick {
+                    down: pressed,
+                    at: placed.translation(),
+                    width: cap.width,
+                });
             }
             let stroke = cap.stroke.step(pressed, time.delta_secs());
             if stroke != cap.stroke {
@@ -410,5 +417,44 @@ impl PressableKey {
                 transform.translation = cap.rest - Vec3::Y * cap.travel * stroke.depth();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Resource, Default)]
+    struct Clicks(Vec<bool>);
+
+    #[test]
+    fn a_tap_clicks_down_and_back_up() {
+        let mut world = World::new();
+        world.init_resource::<Time>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<ButtonInput<Key>>();
+        world.init_resource::<Clicks>();
+        world.add_observer(|click: On<KeyClick>, mut clicks: ResMut<Clicks>| {
+            clicks.0.push(click.down);
+        });
+        world.spawn((
+            PressableKey {
+                rest: Vec3::ZERO,
+                width: 0.02,
+                travel: 0.003,
+                bindings: &[],
+                active: true,
+                held_by_pointer: false,
+                tapped_by_pointer: true,
+                pressed: false,
+                stroke: Stroke::default(),
+            },
+            Transform::default(),
+            GlobalTransform::default(),
+        ));
+        for _ in 0..3 {
+            world.run_system_cached(PressableKey::update).unwrap();
+        }
+        assert_eq!(world.resource::<Clicks>().0, [true, false]);
     }
 }
