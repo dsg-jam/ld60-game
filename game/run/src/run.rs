@@ -395,18 +395,25 @@ impl Run {
             };
         }
         let mut rng = SmallRng::seed_from_u64(self.seed());
-        let special = catalog.specials().find(|(source, from)| {
+        let ready = |&(source, from): &(&LevelSource, u32)| {
             !self.specials.contains(&source.path)
                 && source.load().is_ok_and(|level| {
                     self.signs.contains(&level.device)
-                        && self.served.jobs(level.device) >= *from
+                        && self.served.jobs(level.device) >= from
                         && self.explains(level.chip)
                 })
-        });
+        };
         // The intro jobs of a device, from its first job on, come first and
         // always. Later special jobs come now and then.
-        if let Some((source, from)) = special
-            && (from == 0 || rng.random_ratio(1, SPECIAL_ODDS))
+        if let Some((source, _)) = catalog
+            .specials()
+            .filter(ready)
+            .find(|&(_, from)| from == 0)
+        {
+            return Origin::Special(source.clone());
+        }
+        if let Some((source, _)) = catalog.specials().find(ready)
+            && rng.random_ratio(1, SPECIAL_ODDS)
         {
             return Origin::Special(source.clone());
         }
@@ -669,6 +676,35 @@ mod tests {
                 .find(|(source, _)| source.path == path)
                 .unwrap();
             assert!(job >= from, "{path} at job {job}");
+        }
+    }
+
+    #[test]
+    fn intro_jobs_come_first_wherever_the_catalog_lists_them() {
+        let on_disk = Levels::on_disk();
+        let mut order = Levels::order_on_disk();
+        let tutorial = order.tutorial.len();
+        let mut specials: Vec<_> = order
+            .jobs
+            .drain(..)
+            .zip(on_disk.levels()[tutorial..].iter().cloned())
+            .collect();
+        specials.sort_by_key(|(special, _)| special.from == 0);
+        let mut levels = on_disk.levels()[..tutorial].to_vec();
+        for (special, source) in specials {
+            order.jobs.push(special);
+            levels.push(source);
+        }
+        let levels = Levels::new(Catalog::new(order, levels));
+        let mut run = Run::default().next();
+        run.signs.push(DeviceKind::Summa6);
+        run.served.add(DeviceKind::Summa6);
+        for job in 0..20 {
+            run.job = job;
+            let Origin::Special(source) = run.pick(&levels) else {
+                panic!("job {job} is not the first intro");
+            };
+            assert_eq!(source.path, "summa6/i1-wakes-in-squiggles");
         }
     }
 
