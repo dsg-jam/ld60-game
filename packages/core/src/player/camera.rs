@@ -13,6 +13,7 @@ use bevy::{
 
 use super::focus::{Aside, FocusTarget, Focused};
 use super::free_look::FreeLook;
+use super::lens::FOV;
 use super::look::LookAngles;
 use super::zoom::Zoom;
 #[cfg(feature = "debug_port")]
@@ -68,7 +69,11 @@ impl Plugin for CameraPlugin {
                     ),
                 ),
             )
-            .add_systems(OnEnter(AppState::Title), PlayerCamera::stop_travel);
+            .add_systems(OnEnter(AppState::Title), PlayerCamera::stop_travel)
+            .add_systems(
+                PostUpdate,
+                PlayerCamera::match_bloom.before(bevy::camera::CameraUpdateSystems),
+            );
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(
@@ -106,6 +111,23 @@ pub struct PlayerCamera {
 }
 
 impl PlayerCamera {
+    /// Bloom blurs over a share of the screen. A narrower view would blur
+    /// over a smaller part of the scene, so the glow of many small far
+    /// lights, which looks like haze, would thin out as the player zooms
+    /// in. Stretching it by the zoom keeps it the same.
+    fn match_bloom(cameras: Query<(&Projection, &mut Bloom), With<PlayerCamera>>) {
+        for (projection, mut bloom) in cameras {
+            let Projection::Perspective(perspective) = projection else {
+                continue;
+            };
+            let zoom = (FOV / 2.0).tan() / (perspective.fov / 2.0).tan();
+            let scale = Vec2::splat(zoom.max(1.0));
+            if bloom.scale != scale {
+                bloom.scale = scale;
+            }
+        }
+    }
+
     pub fn seated_at(seat: Transform) -> impl Bundle {
         (Self { seat, travel: None }, seat)
     }
