@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
-use std::f32::consts::{FRAC_PI_3, FRAC_PI_4};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, TAU};
 
-use bevy::prelude::*;
+use bevy::{light::NotShadowCaster, prelude::*};
 use ld60_core::audio::{Play, Sound};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_geometry::block::Block;
@@ -37,20 +37,40 @@ const TRY_TIME: f32 = 1.2;
 /// How far the drone leans into its flight, in radians.
 const TILT: f32 = 0.25;
 /// Turns of the rotors each second.
-const SPIN: f32 = 30.0;
+/// Turns per second the blades show. The real ones turn too fast to see,
+/// so these turn slow enough not to stand still on screen, over a blur.
+const SPIN: f32 = 7.3;
 
-const BODY: Vec3 = Vec3::new(0.06, 0.022, 0.06);
-const ARM: Vec3 = Vec3::new(0.15, 0.006, 0.012);
-const MOTOR: Vec3 = Vec3::new(0.016, 0.014, 0.016);
-const BLADE: Vec3 = Vec3::new(0.06, 0.001, 0.008);
-/// The pod under the body that sheets go into.
-const POD: Vec3 = Vec3::new(0.042, 0.02, 0.036);
-const HOOK: Vec3 = Vec3::new(0.004, 0.02, 0.004);
+/// A round body, flat below and domed on top.
+const BODY_RADIUS: f32 = 0.035;
+const BODY_HEIGHT: f32 = 0.018;
+const DOME_RADIUS: f32 = 0.025;
+/// How far the middle of the dome sits below the top of the body.
+const DOME_SUNK: f32 = 0.011;
+const LIGHT: Vec3 = Vec3::new(0.007, 0.004, 0.007);
+/// The arms reach this far out to the motors.
+const REACH: f32 = 0.075;
+const ARM_RADIUS: f32 = 0.0045;
+const MOTOR: Vec3 = Vec3::new(0.014, 0.012, 0.014);
+const BLADE: Vec3 = Vec3::new(0.064, 0.0015, 0.008);
+const HUB: Vec3 = Vec3::new(0.007, 0.004, 0.007);
+/// The ring around each rotor, and the blur its blades make.
+const GUARD_RADIUS: f32 = 0.036;
+const GUARD_THICKNESS: f32 = 0.0016;
+const BLUR_RADIUS: f32 = 0.032;
+/// The ring and its spokes hang this far below the blades.
+const GUARD_BELOW: f32 = 0.003;
+const SPOKE: Vec2 = Vec2::new(0.0012, 0.0018);
+const BLUR: Color = Color::srgba(0.75, 0.76, 0.78, 0.12);
+/// The drum under the body that sheets go into, and the winch under it.
+const POD: Vec3 = Vec3::new(0.042, 0.016, 0.042);
+const WINCH: Vec3 = Vec3::new(0.012, 0.006, 0.012);
+/// The prongs of the claw, splayed out from the winch.
+const PRONG: Vec3 = Vec3::new(0.0026, 0.013, 0.0026);
+const PRONG_SPLAY: f32 = 0.35;
 /// Where the tether leaves the claw, below the middle of the drone.
-const CLAW_BOTTOM: f32 = -(BODY.y / 2.0 + POD.y + HOOK.y);
+const CLAW_BOTTOM: f32 = -(BODY_HEIGHT / 2.0 + POD.y + WINCH.y + PRONG.y * 0.9);
 const TETHER: f32 = 0.0025;
-const CLAW: Vec3 = Vec3::new(0.03, 0.006, 0.012);
-const LIGHT: Vec3 = Vec3::new(0.008, 0.004, 0.008);
 /// Worn colors of the night city, one for the shell of each drone.
 const SHELLS: [Color; 6] = [
     Color::srgb_u8(0xc8, 0xa4, 0x3a),
@@ -369,11 +389,11 @@ impl Flight {
                     };
                     let eased = t * t * (3.0 - 2.0 * t);
                     transform.translation = flight.from.lerp(to, eased);
-                    // Leans into the way it goes while it speeds up.
+                    // Leans into the way it goes while it speeds up, and back
+                    // while it slows down.
                     let along = (to - flight.from).with_y(0.0);
-                    if let Some(axis) = along.cross(Vec3::NEG_Y).try_normalize() {
-                        let lean = TILT * (std::f32::consts::PI * t).sin();
-                        tilt = Quat::from_axis_angle(axis, -lean);
+                    if let Some(axis) = Vec3::Y.cross(along).try_normalize() {
+                        tilt = Quat::from_axis_angle(axis, TILT * (1.0 - 2.0 * t));
                     }
                     if t >= 1.0 {
                         flight.from = to;
@@ -518,25 +538,58 @@ impl Look {
 }
 
 impl Drone {
-    pub(super) fn on_add(add: On<Add<Drone>>, drones: Query<&Drone>, mut commands: Commands) {
+    pub(super) fn on_add(
+        add: On<Add<Drone>>,
+        drones: Query<&Drone>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+        mut commands: Commands,
+    ) {
         let Ok(drone) = drones.get(add.entity) else {
             return;
         };
         let look = Look::of(drone.seed);
-        let body = Block::new(BODY).translated(Vec3::NEG_Y * BODY.y / 2.0);
-        let light = Block::new(LIGHT).on_top_of(&body);
-        let pod = Block::new(POD).translated(Vec3::NEG_Y * (BODY.y / 2.0 + POD.y));
-        let hook =
-            Block::new(HOOK).translated(pod.min().with_x(0.0).with_z(0.0) - Vec3::Y * HOOK.y);
-        let claw = Block::new(CLAW).translated(hook.min());
-        let arm = Block::new(ARM).translated(Vec3::NEG_Y * ARM.y / 2.0);
+        let body = Block::new(Vec3::new(2.0 * BODY_RADIUS, BODY_HEIGHT, 2.0 * BODY_RADIUS))
+            .translated(Vec3::NEG_Y * BODY_HEIGHT / 2.0);
+        let dome = Block::new(Vec3::splat(2.0 * DOME_RADIUS))
+            .translated(Vec3::Y * (body.max().y - DOME_SUNK - DOME_RADIUS));
+        let light = Block::new(LIGHT).translated(Vec3::Y * (dome.max().y - LIGHT.y / 2.0));
+        let pod = Block::new(POD).translated(Vec3::Y * (body.min().y - POD.y));
+        let winch = Block::new(WINCH).translated(Vec3::Y * (pod.min().y - WINCH.y));
+        let prong = Block::new(PRONG).translated(Vec3::NEG_Y * PRONG.y);
+        let arm = Block::new(Vec3::new(2.0 * ARM_RADIUS, 2.0 * REACH, 2.0 * ARM_RADIUS))
+            .translated(Vec3::NEG_Y * REACH);
+        let rotor_at = ARM_RADIUS + MOTOR.y;
+        let guard = meshes.add(Torus::new(GUARD_RADIUS - GUARD_THICKNESS, GUARD_RADIUS));
+        let blur = meshes.add(Cylinder::new(BLUR_RADIUS, 0.0004));
+        let frame = materials.add(StandardMaterial {
+            base_color: FRAME,
+            perceptual_roughness: 0.5,
+            ..default()
+        });
+        let haze = materials.add(StandardMaterial {
+            base_color: BLUR,
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        });
         commands.entity(add.entity).with_children(|drone| {
-            drone.spawn((Shape::cuboid(&body, look.shell), look.finish));
-            drone.spawn((Shape::cuboid(&light, look.light), Finish::Plastic));
-            drone.spawn((Shape::cuboid(&pod, FRAME), Finish::Plastic));
-            drone.spawn((Shape::cylinder(&hook, FRAME), Finish::Metal));
-            drone.spawn((Shape::cuboid(&claw, FRAME), Finish::Metal));
-            // Arms in a star, a motor and a rotor at each end.
+            drone.spawn((Shape::cylinder(&body, look.shell), look.finish));
+            drone.spawn((Shape::capsule(&dome, look.shell), look.finish));
+            drone.spawn((Shape::cylinder(&light, look.light), Finish::Plastic));
+            drone.spawn((Shape::cylinder(&pod, FRAME), Finish::Plastic));
+            drone.spawn((Shape::cylinder(&winch, FRAME), Finish::Metal));
+            for index in 0..3 {
+                let around = Quat::from_rotation_y(TAU * index as f32 / 3.0);
+                drone
+                    .spawn((
+                        Transform::from_translation(Vec3::Y * winch.min().y)
+                            .with_rotation(around * Quat::from_rotation_x(PRONG_SPLAY)),
+                        Visibility::Inherited,
+                    ))
+                    .with_child((Shape::capsule(&prong, FRAME), Finish::Metal));
+            }
+            // Arms in a star, a motor and a guarded rotor at each end.
             let step = if look.crosses == 2 {
                 2.0 * FRAC_PI_4
             } else {
@@ -547,17 +600,62 @@ impl Drone {
                 drone
                     .spawn((Transform::from_rotation(rotation), Visibility::Inherited))
                     .with_children(|cross| {
-                        cross.spawn((Shape::cuboid(&arm, FRAME), Finish::Metal));
+                        cross
+                            .spawn((
+                                Transform::from_rotation(Quat::from_rotation_z(FRAC_PI_2)),
+                                Visibility::Inherited,
+                            ))
+                            .with_child((Shape::capsule(&arm, FRAME), Finish::Metal));
                         for end in [-1.0, 1.0] {
-                            let at = Vec3::X * end * ARM.x / 2.0;
-                            let motor = Block::new(MOTOR).translated(at - Vec3::Y * MOTOR.y / 2.0);
+                            let at = Vec3::X * end * REACH;
+                            let motor = Block::new(MOTOR).translated(at + Vec3::Y * ARM_RADIUS);
                             cross.spawn((Shape::cylinder(&motor, FRAME), Finish::Metal));
-                            let blade = Block::new(BLADE).translated(at + Vec3::Y * MOTOR.y / 2.0);
+                            let top = at + Vec3::Y * rotor_at;
+                            let ring = top - Vec3::Y * GUARD_BELOW;
                             cross.spawn((
-                                Rotor,
-                                Shape::cuboid(&blade, BLADE_GRAY),
-                                Finish::Plastic,
+                                Mesh3d(guard.clone()),
+                                MeshMaterial3d(frame.clone()),
+                                Transform::from_translation(ring),
                             ));
+                            let length = GUARD_RADIUS - MOTOR.x / 2.0;
+                            let spoke = Block::new(Vec3::new(length, SPOKE.x, SPOKE.y)).translated(
+                                Vec3::new(MOTOR.x / 2.0 + length / 2.0, -SPOKE.x / 2.0, 0.0),
+                            );
+                            for index in 0..3 {
+                                let around = Quat::from_rotation_y(TAU * index as f32 / 3.0);
+                                cross
+                                    .spawn((
+                                        Transform::from_translation(ring).with_rotation(
+                                            around
+                                                * Quat::from_rotation_y(
+                                                    -end * FRAC_PI_2 + FRAC_PI_2,
+                                                ),
+                                        ),
+                                        Visibility::Inherited,
+                                    ))
+                                    .with_child((Shape::cuboid(&spoke, FRAME), Finish::Metal));
+                            }
+                            cross.spawn((
+                                Mesh3d(blur.clone()),
+                                MeshMaterial3d(haze.clone()),
+                                Transform::from_translation(top),
+                                NotShadowCaster,
+                            ));
+                            let blade = Block::new(BLADE);
+                            let hub = Block::new(HUB).on_top_of(&blade);
+                            cross
+                                .spawn((
+                                    Rotor,
+                                    Transform::from_translation(top),
+                                    Visibility::Inherited,
+                                ))
+                                .with_children(|rotor| {
+                                    rotor.spawn((
+                                        Shape::cuboid(&blade, BLADE_GRAY),
+                                        Finish::Plastic,
+                                    ));
+                                    rotor.spawn((Shape::cylinder(&hub, FRAME), Finish::Metal));
+                                });
                         }
                     });
             }
