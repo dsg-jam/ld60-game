@@ -1,5 +1,7 @@
 use std::iter;
 
+#[cfg(feature = "debug_port")]
+use bevy::window::{CursorOptions, PrimaryWindow};
 use bevy::{
     picking::{
         events::PointerPress,
@@ -13,6 +15,8 @@ use super::lens::Lens;
 use super::zoom::Zoom;
 #[cfg(feature = "debug_port")]
 use crate::debug_port::DebugMethods;
+#[cfg(feature = "debug_port")]
+use crate::state::AppState;
 
 pub(super) struct FocusPlugin;
 
@@ -31,7 +35,8 @@ impl Plugin for FocusPlugin {
             .add_observer(FocusTarget::make_clickable)
             .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.focus", Focused::debug_focus);
+        app.add_debug_method("ld60.focus", Focused::debug_focus)
+            .add_debug_method("ld60.state", Focus::debug_state);
     }
 }
 
@@ -44,6 +49,26 @@ pub enum Focus {
     Device,
     Paper,
     Radio,
+}
+
+impl Focus {
+    /// `ld60.state` returns the game state, the focus, whether the window
+    /// has focus and the cursor grab mode.
+    #[cfg(feature = "debug_port")]
+    fn debug_state(
+        In(_): In<Option<serde_json::Value>>,
+        app_state: Res<State<AppState>>,
+        focus: Res<State<Focus>>,
+        window: Single<(&Window, &CursorOptions), With<PrimaryWindow>>,
+    ) -> bevy::remote::BrpResult {
+        let (window, cursor) = *window;
+        Ok(serde_json::json!({
+            "app": format!("{:?}", app_state.get()),
+            "focus": format!("{:?}", focus.get()),
+            "window_focused": window.focused,
+            "cursor": format!("{:?}", cursor.grab_mode),
+        }))
+    }
 }
 
 /// Something the player can click from the desk view.

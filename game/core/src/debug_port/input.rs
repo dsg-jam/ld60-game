@@ -11,7 +11,7 @@ use bevy::{
 };
 use serde_json::Value;
 
-use crate::player::look::KeepMouse;
+use crate::state::KeepMouse;
 
 /// `ld60.input { "pointer": [x, y], "click": "left", "scroll": -1,
 /// "key": "ArrowRight", "text": "LD M1" }` feeds input into the game as if it

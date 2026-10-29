@@ -16,3 +16,8 @@ pub enum AppState {
     /// The player bought the building, so the run is won.
     Owned,
 }
+
+/// Leaves the system mouse to the user while a tool drives the game: the
+/// cursor never locks and losing the window focus does not pause.
+#[derive(Resource, Debug)]
+pub struct KeepMouse;

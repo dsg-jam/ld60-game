@@ -16,7 +16,7 @@ use bevy::{
 
 use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook, lens::Lens};
 use crate::settings::Settings;
-use crate::state::AppState;
+use crate::state::{AppState, KeepMouse};
 
 pub(super) const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.
@@ -45,11 +45,6 @@ impl Plugin for LookPlugin {
             );
     }
 }
-
-/// Leaves the system mouse to the user while a tool drives the game: the
-/// cursor never locks and losing the window focus does not pause.
-#[derive(Resource, Debug)]
-pub struct KeepMouse;
 
 /// Head rotation of the seated player, relative to looking straight ahead.
 #[derive(Resource, Default, Debug)]

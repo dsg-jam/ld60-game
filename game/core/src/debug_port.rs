@@ -8,13 +8,11 @@ use bevy::{
     prelude::*,
     remote::{BrpError, BrpResult, RemoteMethodSystemId, RemoteMethods, RemotePlugin, error_codes},
     render::view::screenshot::{Screenshot, save_to_disk},
-    window::{CursorOptions, PrimaryWindow},
+    window::PrimaryWindow,
 };
 use serde_json::{Value, json};
 
-use crate::player::focus::Focus;
-use crate::player::look::KeepMouse;
-use crate::state::AppState;
+use crate::state::KeepMouse;
 
 const PORT_VARIABLE: &str = "LD60_DEBUG_PORT";
 const KEEP_MOUSE_VARIABLE: &str = "LD60_KEEP_MOUSE";
@@ -45,7 +43,6 @@ impl Plugin for DebugPortPlugin {
             profile::ProfilePlugin,
         ))
         .add_debug_method("ld60.screenshot", screenshot)
-        .add_debug_method("ld60.state", state)
         .add_debug_method("ld60.where", place)
         .add_debug_method("ld60.time", speed)
         .add_debug_method("ld60.input", input::input)
@@ -120,23 +117,6 @@ fn speed(In(params): In<Option<Value>>, mut time: ResMut<Time<Virtual>>) -> BrpR
         time.set_relative_speed(speed as f32);
     }
     Ok(json!(time.relative_speed()))
-}
-
-/// `ld60.state` returns the game state, the focus, whether the window has
-/// focus and the cursor grab mode.
-fn state(
-    In(_): In<Option<Value>>,
-    app_state: Res<State<AppState>>,
-    focus: Res<State<Focus>>,
-    window: Single<(&Window, &CursorOptions), With<PrimaryWindow>>,
-) -> BrpResult {
-    let (window, cursor) = *window;
-    Ok(json!({
-        "app": format!("{:?}", app_state.get()),
-        "focus": format!("{:?}", focus.get()),
-        "window_focused": window.focused,
-        "cursor": format!("{:?}", cursor.grab_mode),
-    }))
 }
 
 /// `ld60.screenshot { "path": "..." }` saves the next frame to `path`.

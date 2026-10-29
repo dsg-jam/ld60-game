@@ -12,9 +12,10 @@ use super::{
     cursor,
     focus::{self, Clickable, Disabled, Focused},
     hints::{self, Caption, ClickHint, Icon, IconFont},
-    look::{Gaze, KeepMouse},
+    look::Gaze,
 };
 use crate::settings::Settings;
+use crate::state::KeepMouse;
 
 /// How much a [`Disabled`] prompt shows.
 const DISABLED_ALPHA: f32 = 0.45;
