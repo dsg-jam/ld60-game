@@ -437,7 +437,7 @@ impl Run {
         if !pickup.ends_job() {
             return;
         }
-        if let Some(visit) = job.visit {
+        if let Some(visit) = &job.visit {
             let served = matches!(pickup, Pickup::Paid(_));
             self.regulars.record(visit, self.job, served);
         }
@@ -560,7 +560,6 @@ mod tests {
     use super::*;
     use crate::levels::Levels;
     use crate::pickup::{Complaint, Payment};
-    use crate::regulars::Regular;
     use crate::salvage::Find;
 
     fn job(run: &Run) -> Job {
@@ -902,16 +901,21 @@ mod tests {
         let mut visits = Vec::new();
         for _ in 0..60 {
             let job = Job::for_run(&run, &levels).unwrap();
-            if let Some(visit) = job.visit {
+            if let Some(visit) = job.visit.clone() {
                 let customer = job.level.text.as_ref().map(|text| text.customer.as_str());
-                assert_eq!(customer, Some(visit.regular.id()));
+                assert_eq!(customer, Some(visit.regular.as_str()));
                 visits.push(visit);
             }
             run.settle(&job, &Pickup::Paid(Payment::example(job.level.reward)));
         }
         let last = visits.iter().filter(|visit| visit.gift() > 0).count();
         assert!(last >= 2, "{visits:?}");
-        assert!(visits.iter().all(|visit| visit.number <= Regular::VISITS));
+        let regulars = levels.regulars();
+        assert!(visits.iter().all(|visit| {
+            regulars
+                .iter()
+                .any(|regular| regular.id == visit.regular && visit.number <= regular.visits)
+        }));
     }
 
     #[test]

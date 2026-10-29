@@ -29,4 +29,10 @@
         (level: "summa6/06-below-zero", from: 9),
         (level: "summa6/07-new-firmware", from: 11),
     ],
+    regulars: [
+        (id: "pell", from: 3, visits: 3),
+        (id: "ommi", from: 6, visits: 3),
+        (id: "vosh", from: 9, visits: 3),
+        (id: "krell", from: 12, visits: 3),
+    ],
 )

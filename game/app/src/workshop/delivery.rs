@@ -106,7 +106,7 @@ impl JobItem {
                 .spawn((
                     Name::new("job ticket"),
                     JobItem,
-                    JobTicket::new(&job.level, job.visit),
+                    JobTicket::new(&job.level, job.visit.clone()),
                     counter.place(TICKET_SPOT, TICKET_YAW),
                 ))
                 .id(),

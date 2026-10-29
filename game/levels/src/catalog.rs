@@ -33,6 +33,8 @@ pub struct Order {
     pub tutorial: Vec<String>,
     /// Hand-written jobs that come between the generated ones.
     pub jobs: Vec<Special>,
+    #[serde(default)]
+    pub regulars: Vec<Regular>,
 }
 
 /// A hand-written job that comes between the generated ones.
@@ -42,6 +44,18 @@ pub struct Special {
     pub level: String,
     /// The first generated job number it can come at.
     pub from: u32,
+}
+
+/// A local who comes back with one broken device after another and tells a
+/// little more of their story each time. The messages of the regular are
+/// named after `id`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct Regular {
+    pub id: String,
+    /// The job of the run from which they may come.
+    pub from: u32,
+    /// How often they come in a run.
+    pub visits: u32,
 }
 
 /// The files of one level.
@@ -93,6 +107,11 @@ impl Catalog {
     /// The first jobs of a run.
     pub fn tutorial(&self) -> &[LevelSource] {
         &self.levels[..self.order.tutorial.len().min(self.levels.len())]
+    }
+
+    /// The regulars of a run.
+    pub fn regulars(&self) -> &[Regular] {
+        &self.order.regulars
     }
 
     /// The hand-written jobs that come between the generated ones, each with

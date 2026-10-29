@@ -104,9 +104,9 @@ impl Job {
         let mut visit = None;
         if let Origin::Generated { device, number } = origin {
             level.id = Self::generated_id(device, number);
-            visit = run.regulars().pick(run.job(), seed);
-            if let (Some(visit), Some(text)) = (visit, &mut level.text) {
-                text.customer = visit.regular.id().into();
+            visit = run.regulars().pick(levels.regulars(), run.job(), seed);
+            if let (Some(visit), Some(text)) = (&visit, &mut level.text) {
+                text.customer = visit.regular.clone();
             }
         }
         let par = Measure::par(&level, &buggy, &fixed)
@@ -187,7 +187,7 @@ impl Job {
                     returns: self.returns,
                     measure,
                     par: self.par,
-                    visit: self.visit,
+                    visit: self.visit.clone(),
                 });
             }
             Err(complaint) => complaint,
@@ -245,8 +245,8 @@ impl Job {
     /// Stands for the customer, so each has their own drone. A regular
     /// keeps theirs.
     pub fn customer(&self) -> u64 {
-        match self.visit {
-            Some(visit) => fixed_hash_one(visit.regular),
+        match &self.visit {
+            Some(visit) => fixed_hash_one(&visit.regular),
             None => fixed_hash_one(&self.level.id),
         }
     }

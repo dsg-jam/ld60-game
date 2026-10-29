@@ -108,7 +108,7 @@ impl JobTicket {
         let Ok(ticket) = tickets.get(add.entity) else {
             return;
         };
-        let (level, visit) = (&ticket.level, ticket.visit);
+        let (level, visit) = (&ticket.level, ticket.visit.as_ref());
         let canvas = UiCanvas::spawn_print(&mut commands, &mut images, CANVAS_SIZE, add.entity);
         let page = Paper::spawn_page(
             &mut commands,
@@ -174,7 +174,7 @@ impl JobTicket {
         ])
     }
 
-    fn write(page: &mut ChildSpawnerCommands, level: &Level, visit: Option<Visit>) {
+    fn write(page: &mut ChildSpawnerCommands, level: &Level, visit: Option<&Visit>) {
         let chip = match level.chip {
             ChipSpec::Calco(info) => Message::new("ticket-chip-calco")
                 .with("revision", info.revision.to_string())
@@ -357,7 +357,6 @@ impl ShopStamp {
 #[cfg(test)]
 mod tests {
     use ld60_game_run::levels::Levels;
-    use ld60_game_run::regulars::Regular;
     use ld60_locale::Locale;
 
     use super::*;
@@ -373,11 +372,12 @@ mod tests {
         }
         let level = Levels::on_disk().levels()[0].load().unwrap();
         let visit = Visit {
-            regular: Regular::Vosh,
+            regular: "vosh".into(),
             number: 2,
+            last: false,
         };
         locale.assert_formats(Localized::spawned_by(|page| {
-            JobTicket::write(page, &level, Some(visit));
+            JobTicket::write(page, &level, Some(&visit));
         }));
         locale.assert_formats([Message::new("ticket-footer")]);
     }
