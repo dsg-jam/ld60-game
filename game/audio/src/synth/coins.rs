@@ -14,7 +14,7 @@ const COIN: [(f32, f32, f32); 4] = [
 impl Samples {
     /// A coin dropping onto the others in the till: a bright clink and a
     /// quieter bounce. `seed` varies the coin and the bounce.
-    pub(in crate::audio) fn coin(seed: u32) -> Self {
+    pub(crate) fn coin(seed: u32) -> Self {
         let mut vary = Vary::new(seed);
         let mut noise = Noise::new(seed.wrapping_add(31));
         let pitch = 2_900.0 * vary.by(0.15);

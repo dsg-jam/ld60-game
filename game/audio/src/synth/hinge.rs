@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 
 use bevy::math::Vec3;
+use ld60_game_core::layout::desk::DeskSpots;
 
 use super::{Lowpass, Mode, Noise, Resonator, Room, SAMPLE_RATE, Samples, Vary};
-use crate::layout::desk::DeskSpots;
 
 const SECONDS: f32 = 0.5;
 /// How long the rod swings, in seconds, before it settles with a click.
@@ -23,7 +23,7 @@ impl Samples {
     /// The hinge of the pin rail turning: the pin sticks and slips in its
     /// knuckle as a soft creak that follows the speed of the swing, and the
     /// rod settles at the end with a quiet tick.
-    pub(in crate::audio) fn hinge(seed: u32) -> Self {
+    pub(crate) fn hinge(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(90));
         let mut bank = Resonator::bank(&PIVOT, vary.by(0.06));
         let mut noise = Noise::new(seed.wrapping_add(91));

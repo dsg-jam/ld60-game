@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_core::audio::Sound;
+use ld60_game_audio::Sound;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::player::focus::{Focus, FocusTarget, View};
 use ld60_game_parts::paper::{Flutter, Paper};

@@ -8,7 +8,7 @@ mod settings;
 mod title;
 
 use bevy::prelude::*;
-use ld60_game_core::audio::Mixer;
+use ld60_game_audio::Mixer;
 use ld60_game_core::player::hints::{INK, SHADOW};
 use ld60_game_core::settings::SettingsPlugin;
 use ld60_game_core::state::AppState;

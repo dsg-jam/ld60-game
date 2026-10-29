@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
 };
 use ld60_devices::DeviceKind;
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::player::focus::{Clickable, Focus, FocusTarget, Focused, Prompting, View};
 use ld60_game_core::state::AppState;

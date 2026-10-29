@@ -5,7 +5,7 @@ use std::error::Error;
 use std::time::Duration;
 
 use bevy::{asset::LoadState, audio::Volume, prelude::*};
-use ld60_game_core::audio::{Mixer, Sound, Takes};
+use ld60_game_audio::{Mixer, Sound, Takes};
 use ld60_game_core::state::AppState;
 
 use self::pan::{Pan, Panned};

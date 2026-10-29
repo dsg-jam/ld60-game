@@ -106,7 +106,7 @@
             url: "https://www.cs.mcgill.ca/~kry/pubs/foleyautomatic/foleyautomatic.pdf",
             published: "SIGGRAPH 2001",
             technique: "Contact sounds from short hits ringing banks of damped modes",
-            used_in: ["game/core/src/audio/synth.rs"],
+            used_in: ["game/audio/src/synth.rs"],
         ),
         (
             authors: "Joost van Dongen",

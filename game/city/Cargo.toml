@@ -18,6 +18,7 @@ debug_port = [
 ]
 
 [dependencies]
+ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-parts = { workspace = true }
 ld60-geometry = { workspace = true }

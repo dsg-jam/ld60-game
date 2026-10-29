@@ -5,7 +5,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::player::focus::{Clickable, Focus, Prompting};
 use ld60_game_run::job::Job;
 use ld60_geometry::block::Block;

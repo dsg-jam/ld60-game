@@ -17,7 +17,7 @@ mod top_sheet;
 mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_game_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
 use ld60_game_parts::paper::{

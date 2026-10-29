@@ -34,13 +34,13 @@ const DRIP_SIZE: (f32, f32) = (4.0, 5.5);
 impl Samples {
     /// Rain on the asphalt of the road: dense, fine clicks of drops hitting
     /// rough, wet stone, with the spray they throw up. Loops.
-    pub(in crate::audio) fn asphalt_rain(seed: u32) -> Self {
+    pub(crate) fn asphalt_rain(seed: u32) -> Self {
         Self::street_rain(seed, 8.3 + 1.7 * seed as f32, (500.0, 8_000.0), 0.5)
     }
 
     /// Rain on the smoother concrete of the sidewalks, a little brighter
     /// than on asphalt. Loops.
-    pub(in crate::audio) fn concrete_rain(seed: u32) -> Self {
+    pub(crate) fn concrete_rain(seed: u32) -> Self {
         Self::street_rain(seed + 10, 7.1 + 2.3 * seed as f32, (700.0, 11_000.0), 0.35)
     }
 
@@ -76,7 +76,7 @@ impl Samples {
     /// Rain on a puddle: soft slaps of drops on water, the high, short
     /// ring of the tiny bubbles that drops of one size always trap, and
     /// now and then the lower plink of a bubble under a big drop. Loops.
-    pub(in crate::audio) fn puddle_rain(seed: u32) -> Self {
+    pub(crate) fn puddle_rain(seed: u32) -> Self {
         const RATE: f32 = 1_500.0;
         let seconds = 7.3 + 1.6 * seed as f32;
         let mut dice = Dice::new(seed.wrapping_add(80));
@@ -116,7 +116,7 @@ impl Samples {
     /// Rain on a taut canvas awning: each drop presses the cloth in, a
     /// soft, dull pat in its many low modes, and big drops thump at a
     /// pitch of their own. Loops.
-    pub(in crate::audio) fn awning_rain(seed: u32) -> Self {
+    pub(crate) fn awning_rain(seed: u32) -> Self {
         const RATE: f32 = 1_200.0;
         let seconds = 6.7 + 1.9 * seed as f32;
         let mut dice = Dice::new(seed.wrapping_add(90));
@@ -149,7 +149,7 @@ impl Samples {
     /// The sheet has too many modes to tell apart, so it rings like noise
     /// that dies down as fast as its rust and bolts damp it. Big drops make
     /// it ping at a few of its modes. Loops.
-    pub(in crate::audio) fn roof_rain(seed: u32) -> Self {
+    pub(crate) fn roof_rain(seed: u32) -> Self {
         const RATE: f32 = 1_800.0;
         const MODES: usize = 24;
         let seconds = 10.9 + 1.8 * seed as f32;
@@ -184,7 +184,7 @@ impl Samples {
 
     /// A big drop off an awning hitting the sidewalk: a hard knock with a
     /// little body, then the droplets it throws up landing around it.
-    pub(in crate::audio) fn drip(seed: u32) -> Self {
+    pub(crate) fn drip(seed: u32) -> Self {
         let mut dice = Dice::new(seed.wrapping_add(130));
         let size = dice.between(DRIP_SIZE.0, DRIP_SIZE.1);
         let hit = strength(size, speed_after(size, DRIP_HEIGHT));
@@ -218,7 +218,7 @@ impl Samples {
     /// A big drop off an awning falling into a puddle: a soft slap of
     /// water and its splash, mostly the high plink of the bubble it traps,
     /// and the splash falling back in droplets.
-    pub(in crate::audio) fn plunk(seed: u32) -> Self {
+    pub(crate) fn plunk(seed: u32) -> Self {
         let mut dice = Dice::new(seed.wrapping_add(140));
         let size = dice.between(DRIP_SIZE.0, DRIP_SIZE.1);
         let hit = strength(size, speed_after(size, DRIP_HEIGHT));

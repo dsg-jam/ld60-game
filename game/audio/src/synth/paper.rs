@@ -1,7 +1,7 @@
+use ld60_game_core::layout::desk::DeskSpots;
 use std::f32::consts::PI;
 
 use super::{Band, Lowpass, Mode, Noise, Resonator, Room, SAMPLE_RATE, Samples, Vary};
-use crate::layout::desk::DeskSpots;
 
 /// Meters from the eyes to the open manuals file while reading it.
 const REACH: f32 = 0.33;
@@ -87,12 +87,12 @@ struct Sheet {
 impl Samples {
     /// A page turning: it peels off the pile, sweeps over with a rustle and
     /// crackles where it bends, and flaps down on the pages under it.
-    pub(in crate::audio) fn page_turn(seed: u32) -> Self {
+    pub(crate) fn page_turn(seed: u32) -> Self {
         Self::turn(seed, &PAGE)
     }
 
     /// A divider of card turning, stiffer and slower than a page.
-    pub(in crate::audio) fn divider_turn(seed: u32) -> Self {
+    pub(crate) fn divider_turn(seed: u32) -> Self {
         Self::turn(seed.wrapping_add(500), &DIVIDER)
     }
 

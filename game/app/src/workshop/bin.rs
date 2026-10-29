@@ -3,7 +3,7 @@ mod basket;
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
-use ld60_game_core::audio::{Play, Sound};
+use ld60_game_audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::shop::ShopLayout;
 use ld60_game_core::player::focus::{Clickable, FocusTarget};

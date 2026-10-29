@@ -36,7 +36,7 @@ fn main() -> AppExit {
     app.add_plugins(ld60_game_core::debug_port::DebugPortPlugin);
     app.add_plugins((
         MeshPickingPlugin,
-        ld60_game_core::audio::AudioPlugin,
+        ld60_game_audio::AudioPlugin,
         ld60_game_city::CityPlugin,
         ld60_game_core::clock::ClockPlugin,
         ld60_geometry::GeometryPlugin,

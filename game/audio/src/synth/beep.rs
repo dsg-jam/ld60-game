@@ -10,7 +10,7 @@ const EDGE: f32 = 0.006;
 impl Samples {
     /// An old computer saying no: two short square wave beeps, the second
     /// lower, from a small speaker.
-    pub(in crate::audio) fn refuse() -> Self {
+    pub(crate) fn refuse() -> Self {
         let mut speaker = Lowpass::at(SPEAKER_HZ);
         let end = NOTES[1].1 + NOTES[1].2 + 0.05;
         Self::generate(end, |t| {

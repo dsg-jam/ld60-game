@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
-use ld60_game_core::audio::{PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 use ld60_game_core::player::focus::{Focus, Focused};
 use ld60_game_parts::paper::{
     Binding, LeafShape, Paper, PaperMaterial, Pressed, RELAX_TIME, Wrinkles, reprinted,

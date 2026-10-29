@@ -1,9 +1,8 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use ld60_game_core::layout::shop::{PILLAR, ShopLayout};
 use ld60_geometry::block::Block;
-
-use crate::layout::shop::{PILLAR, ShopLayout};
 
 /// Meters per second.
 const SOUND_SPEED: f32 = 343.0;
@@ -127,8 +126,9 @@ impl Room {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_core::layout::desk::DeskSpots;
+
     use super::*;
-    use crate::layout::desk::DeskSpots;
 
     #[test]
     fn shop_is_small_and_open() {

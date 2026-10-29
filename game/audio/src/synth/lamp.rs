@@ -1,5 +1,6 @@
+use ld60_game_core::layout::desk::DeskSpots;
+
 use super::{Lowpass, Mode, Noise, Resonator, Room, Samples, Vary};
-use crate::layout::desk::DeskSpots;
 
 /// The plastic plunger of the switch knocking against its stops.
 const PLUNGER: [Mode; 3] = [
@@ -37,7 +38,7 @@ impl Samples {
     /// latches, all the way to its top stop when it comes free. So the lamp
     /// clicks hard and ticks when it goes on, and clicks and clacks when it
     /// goes off. Every hit rings the steel base and the pole.
-    pub(in crate::audio) fn lamp_switch(seed: u32, on: bool) -> Self {
+    pub(crate) fn lamp_switch(seed: u32, on: bool) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(if on { 70 } else { 80 }));
         let snap = 0.0025 * vary.by(0.3);
         let release = HOLD * vary.by(0.3);

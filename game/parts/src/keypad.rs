@@ -5,7 +5,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::audio::KeyClick;
+use ld60_game_audio::KeyClick;
 use ld60_game_core::player::cursor::WantsFinger;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
