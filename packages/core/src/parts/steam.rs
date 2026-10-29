@@ -13,6 +13,8 @@ use bevy::{
     },
 };
 
+use super::downwash::Downwash;
+
 /// Voxels of the density texture across, up and deep.
 const GRID: UVec3 = UVec3::new(32, 64, 32);
 /// The plume widens by this much per meter it rises. Matches
@@ -28,6 +30,10 @@ const SCATTERING: f32 = 0.9;
 const FORWARD: f32 = 0.6;
 /// Bevy's fog catches little light at this exposure. Makes up for it.
 const GLOW: f32 = 60.0;
+/// Room on each side of the plume for the air to blow it over.
+const BLOWN_ROOM: f32 = 0.04;
+/// How many seconds the steam takes to go with a change in the air.
+const BLOWN_LAG: f32 = 0.4;
 
 pub struct SteamPlugin;
 
@@ -67,12 +73,14 @@ struct PlumeParams {
     height: f32,
     width: f32,
     time: f32,
+    /// The [`Downwash`] around the plume, in its own space.
+    wind: Vec3,
 }
 
 impl Steam {
     /// Width of the box the plume fits in.
     fn width(&self) -> f32 {
-        2.0 * (self.radius + (SPREAD + SWAY) * self.height)
+        2.0 * (self.radius + (SPREAD + SWAY) * self.height + BLOWN_ROOM)
     }
 
     fn on_add(
@@ -107,6 +115,7 @@ impl Steam {
                     height: steam.height,
                     width: steam.width(),
                     time: 0.0,
+                    wind: Vec3::ZERO,
                 },
                 seen: false,
             },
@@ -126,13 +135,15 @@ impl Steam {
 }
 
 impl Plume {
-    /// Moves time on for the GPU, and notes whether any camera sees the
-    /// plume, so it only gets redrawn then.
+    /// Moves time and the air on for the GPU, and notes whether any camera
+    /// sees the plume, so it only gets redrawn then.
     fn follow(
         time: Res<Time>,
+        downwash: Res<Downwash>,
         cameras: Query<&Frustum, With<Camera3d>>,
         mut plumes: Query<(&mut Plume, &GlobalTransform)>,
     ) {
+        let follow = 1.0 - (-time.delta_secs() / BLOWN_LAG).exp();
         // The fog volume is a unit cube, scaled to size.
         let unit = Aabb::from_min_max(Vec3::splat(-0.5), Vec3::splat(0.5));
         for (mut plume, transform) in &mut plumes {
@@ -141,6 +152,10 @@ impl Plume {
                 .iter()
                 .any(|frustum| frustum.intersects_obb(&unit, &affine, true, true));
             plume.params.time = time.elapsed_secs();
+            let (_, rotation, middle) = transform.to_scale_rotation_translation();
+            let air = rotation.inverse() * downwash.at(middle);
+            let wind = plume.params.wind;
+            plume.params.wind += (air - wind) * follow;
         }
     }
 }
