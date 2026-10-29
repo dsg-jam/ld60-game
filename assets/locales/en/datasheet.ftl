@@ -19,7 +19,7 @@ datasheet-group-loops = LOOPS
 datasheet-group-lights = LIGHTS
 
 datasheet-experts = FOR EXPERTS
-datasheet-flags = A compare sets Z if A was equal and C if A was lower. Only compares and math change Z and C.
+datasheet-flags = A compare sets Z if A was equal and C if A was lower. The Z and C columns show which other lines change them.
 datasheet-ports = PORTS
 datasheet-syntax = SYNTAX
 datasheet-operation = OPERATION

@@ -57,7 +57,7 @@ impl Cond {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
     Nop,
-    /// Waits for a new key press. The assembler also takes `WAIT`.
+    /// Waits for a new key press. The assembler also takes `HLT`.
     Wait,
     Ret,
     Swp,

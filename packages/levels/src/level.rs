@@ -26,7 +26,7 @@ pub struct Level {
     #[serde(default)]
     pub keep_layout: bool,
     /// The firmware is older than the factory line tests, so its fix need
-    /// not pass them. Early tutorial firmware does not read keys yet.
+    /// not pass them.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub before_line_tests: bool,
     pub chip: ChipSpec,
