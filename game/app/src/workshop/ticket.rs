@@ -9,10 +9,10 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
-use super::job::Job;
-use super::levels::Levels;
-use super::regulars::Visit;
 use ld60_game_device::DeviceName;
+use ld60_game_run::job::Job;
+use ld60_game_run::levels::Levels;
+use ld60_game_run::regulars::Visit;
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
@@ -356,11 +356,11 @@ impl ShopStamp {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::levels::Levels;
+    use ld60_game_run::regulars::Regular;
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::regulars::Regular;
 
     #[test]
     fn every_page_formats() {

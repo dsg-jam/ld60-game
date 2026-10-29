@@ -4,14 +4,14 @@ use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::parts::paper::{Flutter, Paper};
 use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::focus::{Focus, FocusTarget, View};
+use ld60_game_run::Leftover;
+use ld60_game_run::levels::Levels;
+use ld60_game_run::pickup::{Payment, Pickup, TRIES};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::bin::Binned;
-use super::levels::Levels;
-use super::pickup::{Payment, Pickup, TRIES};
 use super::printer::Printing;
-use super::run::Leftover;
 use super::ticket::JobTicket;
 
 pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
@@ -238,11 +238,11 @@ impl Receipt {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::levels::Levels;
+    use ld60_game_run::pickup::Complaint;
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::pickup::Complaint;
 
     #[test]
     fn every_receipt_formats() {

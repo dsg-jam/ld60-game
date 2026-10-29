@@ -1,6 +1,5 @@
 mod bin;
 mod cable;
-mod chore;
 mod clutter;
 mod computer;
 mod counter;
@@ -10,20 +9,15 @@ mod dust;
 #[cfg(test)]
 mod footprint;
 mod front;
-pub(crate) mod job;
 mod lamp;
-pub(crate) mod levels;
 mod manuals;
-mod pickup;
 mod printer;
 mod radio;
 mod receipt;
 mod reflections;
-mod regulars;
 mod reminder;
 mod rent;
 mod rug;
-pub(crate) mod run;
 mod salvage;
 mod save;
 mod service;
@@ -31,7 +25,6 @@ mod shop;
 mod stamp;
 mod ticket;
 mod till;
-mod tutorial;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -40,6 +33,7 @@ use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::focus::Focused;
+use ld60_game_run::NewRun;
 
 use self::bin::Bin;
 use self::clutter::Clutter;
@@ -52,7 +46,6 @@ use self::manuals::ShopManuals;
 use self::printer::Printer;
 use self::radio::Radio;
 use self::reminder::Reminder;
-use self::run::NewRun;
 use self::shop::Shop;
 use self::stamp::RubberStamp;
 use self::ticket::Clipboard;
@@ -85,15 +78,15 @@ impl Plugin for WorkshopPlugin {
             shop::ShopPlugin,
             manuals::ManualsPlugin,
             ticket::TicketPlugin,
-            job::JobPlugin,
-            levels::LevelsPlugin,
+            ld60_game_run::job::JobPlugin,
+            ld60_game_run::levels::LevelsPlugin,
             receipt::ReceiptPlugin,
             stamp::StampPlugin,
             computer::ComputerPlugin,
         ))
         .add_plugins((
             cable::CablePlugin,
-            chore::ChorePlugin,
+            ld60_game_run::chore::ChorePlugin,
             delivery::DeliveryPlugin,
             dial::DialPlugin,
             printer::PrinterPlugin,
@@ -101,11 +94,11 @@ impl Plugin for WorkshopPlugin {
             bin::BinPlugin,
             reflections::ReflectionsPlugin,
             rent::RentPlugin,
-            run::RunPlugin,
+            ld60_game_run::RunPlugin,
             salvage::SalvagePlugin,
             save::SavePlugin,
             till::TillPlugin,
-            tutorial::TutorialPlugin,
+            ld60_game_run::tutorial::TutorialPlugin,
         ))
         .add_systems(Startup, spawn_stage)
         .add_observer(Focused::leave_on::<NewRun>);

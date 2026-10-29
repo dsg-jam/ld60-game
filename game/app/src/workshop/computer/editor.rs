@@ -35,6 +35,7 @@ use bevy::{
 use ld60_game_core::debug_port::DebugMethods;
 use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::free_look::MODIFIERS;
+use ld60_game_run::job::{Job, JobId};
 use ld60_locale::{Localized, Message};
 
 use self::bench::Verdict;
@@ -52,7 +53,6 @@ use self::shades::Shades;
 use self::trace::TraceView;
 use self::undo::Undo;
 use self::versions::VersionsPage;
-use crate::workshop::job::{Job, JobId};
 
 pub(super) const CANVAS_SIZE: UVec2 = UVec2::new(640, 480);
 

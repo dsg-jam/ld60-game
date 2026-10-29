@@ -11,6 +11,7 @@ use ld60_game_core::parts::paper::{Flutter, Paper};
 use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::camera::{PlayerCamera, framing};
 use ld60_game_core::player::focus::{Aside, Clickable, Focus, FocusOn};
+use ld60_game_run::tutorial::FirstNote;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -19,7 +20,6 @@ use self::arm::Arm;
 use self::sway::Sway;
 use super::monitor::Monitor;
 use crate::workshop::manuals::{MoveSheet, Pins, RailSlot, Sheet};
-use crate::workshop::tutorial::FirstNote;
 
 /// A page of the manuals file at five eighths of its size, so the sheets
 /// leave the tools behind them in sight.

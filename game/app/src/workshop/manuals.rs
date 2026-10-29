@@ -24,6 +24,9 @@ use ld60_game_core::parts::paper::{
 use ld60_game_core::parts::screen::{ScreenSurface, UiCanvas};
 use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_game_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use ld60_game_run::Run;
+use ld60_game_run::job::{Job, JobId};
+use ld60_game_run::tutorial::{FirstNote, TutorialNote};
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_locale::Message;
 
@@ -38,9 +41,6 @@ pub(crate) use self::pins::{Pins, Sheet};
 pub(crate) use self::pose::Pose;
 use self::stack::Stack;
 use self::turning::{LeafKit, PageShape};
-use super::job::{Job, JobId};
-use super::run::Run;
-use super::tutorial::{FirstNote, TutorialNote};
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;
@@ -496,13 +496,13 @@ struct Lying(Transform);
 mod tests {
     use ld60_calco::Revision;
     use ld60_devices::{BoardRev, DeviceKind};
+    use ld60_game_run::levels::Levels;
+    use ld60_game_run::salvage::Find;
+    use ld60_game_run::tutorial::TutorialNote;
     use ld60_locale::{Locale, Localized, Message};
 
     use super::contents::{Entry, Section};
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::salvage::Find;
-    use crate::workshop::tutorial::TutorialNote;
 
     fn rich_run() -> Run {
         let mut run = Run::default();

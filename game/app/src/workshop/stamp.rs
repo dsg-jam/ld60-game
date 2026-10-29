@@ -7,12 +7,12 @@ use bevy::{
 };
 use ld60_game_core::audio::{Play, Sound};
 use ld60_game_core::player::focus::{Clickable, Focus, Prompting};
+use ld60_game_run::job::Job;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use super::delivery::{Flight, HandIn, JobItem};
-use super::job::Job;
 use super::printer::Printing;
 use super::ticket::JobTicket;
 use ld60_game_device::Casing;

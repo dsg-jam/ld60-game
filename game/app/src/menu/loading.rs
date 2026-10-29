@@ -3,10 +3,10 @@ use ld60_game_core::pipelines::Pipelines;
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::hints::IconFont;
 use ld60_game_core::state::AppState;
+use ld60_game_run::levels::Levels;
 use ld60_locale::Locale;
 
 use crate::TITLE;
-use crate::workshop::levels::Levels;
 
 /// The colors of the page around the game on the web, which shows until the
 /// game runs.

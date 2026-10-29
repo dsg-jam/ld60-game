@@ -1,5 +1,3 @@
-mod find;
-
 use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
@@ -11,6 +9,8 @@ use ld60_game_core::parts::paper::{INK_FADED, PAPER, Paper};
 use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::focus::{Clickable, Focus, FocusTarget, Focused, Prompting, View};
 use ld60_game_core::state::AppState;
+use ld60_game_run::salvage::Find;
+use ld60_game_run::{Leftover, Rent, Run};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -20,9 +20,7 @@ use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
 use serde::{Deserialize, Serialize};
 
-pub(crate) use self::find::Find;
 use super::rent::RentNote;
-use super::run::{Leftover, Rent, Run};
 
 /// At the front right of the counter, beside the keyboard.
 pub(super) const SPOT: Vec2 = Vec2::new(1.0, 0.72);
@@ -426,11 +424,11 @@ mod tests {
 
     use ld60_devices::DeviceKind;
     use ld60_game_core::player::focus::FocusOn;
+    use ld60_game_run::ComputerTool;
+    use ld60_game_run::chore::PlanetSet;
     use ld60_locale::{Locale, Localized};
 
     use super::*;
-    use crate::workshop::chore::PlanetSet;
-    use crate::workshop::run::ComputerTool;
 
     fn paid_rent(run: &mut Run) {
         run.add_till(run.rent());

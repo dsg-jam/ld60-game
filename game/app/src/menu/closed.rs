@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use ld60_game_core::player::hints::{INK, SHADOW};
+use ld60_game_run::Stats;
 use ld60_locale::{Localized, Message};
 
 use super::list::{Action, Entries};
 use super::{AppState, Column};
-use crate::workshop::run::Stats;
 
 const STATS_SIZE: f32 = 22.0;
 const STATS_GAP: f32 = 6.0;

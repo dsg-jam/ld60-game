@@ -7,12 +7,12 @@ use bevy::{
     text::{EditableText, TextBackgroundColor, TextLineYBounds, TextViewport},
     ui::UiGlobalTransform,
 };
+use ld60_game_run::job::{Job, JobId};
 use ld60_machine::AsmError;
 
 use super::Editor;
 use super::lexer::{Kind, Lexicon};
 use super::shades::{Shade, Shades};
-use crate::workshop::job::{Job, JobId};
 
 const MNEMONIC: Color = Color::srgb(0.82, 1.0, 0.84);
 const DIRECTIVE: Color = Color::srgb(0.95, 1.0, 0.6);

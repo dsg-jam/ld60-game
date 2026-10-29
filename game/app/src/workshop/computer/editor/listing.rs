@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_game_run::job::{Job, JobId};
 use ld60_machine::Assembly;
 
 use super::footer::Flashed;
-use crate::workshop::job::{Job, JobId};
 
 /// Where each source line of the firmware in the device sits in its ROM.
 ///

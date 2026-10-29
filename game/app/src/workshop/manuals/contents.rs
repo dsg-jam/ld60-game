@@ -2,14 +2,14 @@ use bevy::prelude::*;
 use ld60_calco::Revision;
 use ld60_devices::{ChipSpec, DeviceKind};
 use ld60_game_core::parts::paper::{Paper, Press, Print, Stock};
+use ld60_game_run::Run;
+use ld60_game_run::tutorial::TutorialNote;
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 use serde::{Deserialize, Serialize};
 
 use super::layout::{Layouts, ManualFile, PageLayout, Subject};
 use super::pins::Sheet;
-use crate::workshop::run::Run;
-use crate::workshop::tutorial::TutorialNote;
 use ld60_game_device::DeviceName;
 
 const GADGETS: Color = Color::srgb_u8(0xe8, 0xcc, 0x6a);
@@ -131,7 +131,7 @@ impl Entry {
             // Marta typed her notes.
             Self::Note(note) => {
                 return Press::Typewriter
-                    .run(("tutorial", note.0))
+                    .run(("tutorial", note.step()))
                     .on(Stock::TYPING);
             }
         };

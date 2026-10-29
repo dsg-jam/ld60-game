@@ -45,8 +45,9 @@ impl InFile {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::Run;
+
     use super::*;
-    use crate::workshop::run::Run;
 
     #[test]
     fn pinned_pages_are_not_in_the_file() {

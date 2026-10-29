@@ -3,11 +3,11 @@ use ld60_devices::DeviceKind;
 use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::workshop::run::{ComputerTool, Run};
+use crate::{ComputerTool, Run};
 
 /// Something the scrap trader found, for sale in the salvage crate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum Find {
+pub enum Find {
     /// A dead unit with its human manual and the datasheet of the chip it
     /// shipped with. Buying it hangs its sign in the window and files both
     /// in the manuals file.
@@ -24,7 +24,7 @@ pub(crate) enum Find {
 
 impl Find {
     /// Everything the trader can ever find.
-    pub(crate) fn all() -> impl Iterator<Item = Self> {
+    pub fn all() -> impl Iterator<Item = Self> {
         let devices = DeviceKind::SERVICED.into_iter().map(Self::Device);
         let tools = ComputerTool::ALL.into_iter().map(Self::Tool);
         let errata = Revision::ALL
@@ -44,7 +44,7 @@ impl Find {
     }
 
     /// The chip revision whose datasheet buying this files.
-    pub(crate) fn datasheet(self) -> Option<Revision> {
+    pub fn datasheet(self) -> Option<Revision> {
         match self {
             Self::Device(device) => Some(Run::shipped_chip(device)),
             Self::Datasheet(revision) => Some(revision),
@@ -52,7 +52,7 @@ impl Find {
         }
     }
 
-    pub(crate) const fn price(self) -> u32 {
+    pub const fn price(self) -> u32 {
         match self {
             Self::Device(DeviceKind::Tally1) => 8,
             Self::Device(DeviceKind::Tally2) => 12,
@@ -70,7 +70,7 @@ impl Find {
     }
 
     /// What the trader thinks it is, as written on its tag.
-    pub(crate) fn guess(self) -> Message {
+    pub fn guess(self) -> Message {
         Message::new(match self {
             Self::Device(DeviceKind::Tally1) => "salvage-guess-tally1",
             Self::Device(DeviceKind::Tally2) => "salvage-guess-tally2",
@@ -88,7 +88,7 @@ impl Find {
     }
 
     /// What else the tag says about it.
-    pub(crate) fn note(self) -> Message {
+    pub fn note(self) -> Message {
         match self {
             Self::Device(_) => Message::new("salvage-note-device"),
             Self::Tool(_) => Message::new("salvage-note-tool"),

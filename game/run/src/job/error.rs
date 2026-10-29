@@ -4,7 +4,7 @@ use ld60_levels::{GenerateError, LevelError};
 
 /// Why the next job does not come on the bench.
 #[derive(Debug)]
-pub(crate) enum JobError {
+pub enum JobError {
     /// A hand-written job does not load.
     Level(LevelError),
     /// No generated job was made.

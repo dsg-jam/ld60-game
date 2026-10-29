@@ -16,7 +16,7 @@ const MESSAGE: &str = "regular";
 /// A local who comes back with one broken device after another and tells a
 /// little more of their story each time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum Regular {
+pub enum Regular {
     Pell,
     Ommi,
     Vosh,
@@ -25,9 +25,9 @@ pub(crate) enum Regular {
 
 /// One visit of a regular, counted from 1.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Visit {
-    pub(crate) regular: Regular,
-    pub(crate) number: u32,
+pub struct Visit {
+    pub regular: Regular,
+    pub number: u32,
 }
 
 /// How far the story of each regular got in a run.
@@ -76,7 +76,7 @@ impl Regular {
 
 impl Visit {
     /// What the regular tells about themselves when they bring the device.
-    pub(crate) fn story(self) -> Message {
+    pub fn story(self) -> Message {
         self.regular.text("visit", self.number)
     }
 

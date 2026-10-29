@@ -8,7 +8,7 @@ use ld60_locale::Message;
 
 const CATALOG: &str = "levels/catalog.ron";
 
-pub(crate) struct LevelsPlugin;
+pub struct LevelsPlugin;
 
 impl Plugin for LevelsPlugin {
     fn build(&self, app: &mut App) {
@@ -23,7 +23,7 @@ impl Plugin for LevelsPlugin {
 
 /// Every level, once the catalog and the level folders it lists are loaded.
 #[derive(Resource, Debug, Deref)]
-pub(crate) struct Levels {
+pub struct Levels {
     #[deref]
     catalog: Catalog,
     /// The [`Reference::source`] of each device, in the order of
@@ -62,7 +62,7 @@ struct LevelLoader;
 
 impl Levels {
     /// The `attribute` of the message of `level`, in the player's language.
-    pub(crate) fn text(level: &Level, attribute: impl Into<String>) -> Message {
+    pub fn text(level: &Level, attribute: impl Into<String>) -> Message {
         let (id, attribute) = level.message(&attribute.into());
         let message = Message::new(id).attribute(attribute);
         level
@@ -113,16 +113,17 @@ impl Levels {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Levels {
     const DIR: &str = concat!(env!("LD60_ASSETS"), "/levels");
 
     /// The levels in the repository, for tests.
-    pub(crate) fn on_disk() -> Self {
+    pub fn on_disk() -> Self {
         Self::new(Catalog::read(std::path::Path::new(Self::DIR)).unwrap())
     }
 
     /// The order of the catalog in the repository.
+    #[cfg(test)]
     pub(crate) fn order_on_disk() -> Order {
         let file = format!("{}/{}", Self::DIR, Catalog::FILE);
         Catalog::order(&std::fs::read_to_string(file).unwrap()).unwrap()

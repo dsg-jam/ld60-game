@@ -7,19 +7,19 @@ use ld60_devices::Rom;
 use ld60_levels::{Level, Measure, Outcome, TEST_SEEDS};
 use ld60_locale::Message;
 
-use super::regulars::Visit;
+use crate::regulars::Visit;
 
 /// How often a customer tries the device before they take it home broken.
-pub(crate) const TRIES: u32 = 3;
+pub const TRIES: u32 = 3;
 /// What the customer adds for a repair as small or as fast as the factory
 /// fix.
-pub(crate) const TIP: u32 = 1;
+pub const TIP: u32 = 1;
 /// How many ways a customer has to say thanks.
 const THANKS: u32 = 3;
 
 /// What the customer did after trying the device.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Pickup {
+pub enum Pickup {
     /// Everything worked and the customer paid.
     Paid(Payment),
     /// The customer found a fault and handed the device back. They try it
@@ -35,22 +35,22 @@ pub(crate) enum Pickup {
 
 /// What the customer paid for a working device.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Payment {
+pub struct Payment {
     /// The reward, less a share for each return.
-    pub(crate) fee: u32,
+    pub fee: u32,
     /// How often the customer handed the device back first.
-    pub(crate) returns: u32,
+    pub returns: u32,
     /// The repair as the bench measured it.
-    pub(crate) measure: Measure,
+    pub measure: Measure,
     /// The factory fix, if the bench could measure it.
-    pub(crate) par: Option<Measure>,
+    pub par: Option<Measure>,
     /// The regular who brought the device, if a regular did.
     pub(crate) visit: Option<Visit>,
 }
 
 /// The first fault the customer found.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Complaint {
+pub enum Complaint {
     /// The device does not power on.
     Dead,
     /// The display showed `shown` after `keys`, not `expected`.
@@ -72,23 +72,23 @@ impl Payment {
     }
 
     /// What a regular adds on their last visit.
-    pub(crate) fn gift(&self) -> u32 {
+    pub fn gift(&self) -> u32 {
         self.visit.map_or(0, Visit::gift)
     }
 
     /// Whether the repair changed no more words than the factory fix.
-    pub(crate) fn neat(&self) -> bool {
+    pub fn neat(&self) -> bool {
         self.par.is_some_and(|par| self.measure.neat(par))
     }
 
     /// Whether the repaired device runs as fast as the factory fix.
-    pub(crate) fn quick(&self) -> bool {
+    pub fn quick(&self) -> bool {
         self.par.is_some_and(|par| self.measure.quick(par))
     }
 
     /// What the customer adds for a neat or quick repair, unless they had to
     /// hand the device back first.
-    pub(crate) fn tip(&self) -> u32 {
+    pub fn tip(&self) -> u32 {
         if self.returns > 0 {
             return 0;
         }
@@ -128,13 +128,13 @@ impl Payment {
 
 impl Pickup {
     /// Whether the device left the shop with the customer.
-    pub(crate) fn ends_job(&self) -> bool {
+    pub fn ends_job(&self) -> bool {
         !matches!(self, Self::HandedBack { .. })
     }
 
     /// What the customer writes on the note. `pick` picks one of the ways
     /// they put it.
-    pub(crate) fn note(&self, pick: u32) -> Message {
+    pub fn note(&self, pick: u32) -> Message {
         let (complaint, reaction) = match self {
             Self::Paid(payment) => return payment.note(pick),
             Self::HandedBack {
@@ -158,7 +158,7 @@ impl Pickup {
 impl Complaint {
     /// Runs the customer's tests against `rom` and returns the first fault,
     /// if there is one.
-    pub(crate) fn find(level: &Level, rom: &Rom) -> Option<Self> {
+    pub fn find(level: &Level, rom: &Rom) -> Option<Self> {
         let report = match ld60_levels::run(level, rom, TEST_SEEDS) {
             Ok(report) => report,
             Err(err) => {
@@ -202,11 +202,11 @@ impl Complaint {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Payment {
     /// A first-try payment of `fee` for a repair bigger and slower than the
     /// factory fix, so without a tip.
-    pub(crate) fn example(fee: u32) -> Self {
+    pub fn example(fee: u32) -> Self {
         Self {
             fee,
             returns: 0,
@@ -223,17 +223,17 @@ impl Payment {
     }
 
     /// Like [`Payment::example`], but as small and fast as the factory fix.
-    pub(crate) fn tipped(fee: u32) -> Self {
+    pub fn tipped(fee: u32) -> Self {
         let mut payment = Self::example(fee);
         payment.measure = payment.par.unwrap();
         payment
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Complaint {
     /// One complaint for each sentence of the note.
-    pub(crate) fn examples() -> Vec<Self> {
+    pub fn examples() -> Vec<Self> {
         let wrong = |keys: &str, broken| Self::Wrong {
             keys: keys.into(),
             expected: "000046".into(),
@@ -280,7 +280,7 @@ mod tests {
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
+    use crate::levels::Levels;
 
     /// The job as the game loads it.
     fn job(source: &LevelSource) -> Variant {

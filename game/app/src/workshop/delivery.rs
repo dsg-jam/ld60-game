@@ -5,17 +5,17 @@ use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::focus::Focus;
 use ld60_game_device::{Carried, Emulator, Handheld};
+use ld60_game_run::chore::{Busy, Chore};
+use ld60_game_run::job::{Job, JobOnBench};
+use ld60_game_run::pickup::Complaint;
+use ld60_game_run::tutorial::{FirstNote, TutorialNote};
+use ld60_game_run::{Leftover, Run};
 
 use self::drone::Tether;
 pub(super) use self::drone::{Drone, Flight};
-use super::chore::{Busy, Chore};
-use super::job::{Job, JobOnBench};
-use super::pickup::Complaint;
 use super::printer::Printing;
 use super::receipt::Receipt;
-use super::run::{Leftover, Run};
 use super::ticket::JobTicket;
-use super::tutorial::{FirstNote, TutorialNote};
 
 pub(super) const DEVICE_SPOT: Vec2 = Vec2::new(0.03, 0.3);
 pub(super) const DEVICE_YAW: f32 = 0.15;
@@ -113,7 +113,7 @@ impl JobItem {
         ];
         // A new run starts with an empty counter.
         let first = TutorialNote::for_job(&job)
-            .is_some_and(|note| note.0 == 0 && !run.notes().contains(&0));
+            .is_some_and(|note| note == TutorialNote::FIRST && !run.notes().contains(&0));
         if first {
             let [device, ticket] = items;
             commands
@@ -238,12 +238,12 @@ impl HandIn {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::Origin;
+    use ld60_game_run::levels::Levels;
+    use ld60_game_run::pickup::{TIP, TRIES};
     use ld60_levels::{GAME_SEED, Variant, assemble, burn, initial_rom};
 
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::pickup::{TIP, TRIES};
-    use crate::workshop::run::Origin;
 
     fn job(index: usize) -> Job {
         Job::load(&Levels::on_disk(), index).unwrap().unwrap()

@@ -1,13 +1,13 @@
 use std::error::Error;
 
 use bevy::{input_focus::tab_navigation::TabIndex, prelude::*, text::EditableText};
+use ld60_game_run::job::Job;
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run, Status};
 use super::page::{ActivePage, Page};
 use super::undo::Undo;
 use super::{Editor, PHOSPHOR, PHOSPHOR_DIM};
-use crate::workshop::job::Job;
 use ld60_game_device::{Connected, Emulator};
 
 /// Words of the bitstream on each line.
