@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use bevy::{input_focus::tab_navigation::TabIndex, prelude::*, text::EditableText};
 use ld60_locale::{Localized, Message};
 
@@ -34,6 +36,8 @@ pub(super) enum Dump {
 #[derive(Component, Debug, Default)]
 pub(super) struct DumpPage {
     lines: Vec<String>,
+    /// The firmware the bits disassemble to.
+    source: String,
     /// How many of the lines show, as they come in.
     shown: f32,
 }
@@ -162,8 +166,14 @@ impl DumpPage {
                     return;
                 };
                 let image = emulator.rom().image();
+                let source = ld60_levels::dumped_source(&job.level, &job.buggy, image)
+                    .unwrap_or_else(|err| {
+                        error!(error = &err as &dyn Error, "firmware does not disassemble");
+                        job.buggy.clone()
+                    });
                 for mut page in &mut pages {
                     page.lines = Self::lines(image.words(), image.word_bits());
+                    page.source.clone_from(&source);
                     page.shown = 0.0;
                 }
                 *dump = Dump::Bits;
@@ -172,8 +182,11 @@ impl DumpPage {
                     .into();
             }
             Dump::Bits => {
+                let Some(source) = pages.iter().next().map(|page| page.source.clone()) else {
+                    return;
+                };
                 let (mut text, mut undo) = editor.into_inner();
-                undo.replace(&mut text, &job.buggy);
+                undo.replace(&mut text, &source);
                 undo.reset();
                 *dump = Dump::Source;
                 active.0 = Page::Source;
