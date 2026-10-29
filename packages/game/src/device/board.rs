@@ -3,6 +3,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use bevy::prelude::*;
 use ld60_core::parts::pcb::{Pad, Pcb, PcbArt, PcbMaterial, Router};
 use ld60_geometry::block::Block;
+use ld60_locale::{Locale, Message};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 /// Thickness of the board.
@@ -109,6 +110,25 @@ pub(super) struct BoardLayout {
     face: Transform,
     screws: Vec<Vec3>,
     seed: u64,
+}
+
+/// The words on the silkscreen that people read, in the player's language.
+/// Part names like U1 and the maker stay as they are.
+pub(super) struct SilkWords {
+    debug: String,
+    keys: String,
+    battery: String,
+}
+
+impl SilkWords {
+    pub(super) fn new(locale: &Locale) -> Self {
+        let word = |id: &'static str| locale.text(&Message::new(id).into());
+        Self {
+            debug: word("silk-debug"),
+            keys: word("silk-keys"),
+            battery: word("silk-battery"),
+        }
+    }
 }
 
 /// The chip of a board: its body, turned so the top with its marking faces
@@ -249,12 +269,14 @@ impl BoardLayout {
     pub(super) fn faces(
         &self,
         name: &str,
+        words: &SilkWords,
         meshes: &mut Assets<Mesh>,
         images: &mut Assets<Image>,
         pcbs: &mut Assets<PcbMaterial>,
     ) -> [(Mesh3d, MeshMaterial3d<PcbMaterial>, Transform); 2] {
         let mesh = Mesh3d(meshes.add(Rectangle::from_size(self.board.size.xz())));
-        let material = MeshMaterial3d(pcbs.add(Pcb::material(images.add(self.art(name).image()))));
+        let material =
+            MeshMaterial3d(pcbs.add(Pcb::material(images.add(self.art(name, words).image()))));
         // Faces up, with the art at the same place as on the face.
         let back =
             Transform::from_translation(self.board.top_spot(Vec2::ZERO) + Vec3::Y * FACE_GAP)
@@ -495,7 +517,7 @@ impl BoardLayout {
     }
 
     /// Draws the board: every trace runs between two pads of its net.
-    fn art(&self, name: &str) -> PcbArt {
+    fn art(&self, name: &str, words: &SilkWords) -> PcbArt {
         let size = self.board.size.xz();
         let mut art = PcbArt::new(size);
         let mut router = Router::new(size, PITCH, 0.0015);
@@ -545,14 +567,14 @@ impl BoardLayout {
                 }
             }
         }
-        self.print(&mut art, name);
+        self.print(&mut art, name, words);
         art
     }
 
     /// The silkscreen: outlines, names of the parts and of the board. Each
     /// name goes in the first place next to its part that keeps clear of the
     /// pads, the holes, the parts and the other names.
-    fn print(&self, art: &mut PcbArt, name: &str) {
+    fn print(&self, art: &mut PcbArt, name: &str, words: &SilkWords) {
         let mut taken: Vec<(Vec2, Vec2)> = self
             .pads()
             .into_iter()
@@ -582,7 +604,12 @@ impl BoardLayout {
         );
 
         let mut labels = vec![
-            ("J1 DEBUG".to_owned(), header, header_size + 0.0012, TEXT),
+            (
+                format!("J1 {}", words.debug),
+                header,
+                header_size + 0.0012,
+                TEXT,
+            ),
             ("U1".to_owned(), chip, chip_size, TEXT),
         ];
         for passive in &self.passives {
@@ -591,8 +618,12 @@ impl BoardLayout {
         }
         let contacts = [
             ("LCD", self.display, Vec2::new(0.012, 0.0024)),
-            ("KEYS", KEYPAD_SPOT, Vec2::new(0.0018, 0.0098)),
-            ("BAT", BATTERY_SPOT, Vec2::new(0.0034, 0.0058)),
+            (words.keys.as_str(), KEYPAD_SPOT, Vec2::new(0.0018, 0.0098)),
+            (
+                words.battery.as_str(),
+                BATTERY_SPOT,
+                Vec2::new(0.0034, 0.0058),
+            ),
         ];
         for (text, spot, size) in contacts {
             let middle = self.to_art(self.board.top_spot(spot));
@@ -694,6 +725,15 @@ impl BoardLayout {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_silkscreen_words_format() {
+        Locale::on_disk().assert_formats([
+            Message::new("silk-debug"),
+            Message::new("silk-keys"),
+            Message::new("silk-battery"),
+        ]);
+    }
 
     fn layout() -> BoardLayout {
         let shell = Block::new(Vec3::new(0.09, 0.0125, 0.15)).translated(Vec3::Y * 0.0015);
