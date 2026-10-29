@@ -197,7 +197,7 @@ impl Generated {
         if (rng.below(100) as u32) < difficulty.stuck_chance()
             && let Some(job) = lengths
                 .iter()
-                .find_map(|keys| Self::stuck(&working, &mut rng, difficulty, keys))
+                .find_map(|keys| Self::stuck(&working, seed, &mut rng, difficulty, keys))
         {
             return Ok(job.with_text(seed));
         }

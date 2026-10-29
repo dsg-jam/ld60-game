@@ -18,9 +18,11 @@ impl Generated {
     /// A job whose only bug is a stuck RAM bit in a cell that `working`
     /// uses. The fix moves the cell to one the firmware leaves free.
     ///
-    /// The test that shows the fault has a length within `keys`.
+    /// The test that shows the fault has a length within `keys`. The job
+    /// `seed` picks its passing tests.
     pub(super) fn stuck(
         working: &Variant,
+        seed: u64,
         rng: &mut Rng,
         difficulty: &Difficulty,
         keys: &RangeInclusive<usize>,
@@ -54,7 +56,7 @@ impl Generated {
                 bit: rng.below(4) as u8,
                 high: rng.below(2) == 1,
             };
-            Self::moved(working, difficulty, keys, bit, to)
+            Self::moved(working, seed, difficulty, keys, bit, to)
         })
     }
 
@@ -62,6 +64,7 @@ impl Generated {
     /// cell to `to`.
     fn moved(
         working: &Variant,
+        seed: u64,
         difficulty: &Difficulty,
         keys: &RangeInclusive<usize>,
         bit: StuckBit,
@@ -98,7 +101,7 @@ impl Generated {
         }
         let symptom = Symptom::shown(&level, &fixed_rom, &buggy_rom, &case.keys)?;
         let mut tests = vec![case];
-        let mut rng = Rng::new(u64::from(bit.cell), "stuck tests");
+        let mut rng = Rng::new(seed, &format!("stuck tests {}", bit.cell));
         if !TestCase::add_passing(&level, &fixed_rom, &buggy_rom, &mut tests, &mut rng) {
             return None;
         }
