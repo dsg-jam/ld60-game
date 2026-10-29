@@ -1,6 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["packages/*"]
+members = [
+  "packages/asm",
+  "packages/calco",
+  "packages/city",
+  "packages/cli",
+  "packages/core",
+  "packages/devices",
+  "packages/dsl",
+  "packages/game",
+  "packages/geometry",
+  "packages/levels",
+  "packages/locale",
+  "packages/machine",
+  "packages/store",
+]
 
 [workspace.package]
 version = "0.3.0"
