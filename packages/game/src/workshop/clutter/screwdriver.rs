@@ -1,20 +1,22 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, picking::hover::HoverMap, prelude::*};
+use ld60_core::player::camera::PlayerCamera;
+use ld60_core::player::focus::{self, ClickTool, Clickable, Disabled, Focused};
 
 use super::props::Props;
-use ld60_core::player::camera::PlayerCamera;
-
-use crate::device::Turning;
+use crate::device::{ToolSpot, Turning};
 
 /// How fast the screwdriver moves to a screw and back.
 const DECAY_RATE: f32 = 14.0;
+/// How far above a hovered screw the tip waits.
+const HOVER: f32 = 0.012;
 /// The handle points at least this far away from the camera, in radians.
 /// Along a screw that faces the player it would poke into the view.
 const CLEAR: f32 = 0.9;
 
 /// The screwdriver on the counter. It turns the screws of a device in and
-/// out, see [`Turning`].
+/// out, see [`Turning`], and waits over a screw the pointer is on.
 #[derive(Component, Debug)]
 pub(super) struct Screwdriver {
     rest: Transform,
@@ -32,19 +34,26 @@ impl Screwdriver {
     }
 
     /// Puts the tip on the screw that turns, if any, and turns with it.
-    /// The clutter stays at the origin, so its space is the world.
+    /// Otherwise it waits over the screw the pointer is on, if any. The
+    /// clutter stays at the origin, so its space is the world.
     pub(super) fn follow(
         time: Res<Time>,
         turning: Query<&Turning>,
+        aim: Aim,
         camera: Single<&Transform, (With<PlayerCamera>, Without<Screwdriver>)>,
         mut screwdrivers: Query<(&mut Screwdriver, &mut Transform)>,
     ) {
         let screw = turning.iter().next();
+        let waiting = aim
+            .at(ClickTool::Screwdriver)
+            .map(|spot| spot * Transform::from_translation(Vec3::NEG_Y * HOVER));
         let dt = time.delta_secs();
         for (mut screwdriver, mut transform) in &mut screwdrivers {
-            let goal = screw.map_or(screwdriver.rest * Self::tip_to_rest(), |screw| {
-                Self::clear_of(screw.at, camera.translation)
-            });
+            let goal = match (screw, waiting) {
+                (Some(screw), _) => Self::clear_of(screw.at, camera.translation),
+                (None, Some(spot)) => Self::clear_of(spot, camera.translation),
+                (None, None) => screwdriver.rest * Self::tip_to_rest(),
+            };
             let tip = &mut screwdriver.tip;
             tip.translation
                 .smooth_nudge(&goal.translation, DECAY_RATE, dt);
@@ -89,6 +98,36 @@ impl Screwdriver {
     fn tip_to_rest() -> Transform {
         Transform::from_translation(Props::screwdriver_tip())
             .with_rotation(Quat::from_rotation_z(-FRAC_PI_2))
+    }
+}
+
+/// The part the pointer is on, if a tool works it.
+#[derive(SystemParam)]
+pub(super) struct Aim<'w, 's> {
+    hovers: Res<'w, HoverMap>,
+    focused: Res<'w, Focused>,
+    parents: Query<'w, 's, &'static ChildOf>,
+    clickables: Query<'w, 's, &'static Clickable>,
+    spots: Query<
+        'w,
+        's,
+        (
+            &'static GlobalTransform,
+            &'static ToolSpot,
+            &'static ClickTool,
+        ),
+        Without<Disabled>,
+    >,
+}
+
+impl Aim<'_, '_> {
+    /// Where `tool` would touch the part under the pointer, if it works
+    /// that part and can now.
+    fn at(&self, tool: ClickTool) -> Option<Transform> {
+        let part =
+            focus::hovered_clickable(&self.hovers, &self.parents, &self.clickables, &self.focused)?;
+        let (at, spot, works) = self.spots.get(part).ok()?;
+        (*works == tool).then(|| at.compute_transform() * Transform::from_translation(spot.0))
     }
 }
 
