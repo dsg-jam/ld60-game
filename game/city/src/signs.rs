@@ -4,7 +4,7 @@ mod frontage;
 use std::ops::Range;
 
 use bevy::{light::VolumetricLight, prelude::*, shape::Aabb3d};
-use ld60_game_core::parts::script::{GLYPH_SIZE, Word};
+use ld60_game_parts::script::{GLYPH_SIZE, Word};
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};

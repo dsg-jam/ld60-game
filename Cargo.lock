@@ -3615,6 +3615,7 @@ dependencies = [
  "ld60-game-core",
  "ld60-game-device",
  "ld60-game-manuals",
+ "ld60-game-parts",
  "ld60-game-run",
  "ld60-geometry",
  "ld60-levels",
@@ -3633,6 +3634,7 @@ version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-game-core",
+ "ld60-game-parts",
  "ld60-geometry",
  "rand",
  "serde_json",
@@ -3649,6 +3651,7 @@ dependencies = [
  "ld60-game-core",
  "ld60-game-device",
  "ld60-game-manuals",
+ "ld60-game-parts",
  "ld60-game-run",
  "ld60-geometry",
  "ld60-levels",
@@ -3682,6 +3685,7 @@ dependencies = [
  "bevy",
  "ld60-devices",
  "ld60-game-core",
+ "ld60-game-parts",
  "ld60-geometry",
  "ld60-levels",
  "ld60-locale",
@@ -3699,12 +3703,27 @@ dependencies = [
  "ld60-devices",
  "ld60-game-core",
  "ld60-game-device",
+ "ld60-game-parts",
  "ld60-game-run",
  "ld60-geometry",
  "ld60-levels",
  "ld60-locale",
  "ron",
  "serde",
+]
+
+[[package]]
+name = "ld60-game-parts"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-devices",
+ "ld60-game-core",
+ "ld60-geometry",
+ "ld60-locale",
+ "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use super::Wrinkles;
 use super::sheet::Pressed;
-use crate::parts::downwash::Downwash;
+use crate::downwash::Downwash;
 
 /// Seconds the air on a sheet takes to catch up with the air around it.
 const LAG: f32 = 0.15;

@@ -72,7 +72,7 @@
             author: "The X Window System",
             url: None,
             license: "Public domain",
-            files: ["game/core/src/parts/dot_matrix/font.rs"],
+            files: ["game/parts/src/dot_matrix/font.rs"],
         ),
     ],
     research: [
@@ -162,7 +162,7 @@
             url: "https://ntrs.nasa.gov/citations/19670006555",
             published: "NASA SP-106, 1966",
             technique: "Sloshing modes of a liquid in a round container, and how fast each one swings",
-            used_in: ["game/core/src/parts/liquid.rs"],
+            used_in: ["game/parts/src/liquid.rs"],
         ),
         (
             authors: "Dominic Vella, L. Mahadevan",
@@ -170,7 +170,7 @@
             url: "https://arxiv.org/abs/cond-mat/0411688",
             published: "American Journal of Physics, 2005",
             technique: "Floating bubbles gather along the wall and in rafts",
-            used_in: ["game/core/src/parts/liquid.wesl"],
+            used_in: ["game/parts/src/liquid.wesl"],
         ),
         (
             authors: "Alban Sauret, François Boulogne, Jean Cappello, Emilie Dressaire, Howard A. Stone",
@@ -178,7 +178,7 @@
             url: "https://arxiv.org/abs/1411.6542",
             published: "Physics of Fluids, 2015",
             technique: "Foam along the wall damps the waves",
-            used_in: ["game/core/src/parts/liquid.rs"],
+            used_in: ["game/parts/src/liquid.rs"],
         ),
         (
             authors: "B. R. Morton, G. I. Taylor, J. S. Turner",
@@ -186,7 +186,7 @@
             url: "https://doi.org/10.1098/rspa.1956.0011",
             published: "Proceedings of the Royal Society A, 1956",
             technique: "A plume that widens at a steady rate as it rises and takes in the air around it",
-            used_in: ["game/core/src/parts/steam.rs"],
+            used_in: ["game/parts/src/steam.rs"],
         ),
         (
             authors: "Iñigo Quilez",
@@ -194,7 +194,7 @@
             url: "https://iquilezles.org/articles/warp/",
             published: "2002",
             technique: "Wisps from noise looked up at a point that other noise pushes around",
-            used_in: ["game/core/src/parts/steam.rs"],
+            used_in: ["game/parts/src/steam.rs"],
         ),
         (
             authors: "Miles Macklin, Matthias Müller, Nuttapong Chentanez",

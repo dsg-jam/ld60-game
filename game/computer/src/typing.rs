@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
-use ld60_game_core::parts::keypad::PressableKey;
+use ld60_game_parts::keypad::PressableKey;
 
 use super::keyboard::KeyboardKey;
 

@@ -10,13 +10,12 @@ use bevy::{
     },
     prelude::*,
 };
+use ld60_game_core::audio::{Play, Sound};
+use ld60_game_core::player::focus::Focused;
+use ld60_game_core::player::free_look::MODIFIERS;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
-
-use crate::audio::{Play, Sound};
-use crate::player::focus::Focused;
-use crate::player::free_look::MODIFIERS;
 
 const RADIUS: f32 = 0.016;
 const DEPTH: f32 = 0.018;

@@ -5,7 +5,7 @@ use bevy::{
     },
     prelude::*,
 };
-use ld60_game_core::parts::paper::{Paper, PaperButton};
+use ld60_game_parts::paper::{Paper, PaperButton};
 use ld60_locale::{Localized, Message};
 
 use super::contents::{Contents, Entry, Page, Section};

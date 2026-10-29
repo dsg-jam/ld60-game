@@ -5,7 +5,7 @@ use bevy::{light::NotShadowCaster, prelude::*};
 use ld60_game_core::GRAVITY;
 use ld60_game_core::audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::parts::downwash::{Downwash, Jet};
+use ld60_game_parts::downwash::{Downwash, Jet};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

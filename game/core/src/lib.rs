@@ -1,5 +1,5 @@
-//! The seated player, the parts the game is built from, its sound, and the
-//! shop layout, clock, state and settings that the workshop and the city share.
+//! The seated player, the sound, and the shop layout, clock, state and
+//! settings that the workshop and the city share.
 //!
 //! # Features
 //!
@@ -11,7 +11,6 @@ pub mod clock;
 #[cfg(feature = "debug_port")]
 pub mod debug_port;
 pub mod layout;
-pub mod parts;
 pub mod player;
 pub mod settings;
 pub mod state;

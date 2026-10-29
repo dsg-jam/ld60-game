@@ -7,8 +7,8 @@ use bevy::{
     picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::parts::paper::{INK, Paper, PaperButton};
-use ld60_game_core::parts::screen::UiCanvas;
+use ld60_game_parts::paper::{INK, Paper, PaperButton};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};

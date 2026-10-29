@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
 use ld60_game_core::layout::shop::{FRONT, PILLAR};
-use ld60_game_core::parts::script::{GLYPH_SIZE, Word};
+use ld60_game_parts::script::{GLYPH_SIZE, Word};
 use ld60_game_run::Run;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;

@@ -1,8 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::paper::{Flutter, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
-use ld60_game_core::parts::screen::UiCanvas;
+use ld60_game_parts::paper::{Flutter, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::Run;
 use ld60_locale::{Locale, Localized, Message};
 

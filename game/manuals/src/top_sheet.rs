@@ -6,7 +6,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::paper::{Leaf, clearance, relaxing};
+use ld60_game_parts::paper::{Leaf, clearance, relaxing};
 
 use super::Filed;
 use super::model::Parts;

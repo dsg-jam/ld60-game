@@ -7,7 +7,7 @@ mod spray;
 use std::error::Error;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::liquid::Shake;
+use ld60_game_parts::liquid::Shake;
 use ld60_geometry::surface::SurfaceMaterial;
 use rand::RngExt;
 

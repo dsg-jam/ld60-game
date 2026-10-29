@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::script::Word;
+use ld60_game_parts::script::Word;
 use ld60_geometry::block::Block;
 use rand::{Rng, RngExt};
 

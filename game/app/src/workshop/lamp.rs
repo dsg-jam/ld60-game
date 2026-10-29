@@ -9,9 +9,9 @@ use bevy::{
     prelude::*,
 };
 use ld60_game_core::audio::{PlayAt, Sound};
-use ld60_game_core::parts::bulb::Bulb;
-use ld60_game_core::parts::dust::Dust;
 use ld60_game_core::player::focus::{Clickable, Focus};
+use ld60_game_parts::bulb::Bulb;
+use ld60_game_parts::dust::Dust;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

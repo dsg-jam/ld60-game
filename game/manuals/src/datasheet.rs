@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_calco::datasheet::{Group, INSTRUCTIONS, InstructionDoc, NOTES, PORTS};
 use ld60_calco::{Erratum, Op, Revision};
-use ld60_game_core::parts::paper::Paper;
+use ld60_game_parts::paper::Paper;
 use ld60_locale::{Localized, Message};
 
 /// The tables of the CalCo datasheet and its errata, with what one chip

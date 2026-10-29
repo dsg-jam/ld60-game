@@ -5,7 +5,7 @@ use bevy::{
     shape::{Aabb3d, BoundingVolume},
 };
 use ld60_game_core::layout::shop;
-use ld60_game_core::parts::bulb::Bulb;
+use ld60_game_parts::bulb::Bulb;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
