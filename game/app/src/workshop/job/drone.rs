@@ -12,6 +12,7 @@ use ld60_geometry::surface::Finish;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use crate::device::{Carried, Casing};
+use crate::workshop::run::{Leftover, NewRun};
 
 /// The lane the drone flies along the street, just outside the shop, see
 /// [`CounterLayout::place`]. It turns in over the counter from there.
@@ -107,7 +108,7 @@ const BLADE_GRAY: Color = Color::srgb_u8(0x9a, 0x9e, 0xa4);
 /// counter. It flies a [`Flight`]. Each customer has their own, picked by
 /// `seed`.
 #[derive(Component, Debug)]
-#[require(Transform, Visibility)]
+#[require(Transform, Visibility, Leftover)]
 pub(crate) struct Drone {
     seed: u64,
 }
@@ -250,6 +251,18 @@ impl Flight {
             came: false,
             heading: None,
             velocity: Vec3::ZERO,
+        }
+    }
+
+    /// Clears away what the drones carry when the shop opens again. Things on
+    /// their way with a drone are no longer on the counter.
+    pub(in crate::workshop) fn clear_cargo(
+        _: On<NewRun>,
+        flights: Query<&Flight>,
+        mut commands: Commands,
+    ) {
+        for item in flights.iter().flat_map(Flight::items) {
+            commands.entity(item).try_despawn();
         }
     }
 

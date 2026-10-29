@@ -17,13 +17,11 @@ pub(crate) use self::demand::Demand;
 use self::per_device::PerDevice;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
-use super::job::{Drone, Flight, Job, JobItem};
+use super::job::Job;
 use super::manuals::Pins;
 use super::pickup::Pickup;
-use super::receipt::Receipt;
 use super::regulars::Regulars;
-use super::rent::RentNote;
-use super::salvage::{Find, SalvageCrate};
+use super::salvage::Find;
 use super::tutorial::TutorialNote;
 
 /// What the landlord takes the first time the planet sets.
@@ -39,14 +37,10 @@ const RUN_SEEDS: u64 = 1 << 32;
 /// The same board comes at most this many jobs in a row.
 const SAME_BOARDS: usize = 2;
 
-/// What is left on the counter when the shop closes.
-type Leftovers = Or<(
-    With<JobItem>,
-    With<Drone>,
-    With<Receipt>,
-    With<RentNote>,
-    With<SalvageCrate>,
-)>;
+/// Something on the counter that goes when the shop opens again, like a
+/// device, a receipt or a drone on its way.
+#[derive(Component, Debug, Default)]
+pub(crate) struct Leftover;
 
 pub(crate) struct RunPlugin;
 
@@ -540,7 +534,7 @@ impl Run {
         mut clock: ResMut<Clock>,
         mut focused: ResMut<Focused>,
         mut focus: ResMut<NextState<Focus>>,
-        leftovers: Query<(Entity, Option<&Flight>), Leftovers>,
+        leftovers: Query<Entity, With<Leftover>>,
         mut commands: Commands,
     ) {
         *run = match *new_run {
@@ -549,12 +543,8 @@ impl Run {
         };
         *clock = Clock::default();
         focused.leave(&mut focus);
-        for (entity, flight) in &leftovers {
+        for entity in &leftovers {
             commands.entity(entity).try_despawn();
-            // Items on their way with a drone are no longer job items.
-            for item in flight.into_iter().flat_map(Flight::items) {
-                commands.entity(item).try_despawn();
-            }
         }
         commands.remove_resource::<Job>();
         commands.run_system_cached(Job::start);

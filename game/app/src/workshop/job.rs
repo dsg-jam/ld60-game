@@ -23,7 +23,7 @@ use super::pickup::{Complaint, Payment, Pickup, TRIES};
 use super::printer::Printing;
 use super::receipt::Receipt;
 use super::regulars::Visit;
-use super::run::{Origin, Run};
+use super::run::{Leftover, Origin, Run};
 use super::ticket::JobTicket;
 use super::tutorial::{FirstNote, TutorialNote};
 use crate::device::{Carried, Emulator, Handheld};
@@ -52,7 +52,8 @@ impl Plugin for JobPlugin {
             ),
         )
         .add_observer(HandIn::pick_up)
-        .add_observer(Drone::on_add);
+        .add_observer(Drone::on_add)
+        .add_observer(Flight::clear_cargo);
     }
 }
 
@@ -107,6 +108,7 @@ struct Arrive(f32);
 /// The device, ticket and notes of the current [`Job`]. They leave the desk
 /// when the customer takes the device home.
 #[derive(Component, Debug, Default)]
+#[require(Leftover)]
 pub(crate) struct JobItem;
 
 /// Hands in the stamped job and lets the customer test it. Once they take
