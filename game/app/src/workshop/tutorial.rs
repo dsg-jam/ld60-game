@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use ld60_game_core::parts::paper::{Paper, Press, Print, Stock};
 use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
@@ -79,19 +78,11 @@ impl TutorialNote {
         (0..step.min(LESSONS.len())).map(Self)
     }
 
-    /// Marta typed her notes.
-    pub(super) fn print(self) -> Print {
-        Press::Typewriter
-            .run(("tutorial", self.0))
-            .on(Stock::TYPING)
-    }
-
-    pub(super) fn write(self, page: &mut ChildSpawnerCommands) {
+    pub(super) fn paragraphs(self) -> impl Iterator<Item = Message> {
         let message = self.message();
-        page.spawn(Paper::heading(self.title()));
-        for &paragraph in LESSONS[self.0] {
-            page.spawn(Paper::text(message.clone().attribute(paragraph)));
-        }
+        LESSONS[self.0]
+            .iter()
+            .map(move |&paragraph| message.clone().attribute(paragraph))
     }
 
     /// Files the note about the job that came in, unless it is filed
@@ -113,7 +104,7 @@ impl TutorialNote {
 
 #[cfg(test)]
 mod tests {
-    use ld60_locale::{Locale, Localized};
+    use ld60_locale::Locale;
 
     use super::*;
     use crate::workshop::levels::Levels;
@@ -123,8 +114,8 @@ mod tests {
         let locale = Locale::on_disk();
         for step in 0..LESSONS.len() {
             let note = TutorialNote(step);
-            locale.assert_formats(Localized::spawned_by(|page| note.write(page)));
-            locale.assert_formats([note.label()]);
+            locale.assert_formats(note.paragraphs());
+            locale.assert_formats([note.title(), note.label()]);
         }
         locale.assert_formats([Message::new("tutorial-footer")]);
     }
