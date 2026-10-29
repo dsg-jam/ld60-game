@@ -293,8 +293,8 @@ mod tests {
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::computer::editor::page::ActivePage;
-    use crate::workshop::computer::editor::undo::Undo;
+    use crate::editor::page::ActivePage;
+    use crate::editor::undo::Undo;
 
     /// What the status line says after `command` runs on `source`, with or
     /// without the first job and its device.

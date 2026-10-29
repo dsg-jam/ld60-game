@@ -31,7 +31,7 @@ const MAX_STEP: f32 = 1.0 / 60.0;
 /// How a pinned sheet hangs from its clip: tilted a little and swinging in
 /// the draft of passing vehicles. The edge in the clip stays put.
 #[derive(Component, Debug)]
-pub(in crate::workshop::computer) struct Sway {
+pub(crate) struct Sway {
     /// The middle of the top edge, in the rail's space.
     clip: Vec3,
     /// The middle of the sheet while it hangs straight.
@@ -72,9 +72,7 @@ impl Sway {
 
     /// Each page clipped on gets a tilt of its own, which it keeps while
     /// it hangs.
-    pub(in crate::workshop::computer) fn tilt_new_pages(
-        mut sheets: Query<(&Hanging, &mut Sway), Changed<Hanging>>,
-    ) {
+    pub(crate) fn tilt_new_pages(mut sheets: Query<(&Hanging, &mut Sway), Changed<Hanging>>) {
         for (hanging, mut sway) in &mut sheets {
             let mut rng = SmallRng::seed_from_u64(fixed_hash_one(("tilt", sway.slot, hanging.0)));
             let tilt = rng.random_range(MIN_TILT..TILT);
@@ -82,7 +80,7 @@ impl Sway {
         }
     }
 
-    pub(in crate::workshop::computer) fn swing(
+    pub(crate) fn swing(
         time: Res<Time>,
         draft: Option<Res<Draft>>,
         mut sheets: Query<(&mut Sway, &mut Transform, &GlobalTransform)>,

@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn keeps_shaded_lines_apart() {
-        use crate::workshop::computer::editor::listing::Listing;
+        use crate::editor::listing::Listing;
         use ld60_machine::Isa;
 
         let source = "NOP\nNOP\nNOP";

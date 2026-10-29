@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use ld60_devices::DeviceKind;
+use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_game_manuals::ShopManuals;
 use ld60_geometry::block::Block;
 
 use super::clutter::Clutter;
-use super::computer::ComputerLayout;
 use super::{
     COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW, STAMP_SPOT,
     STAMP_YAW, cable, delivery, lamp, printer, radio, receipt, reminder, rent, salvage, stamp,
