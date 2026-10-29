@@ -10,7 +10,6 @@ use bevy::{
 use self::sprite::Sprite;
 use super::crosshair::Prompt;
 use super::focus::{self, Clickable, Disabled, Focus};
-use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
 use crate::state::AppState;
 
 /// Diameter of the dot cursor, in logical pixels.
@@ -87,6 +86,16 @@ impl Plugin for CursorPlugin {
         );
     }
 }
+
+/// Asks for the arrow cursor while set, wherever the mouse is. A screen
+/// under the mouse shows its own pointer, so it wants the arrow.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WantsArrow(pub bool);
+
+/// Asks for the finger cursor while set and the mouse is over the entity,
+/// like a key that can be pressed.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WantsFinger(pub bool);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Kind {
@@ -203,8 +212,8 @@ impl Cursors {
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
-        surfaces: Query<&ScreenSurface>,
-        keys: Query<&PressableKey>,
+        arrows: Query<&WantsArrow>,
+        fingers: Query<&WantsFinger>,
         targets: Query<Has<Disabled>, With<Clickable>>,
         prompt: Res<Prompt>,
         mut icon: Single<&mut CursorIcon, With<PrimaryWindow>>,
@@ -212,13 +221,11 @@ impl Cursors {
         let under: Vec<Entity> = focus::under_mouse(&hovers, &parents).collect();
         let wanted = if *app_state.get() == AppState::Playing && prompt.at_cursor() {
             Kind::Hidden
-        } else if *app_state.get() != AppState::Playing
-            || surfaces.iter().any(ScreenSurface::hovered)
-        {
+        } else if *app_state.get() != AppState::Playing || arrows.iter().any(|arrow| arrow.0) {
             Kind::Arrow
         } else if under
             .iter()
-            .any(|&entity| keys.get(entity).is_ok_and(|key| key.active))
+            .any(|&entity| fingers.get(entity).is_ok_and(|finger| finger.0))
         {
             Kind::Finger
         } else if *state.get() == Focus::Desk
