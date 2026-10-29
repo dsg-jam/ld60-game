@@ -7,11 +7,11 @@ tutorial-1 =
     .label = FIRST JOB
     .welcome = The locals bring us old human gadgets. They pay well to have them fixed.
     .ticket = 1. Read the job ticket. It says what the gadget does wrong.
-    .open = 2. Use "{ click-device }" and turn it over. Take out the screws and lift off the back cover.
-    .cable = 3. Click the black header on the board to plug in the computer's cable.
-    .computer = 4. Use the computer. Press F8 to dump the firmware off the gadget, then F8 again to disassemble it.
+    .open = 2. Pick up the gadget and turn it over. Take out the screws and lift off the back cover.
+    .cable = 3. Push the computer's cable onto the black header on the board.
+    .computer = 4. At the computer, press F8 to read the firmware off the gadget, then F8 again to disassemble it.
     .fix = 5. Find the wrong line and change it.
-    .flash = 6. Press F6 FLASH to put your fix into the gadget, then use "{ click-device }" and try its buttons.
+    .flash = 6. Press F6 to flash your fix into the gadget, then pick it up and try its buttons.
     .finish = 7. If it works, pull the cable, put the cover and the screws back, and stamp the ticket.
     .idea = On this gadget, LDI A, 5 puts 5 in A. ST M2 shows A on its digit.
 
