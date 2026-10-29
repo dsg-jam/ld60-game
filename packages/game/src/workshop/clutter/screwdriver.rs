@@ -5,7 +5,7 @@ use ld60_core::player::camera::PlayerCamera;
 use ld60_core::player::focus::ClickTool;
 
 use super::props::Props;
-use crate::device::{Aim, Turning};
+use crate::device::{Aim, Phillips, Turning};
 
 /// How fast the screwdriver moves to a screw and back.
 const DECAY_RATE: f32 = 14.0;
@@ -50,7 +50,10 @@ impl Screwdriver {
         let dt = time.delta_secs();
         for (mut screwdriver, mut transform) in &mut screwdrivers {
             let goal = match (screw, waiting) {
-                (Some(screw), _) => Self::clear_of(screw.at, camera.translation),
+                (Some(screw), _) => Self::clear_of(
+                    screw.at * Transform::from_translation(Vec3::Y * Phillips::SEAT),
+                    camera.translation,
+                ),
                 (None, Some(spot)) => Self::clear_of(spot, camera.translation),
                 (None, None) => screwdriver.rest * Self::tip_to_rest(),
             };

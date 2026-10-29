@@ -18,6 +18,7 @@ use ld60_geometry::surface::Finish;
 
 pub(crate) use self::travel::Turning;
 use super::board::BoardLayout;
+use super::phillips::Phillips;
 use super::snap::Snap;
 use super::tool::ToolSpot;
 use super::{Connected, Holdable, Turned};
@@ -31,12 +32,8 @@ pub(super) const COVER: f32 = WALL;
 const BOSS: f32 = 0.0026;
 /// The hole in the end of a post that takes a screw.
 const PILOT: Vec3 = Vec3::new(0.0018, 0.0002, 0.0018);
-const SCREW: Vec3 = Vec3::new(0.0055, 0.0014, 0.0055);
+const SCREW: Vec3 = Phillips::HEAD;
 const SHANK: Vec3 = Vec3::new(0.0022, 0.008, 0.0022);
-/// One arm of the cross in the head of a Phillips screw. It stands out of
-/// the head by a hair so it shows.
-const SLOT: Vec3 = Vec3::new(0.0032, 0.0003, 0.0006);
-const SLOT_OUT: f32 = 0.00002;
 /// The empty hole of a screw that is out.
 const HOLE: Vec3 = Vec3::new(0.0034, 0.0003, 0.0034);
 /// Screws that are out lie this far from the left side of the device, and
@@ -249,16 +246,14 @@ impl Casing {
                 cover.spawn((CoverPlate, Shape::cuboid(&plate, color), Finish::Plastic));
                 for (index, &spot) in spots.screws.iter().enumerate() {
                     let head = Block::new(SCREW).translated(underside(spot) - Vec3::Y * SCREW.y);
-                    cover
-                        .spawn((
-                            Screw(index),
-                            ClickTool::Screwdriver,
-                            ToolSpot(Vec3::NEG_Y * SCREW.y / 2.0),
-                            Snap,
-                            Shape::cylinder(&head, SCREW_METAL),
-                            Finish::Metal,
-                        ))
-                        .with_children(Self::cross);
+                    cover.spawn((
+                        Screw(index),
+                        ClickTool::Screwdriver,
+                        ToolSpot(Vec3::NEG_Y * SCREW.y / 2.0),
+                        Snap,
+                        Shape::turned(Phillips::head(), &head, SCREW_METAL),
+                        Finish::Metal,
+                    ));
                     // Under the head, so it shows once the screw is out.
                     let hole = Block::new(HOLE).translated(underside(spot) - Vec3::Y * HOLE.y);
                     cover.spawn((
@@ -310,16 +305,6 @@ impl Casing {
         Self::new(holes, Block::new(shell.size.with_y(height)))
     }
 
-    /// The cross in the outer face of a screw head centered on the origin
-    /// of `head`.
-    fn cross(head: &mut ChildSpawnerCommands) {
-        let bottom = Vec3::Y * (-SCREW.y / 2.0 - SLOT_OUT);
-        for slot in [SLOT, SLOT.zyx()] {
-            let slot = Block::new(slot).translated(bottom);
-            head.spawn((Shape::cuboid(&slot, HOLE_DARK), Finish::Metal));
-        }
-    }
-
     /// Turns a screw in or out. Screws only turn while the cover is on.
     fn turn_screw(&mut self, index: usize) -> bool {
         match self.loose.get_mut(index) {
@@ -362,9 +347,11 @@ impl Casing {
                         .with_children(|screw| {
                             let head = Block::new(SCREW).translated(-Vec3::Y * SCREW.y / 2.0);
                             let shank = Block::new(SHANK).on_top_of(&head);
-                            screw.spawn((Shape::cylinder(&head, SCREW_METAL), Finish::Metal));
+                            screw.spawn((
+                                Shape::turned(Phillips::head(), &head, SCREW_METAL),
+                                Finish::Metal,
+                            ));
                             screw.spawn((Shape::cylinder(&shank, SCREW_METAL), Finish::Metal));
-                            Self::cross(screw);
                         })
                         .id()
                 })

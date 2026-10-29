@@ -4,6 +4,7 @@ mod emulator;
 mod handheld;
 mod link;
 mod name;
+mod phillips;
 mod silhouette;
 mod snap;
 mod tool;
@@ -28,6 +29,7 @@ pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::link::Connected;
 pub(crate) use self::name::{BoardLetter, DeviceName};
+pub(crate) use self::phillips::Phillips;
 pub(crate) use self::silhouette::Silhouette;
 pub(crate) use self::tool::Aim;
 
@@ -51,6 +53,7 @@ impl Plugin for DevicePlugin {
                 casing::CasingPlugin,
                 emulator::EmulatorPlugin,
                 snap::SnapPlugin,
+                phillips::PhillipsPlugin,
                 handheld::HandheldPlugin,
             ))
             .add_systems(

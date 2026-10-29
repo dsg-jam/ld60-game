@@ -36,13 +36,15 @@ struct TopTexture {
     region: Rect,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum Kind {
     Cuboid,
     /// Upright cylinder that fills the width and height of its block.
     Cylinder,
     /// Like [`Kind::Cylinder`], with round ends inside its block.
     Capsule,
+    /// A round mesh of its own that fills its block.
+    Turned(Handle<Mesh>),
 }
 
 impl Shape {
@@ -71,6 +73,12 @@ impl Shape {
         Self::bundle(Kind::Capsule, block, color)
     }
 
+    /// A round part with its own `mesh`, which fills `block` and is
+    /// finished like a cylinder.
+    pub fn turned(mesh: Handle<Mesh>, block: &Block, color: Color) -> impl Bundle {
+        Self::bundle(Kind::Turned(mesh), block, color)
+    }
+
     /// A cuboid with `region` of `image` on its top face.
     pub fn textured_cuboid(block: &Block, image: Handle<Image>, region: Rect) -> impl Bundle {
         (
@@ -96,16 +104,17 @@ impl Shape {
         )
     }
 
-    fn mesh(&self) -> Mesh {
-        let mut mesh: Mesh = match self.kind {
+    fn mesh(&self, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
+        let mut mesh: Mesh = match &self.kind {
             Kind::Cuboid => Cuboid::from_size(self.size).into(),
             Kind::Cylinder => Cylinder::new(self.size.x / 2.0, self.size.y).into(),
             Kind::Capsule => Capsule3d::new(self.size.x / 2.0, self.size.y - self.size.x).into(),
+            Kind::Turned(mesh) => return mesh.clone(),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);
         }
-        mesh
+        meshes.add(mesh)
     }
 
     fn on_add(
@@ -120,11 +129,11 @@ impl Shape {
         };
         let form = match shape.kind {
             Kind::Cuboid => Form::Box(shape.size),
-            Kind::Cylinder | Kind::Capsule => Form::Cylinder(shape.size),
+            Kind::Cylinder | Kind::Capsule | Kind::Turned(_) => Form::Cylinder(shape.size),
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;
         commands.entity(add.entity).insert((
-            Mesh3d(meshes.add(shape.mesh())),
+            Mesh3d(shape.mesh(&mut meshes)),
             MeshMaterial3d(materials.add(finish.copied().unwrap_or_default().textured(
                 shape.color,
                 shape.texture.as_ref().map(|t| t.image.clone()),
