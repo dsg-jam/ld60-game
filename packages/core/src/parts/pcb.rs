@@ -13,9 +13,9 @@ pub use self::router::{Pad, Router};
 use super::dot_matrix::GLYPHS;
 
 /// Mask texels per meter of board.
-const DENSITY: f32 = 6000.0;
+const DENSITY: f32 = 9000.0;
 /// How far the height of the copper spreads out under the mask, in texels.
-const HEIGHT_BLUR: i32 = 2;
+const HEIGHT_BLUR: i32 = 3;
 
 pub struct PcbPlugin;
 
