@@ -43,7 +43,6 @@ fn main() -> AppExit {
         ld60_locale::LocalePlugin,
         menu::MenuPlugin,
         ld60_game_core::parts::PartsPlugin,
-        ld60_game_core::pipelines::PipelinesPlugin,
         ld60_game_core::player::PlayerPlugin,
         ld60_locale::TypefacePlugin,
         workshop::WorkshopPlugin,

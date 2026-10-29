@@ -12,7 +12,6 @@ pub mod clock;
 pub mod debug_port;
 pub mod layout;
 pub mod parts;
-pub mod pipelines;
 pub mod player;
 pub mod settings;
 pub mod state;
