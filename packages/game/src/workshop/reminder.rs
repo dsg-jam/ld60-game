@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 use ld60_core::parts::paper::{Flutter, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
 use ld60_core::parts::screen::UiCanvas;
-use ld60_locale::{Localized, Message};
+use ld60_locale::{Locale, Localized, Message};
 
 use super::run::Run;
 
@@ -20,9 +20,9 @@ const CANVAS: UVec2 = UVec2::new(300, 300);
 const PAPER: Color = Color::srgb_u8(0xe8, 0xd4, 0x6a);
 /// A blue ballpoint pen.
 const INK: Color = Color::srgb_u8(0x2a, 0x3a, 0x6a);
-const TITLE_SIZE: f32 = 42.0;
-const AMOUNT_SIZE: f32 = 88.0;
-const WHEN_SIZE: f32 = 21.0;
+/// The size of each line of the note, and the paper left bare around them.
+const SIZES: [f32; 3] = [30.0, 72.0, 20.0];
+const PADDING: f32 = 24.0;
 
 pub(crate) struct ReminderPlugin;
 
@@ -38,13 +38,9 @@ impl Plugin for ReminderPlugin {
 #[require(Transform, Visibility)]
 pub(crate) struct Reminder;
 
-/// A line of the [`Reminder`].
+/// A line of the [`Reminder`], counted from the top.
 #[derive(Component, Clone, Copy, Debug)]
-enum Line {
-    Title,
-    Amount,
-    When,
-}
+struct Line(usize);
 
 impl Reminder {
     fn on_add(
@@ -55,17 +51,6 @@ impl Reminder {
         mut materials: ResMut<Assets<StandardMaterial>>,
     ) {
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS, add.entity);
-        let line = |line: Line, size: f32| {
-            (
-                line,
-                Localized::verbatim(""),
-                TextFont {
-                    font_size: FontSize::Px(size),
-                    ..default()
-                },
-                TextColor(INK),
-            )
-        };
         commands.spawn((
             Node {
                 width: percent(100),
@@ -73,15 +58,29 @@ impl Reminder {
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                padding: px(PADDING).all(),
                 ..default()
             },
             BackgroundColor(PAPER),
             canvas.target(),
-            children![
-                line(Line::Title, TITLE_SIZE),
-                line(Line::Amount, AMOUNT_SIZE),
-                line(Line::When, WHEN_SIZE),
-            ],
+            Children::spawn(SpawnIter(SIZES.into_iter().enumerate().map(
+                |(index, size)| {
+                    (
+                        Line(index),
+                        Node {
+                            width: percent(100),
+                            ..default()
+                        },
+                        Localized::verbatim(""),
+                        TextFont {
+                            font_size: FontSize::Px(size),
+                            ..default()
+                        },
+                        TextLayout::justify(Justify::Center),
+                        TextColor(INK),
+                    )
+                },
+            ))),
         ));
         let wrinkles = Wrinkles::sticky(SIZE.xz(), "reminder");
         commands.entity(add.entity).with_child((
@@ -101,20 +100,23 @@ impl Reminder {
     }
 
     /// Follows the rent of the run. Once the player owns the building, it
-    /// says so.
-    fn write(run: Res<Run>, mut lines: Query<(&Line, &mut Localized)>) {
-        for (&line, mut text) in &mut lines {
-            let message = match (line, run.owned()) {
-                (Line::Title, false) => Message::new("reminder-title"),
-                (Line::Amount, false) => Message::new("reminder-amount").with("amount", run.rent()),
-                (Line::When, false) => Message::new("reminder-when"),
-                (Line::Title, true) => Message::new("reminder-owned"),
-                (Line::Amount | Line::When, true) => {
-                    text.set_if_neq(Localized::verbatim(""));
-                    continue;
-                }
-            };
-            text.set_if_neq(message.into());
+    /// says so. The note is one message, so it reads as one sentence in any
+    /// language, and each of its lines is written in its own size.
+    fn write(run: Res<Run>, locale: Res<Locale>, mut lines: Query<(&Line, &mut Localized)>) {
+        let message = if run.owned() {
+            Message::new("reminder-owned")
+        } else {
+            Message::new("reminder").with("amount", run.rent())
+        };
+        let text = locale.text(&message.into());
+        let mut written: Vec<&str> = text.lines().collect();
+        // A short note sits on the big middle line.
+        if written.len() == 1 {
+            written.insert(0, "");
+        }
+        for (&Line(index), mut line) in &mut lines {
+            let wanted = Localized::verbatim(written.get(index).copied().unwrap_or_default());
+            line.set_if_neq(wanted);
         }
     }
 }
@@ -128,9 +130,7 @@ mod tests {
     #[test]
     fn every_line_formats() {
         Locale::on_disk().assert_formats([
-            Message::new("reminder-title"),
-            Message::new("reminder-amount").with("amount", 30),
-            Message::new("reminder-when"),
+            Message::new("reminder").with("amount", 30),
             Message::new("reminder-owned"),
         ]);
     }
