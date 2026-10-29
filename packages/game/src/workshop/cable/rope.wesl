@@ -12,6 +12,7 @@ struct Rope {
     points: array<vec4<f32>, POINTS>,
     normals: array<vec4<f32>, POINTS>,
     radius: f32,
+    spacing: f32,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> rope: Rope;
@@ -61,6 +62,10 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     out.world_normal = outward;
 @if(PREPASS_PIPELINE && NORMAL_PREPASS_OR_DEFERRED_PREPASS)
     out.world_normal = outward;
+@if(!PREPASS_PIPELINE && VERTEX_TANGENTS)
+    out.world_tangent = vec4<f32>(tangent, 1.0);
+@if(PREPASS_PIPELINE && NORMAL_PREPASS_OR_DEFERRED_PREPASS && VERTEX_TANGENTS)
+    out.world_tangent = vec4<f32>(tangent, 1.0);
 @if(VERTEX_UVS_A)
     out.uv = vertex.uv;
 @if(PREPASS_PIPELINE && MOTION_VECTOR_PREPASS)

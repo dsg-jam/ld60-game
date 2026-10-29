@@ -239,7 +239,12 @@ impl Cable {
         };
         let exit = rest.rotation * Vec3::Z;
         cable.lay(rest.translation + exit * (PLUG.z / 2.0));
-        let material = ropes.add(Rope::material(CABLE_GRAY, RADIUS, &cable.points));
+        let material = ropes.add(Rope::material(
+            CABLE_GRAY,
+            RADIUS,
+            &cable.points,
+            cable.length,
+        ));
         // The shader moves the tube far from the bounds of its mesh.
         commands.spawn((
             Name::new("debug cable"),
@@ -331,7 +336,7 @@ impl Cable {
             return;
         }
         if let Some(mut rope) = ropes.get_mut(material) {
-            rope.extension.follow(&cable.points);
+            rope.extension.follow(&cable.points, cable.length);
         }
     }
 
