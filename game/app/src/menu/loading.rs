@@ -1,11 +1,13 @@
+mod pipelines;
+
 use bevy::prelude::*;
-use ld60_game_core::pipelines::Pipelines;
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::hints::IconFont;
 use ld60_game_core::state::AppState;
 use ld60_game_run::levels::Levels;
 use ld60_locale::Locale;
 
+use self::pipelines::{Pipelines, PipelinesPlugin};
 use crate::TITLE;
 
 /// The colors of the page around the game on the web, which shows until the
@@ -32,7 +34,8 @@ pub(super) struct LoadingPlugin;
 
 impl Plugin for LoadingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Loading), LoadingScreen::spawn)
+        app.add_plugins(PipelinesPlugin)
+            .add_systems(OnEnter(AppState::Loading), LoadingScreen::spawn)
             .add_systems(
                 Update,
                 LoadingScreen::follow.run_if(in_state(AppState::Loading)),
