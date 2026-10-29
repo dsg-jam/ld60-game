@@ -1,4 +1,5 @@
 mod drilled;
+mod keycap;
 
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
@@ -50,6 +51,9 @@ enum Kind {
     /// Like [`Kind::Cuboid`], with round holes of a radius through it from
     /// top to bottom.
     Drilled(Vec<Vec2>, f32),
+    /// A keycap, with sides that lean in by a taper and a top dished by a
+    /// depth.
+    Keycap(f32, f32),
 }
 
 impl Shape {
@@ -76,6 +80,30 @@ impl Shape {
 
     pub fn capsule(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Capsule, block, color)
+    }
+
+    /// A keycap filling `block`, with sides that lean in by `taper` and a
+    /// top dished by `dish`, showing `region` of `image` on its top. With
+    /// both at zero it is a plain box.
+    pub fn keycap(
+        block: &Block,
+        (taper, dish): (f32, f32),
+        image: Handle<Image>,
+        region: Rect,
+    ) -> impl Bundle {
+        (
+            Self {
+                kind: if (taper, dish) == (0.0, 0.0) {
+                    Kind::Cuboid
+                } else {
+                    Kind::Keycap(taper, dish)
+                },
+                size: block.size,
+                color: Color::WHITE,
+                texture: Some(TopTexture { image, region }),
+            },
+            block.transform(),
+        )
     }
 
     /// A cuboid with round holes of `radius` through it from top to bottom.
@@ -122,6 +150,7 @@ impl Shape {
             Kind::Capsule => Capsule3d::new(self.size.x / 2.0, self.size.y - self.size.x).into(),
             Kind::Turned(mesh) => return mesh.clone(),
             Kind::Drilled(holes, radius) => drilled::drilled(self.size, holes, *radius),
+            Kind::Keycap(taper, dish) => keycap::keycap(self.size, *taper, *dish),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);
@@ -140,7 +169,7 @@ impl Shape {
             return;
         };
         let form = match shape.kind {
-            Kind::Cuboid | Kind::Drilled(..) => Form::Box(shape.size),
+            Kind::Cuboid | Kind::Drilled(..) | Kind::Keycap(..) => Form::Box(shape.size),
             Kind::Cylinder | Kind::Capsule | Kind::Turned(_) => Form::Cylinder(shape.size),
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;

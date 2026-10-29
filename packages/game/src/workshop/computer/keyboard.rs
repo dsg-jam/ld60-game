@@ -10,16 +10,23 @@ use super::{CASE, CASE_DARK};
 /// Base border around the keys.
 const MARGIN: f32 = 0.012;
 const BASE_HEIGHT: f32 = 0.018;
+/// How far the floor the keys stand on lies below the cover around them.
+const WELL: f32 = 0.004;
+/// The floor between the keys, darker in the shade of the cover.
+const FLOOR: Color = Color::srgb_u8(0x3a, 0x37, 0x32);
 
 const STYLE: KeypadStyle = KeypadStyle {
     pitch: 0.0215,
     key_size: Vec3::new(0.018, 0.008, 0.017),
     travel: 0.003,
-    label_cell: 48.0,
-    font_size: 20.0,
-    word_font_size: 11.0,
+    label_cell: 96.0,
+    font_size: 40.0,
+    word_font_size: 22.0,
     ink: Color::srgb_u8(0x4a, 0x44, 0x3a),
     cap: CASE,
+    shape: (0.0016, 0.0005),
+    // The function keys sit apart from the main block.
+    row_gaps: &[0.0, 0.5],
 };
 
 /// Rows from the back to the front.
@@ -112,9 +119,13 @@ const ROWS: &[&[KeyDef<()>]] = &[
     ],
 ];
 
-/// A keyboard with separate keys on a base, in its own local space.
+/// A keyboard with separate keys on a base, in its own local space. The
+/// keys stand on a floor sunk into the base, and the cover of the base
+/// frames the function keys and the main block.
 pub(super) struct Keyboard {
     pub(super) base: Block,
+    floor: Block,
+    cover: Vec<Block>,
     keypad: Keypad<()>,
 }
 
@@ -122,9 +133,34 @@ impl Keyboard {
     /// Lays out the keyboard with its base resting on the ground.
     pub(super) fn new() -> Self {
         let area = Keypad::area(ROWS, &STYLE);
-        let base = Block::new((area + 2.0 * MARGIN).extend(BASE_HEIGHT).xzy());
-        let keypad = Keypad::new(ROWS, &STYLE, &base, Vec2::ZERO);
-        Self { base, keypad }
+        let size = area + 2.0 * MARGIN;
+        let base = Block::new(size.extend(BASE_HEIGHT).xzy());
+        let floor = Block::new(size.extend(BASE_HEIGHT - WELL).xzy());
+        let keypad = Keypad::new(ROWS, &STYLE, &floor, Vec2::ZERO);
+        let bar = |size: Vec2, center: Vec2| {
+            Block::new(size.extend(WELL).xzy())
+                .on_top_of(&floor)
+                .translated(center.extend(0.0).xzy())
+        };
+        let side = Vec2::new(MARGIN, size.y);
+        let end = Vec2::new(area.x, MARGIN);
+        let edge = (area + Vec2::splat(MARGIN)) / 2.0;
+        // The strip between the function keys and the main block.
+        let gap = STYLE.row_gaps[1] * STYLE.pitch;
+        let split = -area.y / 2.0 + STYLE.pitch + gap / 2.0;
+        let cover = vec![
+            bar(side, Vec2::new(-edge.x, 0.0)),
+            bar(side, Vec2::new(edge.x, 0.0)),
+            bar(end, Vec2::new(0.0, -edge.y)),
+            bar(end, Vec2::new(0.0, edge.y)),
+            bar(Vec2::new(area.x, gap), Vec2::new(0.0, split)),
+        ];
+        Self {
+            base,
+            floor,
+            cover,
+            keypad,
+        }
     }
 
     /// Spawns the label canvas on `owner` and returns its texture.
@@ -146,7 +182,10 @@ impl Keyboard {
         parent
             .spawn((Name::new("keyboard"), transform, Visibility::default()))
             .with_children(|keyboard| {
-                keyboard.spawn((Shape::cuboid(&self.base, CASE_DARK), Finish::Plastic));
+                keyboard.spawn((Shape::cuboid(&self.floor, FLOOR), Finish::Plastic));
+                for bar in &self.cover {
+                    keyboard.spawn((Shape::cuboid(bar, CASE_DARK), Finish::Plastic));
+                }
                 self.keypad.spawn_keys(keyboard, &labels, false, |key| {
                     KeyboardKey(
                         key.code()
