@@ -3573,17 +3573,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ld60-city"
-version = "0.3.0"
-dependencies = [
- "bevy",
- "ld60-core",
- "ld60-geometry",
- "rand",
- "serde_json",
-]
-
-[[package]]
 name = "ld60-cli"
 version = "0.3.0"
 dependencies = [
@@ -3594,22 +3583,6 @@ dependencies = [
  "ld60-levels",
  "ld60-machine",
  "unic-langid",
-]
-
-[[package]]
-name = "ld60-core"
-version = "0.3.0"
-dependencies = [
- "bevy",
- "ld60-devices",
- "ld60-geometry",
- "ld60-locale",
- "ld60-store",
- "rand",
- "serde",
- "serde_json",
- "web-sys",
- "winit",
 ]
 
 [[package]]
@@ -3636,9 +3609,9 @@ version = "0.3.0"
 dependencies = [
  "bevy",
  "ld60-calco",
- "ld60-city",
- "ld60-core",
  "ld60-devices",
+ "ld60-game-city",
+ "ld60-game-core",
  "ld60-geometry",
  "ld60-levels",
  "ld60-locale",
@@ -3648,6 +3621,33 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ld60-game-city"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-game-core",
+ "ld60-geometry",
+ "rand",
+ "serde_json",
+]
+
+[[package]]
+name = "ld60-game-core"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-devices",
+ "ld60-geometry",
+ "ld60-locale",
+ "ld60-store",
+ "rand",
+ "serde",
+ "serde_json",
+ "web-sys",
+ "winit",
 ]
 
 [[package]]

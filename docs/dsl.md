@@ -117,7 +117,7 @@ for `buggy.asm`, where the broken rule is often the bug.
 
 ## Other instruction sets
 
-Each instruction set has a backend in `packages/dsl/src/backend/`. The backend
+Each instruction set has a backend in `silicon/dsl/src/backend/`. The backend
 names cells, flags and ports, wraps indexed addresses, prints instructions and
 lowers each statement.
 
