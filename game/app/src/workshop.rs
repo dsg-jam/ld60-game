@@ -10,7 +10,6 @@ mod dust;
 mod footprint;
 mod front;
 mod lamp;
-mod manuals;
 mod printer;
 mod radio;
 mod receipt;
@@ -20,7 +19,6 @@ mod rent;
 mod rug;
 mod salvage;
 mod save;
-mod service;
 mod shop;
 mod stamp;
 mod ticket;
@@ -33,6 +31,7 @@ use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::focus::Focused;
+use ld60_game_manuals::ShopManuals;
 use ld60_game_run::NewRun;
 
 use self::bin::Bin;
@@ -42,7 +41,6 @@ use self::counter::Counter;
 use self::dial::Dial;
 use self::front::Front;
 use self::lamp::Lamp;
-use self::manuals::ShopManuals;
 use self::printer::Printer;
 use self::radio::Radio;
 use self::reminder::Reminder;
@@ -76,7 +74,7 @@ impl Plugin for WorkshopPlugin {
             radio::RadioPlugin,
             rug::RugPlugin,
             shop::ShopPlugin,
-            manuals::ManualsPlugin,
+            ld60_game_manuals::ManualsPlugin,
             ticket::TicketPlugin,
             ld60_game_run::job::JobPlugin,
             ld60_game_run::levels::LevelsPlugin,

@@ -48,14 +48,14 @@ const IN_FRONT: f32 = 0.0005;
 
 /// Asks the manuals file to pin a sheet to the rail or to put it back.
 #[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum MoveSheet {
+pub enum MoveSheet {
     Pin(Sheet),
     Unpin(Sheet),
 }
 
 /// A sheet on the rail, in the slot it holds, see [`Pins`].
 #[derive(Component, Debug)]
-pub(crate) struct RailSlot(pub(crate) usize);
+pub struct RailSlot(pub usize);
 
 /// The pages of a file on their way to or from the rail.
 #[derive(Component, Debug, Default)]

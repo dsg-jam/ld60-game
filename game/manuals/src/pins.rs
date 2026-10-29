@@ -13,7 +13,7 @@ use super::contents::{Contents, Entry, Page};
 /// One page of the manuals file, named by its entry so it stays the same
 /// page when more is filed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct Sheet {
+pub struct Sheet {
     entry: Entry,
     /// Counted from 0 within the entry.
     page: usize,
@@ -25,7 +25,7 @@ pub(crate) struct Sheet {
 /// file until it is unpinned. A new run starts with an empty rail.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Vec<SavedSlot>", into = "Vec<Option<Sheet>>")]
-pub(crate) struct Pins([Option<Sheet>; Pins::MAX]);
+pub struct Pins([Option<Sheet>; Pins::MAX]);
 
 /// A slot of [`Pins`] as saved. Saves from before slots list the sheets
 /// alone.
@@ -60,7 +60,7 @@ impl Sheet {
 
     /// Spawns the sheet on `canvas`, with the band of its section at the
     /// top.
-    pub(crate) fn spawn(self, commands: &mut Commands, canvas: &UiCanvas) -> Option<Entity> {
+    pub fn spawn(self, commands: &mut Commands, canvas: &UiCanvas) -> Option<Entity> {
         let page = self.page()?;
         let spawned = Paper::spawn_single(commands, canvas, page.footer(), |content| {
             content.spawn(self.band());
@@ -70,40 +70,40 @@ impl Sheet {
         Some(spawned)
     }
 
-    pub(crate) fn print(self) -> Print {
+    pub fn print(self) -> Print {
         self.entry.print()
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Sheet {
     /// The first page of the first datasheet.
-    pub(crate) fn example() -> Self {
+    pub fn example() -> Self {
         Self::new(Entry::Chip(ld60_calco::Revision::A), 0)
     }
 }
 
 impl Pins {
-    pub(crate) const MAX: usize = 2;
+    pub const MAX: usize = 2;
 
     /// What hangs in each slot.
-    pub(crate) fn slots(&self) -> &[Option<Sheet>] {
+    pub fn slots(&self) -> &[Option<Sheet>] {
         &self.0
     }
 
     /// How many slots there are up to the last one in use.
-    pub(crate) fn used(&self) -> usize {
+    pub fn used(&self) -> usize {
         self.0
             .iter()
             .rposition(Option::is_some)
             .map_or(0, |last| last + 1)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.used() == 0
     }
 
-    pub(crate) fn contains(&self, sheet: Sheet) -> bool {
+    pub fn contains(&self, sheet: Sheet) -> bool {
         self.slot_of(sheet).is_some()
     }
 
@@ -123,7 +123,7 @@ impl Pins {
     }
 
     /// Unpins the sheets whose entry is not in the manuals file of `run`.
-    pub(crate) fn keep_filed(&mut self, run: &Run) {
+    pub fn keep_filed(&mut self, run: &Run) {
         let contents = Contents::of(run);
         for slot in &mut self.0 {
             if slot.is_some_and(|sheet| !contents.entries().contains(&sheet.entry)) {
@@ -144,7 +144,7 @@ impl Pins {
 
     /// Pins `sheet` in the free slot closest to the monitor, unless it is
     /// pinned already or the rail is full.
-    pub(crate) fn pin(&mut self, sheet: Sheet) {
+    pub fn pin(&mut self, sheet: Sheet) {
         if !self.contains(sheet)
             && let Some(slot) = self.free_slot()
         {
@@ -154,7 +154,7 @@ impl Pins {
 
     /// Takes `sheet` off the rail, back into the manuals file. The other
     /// sheets stay where they are.
-    pub(crate) fn unpin(&mut self, sheet: Sheet) {
+    pub fn unpin(&mut self, sheet: Sheet) {
         if let Some(slot) = self.slot_of(sheet) {
             self.0[slot] = None;
         }
