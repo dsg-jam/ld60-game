@@ -1,13 +1,12 @@
+mod click;
 mod travel;
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::{
     ecs::{lifecycle::HookContext, world::DeferredWorld},
-    picking::{events::PointerClick, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_audio::{Play, Sound};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
 use ld60_game_core::layout::counter::CounterLayout;
@@ -21,7 +20,7 @@ use super::board::{BoardLayout, CHIP_BLACK, LEG_TIN};
 use super::phillips::Phillips;
 use super::snap::Snap;
 use super::tool::ToolSpot;
-use super::{Connected, Holdable, Turned};
+use super::{Connected, Holdable};
 
 /// Thickness of the walls of a device.
 pub(super) const WALL: f32 = 0.0015;
@@ -528,190 +527,6 @@ impl Casing {
             }));
         }
         Ok(states.into())
-    }
-
-    /// The device that `part` belongs to, if the player holds it.
-    fn held<'a>(
-        part: Entity,
-        focused: &Focused,
-        parents: &Query<&ChildOf>,
-        casings: &'a mut Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-    ) -> Option<(Entity, Mut<'a, Casing>, Mut<'a, Holdable>, bool)> {
-        if !focused.holds(part, parents) {
-            return None;
-        }
-        let device = parents
-            .iter_ancestors(part)
-            .find(|ancestor| casings.contains(*ancestor))?;
-        let (_, casing, holdable, plugged) = casings.get_mut(device).ok()?;
-        Some((device, casing, holdable, plugged))
-    }
-}
-
-impl Screw {
-    fn press(
-        mut press: On<PointerClick>,
-        focused: Res<Focused>,
-        turned: Res<Turned>,
-        parents: Query<&ChildOf>,
-        screws: Query<&Screw>,
-        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-        mut commands: Commands,
-    ) {
-        let Ok(screw) = screws.get(press.entity) else {
-            return;
-        };
-        if press.button != PointerButton::Primary || !turned.clicked() {
-            return;
-        }
-        let Some((_, mut casing, ..)) =
-            Casing::held(press.entity, &focused, &parents, &mut casings)
-        else {
-            return;
-        };
-        press.propagate(false);
-        let out = casing.loose.get(screw.0) == Some(&false) && casing.turn_screw(screw.0);
-        // The screwdriver plays the turning, see `Casing::travel`.
-        if !out {
-            commands.trigger(Play(Sound::Refuse));
-        }
-    }
-}
-
-impl Hole {
-    /// Puts the screw back in from beside the device.
-    fn press(
-        mut press: On<PointerClick>,
-        focused: Res<Focused>,
-        turned: Res<Turned>,
-        parents: Query<&ChildOf>,
-        holes: Query<&Hole>,
-        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-        mut commands: Commands,
-    ) {
-        let Ok(hole) = holes.get(press.entity) else {
-            return;
-        };
-        if press.button != PointerButton::Primary || !turned.clicked() {
-            return;
-        }
-        let Some((_, mut casing, ..)) =
-            Casing::held(press.entity, &focused, &parents, &mut casings)
-        else {
-            return;
-        };
-        press.propagate(false);
-        let back = casing.loose.get(hole.0) == Some(&true) && casing.turn_screw(hole.0);
-        if !back {
-            commands.trigger(Play(Sound::Refuse));
-        }
-    }
-}
-
-impl CoverPlate {
-    fn press(
-        mut press: On<PointerClick>,
-        focused: Res<Focused>,
-        turned: Res<Turned>,
-        parents: Query<&ChildOf>,
-        plates: Query<(), With<CoverPlate>>,
-        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-        mut commands: Commands,
-    ) {
-        if !plates.contains(press.entity)
-            || press.button != PointerButton::Primary
-            || !turned.clicked()
-        {
-            return;
-        }
-        let Some((_, mut casing, mut holdable, plugged)) =
-            Casing::held(press.entity, &focused, &parents, &mut casings)
-        else {
-            return;
-        };
-        press.propagate(false);
-        // The cover on the mat goes back on, like a click on the board.
-        let sound = if casing.open {
-            if casing.close_cover(plugged) {
-                holdable.turn_over(casing.bounds.size.y);
-                Sound::CoverOn
-            } else {
-                Sound::Refuse
-            }
-        } else if casing.lift_cover() {
-            holdable.turn_over(casing.bounds.size.y);
-            Sound::CoverOff
-        } else {
-            Sound::Refuse
-        };
-        commands.trigger(Play(sound));
-    }
-}
-
-impl Board {
-    fn press(
-        mut press: On<PointerClick>,
-        focused: Res<Focused>,
-        turned: Res<Turned>,
-        parents: Query<&ChildOf>,
-        boards: Query<(), With<Board>>,
-        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-        mut commands: Commands,
-    ) {
-        if !boards.contains(press.entity)
-            || press.button != PointerButton::Primary
-            || !turned.clicked()
-        {
-            return;
-        }
-        let Some((_, mut casing, mut holdable, plugged)) =
-            Casing::held(press.entity, &focused, &parents, &mut casings)
-        else {
-            return;
-        };
-        press.propagate(false);
-        let sound = if casing.close_cover(plugged) {
-            holdable.turn_over(casing.bounds.size.y);
-            Sound::CoverOn
-        } else {
-            Sound::Refuse
-        };
-        commands.trigger(Play(sound));
-    }
-}
-
-impl Header {
-    /// Plugs the debug cable in, or pulls it out.
-    fn press(
-        mut press: On<PointerClick>,
-        focused: Res<Focused>,
-        turned: Res<Turned>,
-        parents: Query<&ChildOf>,
-        headers: Query<(), With<Header>>,
-        mut casings: Query<(Entity, &mut Casing, &mut Holdable, Has<Connected>)>,
-        mut commands: Commands,
-    ) {
-        if !headers.contains(press.entity)
-            || press.button != PointerButton::Primary
-            || !turned.clicked()
-        {
-            return;
-        }
-        let Some((device, casing, _, plugged)) =
-            Casing::held(press.entity, &focused, &parents, &mut casings)
-        else {
-            return;
-        };
-        press.propagate(false);
-        if !casing.open {
-            commands.trigger(Play(Sound::Refuse));
-        } else if plugged {
-            commands.entity(device).remove::<Connected>();
-            commands.trigger(Play(Sound::PlugOut));
-        } else {
-            commands.entity(device).insert(Connected);
-            commands.trigger(Play(Sound::PlugIn));
-        }
     }
 }
 
