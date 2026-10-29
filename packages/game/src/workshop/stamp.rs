@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
 };
 use ld60_core::audio::{Play, Sound};
-use ld60_core::player::focus::{Clickable, Focus};
+use ld60_core::player::focus::{Clickable, Focus, Prompting};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -114,21 +114,12 @@ impl RubberStamp {
 
     fn arm(
         ready: Ready,
-        stamps: Query<(Entity, Has<Clickable>, Has<Stamping>), With<Self>>,
+        stamps: Query<(Entity, Prompting, Has<Stamping>), With<Self>>,
         mut commands: Commands,
     ) {
-        for (stamp, armed, stamping) in &stamps {
-            match (ready.can_stamp(stamping), armed) {
-                (true, false) => {
-                    commands.entity(stamp).insert(Clickable {
-                        prompt: "click-stamp",
-                    });
-                }
-                (false, true) => {
-                    commands.entity(stamp).remove::<Clickable>();
-                }
-                _ => {}
-            }
+        for (stamp, now, stamping) in &stamps {
+            let wanted = Some(("click-stamp", ready.can_stamp(stamping)));
+            Clickable::show(&mut commands, stamp, now, wanted);
         }
     }
 

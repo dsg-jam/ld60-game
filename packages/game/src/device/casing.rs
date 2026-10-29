@@ -11,7 +11,7 @@ use ld60_core::audio::{Play, Sound};
 #[cfg(feature = "debug_port")]
 use ld60_core::debug_port::DebugMethods;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_core::player::focus::{ClickTool, Clickable, Focused};
+use ld60_core::player::focus::{ClickTool, Clickable, Focused, Prompting};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -53,8 +53,8 @@ const HEADER_PICK: Vec3 = Vec3::splat(0.008);
 
 /// The parts of a casing that say what a click does while the device is
 /// focused.
-type Prompted<'a> = (
-    Option<&'a Clickable>,
+type Prompted = (
+    Prompting,
     Has<CoverPlate>,
     Has<Header>,
     Has<Board>,
@@ -417,28 +417,21 @@ impl Casing {
                 if let (Some(show), Ok(mut visibility)) = (show, shown.get_mut(part)) {
                     visibility.set_if_neq(visible(show));
                 }
-                if let Ok((clickable, plate, header, board, screw)) = parts.get(part) {
-                    // A part a click does nothing to shows no prompt.
-                    let prompt = (focused.get() == Some(device))
-                        .then_some(match (plate, header, board, screw) {
-                            (true, ..) if casing.open && plugged => None,
-                            (true, ..) if casing.open => Some("click-cover-on"),
-                            (true, ..) if all_loose => Some("click-cover-off"),
-                            (true, ..) => None,
-                            (_, true, ..) if plugged => Some("click-unplug"),
-                            (_, true, ..) => Some("click-plug-in"),
-                            (_, _, true, _) if plugged => None,
-                            (_, _, true, _) => Some("click-cover-on"),
-                            (.., true) => Some("click-unscrew"),
-                            _ => Some("click-screw-in"),
-                        })
-                        .flatten();
-                    if clickable.map(|clickable| clickable.prompt) != prompt {
-                        match prompt {
-                            Some(prompt) => commands.entity(part).insert(Clickable { prompt }),
-                            None => commands.entity(part).remove::<Clickable>(),
-                        };
-                    }
+                if let Ok((now, plate, header, board, screw)) = parts.get(part) {
+                    // The cover stays on while plugged in, and comes off once
+                    // all screws are out.
+                    let wanted = (focused.get() == Some(device)).then_some(
+                        match (plate, header, board, screw) {
+                            (true, ..) if casing.open => ("click-cover-on", !plugged),
+                            (true, ..) => ("click-cover-off", all_loose),
+                            (_, true, ..) if plugged => ("click-unplug", true),
+                            (_, true, ..) => ("click-plug-in", true),
+                            (_, _, true, _) => ("click-cover-on", !plugged),
+                            (.., true) => ("click-unscrew", true),
+                            _ => ("click-screw-in", true),
+                        },
+                    );
+                    Clickable::show(&mut commands, part, now, wanted);
                 }
             }
             for &screw in &casing.aside {

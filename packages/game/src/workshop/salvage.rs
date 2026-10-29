@@ -8,7 +8,7 @@ use ld60_core::audio::{Play, Sound};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::parts::paper::{INK_FADED, PAPER, Paper};
 use ld60_core::parts::screen::UiCanvas;
-use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
+use ld60_core::player::focus::{Clickable, Focus, FocusTarget, Focused, Prompting, View};
 use ld60_core::state::AppState;
 use ld60_devices::DeviceKind;
 use ld60_geometry::block::Block;
@@ -333,26 +333,18 @@ impl ForSale {
         Message::new("receipt-amount").with("amount", find.price())
     }
 
-    /// While the crate is open, each find the till holds enough for can be
-    /// bought.
+    /// While the crate is open, each find can be bought once the till holds
+    /// enough for it.
     fn arm(
         run: Res<Run>,
         focused: Res<Focused>,
-        offers: Query<(Entity, &ForSale, &ChildOf, Option<&Clickable>)>,
+        offers: Query<(Entity, &ForSale, &ChildOf, Prompting)>,
         mut commands: Commands,
     ) {
-        for (entity, offer, parent, clickable) in &offers {
-            let wanted = (focused.get() == Some(parent.parent()) && run.till() >= offer.0.price())
-                .then_some(Clickable {
-                    prompt: "click-buy",
-                });
-            if wanted.as_ref() == clickable {
-                continue;
-            }
-            match wanted {
-                Some(clickable) => commands.entity(entity).insert(clickable),
-                None => commands.entity(entity).remove::<Clickable>(),
-            };
+        for (entity, offer, parent, now) in &offers {
+            let wanted = (focused.get() == Some(parent.parent()))
+                .then_some(("click-buy", run.till() >= offer.0.price()));
+            Clickable::show(&mut commands, entity, now, wanted);
         }
     }
 
