@@ -21,6 +21,8 @@ use crate::debug_port::DebugMethods;
 use crate::settings::Settings;
 use crate::state::AppState;
 
+/// Meters between the ears of the player.
+const EAR_GAP: f32 = 0.2;
 /// How quickly the camera moves to a new view.
 const DECAY_RATE: f32 = 8.0;
 /// Faster rate for mouse look, so it feels direct.
@@ -73,7 +75,8 @@ impl Plugin for CameraPlugin {
             .add_systems(
                 PostUpdate,
                 PlayerCamera::match_bloom.before(bevy::camera::CameraUpdateSystems),
-            );
+            )
+            .add_observer(PlayerCamera::listen);
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
             .add_systems(
@@ -111,6 +114,21 @@ pub struct PlayerCamera {
 }
 
 impl PlayerCamera {
+    /// The player hears the world from where the camera is.
+    ///
+    /// Rodio makes a sound louder on the ear farther from it, so the ears
+    /// swap places to put sounds on the right side.
+    fn listen(add: On<Add<PlayerCamera>>, mut commands: Commands) {
+        let SpatialListener {
+            left_ear_offset,
+            right_ear_offset,
+        } = SpatialListener::new(EAR_GAP);
+        commands.entity(add.entity).insert(SpatialListener {
+            left_ear_offset: right_ear_offset,
+            right_ear_offset: left_ear_offset,
+        });
+    }
+
     /// Bloom blurs over a share of the screen. A narrower view would blur
     /// over a smaller part of the scene, so the glow of many small far
     /// lights, which looks like haze, would thin out as the player zooms
