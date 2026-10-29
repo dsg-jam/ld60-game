@@ -27,13 +27,22 @@ const SILK: vec3<f32> = vec3<f32>(0.95, 0.95, 0.9);
 /// thinner, but then the bumps would not show from the seat.
 const COPPER_HEIGHT: f32 = 0.00008;
 
+/// A layer of the mask with a crisp edge where it covers half a texel,
+/// however close the board is. The texels only store how much of each
+/// they cover, which blurs once one spans many pixels. Far off, where a
+/// pixel spans many texels, the edge stays soft.
+fn sharp(cover: f32) -> f32 {
+    let width = clamp(fwidth(cover), 0.0001, 0.5);
+    return smoothstep(0.5 - width, 0.5 + width, cover);
+}
+
 @fragment
 fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> FragmentOutput {
     var pbr_input = pbr_input_from_standard_material(in, is_front);
     let mask = textureSample(mask_texture, mask_sampler, in.uv);
-    let copper = mask.r;
-    let open = mask.g;
-    let silk = mask.b;
+    let copper = sharp(mask.r);
+    let open = sharp(mask.g);
+    let silk = sharp(mask.b);
     let covered = 1.0 - open;
     // Bare board with no copper only shows where a hole goes through.
     if open > 0.5 && copper < 0.5 {
