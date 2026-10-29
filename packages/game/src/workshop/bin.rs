@@ -1,3 +1,5 @@
+mod basket;
+
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
@@ -15,12 +17,15 @@ const ALONG: f32 = -0.42;
 const UNDER: f32 = 0.06;
 /// The box around the bin.
 const SIZE: Vec3 = Vec3::new(0.26, 0.3, 0.26);
-/// The wire basket is this many bars around.
+/// The wire basket is this many bars around, narrower at the bottom by
+/// this much on each side, under a rolled rim. Its wire is painted.
 const BARS: usize = 28;
 const BAR: f32 = 0.003;
-const RIM: f32 = 0.004;
-const BOTTOM: f32 = 0.004;
-const WIRE: Color = Color::srgb_u8(0x3a, 0x3c, 0x40);
+const NARROW: f32 = 0.025;
+const RIM: f32 = 0.006;
+const WIRE: Color = Color::srgb_u8(0x2a, 0x2c, 0x2e);
+/// A slip comes to rest this far above the floor of the bin.
+const LANDS: f32 = 0.016;
 const CRUMPLE_TIME: f32 = 0.35;
 const TOSS_TIME: f32 = 0.7;
 const FALL_TIME: f32 = 0.45;
@@ -61,36 +66,12 @@ impl Bin {
         at
     }
 
-    fn on_add(add: On<Add<Bin>>, mut commands: Commands) {
-        let radius = SIZE.x / 2.0;
-        let bottom = Block::new(Vec3::new(SIZE.x, BOTTOM, SIZE.z));
-        let bar = Block::new(Vec3::new(BAR, SIZE.y, BAR));
-        let rim = Block::new(Vec3::new(TAU * radius / BARS as f32 + BAR, RIM, RIM))
-            .translated(Vec3::Y * (SIZE.y - RIM));
-        commands.entity(add.entity).with_children(|bin| {
-            bin.spawn((Shape::cylinder(&bottom, WIRE), Finish::Metal));
-            for index in 0..BARS {
-                let angle = index as f32 / BARS as f32 * TAU;
-                let turn = Quat::from_rotation_y(angle);
-                // Each bar stands on the bottom, with a piece of the rim
-                // from it to the next one.
-                bin.spawn((
-                    Transform::from_rotation(turn).with_translation(turn * Vec3::Z * radius),
-                    Visibility::Inherited,
-                ))
-                .with_children(|bars| {
-                    bars.spawn((Shape::cylinder(&bar, WIRE), Finish::Metal));
-                });
-                let half = Quat::from_rotation_y(angle + PI / BARS as f32);
-                bin.spawn((
-                    Transform::from_rotation(half).with_translation(half * Vec3::Z * radius),
-                    Visibility::Inherited,
-                ))
-                .with_children(|rims| {
-                    rims.spawn((Shape::cuboid(&rim, WIRE), Finish::Metal));
-                });
-            }
-        });
+    fn on_add(add: On<Add<Bin>>, mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+        let basket = meshes.add(basket::basket(SIZE, NARROW, BARS, BAR, RIM));
+        commands.entity(add.entity).with_child((
+            Shape::turned(basket, &Block::new(SIZE), WIRE),
+            Finish::Paint,
+        ));
     }
 }
 
@@ -116,7 +97,7 @@ impl Binned {
         // Over the edge of the counter, then down into the bin.
         let edge = CounterLayout::new().front_edge(bin.translation.x)
             + Vec3::new(0.0, ARC / 2.0, PAST_EDGE);
-        let into = bin.translation + Vec3::Y * BOTTOM * 4.0;
+        let into = bin.translation + Vec3::Y * LANDS;
         for (entity, mut slip, mut transform) in &mut slips {
             let from = *slip.from.get_or_insert(*transform);
             slip.elapsed += time.delta_secs();
