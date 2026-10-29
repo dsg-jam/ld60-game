@@ -441,7 +441,8 @@ impl Run {
             return;
         }
         if let Some(visit) = job.visit {
-            self.regulars.record(visit, self.job);
+            let served = matches!(pickup, Pickup::Paid(_));
+            self.regulars.record(visit, self.job, served);
         }
         self.job += 1;
         self.boards.push(job.level.board);
