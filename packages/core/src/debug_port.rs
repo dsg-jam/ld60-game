@@ -87,21 +87,21 @@ impl DebugMethods for App {
     }
 }
 
-/// `ld60.where { "name": "stamp" }` returns where in the world each entity
-/// whose name contains `name` is, by name. Without a name, every named
-/// entity.
+/// `ld60.where { "name": "stamp" }` returns each entity whose name
+/// contains `name`, with its name and where it is in the world. Without a
+/// name, every named entity.
 fn place(In(params): In<Option<Value>>, entities: Query<(&Name, &GlobalTransform)>) -> BrpResult {
     let filter = params
         .as_ref()
         .and_then(|params| params.get("name"))
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let places: serde_json::Map<_, _> = entities
+    let places: Vec<_> = entities
         .iter()
         .filter(|(name, _)| name.as_str().contains(filter))
         .map(|(name, transform)| {
             let at = transform.translation();
-            (name.to_string(), json!([at.x, at.y, at.z]))
+            json!({ "name": name.as_str(), "at": [at.x, at.y, at.z] })
         })
         .collect();
     Ok(places.into())

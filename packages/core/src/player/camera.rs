@@ -71,7 +71,12 @@ impl Plugin for CameraPlugin {
             .add_systems(OnEnter(AppState::Title), PlayerCamera::stop_travel);
         #[cfg(feature = "debug_port")]
         app.init_resource::<CameraOverride>()
-            .add_systems(Update, CameraOverride::apply.after(PlayerCamera::follow))
+            .add_systems(
+                PostUpdate,
+                CameraOverride::apply
+                    .before(bevy::transform::TransformSystems::Propagate)
+                    .before(bevy::camera::CameraUpdateSystems),
+            )
             .add_debug_method("ld60.camera", CameraOverride::debug_camera);
     }
 }
@@ -279,21 +284,53 @@ impl Travel {
     }
 }
 
-/// A camera pose set over the debug port, kept until it is cleared.
+/// A camera pose set over the debug port, kept until it is cleared. It
+/// sees things right in front of it and can narrow the view for close
+/// looks.
 #[cfg(feature = "debug_port")]
 #[derive(Resource, Default, Debug)]
-struct CameraOverride(Option<Transform>);
+struct CameraOverride {
+    pose: Option<Transform>,
+    /// In radians.
+    fov: Option<f32>,
+    /// Whether the projection still has to go back to normal.
+    held: bool,
+}
 
 #[cfg(feature = "debug_port")]
 impl CameraOverride {
-    fn apply(pose: Res<CameraOverride>, mut camera: Single<&mut Transform, With<PlayerCamera>>) {
-        if let Some(pose) = pose.0 {
-            **camera = pose;
+    /// Near enough for a screw head a few millimeters away.
+    const NEAR: f32 = 0.001;
+
+    fn apply(
+        mut held: ResMut<CameraOverride>,
+        camera: Single<(&mut Transform, &mut Projection), With<PlayerCamera>>,
+    ) {
+        let (mut transform, mut projection) = camera.into_inner();
+        let Projection::Perspective(perspective) = &mut *projection else {
+            return;
+        };
+        match held.pose {
+            Some(pose) => {
+                *transform = pose;
+                perspective.near = Self::NEAR;
+                if let Some(fov) = held.fov {
+                    perspective.fov = fov;
+                }
+                held.held = true;
+            }
+            None if held.held => {
+                perspective.near = PerspectiveProjection::default().near;
+                held.held = false;
+            }
+            None => {}
         }
     }
 
-    /// `ld60.camera { "eye": [x, y, z], "at": [x, y, z] }` holds the camera
-    /// at `eye`, looking at `at`. Without parameters the camera is released.
+    /// `ld60.camera { "eye": [x, y, z], "at": [x, y, z], "fov": degrees }`
+    /// holds the camera at `eye`, looking at `at`, with a near plane of a
+    /// millimeter. `fov` is optional. Without parameters the camera is
+    /// released.
     fn debug_camera(
         In(params): In<Option<serde_json::Value>>,
         mut pose: ResMut<CameraOverride>,
@@ -301,7 +338,7 @@ impl CameraOverride {
         use bevy::remote::{BrpError, error_codes};
 
         let Some(params) = params.filter(|params| !params.is_null()) else {
-            pose.0 = None;
+            pose.pose = None;
             return Ok(serde_json::Value::Null);
         };
         let point = |name: &str| {
@@ -318,7 +355,18 @@ impl CameraOverride {
                     data: None,
                 })
         };
-        pose.0 = Some(Transform::from_translation(point("eye")?).looking_at(point("at")?, Vec3::Y));
+        let (eye, at) = (point("eye")?, point("at")?);
+        // Straight down needs another up.
+        let up = if (at - eye).normalize_or_zero().y.abs() > 0.99 {
+            Vec3::NEG_Z
+        } else {
+            Vec3::Y
+        };
+        pose.pose = Some(Transform::from_translation(eye).looking_at(at, up));
+        pose.fov = params
+            .get("fov")
+            .and_then(serde_json::Value::as_f64)
+            .map(|degrees| (degrees as f32).to_radians());
         Ok(serde_json::Value::Null)
     }
 }
