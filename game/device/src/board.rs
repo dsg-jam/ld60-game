@@ -1,5 +1,6 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use ld60_game_parts::pcb::{Pad, Pcb, PcbArt, PcbMaterial, Router};
 use ld60_geometry::block::Block;
@@ -114,11 +115,17 @@ pub(super) struct BoardLayout {
 
 /// The words on the silkscreen that people read, in the player's language.
 /// Part names like U1 and the maker stay as they are.
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub(super) struct SilkWords {
     debug: String,
     keys: String,
     battery: String,
 }
+
+/// The faces of the boards made so far, since routing one takes a while.
+/// Boards of one revision come off the same artwork.
+#[derive(Resource, Default)]
+pub(super) struct BoardArts(HashMap<(u64, String, SilkWords), Handle<PcbMaterial>>);
 
 impl SilkWords {
     pub(super) fn new(locale: &Locale) -> Self {
@@ -270,13 +277,18 @@ impl BoardLayout {
         &self,
         name: &str,
         words: &SilkWords,
+        arts: &mut BoardArts,
         meshes: &mut Assets<Mesh>,
         images: &mut Assets<Image>,
         pcbs: &mut Assets<PcbMaterial>,
     ) -> [(Mesh3d, MeshMaterial3d<PcbMaterial>, Transform); 2] {
         let mesh = Mesh3d(meshes.add(Rectangle::from_size(self.board.size.xz())));
-        let material =
-            MeshMaterial3d(pcbs.add(Pcb::material(images.add(self.art(name, words).image()))));
+        let material = arts
+            .0
+            .entry((self.seed, name.to_owned(), words.clone()))
+            .or_insert_with(|| pcbs.add(Pcb::material(images.add(self.art(name, words).image()))))
+            .clone();
+        let material = MeshMaterial3d(material);
         // Faces up, with the art at the same place as on the face.
         let back =
             Transform::from_translation(self.board.top_spot(Vec2::ZERO) + Vec3::Y * FACE_GAP)
@@ -743,6 +755,34 @@ mod tests {
             screws: &[Vec3::new(0.036, 0.0, 0.064)],
         };
         BoardLayout::new(&shell, 0.0015, &spots, 3)
+    }
+
+    #[test]
+    fn boards_of_one_revision_share_their_art() {
+        let words = SilkWords::new(&Locale::on_disk());
+        let mut arts = BoardArts::default();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut images = Assets::<Image>::default();
+        let mut pcbs = Assets::<PcbMaterial>::default();
+        let mut material = |words: &SilkWords| {
+            let [(_, face, _), _] = layout().faces(
+                "PCB 1A",
+                words,
+                &mut arts,
+                &mut meshes,
+                &mut images,
+                &mut pcbs,
+            );
+            face.0
+        };
+        let first = material(&words);
+        assert_eq!(material(&words), first);
+        let other = SilkWords {
+            debug: "DIAGNOSE".into(),
+            ..words
+        };
+        assert_ne!(material(&other), first);
+        assert_eq!(images.len(), 2);
     }
 
     #[test]

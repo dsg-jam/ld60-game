@@ -16,7 +16,7 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Locale, Localized, Message};
 
-use super::board::{BoardLayout, BoardSpots, CHIP_BLACK, CHIP_INK, SilkWords};
+use super::board::{BoardArts, BoardLayout, BoardSpots, CHIP_BLACK, CHIP_INK, SilkWords};
 use super::casing::{COVER, Casing, CasingSpots, WALL};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
@@ -304,7 +304,8 @@ pub(super) struct HandheldPlugin;
 
 impl Plugin for HandheldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(Handheld::on_add);
+        app.init_resource::<BoardArts>()
+            .add_observer(Handheld::on_add);
     }
 }
 
@@ -349,6 +350,7 @@ impl Handheld {
         mut materials: ResMut<Assets<StandardMaterial>>,
         mut stickers: ResMut<Assets<StickerMaterial>>,
         mut pcbs: ResMut<Assets<PcbMaterial>>,
+        mut arts: ResMut<BoardArts>,
         locale: Res<Locale>,
     ) {
         let Ok(unit) = units.get(add.entity) else {
@@ -402,6 +404,7 @@ impl Handheld {
         let faces = board.faces(
             &name,
             &SilkWords::new(&locale),
+            &mut arts,
             &mut meshes,
             &mut images,
             &mut pcbs,
