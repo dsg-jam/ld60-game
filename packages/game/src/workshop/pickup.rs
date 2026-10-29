@@ -86,8 +86,12 @@ impl Payment {
         self.par.is_some_and(|par| self.measure.quick(par))
     }
 
-    /// What the customer adds for a neat or quick repair.
+    /// What the customer adds for a neat or quick repair, unless they had to
+    /// hand the device back first.
     pub(crate) fn tip(&self) -> u32 {
+        if self.returns > 0 {
+            return 0;
+        }
         TIP * (u32::from(self.neat()) + u32::from(self.quick()))
     }
 
@@ -102,6 +106,7 @@ impl Payment {
             None => Message::new(id).with("pick", pick % THANKS),
         };
         let tip = match (self.neat(), self.quick()) {
+            _ if self.tip() == 0 => return thanks,
             (true, true) => "receipt-tip-neat-quick",
             (true, false) => "receipt-tip-neat",
             (false, true) => "receipt-tip-quick",
@@ -272,6 +277,7 @@ impl From<&Outcome> for Complaint {
 #[cfg(test)]
 mod tests {
     use ld60_levels::{GAME_SEED, LevelSource, Variant, assemble, burn, initial_rom};
+    use ld60_locale::Locale;
 
     use super::*;
     use crate::workshop::levels::Levels;
@@ -321,6 +327,19 @@ mod tests {
         assert_eq!(payment.amount(), 5);
         payment.par = None;
         assert!(!payment.neat() && !payment.quick());
+    }
+
+    #[test]
+    fn a_device_handed_back_earns_no_tip() {
+        let mut payment = Payment::tipped(5);
+        payment.returns = 1;
+        assert_eq!(payment.amount(), 5);
+        assert!(
+            !Locale::on_disk()
+                .check(&payment.note(0).into())
+                .unwrap()
+                .contains('$')
+        );
     }
 
     #[test]
