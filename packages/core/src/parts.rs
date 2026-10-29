@@ -7,6 +7,7 @@ pub mod knob;
 pub mod latch_button;
 pub mod lcd;
 pub mod liquid;
+pub mod marking;
 pub mod paper;
 pub mod pcb;
 pub mod screen;
