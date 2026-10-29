@@ -1,6 +1,5 @@
 mod props;
 mod screwdriver;
-mod sides;
 
 use bevy::prelude::*;
 use ld60_core::layout::counter::CounterLayout;
@@ -32,16 +31,14 @@ pub(crate) struct Clutter;
 #[cfg(test)]
 impl Clutter {
     pub(super) fn footprints(counter: &CounterLayout) -> Vec<Footprint> {
-        let mut footprints = vec![
+        vec![
             Footprint::new("mug", counter.place(MUG_SPOT, 0.0), Props::mug_area()),
             Footprint::new(
                 "screwdriver",
                 counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW),
                 Props::screwdriver_area(),
             ),
-        ];
-        footprints.extend(sides::footprints(counter));
-        footprints
+        ]
     }
 }
 
@@ -50,7 +47,6 @@ impl Clutter {
         add: On<Add<Clutter>>,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
     ) {
         let counter = CounterLayout::new();
@@ -76,7 +72,6 @@ impl Clutter {
                     Visibility::default(),
                 ))
                 .with_children(|screwdriver| props.screwdriver(screwdriver));
-            sides::spawn(clutter, props.meshes, &mut materials);
         });
     }
 }
