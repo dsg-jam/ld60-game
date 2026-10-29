@@ -19,9 +19,9 @@ editor-assembled =
        *[other] ASSEMBLED, { $bytes } BYTES
     }
 editor-flashed = FLASHED. DEVICE RESTARTED.
-editor-dump-empty = No firmware read yet. Plug the debug cable into the device and press F8.
-editor-dumped = READ { $words } WORDS OFF THE DEVICE. F8 TO DISASSEMBLE.
-editor-disassembled = DISASSEMBLED. FIX IT, THEN F6 TO FLASH.
+editor-dump-empty = NO FIRMWARE READ
+editor-dumped = READ { $words } WORDS
+editor-disassembled = DISASSEMBLED
 
 editor-assembly-failed = ASSEMBLY FAILED
 editor-asm-error = line { $line }: { $message }
@@ -64,7 +64,7 @@ editor-error-rom-size =
     }
 editor-burn-mask-rom = BURN FAILED: a mask ROM cannot be programmed
 editor-burn-size-mismatch = BURN FAILED: the image does not match the ROM size
-editor-burn-bit-conflict = BURN FAILED: { $address } needs a bit set from 0 to 1. Erase the chip first.
+editor-burn-bit-conflict = BURN FAILED: { $address } IS NOT BLANK
 
 editor-action-save = S SAVE
 editor-action-restore = ENTER RESTORE
@@ -104,7 +104,7 @@ editor-command-break = F9 BREAK
 editor-command-step = F10 STEP
 editor-command-go = F11 GO
 
-editor-bench-pass = TEST PASSED. THE CUSTOMER WILL FIND NOTHING WRONG.
+editor-bench-pass = TEST PASSED
 editor-bench-dead = TEST FAILED: THE DEVICE DOES NOT START
 editor-bench-wrong-start = TEST FAILED: AT START IT SHOWS { $shown }, NOT { $expected }
 editor-bench-wrong = TEST FAILED: AFTER { $keys } IT SHOWS { $shown }, NOT { $expected }
@@ -115,7 +115,7 @@ editor-debug-line = LINE { $line }
 editor-debug-address = ADDRESS { $address }
 editor-debug-held = CHIP HELD AT { $place }
 editor-debug-stepped = STEPPED TO { $place }
-editor-debug-waiting = THE CHIP WAITS FOR A KEY AT { $place }. PRESS ONE ON THE DEVICE.
+editor-debug-waiting = THE CHIP WAITS FOR A KEY AT { $place }
 editor-debug-break = STOPPED AT THE BREAKPOINT ON { $place }
 editor-debug-running = CHIP RUNNING. IT WAITS FOR A KEY.
 editor-debug-timeout = CHIP RUNNING. IT NEVER WAITS FOR A KEY.
