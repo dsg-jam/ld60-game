@@ -19,6 +19,7 @@ use ld60_geometry::surface::Finish;
 pub(crate) use self::travel::Turning;
 use super::board::BoardLayout;
 use super::snap::Snap;
+use super::tool::ToolSpot;
 use super::{Connected, Holdable, Turned};
 
 /// Thickness of the walls of a device.
@@ -89,11 +90,6 @@ impl Plugin for CasingPlugin {
         app.add_debug_method("ld60.device", Casing::debug_device);
     }
 }
-
-/// Where the tool for a part touches it, in the part's space. The tool
-/// points along +Y, into the part.
-#[derive(Component, Clone, Copy, Debug)]
-pub(crate) struct ToolSpot(pub(crate) Vec3);
 
 /// The back cover of a device and its screws. The debug header on the board
 /// is under the cover.
@@ -302,6 +298,8 @@ impl Casing {
             .spawn((
                 Header,
                 ClickTool::Plug,
+                // The plug goes over the whole header.
+                ToolSpot(Vec3::ZERO),
                 Shape::cuboid(&layout.header, BoardLayout::header_color()),
                 Finish::Plastic,
             ))

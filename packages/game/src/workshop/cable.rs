@@ -8,6 +8,7 @@ use bevy::{
 };
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::layout::desk::COMPUTER_SPOT;
+use ld60_core::player::focus::ClickTool;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -16,7 +17,7 @@ use self::rope::{Rope, RopeMaterial, RopePlugin};
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
 use super::manuals::{Pose, ShopManuals};
-use crate::device::{Casing, Connected, Header, Holdable};
+use crate::device::{Aim, Casing, Connected, Header, Holdable};
 
 /// Where the plug of the debug cable lies while it is out, see
 /// [`CounterLayout::place`].
@@ -34,6 +35,10 @@ const FLANGE: f32 = 0.0035;
 /// second at this distance from the monitor.
 const BOOT_RELIEF: [f32; 2] = [0.003, 0.0023];
 const BOOT_STEP: f32 = 0.0085;
+/// How far over a header the pointer is on the plug waits, and how fast it
+/// moves there and back.
+const PLUG_HOVER: f32 = 0.015;
+const PLUG_RATE: f32 = 12.0;
 /// The strain relief at the +Z end of the plug, around the cable.
 const PLUG_RELIEF: f32 = 0.0024;
 const PLUG_RELIEF_LENGTH: f32 = 0.005;
@@ -261,8 +266,10 @@ impl Cable {
             .with_child((Shape::cylinder(&tube, PLUG_BLACK), Finish::Plastic));
     }
 
-    /// Puts the plug on the header of the plugged in device, or back on the
-    /// counter, and lets the cable move to it.
+    /// Puts the plug on the header of the plugged in device, over a header
+    /// the pointer is on, or back on the counter, and lets the cable move to
+    /// it.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn follow(
         headers: Query<(Entity, &ChildOf), With<Header>>,
         plugged: Query<&Casing, With<Connected>>,
@@ -272,6 +279,7 @@ impl Cable {
         cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
+        aim: Aim,
         time: Res<Time>,
     ) {
         let (mut cable, material) = cable.into_inner();
@@ -287,16 +295,27 @@ impl Cable {
             });
         let mut plug = places.p1();
         let (rest, transform) = &mut *plug;
+        // The plug stands straight up off the board, so the cable leaves the
+        // device and not along it.
+        let on = |header: Transform, lift: f32| {
+            let away = header.rotation * Vec3::NEG_Y;
+            Transform::from_translation(header.translation + away * (PLUG.z / 2.0 + lift))
+                .with_rotation(header.rotation * Quat::from_rotation_x(FRAC_PI_2))
+        };
         **transform = match header {
-            // The plug stands straight up off the board, so the cable leaves
-            // the device and not along it.
-            Some((header, _, _)) => {
-                let (_, rotation, center) = header.to_scale_rotation_translation();
-                let away = rotation * Vec3::NEG_Y;
-                Transform::from_translation(center + away * PLUG.z / 2.0)
-                    .with_rotation(rotation * Quat::from_rotation_x(FRAC_PI_2))
+            Some((header, _, _)) => on(header.compute_transform(), 0.0),
+            None => {
+                let goal = aim
+                    .at(ClickTool::Plug)
+                    .map_or(rest.rest, |header| on(header, PLUG_HOVER));
+                let dt = time.delta_secs();
+                let mut moved = **transform;
+                moved
+                    .translation
+                    .smooth_nudge(&goal.translation, PLUG_RATE, dt);
+                moved.rotation.smooth_nudge(&goal.rotation, PLUG_RATE, dt);
+                moved
             }
-            None => rest.rest,
         };
         let exit = transform.rotation * Vec3::Z;
         let ends = Ends {
