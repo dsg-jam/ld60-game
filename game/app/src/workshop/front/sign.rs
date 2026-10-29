@@ -10,8 +10,8 @@ use rand::rngs::SmallRng;
 use rand::{Rng, RngExt, SeedableRng};
 
 use super::{BEAM_HEIGHT, Front};
-use crate::device::Silhouette;
 use crate::workshop::run::Run;
+use ld60_game_device::Silhouette;
 
 const BOARD: Vec3 = Vec3::new(0.3, 0.22, 0.012);
 /// Height of the top edge of the signs.

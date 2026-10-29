@@ -34,7 +34,7 @@ impl Plugin for EmulatorPlugin {
 /// device's [`LcdDisplay`].
 #[derive(Component, Debug)]
 #[require(LcdDisplay)]
-pub(crate) struct Emulator {
+pub struct Emulator {
     device: AnyDevice,
     readout: Readout,
     /// Index into [`TEST_SEEDS`] of the seed for the RAM garbage at the
@@ -53,7 +53,7 @@ pub(crate) struct Emulator {
 
 /// Why the chip stopped running.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Stop {
+pub enum Stop {
     /// It waits for a key.
     Halted,
     /// It reached a breakpoint and the debugger holds it.
@@ -64,7 +64,7 @@ pub(crate) enum Stop {
 
 impl Emulator {
     /// Powers the device on and runs it until it waits for a key.
-    pub(crate) fn power_on(device: AnyDevice) -> Self {
+    pub fn power_on(device: AnyDevice) -> Self {
         Self::power_on_with(device, 0, false, Vec::new())
     }
 
@@ -92,7 +92,7 @@ impl Emulator {
 
     /// Replaces the device and powers it on with fresh RAM garbage. A held
     /// chip stays held at its first instruction.
-    pub(crate) fn restart(&mut self, device: AnyDevice) {
+    pub fn restart(&mut self, device: AnyDevice) {
         let breakpoints = std::mem::take(&mut self.breakpoints);
         *self = Self::power_on_with(device, self.power_ons + 1, self.held, breakpoints);
     }
@@ -101,26 +101,26 @@ impl Emulator {
         TEST_SEEDS[power_ons % TEST_SEEDS.len()]
     }
 
-    pub(crate) fn rom(&self) -> &Rom {
+    pub fn rom(&self) -> &Rom {
         self.device.rom()
     }
 
-    pub(crate) fn cpu(&self) -> &dyn Cpu {
+    pub fn cpu(&self) -> &dyn Cpu {
         self.device.cpu()
     }
 
-    pub(crate) fn held(&self) -> bool {
+    pub fn held(&self) -> bool {
         self.held
     }
 
     /// Lets the debugger take hold of the chip. Key presses then wait for
     /// the next step.
-    pub(crate) fn hold(&mut self) {
+    pub fn hold(&mut self) {
         self.held = true;
     }
 
     /// Runs one instruction of the held chip.
-    pub(crate) fn step(&mut self) -> Step {
+    pub fn step(&mut self) -> Step {
         let pc = self.device.cpu().pc();
         let step = self.device.step();
         if step == Step::Executed {
@@ -132,21 +132,21 @@ impl Emulator {
 
     /// Lets go of the chip and runs it until it waits for a key or reaches
     /// a breakpoint.
-    pub(crate) fn release(&mut self) -> Stop {
+    pub fn release(&mut self) -> Stop {
         self.held = false;
         self.run(true)
     }
 
-    pub(crate) fn breakpoints(&self) -> &[u16] {
+    pub fn breakpoints(&self) -> &[u16] {
         &self.breakpoints
     }
 
-    pub(crate) fn set_breakpoints(&mut self, breakpoints: Vec<u16>) {
+    pub fn set_breakpoints(&mut self, breakpoints: Vec<u16>) {
         self.breakpoints = breakpoints;
     }
 
     /// The addresses of the last instructions the chip ran, oldest first.
-    pub(crate) fn trace(&self) -> impl Iterator<Item = u16> {
+    pub fn trace(&self) -> impl Iterator<Item = u16> {
         self.trace.iter().copied()
     }
 

@@ -7,8 +7,8 @@ use super::footer::{Command, Run, Status};
 use super::page::{ActivePage, Page};
 use super::undo::Undo;
 use super::{Editor, PHOSPHOR, PHOSPHOR_DIM};
-use crate::device::{Connected, Emulator};
 use crate::workshop::job::Job;
+use ld60_game_device::{Connected, Emulator};
 
 /// Words of the bitstream on each line.
 const WORDS_PER_LINE: usize = 6;

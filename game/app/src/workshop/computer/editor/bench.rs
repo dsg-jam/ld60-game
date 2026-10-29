@@ -4,9 +4,9 @@ use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run, Status};
-use crate::device::{Connected, Emulator};
 use crate::workshop::job::Job;
 use crate::workshop::pickup::Complaint;
+use ld60_game_device::{Connected, Emulator};
 
 /// What the test bench found when it tried the device like the customer
 /// will.

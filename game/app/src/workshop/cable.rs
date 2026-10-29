@@ -19,7 +19,7 @@ use self::solver::Ends;
 use super::COMPUTER_YAW;
 use super::computer::ComputerLayout;
 use super::manuals::{Pose, ShopManuals};
-use crate::device::{Aim, Casing, Connected, Header, Holdable};
+use ld60_game_device::{Aim, Casing, Connected, Header, Holdable};
 
 /// Where the plug of the debug cable lies while it is out, see
 /// [`CounterLayout::place`].

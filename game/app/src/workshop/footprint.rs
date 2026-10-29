@@ -12,7 +12,7 @@ use super::{
     STAMP_YAW, cable, job, lamp, printer, radio, receipt, reminder, rent, salvage, stamp, ticket,
     till,
 };
-use crate::device::{Casing, Handheld};
+use ld60_game_device::{Casing, Handheld};
 
 /// Space kept between the keyboard and the mat.
 const MAT_MARGIN: f32 = 0.01;

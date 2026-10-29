@@ -312,26 +312,26 @@ impl Plugin for HandheldPlugin {
 /// level decides the model.
 #[derive(Component, Debug)]
 #[require(Holdable)]
-pub(crate) struct Handheld {
+pub struct Handheld {
     level: Level,
     /// The faulty firmware it comes in with.
     buggy: String,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Handheld {
-    pub(crate) fn body_size(kind: DeviceKind) -> Vec3 {
+    pub fn body_size(kind: DeviceKind) -> Vec3 {
         Model::of(kind).body_size
     }
 
-    pub(crate) fn screw_count(kind: DeviceKind) -> usize {
+    pub fn screw_count(kind: DeviceKind) -> usize {
         Model::of(kind).casing.screws.len()
     }
 }
 
 impl Handheld {
     /// A unit as it comes in for `level`, running `buggy`.
-    pub(crate) fn for_job(level: &Level, buggy: &str) -> Self {
+    pub fn for_job(level: &Level, buggy: &str) -> Self {
         Self {
             level: level.clone(),
             buggy: buggy.into(),

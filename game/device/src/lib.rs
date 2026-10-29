@@ -24,14 +24,14 @@ use ld60_game_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
-pub(crate) use self::casing::{Casing, CasingTravel, Header, Turning};
-pub(crate) use self::emulator::{Emulator, Stop};
-pub(crate) use self::handheld::Handheld;
-pub(crate) use self::link::Connected;
-pub(crate) use self::name::{BoardLetter, DeviceName};
-pub(crate) use self::phillips::Phillips;
-pub(crate) use self::silhouette::Silhouette;
-pub(crate) use self::tool::Aim;
+pub use self::casing::{Casing, CasingTravel, Header, Turning};
+pub use self::emulator::{Emulator, Stop};
+pub use self::handheld::Handheld;
+pub use self::link::Connected;
+pub use self::name::{BoardLetter, DeviceName};
+pub use self::phillips::Phillips;
+pub use self::silhouette::Silhouette;
+pub use self::tool::Aim;
 
 /// How far a held device lifts off the counter.
 const LIFT: f32 = 0.1;
@@ -44,7 +44,7 @@ const DRAG_SPEED: f32 = 0.01;
 /// How quickly a device moves between the counter and the hand.
 const DECAY_RATE: f32 = 10.0;
 
-pub(crate) struct DevicePlugin;
+pub struct DevicePlugin;
 
 impl Plugin for DevicePlugin {
     fn build(&self, app: &mut App) {
@@ -79,7 +79,7 @@ impl Plugin for DevicePlugin {
 
 /// A key on a device was pressed or released.
 #[derive(Message, Debug, Clone, Copy)]
-pub(crate) struct DeviceKey {
+pub struct DeviceKey {
     pub(crate) device: Entity,
     pub(crate) key: char,
     pub(crate) pressed: bool,
@@ -101,7 +101,7 @@ impl DeviceKey {
 /// How far the pointer was dragged to turn the held device since it was last
 /// pressed, in pixels. A click at the end of a turn does nothing else.
 #[derive(Resource, Debug, Default)]
-pub(crate) struct Turned(f32);
+pub struct Turned(f32);
 
 impl Turned {
     /// Further than this, a press and release is a turn, not a click.
@@ -119,14 +119,14 @@ impl Turned {
 /// Something else moves the device, so it neither rests nor follows the
 /// player.
 #[derive(Component, Debug, Default)]
-pub(crate) struct Carried;
+pub struct Carried;
 
 /// A device the player can pick up, rotate and put back.
 ///
 /// It rests where it was spawned and can be focused from the seat.
 #[derive(Component, Debug, Default)]
 #[require(Transform, Visibility)]
-pub(crate) struct Holdable {
+pub struct Holdable {
     rest: Transform,
     /// Rotation applied by dragging, in camera space.
     spin: Quat,
@@ -204,7 +204,7 @@ impl Holdable {
         }
     }
 
-    pub(crate) fn follow(
+    pub fn follow(
         time: Res<Time>,
         state: Res<State<Focus>>,
         focused: Res<Focused>,
@@ -258,7 +258,7 @@ impl Holdable {
 
 /// A physical key on a device. Works with a [`PressableKey`].
 #[derive(Component, Debug)]
-pub(crate) struct DeviceButton {
+pub struct DeviceButton {
     key: char,
     was_pressed: bool,
 }

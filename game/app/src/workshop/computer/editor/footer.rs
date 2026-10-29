@@ -13,9 +13,9 @@ use super::dump::Dump;
 use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
-use crate::device::{Connected, Emulator};
 use crate::workshop::job::Job;
 use crate::workshop::run::{ComputerTool, Origin, Run as ShopRun};
+use ld60_game_device::{Connected, Emulator};
 
 /// A command in the footer below the editor.
 ///

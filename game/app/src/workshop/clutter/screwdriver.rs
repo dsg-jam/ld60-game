@@ -5,7 +5,7 @@ use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::focus::ClickTool;
 
 use super::props::Props;
-use crate::device::{Aim, Phillips, Turning};
+use ld60_game_device::{Aim, Phillips, Turning};
 
 /// How fast the screwdriver moves to a screw and back.
 const DECAY_RATE: f32 = 14.0;

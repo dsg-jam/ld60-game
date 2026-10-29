@@ -3612,6 +3612,7 @@ dependencies = [
  "ld60-devices",
  "ld60-game-city",
  "ld60-game-core",
+ "ld60-game-device",
  "ld60-geometry",
  "ld60-levels",
  "ld60-locale",
@@ -3648,6 +3649,21 @@ dependencies = [
  "serde_json",
  "web-sys",
  "winit",
+]
+
+[[package]]
+name = "ld60-game-device"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-devices",
+ "ld60-game-core",
+ "ld60-geometry",
+ "ld60-levels",
+ "ld60-locale",
+ "ld60-machine",
+ "rand",
+ "serde_json",
 ]
 
 [[package]]

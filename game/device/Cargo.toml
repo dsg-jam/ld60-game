@@ -1,0 +1,35 @@
+[package]
+name = "ld60-game-device"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+readme = { workspace = true }
+publish = { workspace = true }
+
+[features]
+debug_port = ["bevy/bevy_remote", "dep:serde_json", "ld60-game-core/debug_port"]
+test-support = []
+
+[dependencies]
+ld60-devices = { workspace = true, features = ["serde"] }
+ld60-game-core = { workspace = true }
+ld60-geometry = { workspace = true }
+ld60-levels = { workspace = true }
+ld60-locale = { workspace = true }
+ld60-machine = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true, features = ["std"], optional = true }
+
+[dependencies.bevy]
+workspace = true
+features = ["3d_bevy_render", "default_app", "picking", "std", "ui_api"]
+
+[dev-dependencies]
+ld60-game-core = { workspace = true, features = ["test-support"] }
+ld60-locale = { workspace = true, features = ["test-support"] }
+
+[lints]
+workspace = true

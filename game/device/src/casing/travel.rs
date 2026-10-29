@@ -5,7 +5,7 @@ use ld60_game_core::audio::{Play, Sound};
 use ld60_geometry::block::Block;
 
 use super::{Aside, Casing, Cover, SCREW, SHANK};
-use crate::device::Holdable;
+use crate::Holdable;
 
 /// Seconds a screw takes from its hole to the mat.
 const SCREW_TIME: f32 = 1.4;
@@ -30,11 +30,11 @@ type AsideOnly = (Without<Casing>, Without<Cover>);
 
 /// A screw that the screwdriver turns.
 #[derive(Component, Debug)]
-pub(crate) struct Turning {
+pub struct Turning {
     /// The middle of the outer face of the head, with +Y into the device.
-    pub(crate) at: Transform,
+    pub at: Transform,
     /// How far the screw has turned around its axis, in radians.
-    pub(crate) angle: f32,
+    pub angle: f32,
 }
 
 impl Casing {

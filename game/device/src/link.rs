@@ -9,7 +9,7 @@ use super::Emulator;
 /// computer cannot flash or debug the device.
 #[derive(Component, Debug)]
 #[component(on_remove = Connected::on_remove)]
-pub(crate) struct Connected;
+pub struct Connected;
 
 impl Connected {
     /// Pulling the plug lets a held chip run on and forgets the breakpoints.

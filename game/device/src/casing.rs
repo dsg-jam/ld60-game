@@ -16,7 +16,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-pub(crate) use self::travel::Turning;
+pub use self::travel::Turning;
 use super::board::{BoardLayout, CHIP_BLACK, LEG_TIN};
 use super::phillips::Phillips;
 use super::snap::Snap;
@@ -48,7 +48,7 @@ const HOLE_DARK: Color = Color::srgb_u8(0x10, 0x10, 0x12);
 /// Moves the cover and the screws, see [`Casing::travel`]. Whatever follows
 /// a screw runs after it.
 #[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct CasingTravel;
+pub struct CasingTravel;
 
 /// The parts of a casing that say what a click does while the device is
 /// focused.
@@ -97,7 +97,7 @@ impl Plugin for CasingPlugin {
 /// is under the cover.
 #[derive(Component, Debug)]
 #[component(on_remove = Casing::on_remove)]
-pub(crate) struct Casing {
+pub struct Casing {
     /// Whether each screw is out.
     loose: Vec<bool>,
     open: bool,
@@ -149,7 +149,7 @@ struct Board;
 
 /// Where the debug cable plugs in.
 #[derive(Component, Debug)]
-pub(crate) struct Header;
+pub struct Header;
 
 impl Casing {
     fn new(holes: Vec<Vec3>, bounds: Block) -> Self {
@@ -167,7 +167,7 @@ impl Casing {
     /// out, in a row along the left side, from the device's spot on the
     /// counter. Yaw and spot only, so it stays put when the device is turned
     /// over.
-    pub(crate) fn aside_at(bounds: &Block, index: usize, rest: &Transform) -> Transform {
+    pub fn aside_at(bounds: &Block, index: usize, rest: &Transform) -> Transform {
         let yaw = Self::yaw(rest);
         let offset = Vec3::new(
             -bounds.size.x / 2.0 - ASIDE,
@@ -183,7 +183,7 @@ impl Casing {
     /// Where the cover of a device with `bounds` lies while it is off, on
     /// the left of the device past its screws, with its outside up. Like
     /// [`Self::aside_at`], it stays put when the device is turned over.
-    pub(crate) fn cover_at(bounds: &Block, rest: &Transform) -> Transform {
+    pub fn cover_at(bounds: &Block, rest: &Transform) -> Transform {
         let yaw = Self::yaw(rest);
         let at = rest.translation.with_y(0.0)
             + yaw * Vec3::NEG_X * (bounds.size.x + ASIDE + SCREW.x + COVER_GAP);
@@ -218,13 +218,13 @@ impl Casing {
     }
 
     /// The box around the device, in its own space.
-    pub(crate) fn bounds(&self) -> &Block {
+    pub fn bounds(&self) -> &Block {
         &self.bounds
     }
 
     /// Whether the cover is on and all screws are in, as the customer
     /// brought it.
-    pub(crate) fn sealed(&self) -> bool {
+    pub fn sealed(&self) -> bool {
         !self.open && !self.loose.contains(&true)
     }
 

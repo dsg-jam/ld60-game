@@ -4,7 +4,7 @@ use ld60_devices::{BoardRev, DeviceKind};
 use ld60_locale::Message;
 
 /// What a device kind is called, in the player's language.
-pub(crate) trait DeviceName: Sized {
+pub trait DeviceName: Sized {
     /// Like `TALLY 2`.
     fn model(self) -> Message {
         self.name().attribute("model")
@@ -21,7 +21,7 @@ pub(crate) trait DeviceName: Sized {
 
 /// The letter of a board revision, like the `B` in `6B`.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct BoardLetter(pub(crate) BoardRev);
+pub struct BoardLetter(pub BoardRev);
 
 impl DeviceName for DeviceKind {
     fn name(self) -> Message {

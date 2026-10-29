@@ -3,7 +3,7 @@ use ld60_levels::LevelError;
 use ld60_locale::Message;
 use ld60_machine::AsmErrorKind;
 
-use crate::device::{BoardLetter, DeviceName};
+use ld60_game_device::{BoardLetter, DeviceName};
 
 /// What the editor says about an error.
 pub(super) trait Explain {

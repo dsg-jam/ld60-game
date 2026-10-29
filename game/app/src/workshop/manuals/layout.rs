@@ -10,8 +10,8 @@ use ld60_locale::Message;
 use serde::Deserialize;
 
 use super::datasheet::ChipSheet;
-use crate::device::DeviceName;
 use crate::workshop::service::ServiceSheet;
+use ld60_game_device::DeviceName;
 
 /// The layout files in `assets/manuals/`, part of the binary so the pages
 /// are there from the start.

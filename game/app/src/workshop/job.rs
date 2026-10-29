@@ -26,7 +26,7 @@ use super::regulars::Visit;
 use super::run::{Leftover, Origin, Run};
 use super::ticket::JobTicket;
 use super::tutorial::{FirstNote, TutorialNote};
-use crate::device::{Carried, Emulator, Handheld};
+use ld60_game_device::{Carried, Emulator, Handheld};
 
 pub(super) const DEVICE_SPOT: Vec2 = Vec2::new(0.03, 0.3);
 pub(super) const DEVICE_YAW: f32 = 0.15;
