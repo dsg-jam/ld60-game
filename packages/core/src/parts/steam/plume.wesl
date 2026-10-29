@@ -8,6 +8,8 @@ struct Plume {
     /// Of the box the plume fits in.
     width: f32,
     time: f32,
+    /// The air around the plume, in meters per second.
+    wind: vec3<f32>,
 }
 
 @group(0) @binding(0) var<uniform> plume: Plume;
@@ -29,6 +31,11 @@ const FADE: f32 = 0.3;
 const WISP: f32 = 0.025;
 /// How much the wisps twist and curl, in meters.
 const CURL: f32 = 0.015;
+/// How fast the steam itself rises out of the cup, in meters per second.
+/// Air across it bends it over by its speed over this.
+const LIFT: f32 = 0.25;
+/// How much a strong air tears the steam apart and thins it out.
+const TEAR: f32 = 1.2;
 const MAX_U32: f32 = 4294967295.0;
 
 fn hash(cell: vec3<i32>) -> f32 {
@@ -65,14 +72,19 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         sin(t * 0.4 + height * 7.0 + 2.0) + 0.5 * sin(t * 1.1 + height * 9.0),
     ) * SWAY * height / 1.5;
     let reach = plume.radius + SPREAD * height;
+    // Air across the plume bends it over, but not out of its box.
+    let room = max(plume.width * 0.5 - reach, 0.0);
+    let bent = plume.wind.xz * height / LIFT;
+    let bend = bent * min(1.0, room / max(length(bent), 1e-5));
+    let torn = 1.0 / (1.0 + TEAR * length(plume.wind));
     // Thinner as it spreads and mixes, only forms just above the surface,
     // and gone by the top of the box.
     let top = 1.0 - height / plume.height;
-    let thickness = plume.radius / reach
+    let thickness = torn * plume.radius / reach
         * exp(-height / FADE)
         * min(height / (2.0 * voxel.y), 1.0)
         * min(top * 4.0, 1.0);
-    let off_axis = length(p.xz - axis) / reach;
+    let off_axis = length(p.xz - axis - bend) / reach;
     let profile = exp(-2.0 * off_axis * off_axis);
 
     // Wisps rise with the steam, twisted by more noise, after Quilez,
