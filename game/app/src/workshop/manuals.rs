@@ -54,7 +54,9 @@ impl ShopManuals {
 
 impl Plugin for ManualsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(ShopManuals::on_add)
+        app.init_resource::<Pins>()
+            .add_observer(Pins::clear_for_new_run)
+            .add_observer(ShopManuals::on_add)
             .add_observer(ShopManuals::open_at_job)
             .add_observer(PageLink::open_on_click)
             .add_observer(DividerTab::open_on_click)
@@ -222,6 +224,7 @@ impl ShopManuals {
     /// at the page it is open at, or the one after it if that page is out.
     fn file(
         run: Res<Run>,
+        pinned: Res<Pins>,
         mut files: Query<(
             Entity,
             &mut Paper,
@@ -237,7 +240,7 @@ impl ShopManuals {
     ) {
         let mut shop = None;
         for (file, mut paper, mut filed, mut stack, parts, moves) in &mut files {
-            let pins = moves.filed_pins(run.pins());
+            let pins = moves.filed_pins(&pinned);
             if !run.is_changed() && filed.pins == pins {
                 continue;
             }
@@ -416,13 +419,13 @@ impl ShopManuals {
         state: Res<State<Focus>>,
         focused: Res<Focused>,
         files: Query<(&Paper, &Filed)>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut commands: Commands,
     ) {
         if keys.just_pressed(PIN_KEY)
             && let Some(sheet) = Self::open_sheet(&state, &focused, &files)
         {
-            if run.pins().is_full() {
+            if pins.is_full() {
                 commands.trigger(Play(Sound::Refuse));
             } else {
                 commands.trigger(MoveSheet::Pin(sheet));
@@ -434,11 +437,11 @@ impl ShopManuals {
         state: Res<State<Focus>>,
         focused: Res<Focused>,
         files: Query<(&Paper, &Filed)>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut hint: ResMut<KeyHint>,
     ) {
         let action = Self::open_sheet(&state, &focused, &files).map(|_| {
-            let id = if run.pins().is_full() {
+            let id = if pins.is_full() {
                 "hint-pin-full"
             } else {
                 "hint-pin"
@@ -512,6 +515,7 @@ mod tests {
     fn world_with_file() -> (World, Entity) {
         let mut world = World::new();
         world.init_resource::<Run>();
+        world.init_resource::<Pins>();
         world.init_resource::<Assets<Image>>();
         world.init_resource::<Assets<Mesh>>();
         world.init_resource::<Assets<StandardMaterial>>();
@@ -590,7 +594,7 @@ mod tests {
             let contents = Contents::of(&run);
             for page in contents.pages() {
                 locale.assert_formats([page.0.footer()]);
-                let in_file = InFile::new(&contents, run.pins());
+                let in_file = InFile::new(&contents, &Pins::default());
                 let links = Links {
                     file: Entity::PLACEHOLDER,
                     in_file: &in_file,
@@ -658,7 +662,7 @@ mod tests {
             world.get::<SheetMoves>(file).unwrap().waiting(),
             [MoveSheet::Pin(pinned)]
         );
-        world.resource_mut::<Run>().pins_mut().pin(pinned);
+        world.resource_mut::<Pins>().pin(pinned);
         world.run_system_cached(ShopManuals::file).unwrap();
         world.flush();
         let paper = world.get::<Paper>(file).unwrap();
@@ -675,10 +679,10 @@ mod tests {
     fn unpinning_puts_the_page_back_in_its_place() {
         let (mut world, file) = world_with_file();
         let pinned = Sheet::new(Entry::Manual(DeviceKind::Tally2), 1);
-        world.resource_mut::<Run>().pins_mut().pin(pinned);
+        world.resource_mut::<Pins>().pin(pinned);
         world.run_system_cached(ShopManuals::file).unwrap();
         let count = world.get::<Paper>(file).unwrap().page_count();
-        world.resource_mut::<Run>().pins_mut().unpin(pinned);
+        world.resource_mut::<Pins>().unpin(pinned);
         world.run_system_cached(ShopManuals::file).unwrap();
         assert_eq!(world.get::<Paper>(file).unwrap().page_count(), count + 1);
         let filed = world.get::<Filed>(file).unwrap();

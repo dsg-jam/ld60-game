@@ -18,7 +18,6 @@ use self::per_device::PerDevice;
 use self::served::Served;
 pub(crate) use self::tools::ComputerTool;
 use super::job::Job;
-use super::manuals::Pins;
 use super::pickup::Pickup;
 use super::regulars::Regulars;
 use super::salvage::Find;
@@ -76,9 +75,6 @@ pub(crate) struct Run {
     /// tutorial job, which Marta left with her note.
     #[serde(default)]
     manuals: Vec<DeviceKind>,
-    /// The sheets of the manuals file pinned to the monitor.
-    #[serde(default)]
-    pins: Pins,
     tools: Vec<ComputerTool>,
     demand: Demand,
     served: Served,
@@ -162,7 +158,6 @@ impl Default for Run {
             errata: Vec::new(),
             notes: Vec::new(),
             manuals: Vec::new(),
-            pins: Pins::default(),
             tools: Vec::new(),
             demand: Demand::default(),
             served: Served::default(),
@@ -276,14 +271,6 @@ impl Run {
         }
     }
 
-    /// Unpins the sheets that are not in the manuals file. Saves from before
-    /// datasheets were sold can pin datasheets the shop no longer owns.
-    pub(crate) fn unpin_unfiled(&mut self) {
-        let mut pins = std::mem::take(&mut self.pins);
-        pins.keep_filed(self);
-        self.pins = pins;
-    }
-
     fn file_datasheet(&mut self, revision: Revision) {
         if !self.datasheets.contains(&revision) {
             self.datasheets.push(revision);
@@ -294,14 +281,6 @@ impl Run {
     /// It is the oldest one the firmware of `device` runs on.
     pub(crate) fn shipped_chip(device: DeviceKind) -> Revision {
         Reference::revisions(device)[0]
-    }
-
-    pub(crate) fn pins(&self) -> &Pins {
-        &self.pins
-    }
-
-    pub(crate) fn pins_mut(&mut self) -> &mut Pins {
-        &mut self.pins
     }
 
     /// Whether the manuals file has the errata pages for every known bug of
@@ -578,7 +557,6 @@ mod tests {
 
     use super::*;
     use crate::workshop::levels::Levels;
-    use crate::workshop::manuals::Sheet;
     use crate::workshop::pickup::{Complaint, Payment};
     use crate::workshop::regulars::Regular;
     use crate::workshop::salvage::Find;
@@ -629,22 +607,6 @@ mod tests {
         let mut later = Run::default().next();
         later.file_past_notes();
         assert_eq!(later.notes(), (0..7).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn pinned_sheets_go_back_for_the_next_run() {
-        let mut run = Run::default();
-        run.pins_mut().pin(Sheet::example());
-        assert!(!run.pins().is_empty());
-        assert!(run.next().pins().is_empty());
-    }
-
-    #[test]
-    fn pins_are_saved_with_the_run() {
-        let mut run = Run::default();
-        run.pins_mut().pin(Sheet::example());
-        let text = ron::to_string(&run).unwrap();
-        assert_eq!(ron::from_str::<Run>(&text).unwrap(), run);
     }
 
     #[test]

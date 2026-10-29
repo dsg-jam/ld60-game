@@ -7,7 +7,7 @@ use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::contents::{Contents, Entry, Page};
-use crate::workshop::run::Run;
+use crate::workshop::run::{NewRun, Run};
 use crate::workshop::tutorial::TutorialNote;
 
 /// One page of the manuals file, named by its entry so it stays the same
@@ -22,8 +22,8 @@ pub(crate) struct Sheet {
 /// The sheets taken out of the manuals file and pinned to the monitor of
 /// the shop computer, each in one of [`Pins::MAX`] slots on the rail. Slot
 /// 0 is next to the monitor. A pinned sheet keeps its slot and is not in the
-/// file until it is unpinned.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// file until it is unpinned. A new run starts with an empty rail.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Vec<SavedSlot>", into = "Vec<Option<Sheet>>")]
 pub(crate) struct Pins([Option<Sheet>; Pins::MAX]);
 
@@ -109,6 +109,11 @@ impl Pins {
 
     pub(crate) fn slot_of(&self, sheet: Sheet) -> Option<usize> {
         self.0.iter().position(|&other| other == Some(sheet))
+    }
+
+    /// Puts the pinned sheets back into the file, as a new run starts.
+    pub(super) fn clear_for_new_run(_: On<NewRun>, mut pins: ResMut<Pins>) {
+        *pins = Pins::default();
     }
 
     /// Unpins the sheets whose entry is not in the manuals file of `run`.

@@ -19,7 +19,6 @@ use self::arm::Arm;
 use self::sway::Sway;
 use super::monitor::Monitor;
 use crate::workshop::manuals::{MoveSheet, Pins, RailSlot, Sheet};
-use crate::workshop::run::Run;
 use crate::workshop::tutorial::FirstNote;
 
 /// A page of the manuals file at five eighths of its size, so the sheets
@@ -224,16 +223,16 @@ impl PinBoard {
     /// Hangs the pinned sheets. The [`Aside`] goes back to the screen once
     /// none are left.
     pub(super) fn follow_pins(
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut boards: Query<(&mut PinBoard, &mut Aside)>,
         mut visibilities: Query<&mut Visibility>,
         mut commands: Commands,
     ) {
         for (mut board, mut aside) in &mut boards {
-            if board.shown.as_ref() == Some(run.pins()) {
+            if board.shown.as_ref() == Some(&*pins) {
                 continue;
             }
-            let slots = run.pins().slots();
+            let slots = pins.slots();
             let shown = |shown: bool| {
                 if shown {
                     Visibility::Inherited
@@ -258,10 +257,10 @@ impl PinBoard {
                     visibility.set_if_neq(shown(slot.page.is_some()));
                 }
             }
-            if run.pins().is_empty() {
+            if pins.is_empty() {
                 aside.open = false;
             }
-            board.shown = Some(run.pins().clone());
+            board.shown = Some(pins.clone());
         }
     }
 
