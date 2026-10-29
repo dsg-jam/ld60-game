@@ -7,7 +7,6 @@ use bevy::prelude::*;
 use ld60_calco::{Errata, Revision};
 use ld60_devices::{BoardRev, ChipSpec, DeviceKind};
 use ld60_game_core::clock::Clock;
-use ld60_game_core::player::focus::{Focus, Focused};
 use ld60_levels::{Catalog, GAME_SEED, LevelSource, Reference};
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
@@ -511,8 +510,6 @@ impl Run {
         new_run: On<NewRun>,
         mut run: ResMut<Run>,
         mut clock: ResMut<Clock>,
-        mut focused: ResMut<Focused>,
-        mut focus: ResMut<NextState<Focus>>,
         leftovers: Query<Entity, With<Leftover>>,
         mut commands: Commands,
     ) {
@@ -521,7 +518,6 @@ impl Run {
             NewRun::StartOver => run.start_over(),
         };
         *clock = Clock::default();
-        focused.leave(&mut focus);
         for entity in &leftovers {
             commands.entity(entity).try_despawn();
         }
@@ -552,7 +548,6 @@ impl Run {
 
 #[cfg(test)]
 mod tests {
-    use ld60_game_core::player::focus::{FocusOn, FocusTarget, View};
     use ld60_levels::Difficulty;
 
     use super::*;
@@ -862,33 +857,6 @@ mod tests {
         assert_eq!((run.job, run.stats.fixed), (1, 1));
         assert_eq!(run.demand, Demand::default());
         assert_eq!(run.served, Served::default());
-    }
-
-    #[test]
-    fn a_new_run_leaves_the_focus() {
-        let mut world = World::new();
-        world.init_resource::<Run>();
-        world.init_resource::<Clock>();
-        world.init_resource::<Focused>();
-        world.init_resource::<NextState<Focus>>();
-        world.add_observer(Run::restart);
-        world.add_observer(FocusOn::apply);
-        let note = world
-            .spawn(FocusTarget {
-                prompt: "click-rent",
-                focus: Focus::Paper,
-                view: View::World(Transform::IDENTITY),
-            })
-            .id();
-        world.trigger(FocusOn { entity: note });
-        assert_eq!(world.resource::<Focused>().get(), Some(note));
-        world.trigger(NewRun::Reopen);
-        world.flush();
-        assert_eq!(world.resource::<Focused>().get(), None);
-        assert!(matches!(
-            *world.resource::<NextState<Focus>>(),
-            NextState::Pending(Focus::Desk)
-        ));
     }
 
     #[test]

@@ -39,6 +39,7 @@ use bevy::prelude::*;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_core::player::focus::Focused;
 
 use self::bin::Bin;
 use self::clutter::Clutter;
@@ -51,6 +52,7 @@ use self::manuals::ShopManuals;
 use self::printer::Printer;
 use self::radio::Radio;
 use self::reminder::Reminder;
+use self::run::NewRun;
 use self::shop::Shop;
 use self::stamp::RubberStamp;
 use self::ticket::Clipboard;
@@ -105,7 +107,8 @@ impl Plugin for WorkshopPlugin {
             till::TillPlugin,
             tutorial::TutorialPlugin,
         ))
-        .add_systems(Startup, spawn_stage);
+        .add_systems(Startup, spawn_stage)
+        .add_observer(Focused::leave_on::<NewRun>);
     }
 }
 

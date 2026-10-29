@@ -227,6 +227,15 @@ impl Focused {
         next.set(Focus::Desk);
     }
 
+    /// Goes back to the desk when `E` happens.
+    pub fn leave_on<E: Event>(
+        _: On<E>,
+        mut focused: ResMut<Focused>,
+        mut next: ResMut<NextState<Focus>>,
+    ) {
+        focused.leave(&mut next);
+    }
+
     /// Right click or Escape goes back to the desk, or first from an open
     /// [`Aside`] and then from a [`Zoom`] or the [`Lens`] back to the focused
     /// view.
@@ -353,6 +362,33 @@ mod tests {
     use bevy::{ecs::system::RunSystemOnce, picking::backend::HitData};
 
     use super::*;
+
+    #[derive(Event)]
+    struct Away;
+
+    #[test]
+    fn leaving_on_an_event_goes_back_to_the_desk() {
+        let mut world = World::new();
+        world.init_resource::<Focused>();
+        world.init_resource::<NextState<Focus>>();
+        world.add_observer(Focused::leave_on::<Away>);
+        world.add_observer(FocusOn::apply);
+        let note = world
+            .spawn(FocusTarget {
+                prompt: "click-rent",
+                focus: Focus::Paper,
+                view: View::World(Transform::IDENTITY),
+            })
+            .id();
+        world.trigger(FocusOn { entity: note });
+        assert_eq!(world.resource::<Focused>().get(), Some(note));
+        world.trigger(Away);
+        assert_eq!(world.resource::<Focused>().get(), None);
+        assert!(matches!(
+            *world.resource::<NextState<Focus>>(),
+            NextState::Pending(Focus::Desk)
+        ));
+    }
 
     #[test]
     fn focused_prompts_come_from_parts_of_the_focused_thing() {
