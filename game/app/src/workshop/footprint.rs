@@ -9,8 +9,8 @@ use super::computer::ComputerLayout;
 use super::manuals::ShopManuals;
 use super::{
     COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW, STAMP_SPOT,
-    STAMP_YAW, cable, job, lamp, printer, radio, receipt, reminder, rent, salvage, stamp, ticket,
-    till,
+    STAMP_YAW, cable, delivery, lamp, printer, radio, receipt, reminder, rent, salvage, stamp,
+    ticket, till,
 };
 use ld60_game_device::{Casing, Handheld};
 
@@ -120,7 +120,7 @@ fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
         ),
         Footprint::new(
             "job ticket",
-            counter.place(job::TICKET_SPOT, job::TICKET_YAW),
+            counter.place(delivery::TICKET_SPOT, delivery::TICKET_YAW),
             Block::new(ticket::BOARD_SIZE),
         ),
         Footprint::new(
@@ -140,7 +140,7 @@ fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
         ),
         Footprint::new(
             "device",
-            counter.place(job::DEVICE_SPOT, job::DEVICE_YAW),
+            counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW),
             Block::new(device),
         ),
     ];
@@ -184,7 +184,7 @@ fn no_two_counter_props_overlap() {
 #[test]
 fn screws_taken_out_lie_clear_of_everything() {
     let counter = CounterLayout::new();
-    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
     let others: Vec<_> = counter_props(&counter)
         .into_iter()
         .filter(|prop| prop.name != "device")
@@ -214,7 +214,7 @@ fn screws_taken_out_lie_clear_of_everything() {
 #[test]
 fn the_cover_taken_off_lies_clear_of_everything() {
     let counter = CounterLayout::new();
-    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
     let others: Vec<_> = counter_props(&counter)
         .into_iter()
         .filter(|prop| prop.name != "device")
@@ -245,7 +245,7 @@ fn the_open_manuals_lie_clear_of_the_device_its_screws_and_cover() {
         counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0),
         Block::new(ShopManuals::OPEN),
     );
-    let rest = counter.place(job::DEVICE_SPOT, job::DEVICE_YAW);
+    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
     // The closed file stands elsewhere while it lies open, and paper notes
     // lie flat under it.
     let mut others: Vec<_> = counter_props(&counter)
