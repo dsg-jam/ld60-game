@@ -34,8 +34,8 @@ const BOSS: f32 = 0.0026;
 const PILOT: Vec3 = Vec3::new(0.0018, 0.0002, 0.0018);
 const SCREW: Vec3 = Phillips::HEAD;
 const SHANK: Vec3 = Vec3::new(0.0022, 0.008, 0.0022);
-/// The empty hole of a screw that is out.
-const HOLE: Vec3 = Vec3::new(0.0034, 0.0003, 0.0034);
+/// The hole through the cover that a screw goes through.
+const COVER_HOLE: f32 = 0.0013;
 /// Screws that are out lie this far from the left side of the device, and
 /// this far apart.
 const ASIDE: f32 = 0.014;
@@ -241,9 +241,19 @@ impl Casing {
         let underside = |spot: Vec2| plate.top_spot(spot).with_y(0.0);
         let holes: Vec<_> = spots.screws.iter().map(|&spot| underside(spot)).collect();
         device
-            .spawn((Cover, Transform::IDENTITY, Visibility::Inherited))
+            .spawn((
+                Name::new("back cover"),
+                Cover,
+                Transform::IDENTITY,
+                Visibility::Inherited,
+            ))
             .with_children(|cover| {
-                cover.spawn((CoverPlate, Shape::cuboid(&plate, color), Finish::Plastic));
+                let drilled: Vec<Vec2> = holes.iter().map(|hole| hole.xz()).collect();
+                cover.spawn((
+                    CoverPlate,
+                    Shape::drilled(&plate, &drilled, COVER_HOLE, color),
+                    Finish::Plastic,
+                ));
                 for (index, &spot) in spots.screws.iter().enumerate() {
                     let head = Block::new(SCREW).translated(underside(spot) - Vec3::Y * SCREW.y);
                     cover.spawn((
@@ -254,15 +264,14 @@ impl Casing {
                         Shape::turned(Phillips::head(), &head, SCREW_METAL),
                         Finish::Metal,
                     ));
-                    // Under the head, so it shows once the screw is out.
-                    let hole = Block::new(HOLE).translated(underside(spot) - Vec3::Y * HOLE.y);
+                    // The mouth of the hole, to click once the screw is out.
                     cover.spawn((
                         Hole(index),
                         ClickTool::Screwdriver,
-                        ToolSpot(Vec3::NEG_Y * HOLE.y / 2.0),
+                        ToolSpot(Vec3::ZERO),
                         Snap,
-                        Shape::cylinder(&hole, HOLE_DARK),
-                        Finish::Plastic,
+                        Transform::from_translation(underside(spot) - Vec3::Y * COVER / 2.0),
+                        Visibility::Hidden,
                     ));
                 }
                 cover.spawn(sticker);

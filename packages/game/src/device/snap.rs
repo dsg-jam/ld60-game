@@ -12,6 +12,8 @@ use ld60_core::player::focus::{Focus, Focused};
 /// How far from a [`Snap`] part the pointer still catches it, in logical
 /// pixels.
 const REACH: f32 = 24.0;
+/// A hit this close past a part, in meters, still counts as on the part.
+const SEEN_SLACK: f32 = 0.0002;
 
 pub(super) struct SnapPlugin;
 
@@ -28,7 +30,8 @@ pub(super) struct Snap;
 
 impl Snap {
     /// Puts the nearest part in [`REACH`] of each pointer on top of what
-    /// the pointer is over, if nothing hides it.
+    /// the pointer is over, if nothing hides it. A part need not have a
+    /// mesh.
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn hits(
         state: Res<State<Focus>>,
@@ -75,15 +78,20 @@ impl Snap {
             };
             let hoverable = |entity| pickables.get(entity).ok().is_none_or(|p| p.is_hoverable);
             let settings = MeshRayCastSettings::default().with_filter(&hoverable);
+            let reach = eye.translation().distance(at);
             let first = ray_cast
                 .cast_ray(Ray3d::new(eye.translation(), towards), &settings)
                 .first()
                 .map(|&(entity, ref hit)| (entity, hit.distance));
-            let Some((hit, depth)) = first else {
-                continue;
-            };
-            let seen = hit == part || parents.iter_ancestors(hit).any(|parent| parent == part);
+            // A part is seen if the ray hits it first, or nothing on the
+            // way to it, like the empty mouth of a hole.
+            let seen = first.is_none_or(|(hit, depth)| {
+                hit == part
+                    || parents.iter_ancestors(hit).any(|parent| parent == part)
+                    || depth >= reach - SEEN_SLACK
+            });
             if seen {
+                let depth = first.map_or(reach, |(_, depth)| depth.min(reach));
                 hits.write(PointerHits::new(
                     ray_id.pointer,
                     vec![(part, HitData::new(ray_id.camera, depth, Some(at), None))],
