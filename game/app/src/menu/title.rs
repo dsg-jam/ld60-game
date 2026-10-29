@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 use ld60_game_core::layout::title::{EYE, SWAY};
-use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_player::camera::PlayerCamera;
 use ld60_locale::Message;
 
 use super::list::Action;

@@ -9,9 +9,9 @@ mod title;
 
 use bevy::prelude::*;
 use ld60_game_audio::Mixer;
-use ld60_game_core::player::hints::{INK, SHADOW};
 use ld60_game_core::settings::SettingsPlugin;
 use ld60_game_core::state::AppState;
+use ld60_game_player::hints::{INK, SHADOW};
 use ld60_game_run::{NewRun, Run};
 use ld60_locale::{Localized, Message};
 

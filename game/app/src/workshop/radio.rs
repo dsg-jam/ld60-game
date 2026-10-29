@@ -2,13 +2,13 @@ mod broadcast;
 mod front;
 
 use bevy::{picking::events::PointerScroll, prelude::*};
-use ld60_game_core::player::focus::{Clickable, Focus, FocusTarget, Focused, View};
-use ld60_game_core::player::free_look::MODIFIERS;
-use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_game_parts::dot_matrix::DotMatrix;
 use ld60_game_parts::gauge::Gauge;
 use ld60_game_parts::knob::Knob;
 use ld60_game_parts::latch_button::LatchButton;
+use ld60_game_player::focus::{Clickable, Focus, FocusTarget, Focused, View};
+use ld60_game_player::free_look::MODIFIERS;
+use ld60_game_player::hints::{Hint, Hints, Icon, Input};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};

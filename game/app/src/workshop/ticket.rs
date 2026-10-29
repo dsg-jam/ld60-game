@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use ld60_devices::{ChipSpec, RomKind};
-use ld60_game_core::player::focus::{Focus, FocusTarget, View};
 use ld60_game_parts::paper::{Binding, Flutter, Paper};
 use ld60_game_parts::screen::UiCanvas;
+use ld60_game_player::focus::{Focus, FocusTarget, View};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

@@ -28,9 +28,9 @@ use bevy::prelude::*;
 use ld60_game_computer::Computer;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
-use ld60_game_core::player::camera::PlayerCamera;
-use ld60_game_core::player::focus::Focused;
 use ld60_game_manuals::ShopManuals;
+use ld60_game_player::camera::PlayerCamera;
+use ld60_game_player::focus::Focused;
 use ld60_game_run::NewRun;
 
 use self::bin::Bin;

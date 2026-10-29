@@ -11,8 +11,8 @@ use bevy::{
     prelude::*,
 };
 use ld60_game_audio::{Play, Sound};
-use ld60_game_core::player::focus::Focused;
-use ld60_game_core::player::free_look::MODIFIERS;
+use ld60_game_player::focus::Focused;
+use ld60_game_player::free_look::MODIFIERS;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};

@@ -13,10 +13,10 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions, PrimaryWindow, WindowFocused, WindowRef},
 };
+use ld60_game_core::settings::Settings;
+use ld60_game_core::state::{AppState, KeepMouse};
 
 use super::{camera::PlayerCamera, focus::Focus, free_look::FreeLook, lens::Lens};
-use crate::settings::Settings;
-use crate::state::{AppState, KeepMouse};
 
 pub(super) const SENSITIVITY: f32 = 0.0025;
 /// Just short of looking straight up or down, in radians.

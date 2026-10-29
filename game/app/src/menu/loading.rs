@@ -1,9 +1,9 @@
 mod pipelines;
 
 use bevy::prelude::*;
-use ld60_game_core::player::camera::PlayerCamera;
-use ld60_game_core::player::hints::IconFont;
 use ld60_game_core::state::AppState;
+use ld60_game_player::camera::PlayerCamera;
+use ld60_game_player::hints::IconFont;
 use ld60_game_run::levels::Levels;
 use ld60_locale::Locale;
 

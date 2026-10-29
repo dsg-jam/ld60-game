@@ -19,6 +19,7 @@ ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
 ld60-game-parts = { workspace = true }
+ld60-game-player = { workspace = true }
 ld60-game-run = { workspace = true }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }

@@ -10,9 +10,9 @@ use bevy::{
 };
 use ld60_game_core::clock::Clock;
 use ld60_game_core::layout::shop;
-use ld60_game_core::player::camera::PlayerCamera;
-use ld60_game_core::player::focus::Focus;
 use ld60_game_core::settings::Settings;
+use ld60_game_player::camera::PlayerCamera;
+use ld60_game_player::focus::Focus;
 use ld60_geometry::block::Block;
 
 use self::height_fog::HeightFog;

@@ -2,10 +2,10 @@ use bevy::{
     input::mouse::{MouseScrollUnit, MouseWheel},
     prelude::*,
 };
+use ld60_game_core::state::AppState;
 
 use super::focus::{Aside, Focused, View};
 use super::free_look::MODIFIERS;
-use crate::state::AppState;
 
 /// How far a trackpad has to scroll for one step.
 const STEP_PIXELS: f32 = 40.0;

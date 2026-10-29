@@ -1,10 +1,10 @@
 use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*};
+use ld60_game_core::settings::Settings;
+use ld60_game_core::state::AppState;
 
 use super::focus::Focus;
 use super::lens::Lens;
 use super::look::SENSITIVITY;
-use crate::settings::Settings;
-use crate::state::AppState;
 
 /// Held to look around while focused, and with the wheel to zoom.
 pub const MODIFIERS: [KeyCode; 2] = [KeyCode::ControlLeft, KeyCode::ControlRight];

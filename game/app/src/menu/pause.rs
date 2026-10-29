@@ -9,8 +9,8 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowFocused},
 };
-use ld60_game_core::player::{focus::Focus, look::CursorLock};
 use ld60_game_core::state::KeepMouse;
+use ld60_game_player::{focus::Focus, look::CursorLock};
 use ld60_locale::Message;
 
 use super::list::{Action, Navigation};

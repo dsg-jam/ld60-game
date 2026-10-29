@@ -132,8 +132,8 @@ impl SavedShop {
 mod tests {
     use ld60_calco::Revision;
     use ld60_devices::DeviceKind;
-    use ld60_game_core::player::focus::{Focus, Focused};
     use ld60_game_manuals::Sheet;
+    use ld60_game_player::focus::{Focus, Focused};
     use ld60_game_run::NewRun;
     use ld60_game_run::chore::PlanetSet;
     use ld60_game_run::levels::Levels;

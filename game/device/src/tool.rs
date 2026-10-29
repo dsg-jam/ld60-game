@@ -2,7 +2,7 @@ use bevy::{
     ecs::system::SystemParam, picking::hover::HoverMap, prelude::*,
     transform::helper::TransformHelper,
 };
-use ld60_game_core::player::focus::{self, ClickTool, Clickable, Disabled, Focused};
+use ld60_game_player::focus::{self, ClickTool, Clickable, Disabled, Focused};
 
 /// Where the tool for a part touches it, in the part's space. The tool
 /// points along +Y, into the part.

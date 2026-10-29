@@ -4,14 +4,14 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::player::camera::{PlayerCamera, framing};
-use ld60_game_core::player::focus::{Aside, Clickable, Focus, FocusTarget, View};
-use ld60_game_core::player::free_look::MODIFIERS;
-use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
-use ld60_game_core::player::lens;
-use ld60_game_core::player::zoom::Zoom;
 use ld60_game_core::state::AppState;
 use ld60_game_manuals::Pins;
+use ld60_game_player::camera::{PlayerCamera, framing};
+use ld60_game_player::focus::{Aside, Clickable, Focus, FocusTarget, View};
+use ld60_game_player::free_look::MODIFIERS;
+use ld60_game_player::hints::{Hint, Hints, Icon, Input};
+use ld60_game_player::lens;
+use ld60_game_player::zoom::Zoom;
 use ld60_locale::Message;
 
 use super::pinboard::PinBoard;

@@ -6,7 +6,7 @@ use bevy::{
     shape::{Aabb3d, RayCast3d},
 };
 use ld60_game_core::layout::title::TITLE_EYES;
-use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_player::camera::PlayerCamera;
 use rand::{RngExt, rngs::SmallRng};
 
 use super::super::super::buildings::Skyline;

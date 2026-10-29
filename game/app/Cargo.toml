@@ -18,6 +18,7 @@ debug_port = [
   "ld60-game-core/debug_port",
   "ld60-game-device/debug_port",
   "ld60-game-parts/debug_port",
+  "ld60-game-player/debug_port",
 ]
 
 [dependencies]
@@ -30,6 +31,7 @@ ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
 ld60-game-manuals = { workspace = true }
 ld60-game-parts = { workspace = true }
+ld60-game-player = { workspace = true }
 ld60-game-run = { workspace = true }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }

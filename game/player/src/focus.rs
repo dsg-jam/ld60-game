@@ -10,13 +10,13 @@ use bevy::{
     },
     prelude::*,
 };
+#[cfg(feature = "debug_port")]
+use ld60_game_core::debug_port::DebugMethods;
+#[cfg(feature = "debug_port")]
+use ld60_game_core::state::AppState;
 
 use super::lens::Lens;
 use super::zoom::Zoom;
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-#[cfg(feature = "debug_port")]
-use crate::state::AppState;
 
 pub(super) struct FocusPlugin;
 

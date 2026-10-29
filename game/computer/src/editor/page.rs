@@ -4,7 +4,7 @@ use bevy::{
 };
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
-use ld60_game_core::player::focus::{Aside, Focus};
+use ld60_game_player::focus::{Aside, Focus};
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run};

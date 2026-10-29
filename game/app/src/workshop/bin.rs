@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use ld60_game_audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::shop::ShopLayout;
-use ld60_game_core::player::focus::{Clickable, FocusTarget};
+use ld60_game_player::focus::{Clickable, FocusTarget};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

@@ -6,11 +6,11 @@ use bevy::{
     prelude::*,
     window::{CursorIcon, PrimaryWindow},
 };
+use ld60_game_core::state::AppState;
 
 use self::sprite::Sprite;
 use super::crosshair::Prompt;
 use super::focus::{self, Clickable, Disabled, Focus};
-use crate::state::AppState;
 
 /// Diameter of the dot cursor, in logical pixels.
 pub const DOT_SIZE: f32 = 10.0;

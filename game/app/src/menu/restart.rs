@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_core::player::hints::{INK, SHADOW};
+use ld60_game_player::hints::{INK, SHADOW};
 use ld60_locale::{Localized, Message};
 
 use super::list::{Action, Entries};

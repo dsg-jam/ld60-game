@@ -14,8 +14,8 @@ use bevy::{
     render::render_resource::{TextureFormat, TextureUsages},
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
-use ld60_game_core::player::cursor::WantsArrow;
 use ld60_game_core::state::AppState;
+use ld60_game_player::cursor::WantsArrow;
 
 pub use self::crt::{CrtGlass, CrtLight, CrtMaterial};
 

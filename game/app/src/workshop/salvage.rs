@@ -5,10 +5,10 @@ use bevy::{
 use ld60_devices::DeviceKind;
 use ld60_game_audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::player::focus::{Clickable, Focus, FocusTarget, Focused, Prompting, View};
 use ld60_game_core::state::AppState;
 use ld60_game_parts::paper::{INK_FADED, PAPER, Paper};
 use ld60_game_parts::screen::UiCanvas;
+use ld60_game_player::focus::{Clickable, Focus, FocusTarget, Focused, Prompting, View};
 use ld60_game_run::salvage::Find;
 use ld60_game_run::{Leftover, Rent, Run};
 use ld60_geometry::block::Block;
@@ -423,7 +423,7 @@ mod tests {
     use std::collections::HashSet;
 
     use ld60_devices::DeviceKind;
-    use ld60_game_core::player::focus::FocusOn;
+    use ld60_game_player::focus::FocusOn;
     use ld60_game_run::ComputerTool;
     use ld60_game_run::chore::PlanetSet;
     use ld60_locale::{Locale, Localized};

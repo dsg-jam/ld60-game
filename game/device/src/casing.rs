@@ -11,7 +11,7 @@ use ld60_game_audio::{Play, Sound};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::player::focus::{ClickTool, Clickable, Focused, Prompting};
+use ld60_game_player::focus::{ClickTool, Clickable, Focused, Prompting};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
