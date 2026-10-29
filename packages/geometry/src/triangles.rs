@@ -6,18 +6,24 @@ use bevy::{
 
 /// Collects the triangles of a mesh, each facing the way it is told.
 ///
-/// It has no UVs to speak of, they are all zero.
+/// Vertices have a UV of zero unless they are given one.
 #[derive(Default)]
 pub struct Triangles {
     positions: Vec<Vec3>,
     normals: Vec<Vec3>,
+    uvs: Vec<Vec2>,
     indices: Vec<u32>,
 }
 
 impl Triangles {
     pub fn vertex(&mut self, position: Vec3, normal: Vec3) -> u32 {
+        self.vertex_at(position, normal, Vec2::ZERO)
+    }
+
+    pub fn vertex_at(&mut self, position: Vec3, normal: Vec3, uv: Vec2) -> u32 {
         self.positions.push(position);
         self.normals.push(normal);
+        self.uvs.push(uv);
         (self.positions.len() - 1) as u32
     }
 
@@ -64,14 +70,13 @@ impl Triangles {
     }
 
     pub fn build(self) -> Mesh {
-        let count = self.positions.len();
         Mesh::new(
             PrimitiveTopology::TriangleList,
             RenderAssetUsages::default(),
         )
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![Vec2::ZERO; count])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, self.uvs)
         .with_inserted_indices(Indices::U32(self.indices))
     }
 }

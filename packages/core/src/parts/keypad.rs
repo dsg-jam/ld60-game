@@ -125,6 +125,23 @@ pub struct KeypadStyle {
     pub word_font_size: f32,
     pub ink: Color,
     pub cap: Color,
+    /// How far the sides of a key lean in towards its top, and how deep its
+    /// top is dished. Flat keys with straight sides at zero.
+    pub shape: (f32, f32),
+    /// Extra space before each row, in keys. Rows past the end get none.
+    pub row_gaps: &'static [f32],
+}
+
+impl KeypadStyle {
+    /// Where row `row` starts, in keys from the back.
+    fn row_start(&self, row: usize) -> f32 {
+        row as f32 + self.row_gaps.iter().take(row + 1).sum::<f32>()
+    }
+
+    /// How deep `rows` rows are, in keys.
+    fn depth(&self, rows: usize) -> f32 {
+        rows as f32 + self.row_gaps.iter().take(rows).sum::<f32>()
+    }
 }
 
 /// Rows of keys with printed labels, centered in each row.
@@ -159,7 +176,7 @@ pub struct PlacedKey<K> {
 impl<K: Copy> Keypad<K> {
     /// Area covered by the keys, in x and z.
     pub fn area(rows: &[&[KeyDef<K>]], style: &KeypadStyle) -> Vec2 {
-        Vec2::new(Self::max_units(rows), rows.len() as f32) * style.pitch
+        Vec2::new(Self::max_units(rows), style.depth(rows.len())) * style.pitch
     }
 
     /// Lays out the keys resting on `surface`, with their area centered on
@@ -173,10 +190,10 @@ impl<K: Copy> Keypad<K> {
         let area = Self::area(rows, style);
         let origin = surface.top_spot(spot) - (area / 2.0).extend(0.0).xzy();
         let max_units = Self::max_units(rows);
-        let row_count = rows.len() as f32;
+        let depth = style.depth(rows.len());
         let mut keys = Vec::new();
         for (row, defs) in rows.iter().enumerate() {
-            let row = row as f32;
+            let row = style.row_start(row);
             let units = Self::units(defs);
             // Left edge of the current key, in units from the left of the area.
             let mut left = (max_units - units) / 2.0;
@@ -196,9 +213,9 @@ impl<K: Copy> Keypad<K> {
                 // neighbors.
                 let cell = Rect::new(
                     left / max_units,
-                    row / row_count,
+                    row / depth,
                     (left + def.width) / max_units,
-                    (row + 1.0) / row_count,
+                    (row + 1.0) / depth,
                 );
                 let label_region =
                     Rect::from_center_size(cell.center(), cell.size() * size.xz() / span);
@@ -230,7 +247,12 @@ impl<K: Copy> Keypad<K> {
     ) {
         for key in &self.keys {
             parent.spawn((
-                Shape::textured_cuboid(&key.block, labels.clone(), key.label_region),
+                Shape::keycap(
+                    &key.block,
+                    self.style.shape,
+                    labels.clone(),
+                    key.label_region,
+                ),
                 Finish::Plastic,
                 PressableKey {
                     rest: key.block.center,
@@ -272,7 +294,13 @@ impl<K: Copy> Keypad<K> {
                 canvas.target(),
             ))
             .with_children(|root| {
-                for defs in self.rows {
+                for (row, defs) in self.rows.iter().enumerate() {
+                    if let Some(&gap) = self.style.row_gaps.get(row) {
+                        root.spawn(Node {
+                            height: px(gap * cell),
+                            ..default()
+                        });
+                    }
                     root.spawn(Node {
                         height: px(cell),
                         ..default()

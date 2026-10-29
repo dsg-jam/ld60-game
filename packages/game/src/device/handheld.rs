@@ -45,6 +45,8 @@ const STYLE: KeypadStyle = KeypadStyle {
     word_font_size: 36.0,
     ink: Color::srgb_u8(0x2a, 0x26, 0x24),
     cap: Color::srgb_u8(0xe8, 0xe0, 0xcc),
+    shape: (0.0, 0.0),
+    row_gaps: &[],
 };
 
 /// Rows from the back to the front.
