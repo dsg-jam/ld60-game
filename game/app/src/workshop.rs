@@ -4,6 +4,7 @@ mod chore;
 mod clutter;
 mod computer;
 mod counter;
+mod delivery;
 mod dial;
 mod dust;
 #[cfg(test)]
@@ -91,6 +92,7 @@ impl Plugin for WorkshopPlugin {
         .add_plugins((
             cable::CablePlugin,
             chore::ChorePlugin,
+            delivery::DeliveryPlugin,
             dial::DialPlugin,
             printer::PrinterPlugin,
             reminder::ReminderPlugin,
@@ -136,7 +138,7 @@ fn spawn_stage(mut commands: Commands) {
     commands.spawn((
         Name::new("clipboard"),
         Clipboard,
-        counter.place(job::TICKET_SPOT, job::TICKET_YAW),
+        counter.place(delivery::TICKET_SPOT, delivery::TICKET_YAW),
     ));
     commands.spawn((Name::new("paper bin"), Bin, Bin::place()));
     commands.spawn((
