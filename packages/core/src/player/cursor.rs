@@ -9,7 +9,7 @@ use bevy::{
 
 use self::sprite::Sprite;
 use super::crosshair::Prompt;
-use super::focus::{self, Clickable, Focus};
+use super::focus::{self, Clickable, Disabled, Focus};
 use crate::parts::{keypad::PressableKey, screen::ScreenSurface};
 use crate::state::AppState;
 
@@ -205,7 +205,7 @@ impl Cursors {
         parents: Query<&ChildOf>,
         surfaces: Query<&ScreenSurface>,
         keys: Query<&PressableKey>,
-        targets: Query<(), With<Clickable>>,
+        targets: Query<Has<Disabled>, With<Clickable>>,
         prompt: Res<Prompt>,
         mut icon: Single<&mut CursorIcon, With<PrimaryWindow>>,
     ) {
@@ -222,7 +222,7 @@ impl Cursors {
         {
             Kind::Finger
         } else if *state.get() == Focus::Desk
-            && under.iter().any(|&entity| targets.contains(entity))
+            && under.iter().find_map(|&entity| targets.get(entity).ok()) == Some(false)
         {
             Kind::HoverDot
         } else {

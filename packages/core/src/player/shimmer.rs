@@ -13,7 +13,7 @@ use bevy::{
 
 use super::{
     camera::PlayerCamera,
-    focus::{self, Clickable, Focus},
+    focus::{self, Clickable, Disabled, Focus},
 };
 
 const COLOR: LinearRgba = LinearRgba::new(1.0, 0.98, 0.9, 1.0);
@@ -110,24 +110,28 @@ struct Shimmer {
 }
 
 impl Shimmer {
-    /// The target under the mouse in the desk view, if any.
+    /// The target under the mouse in the desk view, if any. A disabled one
+    /// does not shimmer.
     fn hovered(
         state: &State<Focus>,
         hovers: &HoverMap,
-        targets: &Query<(), With<Clickable>>,
+        targets: &Query<Has<Disabled>, With<Clickable>>,
         parents: &Query<&ChildOf>,
     ) -> Option<Entity> {
         if *state.get() != Focus::Desk {
             return None;
         }
-        focus::under_mouse(hovers, parents).find(|&entity| targets.contains(entity))
+        focus::under_mouse(hovers, parents)
+            .find_map(|entity| targets.get(entity).ok().map(|disabled| (entity, disabled)))
+            .filter(|&(_, disabled)| !disabled)
+            .map(|(entity, _)| entity)
     }
 
     /// Starts a shimmer on a newly hovered target.
     fn start(
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
-        targets: Query<(), With<Clickable>>,
+        targets: Query<Has<Disabled>, With<Clickable>>,
         parents: Query<&ChildOf>,
         shimmers: Query<(), With<Shimmer>>,
         mut materials: ResMut<Assets<ShimmerMaterial>>,
@@ -245,7 +249,7 @@ impl Shimmer {
         time: Res<Time>,
         state: Res<State<Focus>>,
         hovers: Res<HoverMap>,
-        targets: Query<(), With<Clickable>>,
+        targets: Query<Has<Disabled>, With<Clickable>>,
         parents: Query<&ChildOf>,
         children: Query<&Children>,
         overlays: Query<(&Aabb, &GlobalTransform, &InheritedVisibility), With<ShimmerOverlay>>,

@@ -13,11 +13,14 @@ use ld60_locale::{Localized, Message};
 use self::badge::ToolBadge;
 use super::{
     cursor,
-    focus::{self, ClickTool, Clickable, Focused},
-    hints::{Caption, ClickHint, Icon, IconFont},
+    focus::{self, ClickTool, Clickable, Disabled, Focused},
+    hints::{self, Caption, ClickHint, Icon, IconFont},
     look::{Gaze, KeepMouse},
 };
 use crate::settings::Settings;
+
+/// How much a [`Disabled`] prompt shows.
+const DISABLED_ALPHA: f32 = 0.45;
 
 pub(super) struct CrosshairPlugin;
 
@@ -49,6 +52,11 @@ enum Shape {
 /// The [`Caption`] of [`Shape::Prompt`].
 #[derive(Component, Debug)]
 struct PromptCaption;
+
+/// The mouse button of [`Shape::Prompt`], hidden while the action is
+/// [`Disabled`].
+#[derive(Component, Debug)]
+struct PromptIcon;
 
 impl Crosshair {
     fn spawn(mut commands: Commands, font: Res<IconFont>) {
@@ -92,7 +100,9 @@ impl Crosshair {
                     .with_children(|prompt| {
                         ToolBadge::spawn(prompt, ClickTool::Screwdriver);
                         ToolBadge::spawn(prompt, ClickTool::Plug);
-                        Icon::MouseLeft.spawn(prompt, &font);
+                        prompt
+                            .spawn((PromptIcon, Node::default(), Pickable::IGNORE))
+                            .with_children(|icon| Icon::MouseLeft.spawn(icon, &font));
                         // Hangs below the icon, so the icon stays in the
                         // middle.
                         prompt.spawn((
@@ -124,7 +134,8 @@ impl Crosshair {
         ui_scale: Res<UiScale>,
         crosshair: Single<(&mut Visibility, &mut UiTransform), With<Crosshair>>,
         mut shapes: Query<(&Shape, &mut Node)>,
-        caption: Single<(Entity, Option<&Localized>), With<PromptCaption>>,
+        caption: Single<(Entity, Option<&Localized>, &mut TextColor), With<PromptCaption>>,
+        mut icon: Single<&mut Visibility, (With<PromptIcon>, Without<Crosshair>)>,
         mut commands: Commands,
     ) {
         let (mut visibility, mut transform) = crosshair.into_inner();
@@ -150,13 +161,20 @@ impl Crosshair {
                 node.display = display;
             }
         }
+        let (entity, current, mut color) = caption.into_inner();
         if let Some(message) = &prompt.message {
-            let (entity, current) = *caption;
             let text = Localized::from(message.clone());
             if current != Some(&text) {
                 commands.entity(entity).insert(text);
             }
         }
+        let (shown, ink) = if prompt.disabled {
+            (Visibility::Hidden, hints::INK.with_alpha(DISABLED_ALPHA))
+        } else {
+            (Visibility::Inherited, hints::INK)
+        };
+        icon.set_if_neq(shown);
+        color.set_if_neq(TextColor(ink));
     }
 }
 
@@ -169,6 +187,8 @@ pub(crate) struct Prompt {
     message: Option<Message>,
     /// The tool of the hovered part the message is about, if any.
     tool: Option<ClickTool>,
+    /// Whether the action can't be done right now.
+    disabled: bool,
     /// Where the free cursor is, in logical pixels, while the prompt shows
     /// there.
     at_cursor: Option<Vec2>,
@@ -190,7 +210,7 @@ impl Prompt {
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
         clickables: Query<&Clickable>,
-        tools: Query<&ClickTool>,
+        parts: Query<(Option<&ClickTool>, Has<Disabled>)>,
         window: Single<&Window, With<PrimaryWindow>>,
         keep_mouse: Option<Res<KeepMouse>>,
         pointers: Query<(&PointerId, &PointerLocation)>,
@@ -200,13 +220,14 @@ impl Prompt {
         let from_hover = (settings.hints() && (gaze.steering() || gaze.focused()))
             .then(|| hovered.and_then(|entity| clickables.get(entity).ok()))
             .flatten();
-        let (message, tool) = match (settings.hints(), click.0.clone()) {
-            (true, Some(click)) if gaze.focused() => (Some(click), None),
+        let (message, (tool, disabled)) = match (settings.hints(), click.0.clone()) {
+            (true, Some(click)) if gaze.focused() => (Some(click), (None, false)),
             _ => (
                 from_hover.map(|clickable| Message::new(clickable.prompt)),
                 hovered
                     .filter(|_| from_hover.is_some())
-                    .and_then(|entity| tools.get(entity).ok().copied()),
+                    .and_then(|entity| parts.get(entity).ok())
+                    .map_or((None, false), |(tool, disabled)| (tool.copied(), disabled)),
             ),
         };
         // A tool driving the game moves only its pointer, not the cursor.
@@ -228,6 +249,7 @@ impl Prompt {
             at_cursor: at_cursor.filter(|_| message.is_some()),
             message,
             tool,
+            disabled,
         });
     }
 }

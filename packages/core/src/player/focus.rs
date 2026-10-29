@@ -55,6 +55,41 @@ pub struct Clickable {
     pub prompt: &'static str,
 }
 
+/// What a part prompts now, for [`Clickable::show`].
+pub type Prompting = (Option<&'static Clickable>, Has<Disabled>);
+
+impl Clickable {
+    /// Makes `entity` prompt `wanted`, with whether the action can be done
+    /// now, or not at all. `(clickable, disabled)` is what it prompts now.
+    pub fn show(
+        commands: &mut Commands,
+        entity: Entity,
+        (clickable, disabled): (Option<&Self>, bool),
+        wanted: Option<(&'static str, bool)>,
+    ) {
+        if clickable.map(|clickable| (clickable.prompt, !disabled)) == wanted {
+            return;
+        }
+        let mut entity = commands.entity(entity);
+        match wanted {
+            Some((prompt, true)) => {
+                entity.insert(Self { prompt }).remove::<Disabled>();
+            }
+            Some((prompt, false)) => {
+                entity.insert((Self { prompt }, Disabled));
+            }
+            None => {
+                entity.remove::<(Self, Disabled)>();
+            }
+        }
+    }
+}
+
+/// A [`Clickable`] whose action can't be done right now. Its prompt shows
+/// dimmed, without the mouse button, and it does not shimmer.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct Disabled;
+
 /// A tool drawn next to the prompt of a [`Clickable`], for a part that is
 /// worked with it.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
