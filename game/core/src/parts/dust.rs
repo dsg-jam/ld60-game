@@ -1,5 +1,5 @@
+use super::downwash::Downwash;
 use bevy::{light::NotShadowCaster, prelude::*};
-use ld60_game_core::parts::downwash::Downwash;
 use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
@@ -12,7 +12,7 @@ const MOTE: Color = Color::srgb(0.9, 0.88, 0.85);
 /// How many seconds a speck takes to go with a change in the air.
 const LAG: f32 = 0.3;
 
-pub(super) struct DustPlugin;
+pub struct DustPlugin;
 
 impl Plugin for DustPlugin {
     fn build(&self, app: &mut App) {
@@ -24,11 +24,11 @@ impl Plugin for DustPlugin {
 /// Specks of dust floating in the air around an entity. They only show
 /// where a light shines on them.
 #[derive(Component, Clone, Copy, Debug)]
-pub(super) struct Dust {
+pub struct Dust {
     /// Where the specks float, in the entity's own space.
-    pub(super) cloud: Block,
-    pub(super) motes: usize,
-    pub(super) seed: u64,
+    pub cloud: Block,
+    pub motes: usize,
+    pub seed: u64,
 }
 
 /// A speck of [`Dust`].
