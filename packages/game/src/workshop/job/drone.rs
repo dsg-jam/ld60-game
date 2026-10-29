@@ -4,6 +4,7 @@ use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, TAU};
 use bevy::{light::NotShadowCaster, prelude::*};
 use ld60_core::audio::{Play, Sound};
 use ld60_core::layout::counter::CounterLayout;
+use ld60_core::parts::downwash::{Downwash, Jet};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -71,6 +72,9 @@ const PRONG_SPLAY: f32 = 0.35;
 /// Where the tether leaves the claw, below the middle of the drone.
 const CLAW_BOTTOM: f32 = -(BODY_HEIGHT / 2.0 + POD.y + WINCH.y + PRONG.y * 0.9);
 const TETHER: f32 = 0.0025;
+/// How fast the air leaves the rotors, in meters per second. Faster than a
+/// real drone of this size, so the dust and the steam show it.
+const DOWNWASH: f32 = 3.0;
 /// Worn colors of the night city, one for the shell of each drone.
 const SHELLS: [Color; 6] = [
     Color::srgb_u8(0xc8, 0xa4, 0x3a),
@@ -660,6 +664,24 @@ impl Drone {
                     });
             }
         });
+    }
+
+    /// Lets each drone that is out push its air down.
+    pub(super) fn blow(
+        drones: Query<(&Transform, &Visibility), With<Drone>>,
+        mut downwash: ResMut<Downwash>,
+    ) {
+        downwash.floor = CounterLayout::new().top.max().y;
+        downwash.jets = drones
+            .iter()
+            .filter(|(_, shown)| **shown != Visibility::Hidden)
+            .map(|(drone, _)| Jet {
+                at: drone.translation,
+                down: drone.rotation * Vec3::NEG_Y,
+                radius: (REACH + GUARD_RADIUS) * drone.scale.x,
+                speed: DOWNWASH,
+            })
+            .collect();
     }
 
     pub(super) fn spin(time: Res<Time>, mut rotors: Query<&mut Transform, With<Rotor>>) {
