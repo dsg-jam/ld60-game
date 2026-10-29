@@ -87,10 +87,7 @@ struct Dab {
 impl WindowSign {
     /// The sign of `device` in run `run`. Each run gets other paintings.
     fn new(device: DeviceKind, run: u32) -> Self {
-        let index = DeviceKind::ALL
-            .iter()
-            .position(|&kind| kind == device)
-            .unwrap_or_default();
+        let index = device.index();
         Self {
             device,
             seed: (u64::from(run) << 8) | index as u64,

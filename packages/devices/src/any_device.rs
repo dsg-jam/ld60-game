@@ -186,6 +186,22 @@ impl DeviceKind {
     /// The models that customers bring outside the tutorial.
     pub const SERVICED: [Self; 4] = [Self::Tally2, Self::Summa6, Self::Lock4, Self::Score5];
 
+    /// Where the device is in [`DeviceKind::ALL`].
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+
+    /// The model name in ids and files, like `summa6`.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Tally2 => "tally2",
+            Self::Summa6 => "summa6",
+            Self::Lock4 => "lock4",
+            Self::Score5 => "score5",
+            Self::Tally1 => "tally1",
+        }
+    }
+
     pub fn board(self, rev: BoardRev) -> &'static Board {
         &self.boards()[rev as usize]
     }
@@ -238,7 +254,7 @@ impl FromStr for DeviceKind {
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         Self::ALL
             .into_iter()
-            .find(|kind| format!("{kind:?}").eq_ignore_ascii_case(text))
+            .find(|kind| kind.id().eq_ignore_ascii_case(text))
             .ok_or_else(|| UnknownDeviceKind(text.into()))
     }
 }
@@ -371,4 +387,17 @@ const fn score5_keys([home, guest, period, clear]: [u8; 4]) -> [(char, u8); 14] 
         ('P', period),
         ('C', clear),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_device_knows_its_place_and_name() {
+        for (index, kind) in DeviceKind::ALL.into_iter().enumerate() {
+            assert_eq!(kind.index(), index);
+            assert_eq!(kind.id().parse::<DeviceKind>().ok(), Some(kind));
+        }
+    }
 }

@@ -77,10 +77,7 @@ impl Levels {
         device: DeviceKind,
         chip: ChipSpec,
     ) -> Result<Reference, GenerateError> {
-        let index = DeviceKind::ALL
-            .iter()
-            .position(|&kind| kind == device)
-            .unwrap_or_default();
+        let index = device.index();
         Reference::compile(device, chip, &self.firmware[index])
     }
 

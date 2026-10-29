@@ -82,10 +82,7 @@ pub struct UnknownDeviceKind(pub String);
 
 impl fmt::Display for UnknownDeviceKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let names: Vec<String> = DeviceKind::ALL
-            .iter()
-            .map(|kind| format!("{kind:?}").to_lowercase())
-            .collect();
+        let names: Vec<&str> = DeviceKind::ALL.iter().map(|kind| kind.id()).collect();
         write!(f, "unknown device '{}', use {}", self.0, names.join(" or "))
     }
 }
