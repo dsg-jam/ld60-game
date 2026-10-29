@@ -12,7 +12,7 @@ const DISPLAY_WIDTH: f32 = 160.0;
 
 /// The tables of a service sheet, from the data of one board revision.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct ServiceSheet {
+pub(crate) struct ServiceSheet {
     board: &'static Board,
 }
 

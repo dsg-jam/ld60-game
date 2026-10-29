@@ -11,10 +11,10 @@ use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_game_core::player::lens;
 use ld60_game_core::player::zoom::Zoom;
 use ld60_game_core::state::AppState;
+use ld60_game_manuals::Pins;
 use ld60_locale::Message;
 
 use super::pinboard::PinBoard;
-use crate::workshop::manuals::Pins;
 
 /// How far the wide view looks down at the keyboard, in radians.
 const WIDE_PITCH: f32 = 0.3;
@@ -230,10 +230,10 @@ impl BackToScreen {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_manuals::Sheet;
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::manuals::Sheet;
 
     #[test]
     fn every_hint_formats() {

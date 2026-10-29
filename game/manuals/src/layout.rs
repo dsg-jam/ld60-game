@@ -10,7 +10,7 @@ use ld60_locale::Message;
 use serde::Deserialize;
 
 use super::datasheet::ChipSheet;
-use crate::workshop::service::ServiceSheet;
+use crate::service::ServiceSheet;
 use ld60_game_device::DeviceName;
 
 /// The layout files in `assets/manuals/`, part of the binary so the pages
@@ -343,7 +343,7 @@ impl error::Error for LayoutError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::workshop::manuals::contents::Entry;
+    use crate::contents::Entry;
 
     #[test]
     fn every_layout_loads() {
