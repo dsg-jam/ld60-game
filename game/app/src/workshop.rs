@@ -5,7 +5,6 @@ mod computer;
 mod counter;
 mod delivery;
 mod dial;
-mod dust;
 #[cfg(test)]
 mod footprint;
 mod front;
@@ -67,7 +66,6 @@ impl Plugin for WorkshopPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             counter::CounterPlugin,
-            dust::DustPlugin,
             clutter::ClutterPlugin,
             front::FrontPlugin,
             lamp::LampPlugin,

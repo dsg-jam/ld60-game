@@ -1,6 +1,7 @@
 pub mod bulb;
 pub mod dot_matrix;
 pub mod downwash;
+pub mod dust;
 pub mod gauge;
 pub mod keypad;
 pub mod knob;
@@ -26,6 +27,7 @@ impl Plugin for PartsPlugin {
             bulb::BulbPlugin,
             dot_matrix::DotMatrixPlugin,
             downwash::DownwashPlugin,
+            dust::DustPlugin,
             gauge::GaugePlugin,
             keypad::KeypadPlugin,
             knob::KnobPlugin,
