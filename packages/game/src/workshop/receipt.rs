@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_core::audio::Sound;
 use ld60_core::layout::counter::CounterLayout;
-use ld60_core::parts::paper::Paper;
+use ld60_core::parts::paper::{Flutter, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Focus, FocusTarget, View};
 use ld60_levels::Level;
@@ -116,12 +116,15 @@ impl Receipt {
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|slip| {
             sheet = slip
-                .spawn(Paper::sheet(
-                    &canvas,
-                    ("receipt", receipt.till),
-                    SHEET_SIZE,
-                    Self::sheet_center(),
-                    &mut meshes,
+                .spawn((
+                    Paper::sheet(
+                        &canvas,
+                        ("receipt", receipt.till),
+                        SHEET_SIZE,
+                        Self::sheet_center(),
+                        &mut meshes,
+                    ),
+                    Flutter::default(),
                 ))
                 .id();
         });

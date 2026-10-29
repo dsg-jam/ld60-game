@@ -7,7 +7,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_core::parts::paper::Paper;
+use ld60_core::parts::paper::{Flutter, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::camera::{PlayerCamera, framing};
 use ld60_core::player::focus::{Aside, Clickable, Focus, FocusOn};
@@ -187,6 +187,7 @@ impl PinBoard {
                                     SHEET_GLOW,
                                     meshes,
                                 ),
+                                Flutter::default(),
                                 RailSlot(index),
                                 Sway::new(center.with_y(clip.min().y + CLIP_GRIP), center, index),
                                 Visibility::Hidden,

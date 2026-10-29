@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_core::audio::{Play, Sound};
 use ld60_core::layout::counter::CounterLayout;
-use ld60_core::parts::paper::{Paper, Press, Stock};
+use ld60_core::parts::paper::{Flutter, Paper, Press, Stock};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_core::state::AppState;
@@ -113,12 +113,15 @@ impl RentNote {
         let mut sheet = Entity::PLACEHOLDER;
         commands.entity(add.entity).with_children(|note| {
             sheet = note
-                .spawn(Paper::sheet(
-                    &canvas,
-                    document,
-                    SHEET_SIZE,
-                    Self::sheet_center(),
-                    &mut meshes,
+                .spawn((
+                    Paper::sheet(
+                        &canvas,
+                        document,
+                        SHEET_SIZE,
+                        Self::sheet_center(),
+                        &mut meshes,
+                    ),
+                    Flutter::default(),
                 ))
                 .id();
         });

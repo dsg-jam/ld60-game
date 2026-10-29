@@ -1,8 +1,8 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::prelude::*;
+use ld60_core::parts::paper::{Flutter, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
 use ld60_core::parts::screen::UiCanvas;
-use ld60_geometry::block::Block;
-use ld60_geometry::shape::Shape;
-use ld60_geometry::surface::Finish;
 use ld60_locale::{Localized, Message};
 
 use super::run::Run;
@@ -14,6 +14,8 @@ use super::run::Run;
 pub(super) const SPOT: Vec2 = Vec2::new(-0.02, -0.5);
 pub(super) const YAW: f32 = 0.2;
 pub(super) const SIZE: Vec3 = Vec3::new(0.075, 0.002, 0.075);
+/// Keeps the note off the counter under it.
+const LIFT: f32 = 0.0003;
 const CANVAS: UVec2 = UVec2::new(300, 300);
 const PAPER: Color = Color::srgb_u8(0xe8, 0xd4, 0x6a);
 /// A blue ballpoint pen.
@@ -45,7 +47,13 @@ enum Line {
 }
 
 impl Reminder {
-    fn on_add(add: On<Add<Reminder>>, mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    fn on_add(
+        add: On<Add<Reminder>>,
+        mut commands: Commands,
+        mut images: ResMut<Assets<Image>>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
         let canvas = UiCanvas::spawn(&mut commands, &mut images, CANVAS, add.entity);
         let line = |line: Line, size: f32| {
             (
@@ -75,13 +83,20 @@ impl Reminder {
                 line(Line::When, WHEN_SIZE),
             ],
         ));
+        let wrinkles = Wrinkles::sticky(SIZE.xz(), "reminder");
         commands.entity(add.entity).with_child((
-            Shape::textured_cuboid(
-                &Block::new(SIZE),
-                canvas.image,
-                Rect::new(0.0, 0.0, 1.0, 1.0),
-            ),
-            Finish::Paper,
+            Mesh3d(meshes.add(wrinkles.mesh())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color_texture: Some(canvas.image),
+                perceptual_roughness: PAPER_ROUGHNESS,
+                reflectance: PAPER_REFLECTANCE,
+                double_sided: true,
+                cull_mode: None,
+                ..default()
+            })),
+            wrinkles,
+            Flutter::default(),
+            Transform::from_xyz(0.0, LIFT, 0.0).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
         ));
     }
 
