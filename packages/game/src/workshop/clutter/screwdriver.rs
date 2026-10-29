@@ -1,11 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{ecs::system::SystemParam, picking::hover::HoverMap, prelude::*};
+use bevy::prelude::*;
 use ld60_core::player::camera::PlayerCamera;
-use ld60_core::player::focus::{self, ClickTool, Clickable, Disabled, Focused};
+use ld60_core::player::focus::ClickTool;
 
 use super::props::Props;
-use crate::device::{ToolSpot, Turning};
+use crate::device::{Aim, Turning};
 
 /// How fast the screwdriver moves to a screw and back.
 const DECAY_RATE: f32 = 14.0;
@@ -98,36 +98,6 @@ impl Screwdriver {
     fn tip_to_rest() -> Transform {
         Transform::from_translation(Props::screwdriver_tip())
             .with_rotation(Quat::from_rotation_z(-FRAC_PI_2))
-    }
-}
-
-/// The part the pointer is on, if a tool works it.
-#[derive(SystemParam)]
-pub(super) struct Aim<'w, 's> {
-    hovers: Res<'w, HoverMap>,
-    focused: Res<'w, Focused>,
-    parents: Query<'w, 's, &'static ChildOf>,
-    clickables: Query<'w, 's, &'static Clickable>,
-    spots: Query<
-        'w,
-        's,
-        (
-            &'static GlobalTransform,
-            &'static ToolSpot,
-            &'static ClickTool,
-        ),
-        Without<Disabled>,
-    >,
-}
-
-impl Aim<'_, '_> {
-    /// Where `tool` would touch the part under the pointer, if it works
-    /// that part and can now.
-    fn at(&self, tool: ClickTool) -> Option<Transform> {
-        let part =
-            focus::hovered_clickable(&self.hovers, &self.parents, &self.clickables, &self.focused)?;
-        let (at, spot, works) = self.spots.get(part).ok()?;
-        (*works == tool).then(|| at.compute_transform() * Transform::from_translation(spot.0))
     }
 }
 

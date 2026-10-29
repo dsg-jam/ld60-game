@@ -6,6 +6,7 @@ mod link;
 mod name;
 mod silhouette;
 mod snap;
+mod tool;
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -22,12 +23,13 @@ use ld60_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
-pub(crate) use self::casing::{Casing, Header, ToolSpot, Turning};
+pub(crate) use self::casing::{Casing, Header, Turning};
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::link::Connected;
 pub(crate) use self::name::{BoardLetter, DeviceName};
 pub(crate) use self::silhouette::Silhouette;
+pub(crate) use self::tool::Aim;
 
 /// How far a held device lifts off the counter.
 const LIFT: f32 = 0.1;
