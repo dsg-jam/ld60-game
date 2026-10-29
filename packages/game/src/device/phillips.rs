@@ -1,10 +1,7 @@
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, TAU};
 
-use bevy::{
-    asset::{RenderAssetUsages, uuid_handle},
-    mesh::{Indices, PrimitiveTopology},
-    prelude::*,
-};
+use bevy::{asset::uuid_handle, prelude::*};
+use ld60_geometry::triangles::Triangles;
 
 /// Pan head of a screw: radius, height and the round over its outer edge.
 const HEAD_RADIUS: f32 = 0.00275;
@@ -62,7 +59,7 @@ impl Phillips {
     fn head_mesh() -> Mesh {
         let outline = Self::outline();
         let face = -HEAD_HEIGHT / 2.0;
-        let mut mesh = Builder::default();
+        let mut mesh = Triangles::default();
 
         // The round edge and the side, from the face out and up to the base.
         let mut profile: Vec<(f32, f32, Vec2)> = (0..=ROUND_STEPS)
@@ -135,7 +132,7 @@ impl Phillips {
             mesh.flat([bottom, floor(a), floor(b)], Vec3::NEG_Y);
         }
         let shade = mesh
-            .positions
+            .positions()
             .iter()
             .map(|point| {
                 let inside = point.xz().length() <= REACH * 1.01;
@@ -200,7 +197,7 @@ impl Phillips {
             0.0, 0.05, 0.1, 0.2, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3, 1.7, 2.2, 2.8, 3.5, 4.3, 5.2, 6.0,
         ]
         .map(|back: f32| (back * 0.001).min(length));
-        let mut mesh = Builder::default();
+        let mut mesh = Triangles::default();
         for pair in backs.windows(2) {
             for side in 0..TIP_SIDES {
                 let [a, b] = [side, side + 1].map(|side| side as f32 / TIP_SIDES as f32 * TAU);
@@ -222,71 +219,5 @@ impl Phillips {
             mesh.flat([point, a, b], Vec3::Y);
         }
         mesh.build()
-    }
-}
-
-/// Collects the triangles of a mesh, each facing the way it is told.
-#[derive(Default)]
-struct Builder {
-    positions: Vec<Vec3>,
-    normals: Vec<Vec3>,
-    indices: Vec<u32>,
-}
-
-impl Builder {
-    fn vertex(&mut self, position: Vec3, normal: Vec3) -> u32 {
-        self.positions.push(position);
-        self.normals.push(normal);
-        (self.positions.len() - 1) as u32
-    }
-
-    /// A triangle of shared vertices, facing along their normals.
-    fn triangle(&mut self, [a, b, c]: [u32; 3]) {
-        let [pa, pb, pc] = [a, b, c].map(|index| self.positions[index as usize]);
-        let normal: Vec3 = [a, b, c]
-            .map(|index| self.normals[index as usize])
-            .iter()
-            .sum();
-        let facing = (pb - pa).cross(pc - pa).dot(normal) >= 0.0;
-        self.indices
-            .extend(if facing { [a, b, c] } else { [a, c, b] });
-    }
-
-    /// A triangle of its own, lit flat and facing about `towards`.
-    fn flat(&mut self, [a, b, c]: [Vec3; 3], towards: Vec3) {
-        let mut normal = (b - a).cross(c - a).normalize_or_zero();
-        if normal.dot(towards) < 0.0 {
-            normal = -normal;
-        }
-        let indices = [a, b, c].map(|point| self.vertex(point, normal));
-        self.triangle(indices);
-    }
-
-    /// Quads between two loops of the same length.
-    fn strip(&mut self, near: &[u32], far: &[u32]) {
-        for index in 0..near.len() {
-            let next = (index + 1) % near.len();
-            self.triangle([near[index], near[next], far[next]]);
-            self.triangle([near[index], far[next], far[index]]);
-        }
-    }
-
-    /// Triangles from `middle` to each side of a loop.
-    fn fan(&mut self, middle: u32, ring: &[u32]) {
-        for index in 0..ring.len() {
-            self.triangle([middle, ring[index], ring[(index + 1) % ring.len()]]);
-        }
-    }
-
-    fn build(self) -> Mesh {
-        let count = self.positions.len();
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::default(),
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![Vec2::ZERO; count])
-        .with_inserted_indices(Indices::U32(self.indices))
     }
 }
