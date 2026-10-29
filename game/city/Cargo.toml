@@ -29,25 +29,7 @@ serde_json = { workspace = true, features = ["std"], optional = true }
 
 [dependencies.bevy]
 workspace = true
-features = [
-  "3d_bevy_render",
-  "area_light_luts",
-  "bevy_audio",
-  "bevy_clipboard",
-  "bevy_ui_widgets",
-  "bevy_winit",
-  "custom_cursor",
-  "default_app",
-  "multi_threaded",
-  "picking",
-  "std",
-  "symphonia-vorbis",
-  "sysinfo_plugin",
-  "system_clipboard",
-  "ui_api",
-  "ui_bevy_render",
-  "wav",
-]
+features = ["3d_bevy_render", "bevy_audio", "default_app", "std"]
 
 [dev-dependencies]
 ld60-game-core = { workspace = true, features = ["test-support"] }
