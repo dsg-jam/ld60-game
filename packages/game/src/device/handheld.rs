@@ -5,6 +5,7 @@ use bevy::{input::keyboard::Key, prelude::*};
 use ld60_core::parts::keypad::KeyBinding::{Named, Typed};
 use ld60_core::parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use ld60_core::parts::lcd;
+use ld60_core::parts::marking::Marking;
 use ld60_core::parts::pcb::PcbMaterial;
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::parts::sticker::{Sticker, StickerMaterial};
@@ -15,7 +16,7 @@ use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
 use ld60_locale::{Localized, Message};
 
-use super::board::{BoardLayout, BoardSpots};
+use super::board::{BoardLayout, BoardSpots, CHIP_BLACK, CHIP_INK};
 use super::casing::{COVER, Casing, CasingSpots, WALL};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
@@ -398,6 +399,7 @@ impl Handheld {
         let artwork = Sticker::seed(&format!("{:?} {name}", level.device));
         let board = BoardLayout::new(&shell, COVER, &spots, artwork);
         let faces = board.faces(&name, &mut meshes, &mut images, &mut pcbs);
+        let marking = images.add(Self::chip_marking(level));
         let (plating, platings) = board.platings();
         let plating = (
             Mesh3d(meshes.add(plating)),
@@ -467,6 +469,7 @@ impl Handheld {
                 sticker,
                 &board,
                 faces,
+                marking.clone(),
                 height,
             ));
         });
@@ -495,6 +498,15 @@ impl Handheld {
     fn build_device(&self) -> Result<AnyDevice, LevelError> {
         let rom = ld60_levels::initial_rom(&self.level, &self.buggy)?;
         ld60_levels::device(&self.level, rom)
+    }
+
+    /// The maker, revision and date code etched into the chip.
+    fn chip_marking(level: &Level) -> Image {
+        let (maker, revision, date_code) = match level.chip {
+            ChipSpec::Calco(info) => ("CALCO", info.revision, info.date_code),
+        };
+        let code = format!("{revision} {date_code}");
+        Marking::image(&[maker, &code], CHIP_INK, CHIP_BLACK)
     }
 
     fn sticker_text(level: &Level) -> Message {

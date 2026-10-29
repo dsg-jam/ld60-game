@@ -27,6 +27,18 @@ const HEADER_PAD: Vec2 = Vec2::splat(0.0017);
 const CHIP_SPOT: Vec2 = Vec2::new(0.0, 0.45);
 const CHIP: Vec3 = Vec3::new(0.0062, 0.0016, 0.0102);
 const CHIP_PITCH: f32 = 0.00127;
+/// The black body of the chip inside its footprint, which the legs reach
+/// out of, and the gap it stands off the board.
+const CHIP_BODY: Vec3 = Vec3::new(0.0039, 0.0015, 0.0099);
+const STANDOFF: f32 = 0.0001;
+/// A leg of the chip: how thick the metal is, how wide, how far it reaches
+/// out of the body before it bends down, and where its foot ends.
+const LEG: Vec2 = Vec2::new(0.0002, 0.00042);
+const SHOULDER: f32 = 0.0005;
+const FOOT_END: f32 = 0.0029;
+/// The dimple by pin 1, how wide, and how far in from the corner.
+const DIMPLE: f32 = 0.0007;
+const DIMPLE_IN: Vec2 = Vec2::new(0.0007, 0.001);
 /// The keypad contacts run down one side, see [`Block::top_spot`].
 const KEYPAD_SPOT: Vec2 = Vec2::new(0.72, 0.2);
 const BATTERY_SPOT: Vec2 = Vec2::new(-0.62, 0.3);
@@ -46,7 +58,11 @@ const TEXT: f32 = 0.0011;
 const FACE_GAP: f32 = 0.00005;
 /// The edge of the board, where the mask shows on the cut glass fiber.
 const EDGE: Color = Color::srgb_u8(0x1e, 0x3a, 0x22);
-const CHIP_BLACK: Color = Color::srgb_u8(0x1c, 0x1c, 0x1e);
+pub(super) const CHIP_BLACK: Color = Color::srgb_u8(0x1c, 0x1c, 0x1e);
+/// The tinned legs of the chip.
+pub(super) const LEG_TIN: Color = Color::srgb_u8(0xc4, 0xc4, 0xbe);
+/// The laser marking on the chip, a little lighter than its body.
+pub(super) const CHIP_INK: Color = Color::srgb_u8(0x6a, 0x6a, 0x6a);
 const CAPACITOR: Color = Color::srgb_u8(0x9a, 0x84, 0x5e);
 const RESISTOR: Color = Color::srgb_u8(0x24, 0x24, 0x26);
 const HEADER_BLACK: Color = Color::srgb_u8(0x1a, 0x1a, 0x1c);
@@ -93,6 +109,15 @@ pub(super) struct BoardLayout {
     face: Transform,
     screws: Vec<Vec3>,
     seed: u64,
+}
+
+/// The chip of a board: its body, turned so the top with its marking faces
+/// down, its size, its legs and the dimple by pin 1.
+pub(super) struct ChipModel {
+    pub(super) body: Transform,
+    pub(super) size: Vec3,
+    pub(super) legs: Vec<Block>,
+    pub(super) dimple: Block,
 }
 
 impl Net {
@@ -168,10 +193,55 @@ impl BoardLayout {
             };
             (&passive.block, color)
         });
-        [(&self.chip, CHIP_BLACK)]
+        passives.chain(self.springs.iter().map(|spring| (spring, SPRING_METAL)))
+    }
+
+    /// The chip, hanging under the board with its marking facing away.
+    pub(super) fn chip(&self) -> ChipModel {
+        let surface = self.chip.max().y;
+        let middle = self
+            .chip
+            .center
+            .with_y(surface - STANDOFF - CHIP_BODY.y / 2.0);
+        let centered =
+            |size: Vec3, center: Vec3| Block::new(size).translated(center - Vec3::Y * size.y / 2.0);
+        let bend = CHIP_BODY.x / 2.0 + SHOULDER;
+        let legs = [-1.0, 1.0]
             .into_iter()
-            .chain(passives)
-            .chain(self.springs.iter().map(|spring| (spring, SPRING_METAL)))
+            .flat_map(|side| {
+                (0..8).flat_map(move |pin| {
+                    let z = middle.z + (pin as f32 - 3.5) * CHIP_PITCH;
+                    let x = |out: f32| middle.x + side * out;
+                    let drop = surface - middle.y;
+                    [
+                        centered(
+                            Vec3::new(SHOULDER, LEG.x, LEG.y),
+                            Vec3::new(x(bend - SHOULDER / 2.0), middle.y, z),
+                        ),
+                        centered(
+                            Vec3::new(LEG.x, drop, LEG.y),
+                            Vec3::new(x(bend), middle.y + drop / 2.0, z),
+                        ),
+                        centered(
+                            Vec3::new(FOOT_END - bend, LEG.x, LEG.y),
+                            Vec3::new(x((bend + FOOT_END) / 2.0), surface - LEG.x / 2.0, z),
+                        ),
+                    ]
+                })
+            })
+            .collect();
+        // Pin 1 is in the corner the dot on the board marks.
+        let corner = (CHIP_BODY.xz() / 2.0 - DIMPLE_IN) * Vec2::new(1.0, -1.0);
+        let dimple = centered(
+            Vec3::new(DIMPLE, 0.00002, DIMPLE),
+            middle + Vec3::new(corner.x, -CHIP_BODY.y / 2.0, corner.y),
+        );
+        ChipModel {
+            body: Transform::from_translation(middle).with_rotation(Quat::from_rotation_z(PI)),
+            size: CHIP_BODY,
+            legs,
+            dimple,
+        }
     }
 
     /// The face of the board with its copper, mask and print, for a board

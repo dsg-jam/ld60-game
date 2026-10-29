@@ -17,7 +17,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 pub(crate) use self::travel::Turning;
-use super::board::BoardLayout;
+use super::board::{BoardLayout, CHIP_BLACK, LEG_TIN};
 use super::phillips::Phillips;
 use super::snap::Snap;
 use super::tool::ToolSpot;
@@ -235,6 +235,7 @@ impl Casing {
         sticker: impl Bundle,
         layout: &BoardLayout,
         faces: [impl Bundle; 2],
+        marking: Handle<Image>,
         height: f32,
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
@@ -308,9 +309,30 @@ impl Casing {
                 Finish::Plastic,
             ))
             .insert(Snap);
+        // The parts count as the board, so a click on one puts the cover on.
         for (part, color) in layout.parts() {
-            device.spawn((Shape::cuboid(part, color), Finish::Plastic));
+            device.spawn((Board, Shape::cuboid(part, color), Finish::Plastic));
         }
+        let chip = layout.chip();
+        device
+            .spawn((Name::new("chip"), chip.body, Visibility::Inherited))
+            .with_child((
+                Board,
+                Shape::textured_cuboid(
+                    &Block::new(chip.size).translated(Vec3::NEG_Y * chip.size.y / 2.0),
+                    marking,
+                    Rect::new(0.0, 0.0, 1.0, 1.0),
+                ),
+                Finish::Plastic,
+            ));
+        for leg in &chip.legs {
+            device.spawn((Board, Shape::cuboid(leg, LEG_TIN), Finish::Plated));
+        }
+        device.spawn((
+            Board,
+            Shape::cylinder(&chip.dimple, CHIP_BLACK),
+            Finish::Plastic,
+        ));
         Self::new(holes, Block::new(shell.size.with_y(height)))
     }
 
