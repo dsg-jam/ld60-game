@@ -15,7 +15,7 @@
         (level: "summa6/i3-two-at-a-time", from: 0),
         (level: "lock4/01-locked-out", from: 0),
         (level: "tally2/01-clear-key", from: 1),
-        (level: "tally2/02-double-count", from: 1),
+        (level: "tally2/02-back-to-one", from: 1),
         (level: "summa6/01-strange-symbols", from: 1),
         (level: "summa6/02-last-digit", from: 2),
         (level: "lock4/02-open-door", from: 2),

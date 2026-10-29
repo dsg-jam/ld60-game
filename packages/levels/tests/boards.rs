@@ -10,11 +10,7 @@ static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEV
 
 const SEEDS: std::ops::Range<u64> = 0..256;
 /// Levels whose buggy firmware checks a wrong key code or misses a check.
-const WRONG_KEY_CODE: &[&str] = &[
-    "tally2/01-clear-key",
-    "tally2/t4-c-key-counts",
-    "tally2/t5-no-clear-key",
-];
+const WRONG_KEY_CODE: &[&str] = &["tally2/t4-c-key-counts", "tally2/t5-no-clear-key"];
 /// Tutorial firmware that only checks for the C key. Any other key counts.
 const ONLY_CLEAR_KEY: &[&str] = &[
     "tally2/t4-c-key-counts",

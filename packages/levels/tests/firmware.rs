@@ -63,7 +63,7 @@ fn every_level_is_generated() {
 }
 
 #[test]
-fn firmware_1_0_built_for_rev_a_fixes_the_clear_key_level() {
+fn firmware_1_0_built_for_rev_a_fixes_the_half_clear_level() {
     let source = CATALOG.find("tally2/01-clear-key").unwrap();
     let level = source.load().unwrap();
     let selection = Selection {

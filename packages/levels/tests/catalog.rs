@@ -13,6 +13,7 @@ static CATALOG: LazyLock<Catalog> = LazyLock::new(|| Catalog::read(Path::new(LEV
 /// Levels whose bug only the customer's tests find.
 const MISSED_BY_LINE_TESTS: &[&str] = &[
     "tally2-t6",
+    "tally2-02",
     "tally2-03",
     "summa6-05",
     "summa6-06",
