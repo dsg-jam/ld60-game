@@ -262,7 +262,7 @@ impl Casing {
                         ToolSpot(Vec3::NEG_Y * SCREW.y / 2.0),
                         Snap,
                         Shape::turned(Phillips::head(), &head, SCREW_METAL),
-                        Finish::Metal,
+                        Finish::Plated,
                     ));
                     // The mouth of the hole, to click once the screw is out.
                     cover.spawn((
@@ -358,9 +358,9 @@ impl Casing {
                             let shank = Block::new(SHANK).on_top_of(&head);
                             screw.spawn((
                                 Shape::turned(Phillips::head(), &head, SCREW_METAL),
-                                Finish::Metal,
+                                Finish::Plated,
                             ));
-                            screw.spawn((Shape::cylinder(&shank, SCREW_METAL), Finish::Metal));
+                            screw.spawn((Shape::cylinder(&shank, SCREW_METAL), Finish::Plated));
                         })
                         .id()
                 })
