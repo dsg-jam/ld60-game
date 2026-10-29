@@ -14,9 +14,19 @@ use rand::RngExt;
 pub use self::draft::Draft;
 use self::flying::SkyCar;
 use self::models::{Body, Fleet};
-use self::spray::Spray;
+use self::spray::{Spray, SprayMaterial};
+use super::street::{ROAD_PUDDLES, ROAD_SEED};
+use super::wet::Wet;
 use super::{CURB_HEIGHT, FAR_CURB, HALF_LENGTH, Kit, NEAR_CURB, rng, turned_to};
 
+/// Millimeters of water on a soaked road.
+const FILM: f32 = 1.0;
+/// Millimeters of water in a puddle per unit [`Wet::puddle`] is above its
+/// level.
+const PUDDLE: f32 = 40.0;
+/// Share of a puddle's water left for the rear wheels, after the front ones
+/// pushed it aside.
+const WAKE: f32 = 0.6;
 const SEED: u64 = 4;
 
 /// All vehicles in a lane go the same speed, so they never catch up.
@@ -71,10 +81,24 @@ struct Vehicle {
 }
 
 impl Vehicle {
+    /// Millimeters of water under each wheel of the vehicle at `transform`,
+    /// in the order of [`Body::wheels`]. The front wheels push a puddle's
+    /// water aside, so the rear ones get less of it.
+    fn water(&self, transform: &GlobalTransform, wetness: f32) -> [f32; 4] {
+        let wheels = self.body.wheels();
+        std::array::from_fn(|index| {
+            let at = transform.transform_point(wheels[index]).xz();
+            let wake = if index < 2 { 1.0 } else { WAKE };
+            let puddle = Wet::puddle(at, wetness, ROAD_PUDDLES, ROAD_SEED).max(0.0);
+            FILM * wetness + PUDDLE * puddle * wake
+        })
+    }
+
     fn spawn_all(
         mut commands: Commands,
         kit: Res<Kit>,
         spray: Res<Spray>,
+        mut sprays: ResMut<Assets<SprayMaterial>>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
         mut surfaces: ResMut<Assets<SurfaceMaterial>>,
@@ -95,13 +119,14 @@ impl Vehicle {
                 // Local +X is the front.
                 let facing = turned_to(lane.velocity);
                 let mut car = commands.spawn((
+                    Name::new("car"),
                     Transform::from_xyz(x, lane.height, lane.z).with_rotation(facing),
                     Visibility::default(),
                 ));
                 let mut body = Body::Sedan;
                 car.with_children(|parts| {
                     body = fleet.car(parts, &kit, &mut rng);
-                    parts.spawn(spray.bundle());
+                    parts.spawn(spray.bundle(&mut sprays));
                 });
                 car.insert(Vehicle {
                     velocity: lane.velocity,

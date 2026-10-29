@@ -14,9 +14,7 @@ use self::fans::Fans;
 use self::motor::Motor;
 use self::tire::Tire;
 use self::voice::{Controls, Heard, Part, Voice};
-use super::super::street::{ROAD_PUDDLES, ROAD_SEED};
 use super::super::weather::Weather;
-use super::super::wet::Wet;
 use super::Vehicle;
 use super::flying::SkyCar;
 use super::models::{Body, WHEEL_RADIUS, WHEELBASE};
@@ -33,14 +31,6 @@ const KEEP: f32 = 1.1;
 const SKY_EDGE: f32 = 60.0;
 const CAR_VOLUME: f32 = 0.019;
 const SKY_VOLUME: f32 = 0.016;
-/// Millimeters of water on a soaked road.
-const FILM: f32 = 1.0;
-/// Millimeters of water in a puddle per unit [`Wet::puddle`] is above its
-/// level.
-const PUDDLE: f32 = 40.0;
-/// Share of a puddle's water left for the rear wheels, after the front ones
-/// pushed it aside.
-const WAKE: f32 = 0.6;
 /// Sound in the air loses its highs over distance: a one pole low-pass at
 /// this many hertz times meters over the distance comes close for the
 /// kilohertz that matter.
@@ -141,10 +131,10 @@ impl Vehicle {
             let velocity = Vec3::X * vehicle.velocity;
             let speed = vehicle.velocity.abs();
             let wheels = vehicle.body.wheels();
-            for (index, (wheel, heard)) in wheels.iter().zip(&controls.parts).enumerate() {
+            let water = vehicle.water(transform, weather.wetness);
+            for ((wheel, heard), water) in wheels.iter().zip(&controls.parts).zip(water) {
                 let at = transform.transform_point(*wheel);
-                let wake = if index < 2 { 1.0 } else { WAKE };
-                heard.water.set(water(at.xz(), weather.wetness, wake));
+                heard.water.set(water);
                 heard.speed.set(speed);
                 ears.hear(heard, at, velocity, &STREET);
             }
@@ -336,12 +326,6 @@ fn pick<'a, T>(
             _ => {}
         }
     }
-}
-
-/// Millimeters of water at `at` on the road, `wake` of it in puddles.
-fn water(at: Vec2, wetness: f32, wake: f32) -> f32 {
-    let puddle = Wet::puddle(at, wetness, ROAD_PUDDLES, ROAD_SEED).max(0.0);
-    FILM * wetness + PUDDLE * puddle * wake
 }
 
 /// A factor from `1 - amount` to `1 + amount` made from `seed`.
