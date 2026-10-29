@@ -8,6 +8,8 @@ use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_core::parts::liquid::{Foam, Liquid};
 use ld60_core::parts::steam::Steam;
 
+use crate::device::Phillips;
+
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;
 const MUG_WALL: f32 = 0.004;
@@ -31,14 +33,10 @@ const GRIP_RADIUS: f32 = 0.012;
 const GRIP_LENGTH: f32 = 0.07;
 const FERRULE_RADIUS: f32 = 0.007;
 const FERRULE_LENGTH: f32 = 0.01;
-const SHAFT_RADIUS: f32 = 0.0028;
+const SHAFT_RADIUS: f32 = 0.00225;
 const SHAFT_LENGTH: f32 = 0.075;
-/// The Phillips tip: a cone with two crossed wedges, which make the cross
-/// that fits the screws.
+/// The Phillips tip that fits the screws, see [`Phillips::tip`].
 const TIP_LENGTH: f32 = 0.006;
-const TIP_RADIUS: f32 = 0.0004;
-const TIP_CORE: f32 = 0.0017;
-const FIN: f32 = 0.0008;
 
 const CERAMIC: Color = Color::srgb_u8(0xe8, 0xe0, 0xd0);
 const STRIPE: Color = Color::srgb_u8(0x3a, 0x55, 0x7a);
@@ -168,14 +166,6 @@ impl Props<'_> {
         let ferrule = grip_end + FERRULE_LENGTH / 2.0 - 0.002;
         let shaft = grip_end + FERRULE_LENGTH + SHAFT_LENGTH / 2.0 - 0.002;
         let tip = shaft + SHAFT_LENGTH / 2.0 + TIP_LENGTH / 2.0;
-        let fin = self.meshes.add(Extrusion::new(
-            Triangle2d::new(
-                Vec2::new(-TIP_LENGTH / 2.0, -SHAFT_RADIUS),
-                Vec2::new(TIP_LENGTH / 2.0, 0.0),
-                Vec2::new(-TIP_LENGTH / 2.0, SHAFT_RADIUS),
-            ),
-            FIN,
-        ));
         let parts = [
             (
                 self.meshes.add(Capsule3d::new(GRIP_RADIUS, GRIP_LENGTH)),
@@ -194,24 +184,9 @@ impl Props<'_> {
                 Transform::from_xyz(shaft, height, 0.0).with_rotation(along_x),
             ),
             (
-                self.meshes.add(ConicalFrustum {
-                    radius_top: TIP_RADIUS,
-                    radius_bottom: TIP_CORE,
-                    height: TIP_LENGTH,
-                }),
+                self.meshes.add(Phillips::tip(SHAFT_RADIUS, TIP_LENGTH)),
                 &self.finishes.steel,
                 Transform::from_xyz(tip, height, 0.0).with_rotation(along_x),
-            ),
-            (
-                fin.clone(),
-                &self.finishes.steel,
-                Transform::from_xyz(tip, height, 0.0),
-            ),
-            (
-                fin,
-                &self.finishes.steel,
-                Transform::from_xyz(tip, height, 0.0)
-                    .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
             ),
         ];
         // It moves over the parts it works and must not hide them from the
