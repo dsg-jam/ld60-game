@@ -25,6 +25,17 @@ const CLICK: [Mode; 3] = [
     Mode::new(5_400.0, 3_200.0, 1.0),
     Mode::new(8_100.0, 4_500.0, 0.8),
 ];
+/// The gold-plated spring contacts of the debug plug, thin metal that
+/// rings briefly and high.
+const CONTACT: [Mode; 3] = [
+    Mode::new(4_600.0, 350.0, 1.0),
+    Mode::new(6_300.0, 450.0, 0.8),
+    Mode::new(8_700.0, 600.0, 0.5),
+];
+/// Seconds between the bumps the contacts ride over on the pins, and how
+/// loud each is.
+const SCRAPE_GAP: f32 = 0.0022;
+const SCRAPE_TICK: f32 = 1.2;
 /// The hollow case ringing from a click, a short tock.
 const SHELL: [Mode; 2] = [
     Mode::new(1_250.0, 260.0, 1.0),
@@ -45,10 +56,10 @@ const GRIND: Rub = Rub {
     level: 2.0,
     pulses: 14.0,
 };
-/// Plastic sliding over pins.
-const SLIDE: Rub = Rub {
-    modes: &CASE,
-    level: 1.5,
+/// A faint hiss of metal on metal under the ticks of a scrape.
+const SCRAPE: Rub = Rub {
+    modes: &CONTACT,
+    level: 0.05,
     pulses: 0.0,
 };
 /// The cover flexing a little as its clips give.
@@ -99,36 +110,52 @@ impl Samples {
         Self::fastening(seed, at + 0.06, vary.by(0.05), &ticks, &GRIND)
     }
 
-    /// The debug plug pushed onto the header: the plastic slides over the
-    /// pins, then snaps home.
+    /// The debug plug pushed onto the header: its spring contacts scrape
+    /// down the pins in tiny metal ticks, catch at the end, and the housing
+    /// bottoms out with a dull tock.
     pub(in crate::audio) fn plug_in(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(140));
-        let home = 0.05 * vary.by(0.2);
-        Self::fastening(
-            seed,
-            home + 0.05,
-            vary.by(0.05),
-            &[
-                Hit::new(home, 0.0004, 1.0, &SNAP),
-                Hit::new(home + 0.003, 0.0008, 0.6, &KNOCK),
-            ],
-            &SLIDE,
-        )
+        let home = 0.035 * vary.by(0.2);
+        let mut hits = Self::scrape(&mut vary, 0.0, home, 3.0, false);
+        hits.extend([
+            Hit::new(home, CLICK_WIDTH, 0.5 * CLICK_LEVEL, &CONTACT),
+            Hit::new(home + 0.001, 0.0008, 0.5, &KNOCK),
+            Hit::new(home + 0.001, 0.0004, 0.2, &SHELL),
+        ]);
+        Self::fastening(seed, home + 0.08, vary.by(0.04), &hits, &SCRAPE)
     }
 
-    /// The debug plug pulled off: it gives with a pop and slides free.
+    /// The debug plug pulled off: the contacts let go of the pins with a
+    /// light tick, then scrape off them, quicker and quicker.
     pub(in crate::audio) fn plug_out(seed: u32) -> Self {
         let mut vary = Vary::new(seed.wrapping_add(150));
-        Self::fastening(
-            seed,
-            0.09,
-            vary.by(0.05) * 1.1,
-            &[
-                Hit::new(0.0, 0.0003, 0.8, &SNAP),
-                Hit::new(0.03 * vary.by(0.2), 0.0005, 0.25, &KNOCK),
-            ],
-            &SLIDE,
-        )
+        let free = 0.004 + 0.028 * vary.by(0.2);
+        let mut hits = vec![
+            Hit::new(0.0, CLICK_WIDTH, 0.4 * CLICK_LEVEL, &CONTACT),
+            Hit::new(0.0005, 0.0004, 0.25, &SNAP),
+        ];
+        hits.extend(Self::scrape(&mut vary, 0.004, free, 1.0, true));
+        Self::fastening(seed, free + 0.05, 1.04 * vary.by(0.04), &hits, &SCRAPE)
+    }
+
+    /// Spring contacts riding over the rough pins from `from` to `to`
+    /// seconds, a little tick as loud as `level` at each bump, fading out if
+    /// `fading`.
+    fn scrape(vary: &mut Vary, from: f32, to: f32, level: f32, fading: bool) -> Vec<Hit<'static>> {
+        let mut hits = Vec::new();
+        let mut at = from;
+        while at < to {
+            let along = (at - from) / (to - from);
+            let fade = if fading {
+                1.0 - along
+            } else {
+                0.6 + 0.4 * along
+            };
+            let loud = SCRAPE_TICK * level * fade * vary.by(0.6);
+            hits.push(Hit::new(at, CLICK_WIDTH, loud, &CONTACT));
+            at += SCRAPE_GAP * vary.by(0.6);
+        }
+        hits
     }
 
     /// The back cover lifting off: its two clips let go one after the
