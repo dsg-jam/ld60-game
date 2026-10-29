@@ -9,6 +9,7 @@ use bevy::{
 };
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
+use super::downwash::Downwash;
 use crate::GRAVITY;
 
 /// Surface tension over density of water, and so of coffee, in m³/s².
@@ -45,6 +46,15 @@ const RESPONSE: f32 = 0.3;
 /// this much less.
 const IMPERFECTION: f32 = 0.5;
 const SEED: u64 = 21;
+/// How far air across the surface pushes the foam, as meters per meter per
+/// second of air, at most this share of the radius away, and how many
+/// seconds it takes to get there.
+const FOAM_DRIFT: f32 = 0.06;
+const FOAM_REACH: f32 = 0.35;
+const FOAM_LAG: f32 = 0.5;
+/// How much air stirs the surface, like the ground shaking this much per
+/// meter per second.
+const AIR_SHAKE: f32 = 0.6;
 /// Simulation steps stay this short, so the fastest mode stays stable.
 const MAX_STEP: f32 = 0.004;
 const ROUGHNESS: f32 = 0.08;
@@ -79,6 +89,8 @@ pub struct Liquid {
     color: Color,
     foam: Foam,
     turn: f32,
+    /// How far air has pushed the foam across the surface.
+    blown: Vec2,
     waves: [Wave; WAVES],
 }
 
@@ -115,6 +127,8 @@ struct LiquidParams {
     radius: f32,
     /// How far the liquid has turned in the container, in radians.
     turn: f32,
+    /// How far air has pushed the foam across the surface.
+    blown: Vec2,
     /// Per mode: the heights of its two waves, its Bessel root and its
     /// number of waves around.
     waves: [Vec4; WAVES],
@@ -135,6 +149,7 @@ impl Liquid {
             color,
             foam: Foam { color, cover: 0.0 },
             turn: 0.0,
+            blown: Vec2::ZERO,
             waves: [Wave::default(); WAVES],
         }
     }
@@ -182,6 +197,7 @@ impl Liquid {
                 .extend(self.foam.cover),
             radius: self.radius,
             turn: self.turn,
+            blown: self.blown,
             waves: std::array::from_fn(|index| {
                 let (around, root) = MODES[index];
                 let height = self.waves[index].height;
@@ -190,11 +206,17 @@ impl Liquid {
         }
     }
 
-    /// Moves the waves on, pushed about at random by the shaking ground.
+    /// Moves the waves on, pushed about at random by the shaking ground and
+    /// the [`Downwash`]. The air also pushes the foam aside.
     fn slosh(
         time: Res<Time>,
         shake: Res<Shake>,
-        mut liquids: Query<(&mut Liquid, &MeshMaterial3d<LiquidMaterial>)>,
+        downwash: Res<Downwash>,
+        mut liquids: Query<(
+            &mut Liquid,
+            &MeshMaterial3d<LiquidMaterial>,
+            &GlobalTransform,
+        )>,
         mut materials: ResMut<Assets<LiquidMaterial>>,
         mut noise: Local<Option<SmallRng>>,
     ) {
@@ -207,13 +229,21 @@ impl Liquid {
         let step = dt / steps;
         // White noise with unit variance per second, whatever the step.
         let spread = 3.0_f32.sqrt() / step.sqrt();
-        for (mut liquid, material) in &mut liquids {
+        for (mut liquid, material, at) in &mut liquids {
             liquid.turn = (liquid.turn + SWIRL * dt) % TAU;
+            // The surface faces +Z, so air across it is along X and Y.
+            let (_, rotation, middle) = at.to_scale_rotation_translation();
+            let air = rotation.inverse() * downwash.at(middle);
+            let reach = FOAM_REACH * liquid.radius;
+            let pushed = (air.truncate() * FOAM_DRIFT).clamp_length_max(reach);
+            let blown = liquid.blown;
+            liquid.blown += (pushed - blown) * (1.0 - (-dt / FOAM_LAG).exp());
+            let shaking = shake.0 + AIR_SHAKE * air.length();
             let damping = DAMPING * (1.0 + FOAM_DAMPING * liquid.foam.cover);
             for (index, &(around, _)) in MODES.iter().enumerate() {
                 let omega = liquid.frequency(index);
                 let gain = if around == 1 { 1.0 } else { IMPERFECTION };
-                let strength = shake.0 * RESPONSE * gain * spread;
+                let strength = shaking * RESPONSE * gain * spread;
                 let wave = &mut liquid.waves[index];
                 for _ in 0..steps as usize {
                     let push =
