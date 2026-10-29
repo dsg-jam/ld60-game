@@ -11,8 +11,8 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
-use crate::workshop::run::{Leftover, NewRun};
 use ld60_game_device::{Carried, Casing};
+use ld60_game_run::{Leftover, NewRun};
 
 /// The lane the drone flies along the street, just outside the shop, see
 /// [`CounterLayout::place`]. It turns in over the counter from there.

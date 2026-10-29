@@ -4,6 +4,7 @@ use ld60_game_core::audio::{PlayAt, Sound};
 use ld60_game_core::parts::lcd::{self, LcdDisplay};
 use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::parts::sticker::{Sticker, StickerMaterial};
+use ld60_game_run::Run;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -11,7 +12,6 @@ use ld60_locale::{Localized, Message};
 
 use super::printer::Printing;
 use super::receipt::Receipt;
-use super::run::Run;
 
 /// Between the shop manuals and the stamp, where the player sees it.
 pub(super) const SPOT: Vec2 = Vec2::new(-0.03, -0.72);

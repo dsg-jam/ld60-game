@@ -23,6 +23,7 @@ ld60-calco = { workspace = true, features = ["serde"] }
 ld60-game-city = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
+ld60-game-run = { workspace = true }
 ld60-devices = { workspace = true, features = ["serde"] }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }
@@ -64,6 +65,7 @@ features = [
 [dev-dependencies]
 ld60-game-core = { workspace = true, features = ["test-support"] }
 ld60-game-device = { workspace = true, features = ["test-support"] }
+ld60-game-run = { workspace = true, features = ["test-support"] }
 ld60-locale = { workspace = true, features = ["test-support"] }
 ld60-store = { workspace = true, features = ["test-support"] }
 

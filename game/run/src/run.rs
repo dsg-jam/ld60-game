@@ -15,12 +15,12 @@ use serde::{Deserialize, Serialize};
 pub(crate) use self::demand::Demand;
 use self::per_device::PerDevice;
 use self::served::Served;
-pub(crate) use self::tools::ComputerTool;
-use super::job::Job;
-use super::pickup::Pickup;
-use super::regulars::Regulars;
-use super::salvage::Find;
-use super::tutorial::TutorialNote;
+pub use self::tools::ComputerTool;
+use crate::job::Job;
+use crate::pickup::Pickup;
+use crate::regulars::Regulars;
+use crate::salvage::Find;
+use crate::tutorial::TutorialNote;
 
 /// What the landlord takes the first time the planet sets.
 const RENT: u32 = 6;
@@ -38,9 +38,9 @@ const SAME_BOARDS: usize = 2;
 /// Something on the counter that goes when the shop opens again, like a
 /// device, a receipt or a drone on its way.
 #[derive(Component, Debug, Default)]
-pub(crate) struct Leftover;
+pub struct Leftover;
 
-pub(crate) struct RunPlugin;
+pub struct RunPlugin;
 
 impl Plugin for RunPlugin {
     fn build(&self, app: &mut App) {
@@ -50,7 +50,7 @@ impl Plugin for RunPlugin {
 
 /// One run of the shop, from opening until the landlord closes it.
 #[derive(Resource, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Run {
+pub struct Run {
     /// Counts the runs since the game started, from 0.
     number: u32,
     /// The current job, counted from 0.
@@ -93,24 +93,24 @@ pub(crate) struct Run {
 
 /// What the shop did in a run.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Stats {
+pub struct Stats {
     /// Jobs the customer paid for.
-    pub(crate) fixed: u32,
+    pub fixed: u32,
     /// Jobs the customer took home broken.
-    pub(crate) lost: u32,
+    pub lost: u32,
     /// All money taken in.
-    pub(crate) earned: u32,
+    pub earned: u32,
     /// All rent paid.
-    pub(crate) rent: u32,
+    pub rent: u32,
     /// All money paid to the scrap trader.
-    pub(crate) spent: u32,
+    pub spent: u32,
     /// How often the planet set with the rent paid.
-    pub(crate) cycles: u32,
+    pub cycles: u32,
 }
 
 /// Where a job comes from.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Origin {
+pub enum Origin {
     /// Step `step` of the tutorial, counted from 0.
     Lesson { step: usize, source: LevelSource },
     /// A hand-written job between the generated ones.
@@ -122,7 +122,7 @@ pub(crate) enum Origin {
 
 /// The landlord's visit when the planet sets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum Rent {
+pub enum Rent {
     /// The landlord took `amount` from the till and comes for `next` the
     /// next time. He sells the building for `deed`, if he offers it.
     Paid {
@@ -138,7 +138,7 @@ pub(crate) enum Rent {
 
 /// Starts a new run.
 #[derive(Event, Debug)]
-pub(crate) enum NewRun {
+pub enum NewRun {
     /// After the shop closed. The player knows the shop by then.
     Reopen,
     /// Asked for in the menu. Starts over with the tutorial.
@@ -173,7 +173,7 @@ impl Run {
     /// The run after this one. The player knows the shop by then, so it
     /// skips the tutorial. The notes stay filed and the pinned sheets go
     /// back into the file.
-    pub(crate) fn next(&self) -> Self {
+    pub fn next(&self) -> Self {
         Self {
             number: self.number + 1,
             tutorial: false,
@@ -184,7 +184,7 @@ impl Run {
     }
 
     /// A run from the start, with the tutorial and an empty manuals file.
-    pub(crate) fn start_over(&self) -> Self {
+    pub fn start_over(&self) -> Self {
         Self {
             number: self.number + 1,
             ..Self::default()
@@ -193,15 +193,15 @@ impl Run {
 
     /// Whether the shop has served anyone yet, so the title screen offers
     /// to continue.
-    pub(crate) fn underway(&self) -> bool {
+    pub fn underway(&self) -> bool {
         self.job > 0 || self.number > 0
     }
 
-    pub(crate) fn till(&self) -> u32 {
+    pub fn till(&self) -> u32 {
         self.till
     }
 
-    pub(crate) fn stats(&self) -> Stats {
+    pub fn stats(&self) -> Stats {
         self.stats
     }
 
@@ -219,26 +219,26 @@ impl Run {
     }
 
     /// Counts the runs since the game started, from 0.
-    pub(crate) fn number(&self) -> u32 {
+    pub fn number(&self) -> u32 {
         self.number
     }
 
-    pub(crate) fn signs(&self) -> &[DeviceKind] {
+    pub fn signs(&self) -> &[DeviceKind] {
         &self.signs
     }
 
-    pub(crate) fn errata(&self) -> &[Revision] {
+    pub fn errata(&self) -> &[Revision] {
         &self.errata
     }
 
     /// The tutorial steps whose notes are filed, in the order they were
     /// filed.
-    pub(crate) fn notes(&self) -> &[usize] {
+    pub fn notes(&self) -> &[usize] {
         &self.notes
     }
 
     /// Files the note of tutorial step `step` in the manuals file.
-    pub(crate) fn file_note(&mut self, step: usize) {
+    pub fn file_note(&mut self, step: usize) {
         if !self.notes.contains(&step) {
             self.notes.push(step);
         }
@@ -246,7 +246,7 @@ impl Run {
 
     /// Files the notes of the tutorial steps the shop is past. Saves from
     /// before the manuals file kept no notes.
-    pub(crate) fn file_past_notes(&mut self) {
+    pub fn file_past_notes(&mut self) {
         let past = if self.tutorial {
             self.job as usize
         } else {
@@ -259,7 +259,7 @@ impl Run {
 
     /// Files the datasheets that come with the signs and the errata pages.
     /// Saves from before datasheets were sold kept none.
-    pub(crate) fn file_owned_datasheets(&mut self) {
+    pub fn file_owned_datasheets(&mut self) {
         let owned = self
             .signs
             .iter()
@@ -293,7 +293,7 @@ impl Run {
 
     /// The chip revisions with a datasheet in the manuals file, in the order
     /// of [`Revision::ALL`].
-    pub(crate) fn chips(&self) -> Vec<Revision> {
+    pub fn chips(&self) -> Vec<Revision> {
         Revision::ALL
             .into_iter()
             .filter(|revision| self.datasheets.contains(revision))
@@ -301,12 +301,12 @@ impl Run {
     }
 
     /// Whether the shop computer has `tool`.
-    pub(crate) fn has(&self, tool: ComputerTool) -> bool {
+    pub fn has(&self, tool: ComputerTool) -> bool {
         self.tools.contains(&tool)
     }
 
     /// Whether the manual of `device` is in the manuals file.
-    pub(crate) fn has_manual(&self, device: DeviceKind) -> bool {
+    pub fn has_manual(&self, device: DeviceKind) -> bool {
         self.signs.contains(&device) || self.manuals.contains(&device)
     }
 
@@ -334,7 +334,7 @@ impl Run {
 
     /// Whether the scrap trader can offer `find`. The shop must not own it
     /// yet and must be able to use it.
-    pub(crate) fn wants(&self, find: Find) -> bool {
+    pub fn wants(&self, find: Find) -> bool {
         let usable = match find {
             Find::Device(_) | Find::Datasheet(_) => true,
             Find::Tool(tool) => tool
@@ -348,7 +348,7 @@ impl Run {
 
     /// Pays for `find` from the till and puts it in the shop. Returns
     /// whether the till held enough.
-    pub(crate) fn buy(&mut self, find: Find) -> bool {
+    pub fn buy(&mut self, find: Find) -> bool {
         let price = find.price();
         if self.till < price || self.owns(find) {
             return false;
@@ -369,7 +369,7 @@ impl Run {
     }
 
     /// The seed of the current job.
-    pub(crate) fn seed(&self) -> u64 {
+    pub fn seed(&self) -> u64 {
         GAME_SEED + RUN_SEEDS * u64::from(self.number) + u64::from(self.job)
     }
 
@@ -422,7 +422,7 @@ impl Run {
 
     /// Takes in what the customer paid for `job`. Once the device leaves
     /// the shop, the run moves on to the next job.
-    pub(crate) fn settle(&mut self, job: &Job, pickup: &Pickup) {
+    pub fn settle(&mut self, job: &Job, pickup: &Pickup) {
         if let Pickup::Paid(payment) = pickup {
             self.till += payment.amount();
             self.stats.earned += payment.amount();
@@ -471,17 +471,17 @@ impl Run {
     }
 
     /// Whether the player bought the building, so no rent is due.
-    pub(crate) fn owned(&self) -> bool {
+    pub fn owned(&self) -> bool {
         self.owned
     }
 
     /// What the landlord takes the next time the planet sets.
-    pub(crate) fn rent(&self) -> u32 {
+    pub fn rent(&self) -> u32 {
         RENT + RENT_RISE * self.stats.cycles
     }
 
     /// The landlord takes the rent from the till, if it holds enough.
-    pub(crate) fn pay_rent(&mut self) -> Rent {
+    pub fn pay_rent(&mut self) -> Rent {
         if self.owned {
             self.stats.cycles += 1;
             self.demand.recover();
@@ -506,7 +506,7 @@ impl Run {
     }
 
     /// Clears the counter and opens the shop again with an empty till.
-    pub(super) fn restart(
+    pub fn restart(
         new_run: On<NewRun>,
         mut run: ResMut<Run>,
         mut clock: ResMut<Clock>,
@@ -526,19 +526,19 @@ impl Run {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Run {
-    pub(crate) fn add_till(&mut self, amount: u32) {
+    pub fn add_till(&mut self, amount: u32) {
         self.till += amount;
     }
 
     /// A run whose landlord sells the building.
-    pub(crate) fn offer_deed(&mut self) {
+    pub fn offer_deed(&mut self) {
         self.stats.cycles = DEED_FROM;
     }
 
     /// A run whose shop computer has every tool.
-    pub(crate) fn with_all_tools() -> Self {
+    pub fn with_all_tools() -> Self {
         Self {
             tools: ComputerTool::ALL.to_vec(),
             ..Self::default()
@@ -551,10 +551,10 @@ mod tests {
     use ld60_levels::Difficulty;
 
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::pickup::{Complaint, Payment};
-    use crate::workshop::regulars::Regular;
-    use crate::workshop::salvage::Find;
+    use crate::levels::Levels;
+    use crate::pickup::{Complaint, Payment};
+    use crate::regulars::Regular;
+    use crate::salvage::Find;
 
     fn job(run: &Run) -> Job {
         Job::new(run.pick(&Levels::on_disk()), run, &Levels::on_disk()).unwrap()

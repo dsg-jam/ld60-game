@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 use ld60_devices::Rom;
+use ld60_game_run::job::Job;
+use ld60_game_run::pickup::Complaint;
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 
 use super::footer::{Command, Run, Status};
-use crate::workshop::job::Job;
-use crate::workshop::pickup::Complaint;
 use ld60_game_device::{Connected, Emulator};
 
 /// What the test bench found when it tried the device like the customer
@@ -76,11 +76,11 @@ impl Verdict {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::levels::Levels;
     use ld60_levels::{assemble, burn, initial_rom};
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
 
     #[test]
     fn passes_only_the_fixed_firmware() {

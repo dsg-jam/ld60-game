@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use ld60_game_run::{ComputerTool, Run as ShopRun};
 
 use super::breakpoints::Breakpoints;
 use super::listing::Listing;
 use super::trace::TraceView;
-use crate::workshop::run::{ComputerTool, Run as ShopRun};
 use ld60_game_device::{Connected, Emulator};
 
 /// Lines the chip ran recently.

@@ -1,11 +1,11 @@
 use bevy::prelude::*;
+use ld60_game_run::{ComputerTool, Run as ShopRun};
 use ld60_locale::{Localized, Message};
 use ld60_machine::{Cpu, Step};
 
 use super::PHOSPHOR;
 use super::footer::{Command, Run, Status};
 use super::listing::Listing;
-use crate::workshop::run::{ComputerTool, Run as ShopRun};
 use ld60_game_device::{Connected, Emulator, Stop};
 
 /// RAM cells the panel shows.
@@ -155,11 +155,11 @@ impl DebugPanel {
 #[cfg(test)]
 mod tests {
     use ld60_devices::AnyDevice;
+    use ld60_game_run::levels::Levels;
     use ld60_levels::{Level, device, initial_rom};
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
 
     fn tally() -> (Level, String, AnyDevice) {
         let levels = Levels::on_disk();

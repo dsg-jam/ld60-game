@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 use ld60_game_core::clock::Clock;
+use ld60_game_run::Run;
+use ld60_game_run::job::{Bench, Job};
 use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
-use super::job::{Bench, Job};
 use super::manuals::Pins;
-use super::run::Run;
 use super::salvage::SalvageCrate;
 
 pub(crate) struct SavePlugin;
@@ -133,14 +133,14 @@ mod tests {
     use ld60_calco::Revision;
     use ld60_devices::DeviceKind;
     use ld60_game_core::player::focus::{Focus, Focused};
+    use ld60_game_run::NewRun;
+    use ld60_game_run::chore::PlanetSet;
+    use ld60_game_run::levels::Levels;
+    use ld60_game_run::salvage::Find;
 
     use super::*;
-    use crate::workshop::chore::PlanetSet;
-    use crate::workshop::levels::Levels;
     use crate::workshop::manuals::Sheet;
     use crate::workshop::rent::RentNote;
-    use crate::workshop::run::NewRun;
-    use crate::workshop::salvage::Find;
 
     fn world(store: Store) -> World {
         let mut world = World::new();

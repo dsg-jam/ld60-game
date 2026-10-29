@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// A program for the shop computer that helps find bugs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum ComputerTool {
+pub enum ComputerTool {
     /// Runs the complaint of the job against the firmware.
     TestBench,
     /// Runs the firmware one instruction at a time.

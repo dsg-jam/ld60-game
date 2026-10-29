@@ -3,12 +3,12 @@ use std::fmt;
 use bevy::prelude::*;
 use ld60_game_core::parts::paper::{Paper, Print};
 use ld60_game_core::parts::screen::UiCanvas;
+use ld60_game_run::tutorial::TutorialNote;
+use ld60_game_run::{NewRun, Run};
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::contents::{Contents, Entry, Page};
-use crate::workshop::run::{NewRun, Run};
-use crate::workshop::tutorial::TutorialNote;
 
 /// One page of the manuals file, named by its entry so it stays the same
 /// page when more is filed.
@@ -53,7 +53,7 @@ impl Sheet {
     /// The page, if the entry has it.
     pub(super) fn page(self) -> Option<Page> {
         if let Entry::Note(note) = self.entry {
-            TutorialNote::new(note.0)?;
+            TutorialNote::new(note.step())?;
         }
         self.entry.pages().get(self.page).copied()
     }
@@ -114,7 +114,7 @@ impl Pins {
     /// Pins the first note at the monitor as it comes in, where it also
     /// shows how pinning works.
     pub(super) fn pin_first_note(mut pins: ResMut<Pins>) {
-        pins.pin(Sheet::note(TutorialNote(0)));
+        pins.pin(Sheet::note(TutorialNote::FIRST));
     }
 
     /// Puts the pinned sheets back into the file, as a new run starts.
@@ -228,8 +228,8 @@ mod tests {
         world.init_resource::<Pins>();
         world.run_system_cached(Pins::pin_first_note).unwrap();
         let pins = world.resource::<Pins>();
-        assert!(pins.contains(Sheet::note(TutorialNote(0))));
-        assert!(!pins.contains(Sheet::note(TutorialNote(1))));
+        assert!(pins.contains(Sheet::note(TutorialNote::FIRST)));
+        assert!(!pins.contains(Sheet::note(TutorialNote::new(1).unwrap())));
     }
 
     fn chip(page: usize) -> Sheet {
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn loading_keeps_the_rules() {
         let missing = Sheet::new(Entry::Manual(DeviceKind::Tally2), 99);
-        let note = Sheet::new(Entry::Note(TutorialNote(99)), 0);
+        let note = Sheet::new(Entry::Note(ron::from_str("(99)").unwrap()), 0);
         let load = |sheets: Vec<Option<Sheet>>| {
             Pins::from(sheets.into_iter().map(SavedSlot).collect::<Vec<_>>())
         };
@@ -304,7 +304,7 @@ mod tests {
     fn pins_load_as_saved() {
         let mut pins = Pins::default();
         pins.pin(chip(1));
-        pins.pin(Sheet::new(Entry::Note(TutorialNote(0)), 0));
+        pins.pin(Sheet::new(Entry::Note(TutorialNote::FIRST), 0));
         pins.unpin(chip(1));
         let text = ron::to_string(&pins).unwrap();
         assert_eq!(ron::from_str::<Pins>(&text).unwrap(), pins);

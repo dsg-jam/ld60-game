@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use ld60_locale::Message;
 use serde::{Deserialize, Serialize};
 
-use super::job::Job;
-use super::run::{Origin, Run};
+use crate::job::Job;
+use crate::{Origin, Run};
 
 /// The paragraphs of each note, as attributes of its message.
 const LESSONS: [&[&str]; 7] = [
@@ -18,7 +18,7 @@ const LESSONS: [&[&str]; 7] = [
     &["versions", "rent", "trader"],
 ];
 
-pub(crate) struct TutorialPlugin;
+pub struct TutorialPlugin;
 
 impl Plugin for TutorialPlugin {
     fn build(&self, app: &mut App) {
@@ -35,21 +35,27 @@ impl Plugin for TutorialPlugin {
 /// Each note is filed in the manuals file when the job of its step comes
 /// in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct TutorialNote(pub(crate) usize);
+pub struct TutorialNote(pub(crate) usize);
 
 /// The first note was just pinned to the monitor. The player looks at it
 /// once they sit at the bench, as if it was left there for them.
 #[derive(Resource, Debug)]
-pub(crate) struct FirstNote;
+pub struct FirstNote;
 
 impl TutorialNote {
+    pub const FIRST: Self = Self(0);
+
     /// The note of step `step`, if it has one.
-    pub(super) fn new(step: usize) -> Option<Self> {
+    pub fn new(step: usize) -> Option<Self> {
         (step < LESSONS.len()).then_some(Self(step))
     }
 
+    pub fn step(self) -> usize {
+        self.0
+    }
+
     /// The note about `job`, if it is a job of the tutorial with one.
-    pub(crate) fn for_job(job: &Job) -> Option<Self> {
+    pub fn for_job(job: &Job) -> Option<Self> {
         match job.origin {
             Origin::Lesson { step, .. } => Self::new(step),
             _ => None,
@@ -60,25 +66,25 @@ impl TutorialNote {
         Message::new(format!("tutorial-{}", self.0 + 1))
     }
 
-    pub(super) fn title(self) -> Message {
+    pub fn title(self) -> Message {
         self.message().attribute("title")
     }
 
     /// The short name of the note in the index of the manuals file.
-    pub(super) fn label(self) -> Message {
+    pub fn label(self) -> Message {
         self.message().attribute("label")
     }
 
-    pub(super) fn footer(self) -> Message {
+    pub fn footer(self) -> Message {
         Message::new("tutorial-footer")
     }
 
     /// The notes of the steps before `step`.
-    pub(super) fn before(step: usize) -> impl Iterator<Item = Self> {
+    pub(crate) fn before(step: usize) -> impl Iterator<Item = Self> {
         (0..step.min(LESSONS.len())).map(Self)
     }
 
-    pub(super) fn paragraphs(self) -> impl Iterator<Item = Message> {
+    pub fn paragraphs(self) -> impl Iterator<Item = Message> {
         let message = self.message();
         LESSONS[self.0]
             .iter()
@@ -107,7 +113,7 @@ mod tests {
     use ld60_locale::Locale;
 
     use super::*;
-    use crate::workshop::levels::Levels;
+    use crate::levels::Levels;
 
     #[test]
     fn every_note_formats() {

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
+use ld60_game_run::job::Job;
 use ld60_levels::LevelError;
 use ld60_locale::Message;
 
 use super::changes::LineChanges;
-use crate::workshop::job::Job;
 
 /// Most versions a job keeps, including the factory firmware. The player
 /// can save one less, so a restore always has room to keep the changes.

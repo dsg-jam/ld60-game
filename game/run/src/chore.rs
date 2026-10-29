@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use ld60_game_core::clock::Clock;
 
-use super::job::Job;
-use super::run::Origin;
+use crate::Origin;
+use crate::job::Job;
 
-pub(crate) struct ChorePlugin;
+pub struct ChorePlugin;
 
 impl Plugin for ChorePlugin {
     fn build(&self, app: &mut App) {
@@ -14,12 +14,12 @@ impl Plugin for ChorePlugin {
 
 /// The shop spends time on `0`. Tutorial jobs take no time.
 #[derive(Event, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Busy(pub(crate) Chore);
+pub struct Busy(pub Chore);
 
 /// Work that takes time. Work at the bench is free, only customers take
 /// time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Chore {
+pub enum Chore {
     /// A customer coming to try a device and take it home.
     HandIn,
     /// A customer coming to try a device and handing it back.
@@ -28,7 +28,7 @@ pub(crate) enum Chore {
 
 /// The planet went down, so the rent is due.
 #[derive(Event, Debug)]
-pub(crate) struct PlanetSet;
+pub struct PlanetSet;
 
 impl Chore {
     pub(crate) const fn ticks(self) -> u32 {
@@ -61,8 +61,8 @@ mod tests {
     use ld60_game_core::clock::{CYCLE, OPENING};
 
     use super::*;
-    use crate::workshop::levels::Levels;
-    use crate::workshop::run::Run;
+    use crate::Run;
+    use crate::levels::Levels;
 
     #[derive(Resource, Default)]
     struct Sets(u32);

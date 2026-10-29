@@ -9,14 +9,14 @@ use ld60_devices::{DeviceKind, Rom};
 use ld60_levels::{Difficulty, Generated, Level, LevelSource, Measure, Variant};
 use ld60_machine::Isa;
 
-pub(crate) use self::bench::Bench;
-pub(crate) use self::error::JobError;
-use super::levels::Levels;
-use super::pickup::{Complaint, Payment, Pickup, TRIES};
-use super::regulars::Visit;
-use super::run::{Origin, Run};
+pub use self::bench::Bench;
+pub use self::error::JobError;
+use crate::levels::Levels;
+use crate::pickup::{Complaint, Payment, Pickup, TRIES};
+use crate::regulars::Visit;
+use crate::{Origin, Run};
 
-pub(crate) struct JobPlugin;
+pub struct JobPlugin;
 
 impl Plugin for JobPlugin {
     fn build(&self, app: &mut App) {
@@ -33,22 +33,22 @@ impl Plugin for JobPlugin {
 /// The customer picks the device up. The customer tests the device at pickup. If
 /// it fails, they hand it back and the steps start over.
 #[derive(Resource, Debug)]
-pub(crate) struct Job {
-    pub(crate) id: JobId,
-    pub(crate) origin: Origin,
-    pub(crate) level: Level,
+pub struct Job {
+    pub id: JobId,
+    pub origin: Origin,
+    pub level: Level,
     /// The firmware the device comes in with.
-    pub(crate) buggy: String,
+    pub buggy: String,
     /// The factory fix, as the bench measures it.
     par: Option<Measure>,
     /// The regular who brought the device, if a regular did.
-    pub(crate) visit: Option<Visit>,
+    pub visit: Option<Visit>,
     /// Set once firmware was burned into the device.
-    pub(crate) flashed: bool,
+    pub flashed: bool,
     /// Set once the ticket carries the shop stamp.
-    pub(crate) stamped: bool,
+    pub stamped: bool,
     /// How often the customer handed the device back.
-    pub(crate) returns: u32,
+    pub returns: u32,
     /// The run as it was when the customer brought the device.
     brought: Run,
 }
@@ -56,14 +56,14 @@ pub(crate) struct Job {
 /// Tells one job on the bench from the next, even when both are built from
 /// the same level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct JobId(u32);
+pub struct JobId(u32);
 
 /// A job came on the bench, so its device and ticket come to the counter.
 #[derive(Event, Debug)]
-pub(crate) struct JobOnBench;
+pub struct JobOnBench;
 
 impl JobId {
-    pub(crate) fn next() -> Self {
+    pub fn next() -> Self {
         static NEXT: AtomicU32 = AtomicU32::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))
     }
@@ -81,7 +81,7 @@ impl Origin {
 
 impl Job {
     /// The job from `origin` for the current job of `run`. Outside the
-    /// tutorial, it pays what the [`Demand`](super::run::Demand) allows.
+    /// tutorial, it pays what the [`Demand`](crate::Demand) allows.
     pub(crate) fn new(origin: Origin, run: &Run, levels: &Levels) -> Result<Self, JobError> {
         let seed = run.seed();
         let variant = match &origin {
@@ -127,29 +127,29 @@ impl Job {
     }
 
     /// The current job of `run`.
-    pub(crate) fn for_run(run: &Run, levels: &Levels) -> Result<Self, JobError> {
+    pub fn for_run(run: &Run, levels: &Levels) -> Result<Self, JobError> {
         Self::new(run.pick(levels), run, levels)
     }
 
     /// The instruction set the firmware of this job is written in.
-    pub(crate) fn isa(&self) -> &'static dyn Isa {
+    pub fn isa(&self) -> &'static dyn Isa {
         self.level.chip.isa()
     }
 
     /// How often the customer still tries the device.
-    pub(crate) fn tries_left(&self) -> u32 {
+    pub fn tries_left(&self) -> u32 {
         TRIES.saturating_sub(self.returns)
     }
 
     /// What the customer pays for a working device. Each return takes an
     /// equal share off the full reward, rounded to the nearest unit.
-    pub(crate) fn reward(&self) -> u32 {
+    pub fn reward(&self) -> u32 {
         (self.level.reward * self.tries_left() + TRIES / 2) / TRIES
     }
 
     /// Runs the customer's tests on `rom` and measures the repair if they
     /// pass.
-    pub(crate) fn try_out(&self, rom: &Rom) -> Result<Measure, Complaint> {
+    pub fn try_out(&self, rom: &Rom) -> Result<Measure, Complaint> {
         if let Some(complaint) = Complaint::find(&self.level, rom) {
             return Err(complaint);
         }
@@ -159,7 +159,7 @@ impl Job {
     }
 
     /// Puts the current job of the run on the bench.
-    pub(crate) fn start(run: Res<Run>, levels: Option<Res<Levels>>, mut commands: Commands) {
+    pub fn start(run: Res<Run>, levels: Option<Res<Levels>>, mut commands: Commands) {
         let Some(levels) = levels else {
             return;
         };
@@ -177,7 +177,7 @@ impl Job {
 
     /// The customer tries the device. It either works as `measure` says or
     /// shows a complaint. The steps start over either way.
-    pub(crate) fn pick_up(&mut self, tried: Result<Measure, Complaint>) -> Pickup {
+    pub fn pick_up(&mut self, tried: Result<Measure, Complaint>) -> Pickup {
         self.flashed = false;
         self.stamped = false;
         let complaint = match tried {
@@ -244,7 +244,7 @@ impl Job {
 impl Job {
     /// Stands for the customer, so each has their own drone. A regular
     /// keeps theirs.
-    pub(crate) fn customer(&self) -> u64 {
+    pub fn customer(&self) -> u64 {
         match self.visit {
             Some(visit) => fixed_hash_one(visit.regular),
             None => fixed_hash_one(&self.level.id),
@@ -258,10 +258,10 @@ impl Job {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Job {
     /// The job built from the level at `index`, as the first job of a run.
-    pub(crate) fn load(levels: &Levels, index: usize) -> Option<Result<Self, JobError>> {
+    pub fn load(levels: &Levels, index: usize) -> Option<Result<Self, JobError>> {
         let source = levels.levels().get(index)?;
         Some(Self::new(
             Origin::Special(source.clone()),

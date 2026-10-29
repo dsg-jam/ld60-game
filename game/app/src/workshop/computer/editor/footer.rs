@@ -5,6 +5,8 @@ use bevy::{
     prelude::*,
     text::EditableText,
 };
+use ld60_game_run::job::Job;
+use ld60_game_run::{ComputerTool, Origin, Run as ShopRun};
 use ld60_locale::{Localized, Message};
 
 use super::Editor;
@@ -13,8 +15,6 @@ use super::dump::Dump;
 use super::errors::Explain;
 use super::page::Page;
 use super::trace::TraceView;
-use crate::workshop::job::Job;
-use crate::workshop::run::{ComputerTool, Origin, Run as ShopRun};
 use ld60_game_device::{Connected, Emulator};
 
 /// A command in the footer below the editor.
@@ -288,13 +288,13 @@ impl Run {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::levels::Levels;
     use ld60_levels::{GAME_SEED, Variant};
     use ld60_locale::Locale;
 
     use super::*;
     use crate::workshop::computer::editor::page::ActivePage;
     use crate::workshop::computer::editor::undo::Undo;
-    use crate::workshop::levels::Levels;
 
     /// What the status line says after `command` runs on `source`, with or
     /// without the first job and its device.

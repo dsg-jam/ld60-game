@@ -56,14 +56,14 @@ impl Notes {
 #[cfg(test)]
 mod tests {
     use bevy::ecs::system::RunSystemOnce;
+    use ld60_game_run::job::Job;
+    use ld60_game_run::levels::Levels;
     use ld60_locale::Localized;
 
     use super::*;
     use crate::workshop::computer::editor::{
         Editor, dump::Dump, footer::Status, page::ActivePage, undo::Undo,
     };
-    use crate::workshop::job::Job;
-    use crate::workshop::levels::Levels;
 
     #[test]
     fn notes_survive_a_new_job() {

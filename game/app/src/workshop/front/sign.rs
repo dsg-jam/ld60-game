@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use ld60_devices::DeviceKind;
 use ld60_game_core::layout::shop::{FRONT, PILLAR};
 use ld60_game_core::parts::script::{GLYPH_SIZE, Word};
+use ld60_game_run::Run;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -10,7 +11,6 @@ use rand::rngs::SmallRng;
 use rand::{Rng, RngExt, SeedableRng};
 
 use super::{BEAM_HEIGHT, Front};
-use crate::workshop::run::Run;
 use ld60_game_device::Silhouette;
 
 const BOARD: Vec3 = Vec3::new(0.3, 0.22, 0.012);
@@ -258,8 +258,9 @@ impl WindowSign {
 
 #[cfg(test)]
 mod tests {
+    use ld60_game_run::salvage::Find;
+
     use super::*;
-    use crate::workshop::salvage::Find;
 
     fn dabs(device: DeviceKind, seed: u64) -> Vec<Dab> {
         WindowSign::picture(&Silhouette::of(device), &mut SmallRng::seed_from_u64(seed))
