@@ -1,5 +1,3 @@
-mod badge;
-
 use bevy::{
     picking::{
         hover::HoverMap,
@@ -10,10 +8,9 @@ use bevy::{
 };
 use ld60_locale::{Localized, Message};
 
-use self::badge::ToolBadge;
 use super::{
     cursor,
-    focus::{self, ClickTool, Clickable, Disabled, Focused},
+    focus::{self, Clickable, Disabled, Focused},
     hints::{self, Caption, ClickHint, Icon, IconFont},
     look::{Gaze, KeepMouse},
 };
@@ -28,10 +25,7 @@ impl Plugin for CrosshairPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Prompt>()
             .add_systems(Startup, Crosshair::spawn)
-            .add_systems(
-                Update,
-                (Prompt::update, (Crosshair::update, ToolBadge::update)).chain(),
-            );
+            .add_systems(Update, (Prompt::update, Crosshair::update).chain());
     }
 }
 
@@ -98,8 +92,6 @@ impl Crosshair {
                         Pickable::IGNORE,
                     ))
                     .with_children(|prompt| {
-                        ToolBadge::spawn(prompt, ClickTool::Screwdriver);
-                        ToolBadge::spawn(prompt, ClickTool::Plug);
                         prompt
                             .spawn((PromptIcon, Node::default(), Pickable::IGNORE))
                             .with_children(|icon| Icon::MouseLeft.spawn(icon, &font));
@@ -185,8 +177,6 @@ impl Crosshair {
 #[derive(Resource, Debug, Default, PartialEq)]
 pub(crate) struct Prompt {
     message: Option<Message>,
-    /// The tool of the hovered part the message is about, if any.
-    tool: Option<ClickTool>,
     /// Whether the action can't be done right now.
     disabled: bool,
     /// Where the free cursor is, in logical pixels, while the prompt shows
@@ -210,7 +200,7 @@ impl Prompt {
         hovers: Res<HoverMap>,
         parents: Query<&ChildOf>,
         clickables: Query<&Clickable>,
-        parts: Query<(Option<&ClickTool>, Has<Disabled>)>,
+        disabled: Query<(), With<Disabled>>,
         window: Single<&Window, With<PrimaryWindow>>,
         keep_mouse: Option<Res<KeepMouse>>,
         pointers: Query<(&PointerId, &PointerLocation)>,
@@ -220,14 +210,13 @@ impl Prompt {
         let from_hover = (settings.hints() && (gaze.steering() || gaze.focused()))
             .then(|| hovered.and_then(|entity| clickables.get(entity).ok()))
             .flatten();
-        let (message, (tool, disabled)) = match (settings.hints(), click.0.clone()) {
-            (true, Some(click)) if gaze.focused() => (Some(click), (None, false)),
+        let (message, disabled) = match (settings.hints(), click.0.clone()) {
+            (true, Some(click)) if gaze.focused() => (Some(click), false),
             _ => (
                 from_hover.map(|clickable| Message::new(clickable.prompt)),
                 hovered
                     .filter(|_| from_hover.is_some())
-                    .and_then(|entity| parts.get(entity).ok())
-                    .map_or((None, false), |(tool, disabled)| (tool.copied(), disabled)),
+                    .is_some_and(|entity| disabled.contains(entity)),
             ),
         };
         // A tool driving the game moves only its pointer, not the cursor.
@@ -248,7 +237,6 @@ impl Prompt {
         prompt.set_if_neq(Prompt {
             at_cursor: at_cursor.filter(|_| message.is_some()),
             message,
-            tool,
             disabled,
         });
     }
