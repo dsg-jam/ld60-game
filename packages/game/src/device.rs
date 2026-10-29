@@ -24,7 +24,7 @@ use ld60_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
-pub(crate) use self::casing::{Casing, Header, Turning};
+pub(crate) use self::casing::{Casing, CasingTravel, Header, Turning};
 pub(crate) use self::emulator::{Emulator, Stop};
 pub(crate) use self::handheld::Handheld;
 pub(crate) use self::link::Connected;

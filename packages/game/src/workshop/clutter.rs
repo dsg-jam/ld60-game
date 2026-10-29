@@ -9,6 +9,7 @@ use self::props::{Finishes, Props};
 use self::screwdriver::Screwdriver;
 #[cfg(test)]
 use super::footprint::Footprint;
+use crate::device::CasingTravel;
 
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);
@@ -18,7 +19,7 @@ pub(crate) struct ClutterPlugin;
 
 impl Plugin for ClutterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, Screwdriver::follow)
+        app.add_systems(Update, Screwdriver::follow.after(CasingTravel))
             .add_observer(Clutter::on_add);
     }
 }
