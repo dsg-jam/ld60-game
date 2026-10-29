@@ -137,10 +137,7 @@ impl Layouts {
     }
 
     pub(super) fn manual(&self, device: DeviceKind) -> &ManualFile {
-        let index = DeviceKind::ALL
-            .iter()
-            .position(|&kind| kind == device)
-            .unwrap_or_default();
+        let index = device.index();
         &self.manuals[index]
     }
 

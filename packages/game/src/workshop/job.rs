@@ -464,7 +464,7 @@ impl Job {
     /// The job number of the generated job `number` for `device`, like
     /// `tally2-005`. Three digits keep it apart from the special jobs.
     fn generated_id(device: DeviceKind, number: u32) -> String {
-        format!("{device:?}-{:03}", number + 1).to_lowercase()
+        format!("{}-{:03}", device.id(), number + 1)
     }
 }
 

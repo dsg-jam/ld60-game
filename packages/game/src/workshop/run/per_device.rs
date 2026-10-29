@@ -13,13 +13,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 pub(crate) struct PerDevice([u32; DeviceKind::ALL.len()]);
 
 impl PerDevice {
-    fn index(device: DeviceKind) -> usize {
-        DeviceKind::ALL
-            .iter()
-            .position(|&kind| kind == device)
-            .unwrap_or_default()
-    }
-
     pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut u32> {
         self.0.iter_mut()
     }
@@ -29,13 +22,13 @@ impl Index<DeviceKind> for PerDevice {
     type Output = u32;
 
     fn index(&self, device: DeviceKind) -> &u32 {
-        &self.0[Self::index(device)]
+        &self.0[device.index()]
     }
 }
 
 impl IndexMut<DeviceKind> for PerDevice {
     fn index_mut(&mut self, device: DeviceKind) -> &mut u32 {
-        &mut self.0[Self::index(device)]
+        &mut self.0[device.index()]
     }
 }
 
