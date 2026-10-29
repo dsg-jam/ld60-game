@@ -2,13 +2,15 @@ use std::fmt;
 use std::ops::{Index, IndexMut};
 
 use ld60_devices::DeviceKind;
-use serde::de::{SeqAccess, Visitor};
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A count for each device, in the order of [`DeviceKind::ALL`].
+/// A count for each device.
 ///
-/// A save from before a device existed holds fewer counts. The missing ones
-/// load as 0.
+/// A save holds the counts by device name. Older saves hold them in the
+/// order of [`DeviceKind::ALL`], and those from before a device existed
+/// hold fewer. Missing counts load as 0.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerDevice([u32; DeviceKind::ALL.len()]);
 
@@ -34,14 +36,17 @@ impl IndexMut<DeviceKind> for PerDevice {
 
 impl Serialize for PerDevice {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
+        let mut map = serializer.serialize_map(Some(DeviceKind::ALL.len()))?;
+        for device in DeviceKind::ALL {
+            map.serialize_entry(&device, &self[device])?;
+        }
+        map.end()
     }
 }
 
 impl<'de> Deserialize<'de> for PerDevice {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        // Arrays are tuples in a save, so any length has to read as one.
-        deserializer.deserialize_tuple(usize::MAX, PerDevice::default())
+        deserializer.deserialize_any(PerDevice::default())
     }
 }
 
@@ -50,6 +55,13 @@ impl<'de> Visitor<'de> for PerDevice {
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("a count for each device")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(mut self, mut map: A) -> Result<Self, A::Error> {
+        while let Some((device, count)) = map.next_entry::<DeviceKind, u32>()? {
+            self[device] = count;
+        }
+        Ok(self)
     }
 
     fn visit_seq<A: SeqAccess<'de>>(mut self, mut seq: A) -> Result<Self, A::Error> {
@@ -73,6 +85,14 @@ mod tests {
         assert_eq!(loaded[DeviceKind::Tally2], 3);
         assert_eq!(loaded[DeviceKind::Lock4], 4);
         assert_eq!(&loaded.0[3..], &[0; DeviceKind::ALL.len() - 3]);
+    }
+
+    #[test]
+    fn a_save_keeps_the_counts_by_device() {
+        let mut counts = PerDevice::default();
+        counts[DeviceKind::Lock4] = 2;
+        let text = ron::to_string(&counts).unwrap();
+        assert!(text.contains("Lock4:2"), "{text}");
     }
 
     #[test]
