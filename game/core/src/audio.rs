@@ -9,7 +9,6 @@ use bevy::{
 };
 
 use self::synth::{Noise, Samples};
-use crate::player::camera::PlayerCamera;
 use crate::settings::Settings;
 
 /// How loud the game is while a menu is open.
@@ -23,8 +22,6 @@ pub const HUSH: f32 = 0.08;
 /// stabilizer wire and sound a little lower.
 const LONG_KEY: f32 = 0.08;
 const LONG_KEY_PITCH: f32 = 0.94;
-/// Meters between the ears of the player.
-const EAR_GAP: f32 = 0.2;
 /// So small that rodio never fades a sound with distance. Sounds on the
 /// desk are all within reach.
 const NEAR: SpatialScale = SpatialScale::new(0.002);
@@ -362,8 +359,7 @@ impl Plugin for AudioPlugin {
             )
             .add_observer(Sounds::play)
             .add_observer(Sounds::play_at)
-            .add_observer(Sounds::click_key)
-            .add_observer(listen);
+            .add_observer(Sounds::click_key);
     }
 }
 
@@ -550,21 +546,6 @@ impl<T> Takes<T> {
         self.last = Some(pick);
         &self.takes[pick]
     }
-}
-
-/// The player hears the world from where the camera is.
-///
-/// Rodio makes a sound louder on the ear farther from it, so the ears
-/// swap places to put sounds on the right side.
-fn listen(add: On<Add<PlayerCamera>>, mut commands: Commands) {
-    let SpatialListener {
-        left_ear_offset,
-        right_ear_offset,
-    } = SpatialListener::new(EAR_GAP);
-    commands.entity(add.entity).insert(SpatialListener {
-        left_ear_offset: right_ear_offset,
-        right_ear_offset: left_ear_offset,
-    });
 }
 
 #[cfg(test)]
