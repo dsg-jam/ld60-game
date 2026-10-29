@@ -61,6 +61,9 @@ const SUBSTEPS: usize = 12;
 const TICK: f32 = 1.0 / 60.0;
 /// A slow frame runs at most this many ticks and drops the rest.
 const MAX_TICKS: u32 = 4;
+/// Points from the plug end that bend over to where the plug is between
+/// ticks.
+const CATCH_UP: usize = 8;
 /// How soft the cable bends, in meters per newton. Zero would be a rod.
 const BEND_COMPLIANCE: f32 = 2e-7;
 /// How much of its speed the cable loses per second.
@@ -110,6 +113,8 @@ struct Cable {
     points: Vec<Vec3>,
     /// Where the points were a step ago, which gives their speed.
     previous: Vec<Vec3>,
+    /// Where the points were a tick ago, to show the cable between ticks.
+    ticked: Vec<Vec3>,
     /// How long the cable is now, see [`SLACK`].
     length: f32,
     /// Where the plug end was when the cable went to sleep.
@@ -232,6 +237,7 @@ impl Cable {
             ],
             points: Vec::new(),
             previous: Vec::new(),
+            ticked: Vec::new(),
             length: 0.0,
             asleep: None,
             behind: 0.0,
@@ -332,11 +338,12 @@ impl Cable {
                 .find(|(_, pose)| pose.lying() > 0.5)
                 .map(|(file, _)| (file.open_at.compute_affine(), Block::new(ShopManuals::OPEN))),
         };
-        if !cable.advance(time.delta_secs(), &ends) {
+        let moved = cable.advance(time.delta_secs(), &ends);
+        if !moved && cable.ticked == cable.points {
             return;
         }
         if let Some(mut rope) = ropes.get_mut(material) {
-            rope.extension.follow(&cable.points, cable.length);
+            rope.extension.follow(&cable.shown(&ends), cable.length);
         }
     }
 
@@ -352,6 +359,7 @@ impl Cable {
             })
             .collect();
         self.previous = self.points.clone();
+        self.ticked = self.points.clone();
     }
 
     /// Moves the cable on by `dt` seconds in whole ticks. Returns whether it
@@ -381,10 +389,12 @@ impl Cable {
                 .asleep
                 .is_some_and(|end| end.distance(ends.end) < SLEEP)
         {
+            self.ticked.clone_from(&self.points);
             return false;
         }
         self.length += (wanted - self.length).clamp(-REEL * TICK, REEL * TICK);
         let before = self.points.clone();
+        self.ticked.clone_from(&before);
         let from = self.last.unwrap_or(*ends);
         let mut previous = from;
         for substep in 1..=SUBSTEPS {
@@ -400,6 +410,35 @@ impl Cable {
             .fold(0.0, f32::max);
         self.asleep = (moved < SLEEP).then_some(ends.end);
         true
+    }
+
+    /// Where the points show this frame: between the last two ticks, as
+    /// far as the time since the last one, with the plug end where the plug
+    /// is now. Ticks come at their own pace, so the cable would move in
+    /// steps between frames.
+    fn shown(&self, ends: &Ends) -> Vec<Vec3> {
+        let last = POINTS - 1;
+        let t = self.behind / TICK;
+        let mut shown: Vec<Vec3> = self
+            .ticked
+            .iter()
+            .zip(&self.points)
+            .map(|(a, b)| a.lerp(*b, t))
+            .collect();
+        let spacing = self.length / last as f32;
+        let mut pull = Vec3::ZERO;
+        for k in 0..3 {
+            let index = last - k;
+            let at = ends.end + ends.exit * k as f32 * spacing;
+            pull = at - shown[index];
+            shown[index] = at;
+        }
+        for k in 1..=CATCH_UP {
+            let index = last - 2 - k;
+            let share = 1.0 - k as f32 / (CATCH_UP + 1) as f32;
+            shown[index] += pull * share * share * (3.0 - 2.0 * share);
+        }
+        shown
     }
 
     /// How long the cable wants to be between `socket` and `end`.
@@ -526,18 +565,28 @@ impl Cable {
             })
     }
 
-    /// `point`, moved out of `bounds` of a thing at `transform` if it is
-    /// inside. It leaves through the side it came in by from `came_from`,
-    /// or through the nearest side above the counter if it was inside
-    /// already.
+    /// `point`, moved out of `bounds` of a thing at `transform`, rounded by
+    /// the radius of the cable, if it is inside. From inside the box itself
+    /// it leaves through the side it came in by from `came_from`, or
+    /// through the nearest side above the counter if it was inside already.
     fn around(&self, point: Vec3, came_from: Vec3, transform: Affine3A, bounds: &Block) -> Vec3 {
         let inverse = transform.inverse();
-        let half = bounds.size / 2.0 + RADIUS;
         let local = inverse.transform_point3(point) - bounds.center;
-        let room = half - local.abs();
-        if room.min_element() <= 0.0 {
-            return point;
+        let core = bounds.size / 2.0;
+        if (local.abs() - core).max_element() > 0.0 {
+            // Outside the box, the cable keeps its radius from the nearest
+            // point of it. Round around the edges, so a point slides over
+            // them as the box turns.
+            let nearest = local.clamp(-core, core);
+            let off = local - nearest;
+            let distance = off.length();
+            if distance >= RADIUS || distance < 1e-9 {
+                return point;
+            }
+            return transform.transform_point3(nearest + off / distance * RADIUS + bounds.center);
         }
+        let half = core + RADIUS;
+        let room = half - local.abs();
         let through = |axis: usize, side: f32| {
             let mut moved = local;
             moved[axis] = half[axis] * side.signum();
@@ -590,6 +639,7 @@ mod tests {
             solids: Vec::new(),
             points: Vec::new(),
             previous: Vec::new(),
+            ticked: Vec::new(),
             length: 0.0,
             asleep: None,
             behind: 0.0,
@@ -778,5 +828,62 @@ mod tests {
         assert!(moved.y >= 2.02 + RADIUS - 1e-6, "{moved}");
         let outside = Vec3::new(1.2, 2.0, 3.0);
         assert_eq!(cable.around(outside, outside, transform, &bounds), outside);
+    }
+
+    #[test]
+    fn the_cable_shows_between_ticks_with_its_end_on_the_plug() {
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        let at = |t: f32| {
+            let turn = Quat::from_rotation_y(1.5 * t) * Quat::from_rotation_x(2.5);
+            let transform = Affine3A::from_rotation_translation(turn, Vec3::new(-0.25, 1.2, 0.15));
+            let exit = turn * Vec3::NEG_Y;
+            Ends {
+                end: transform.transform_point3(Vec3::ZERO) + exit * 0.016,
+                exit,
+                device: Some((transform, bounds)),
+                file: None,
+            }
+        };
+        let mut cable = cable(Vec3::new(-0.4, 1.01, 0.1));
+        settle(&mut cable, &at(0.0));
+        let dt = 1.0 / 144.0;
+        let (shown, ticked): (Vec<_>, Vec<_>) = (0..288)
+            .map(|frame| {
+                let ends = at(frame as f32 * dt);
+                cable.advance(dt, &ends);
+                let shown = cable.shown(&ends);
+                assert_eq!(shown[POINTS - 1], ends.end);
+                (shown, cable.points.clone())
+            })
+            .unzip();
+        let jolt = |frames: &[Vec<Vec3>]| {
+            frames
+                .windows(3)
+                .skip(100)
+                .flat_map(|f| {
+                    (0..POINTS).map(move |i| (f[0][i] - 2.0 * f[1][i] + f[2][i]).length())
+                })
+                .fold(0.0, f32::max)
+        };
+        let (smooth, stepped) = (jolt(&shown), jolt(&ticked));
+        assert!(smooth < stepped / 2.0, "{smooth} {stepped}");
+    }
+
+    #[test]
+    fn the_cable_slides_round_the_edges_of_a_box() {
+        let cable = cable(Vec3::new(-0.4, 1.01, 0.1));
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        let transform = Affine3A::from_translation(Vec3::new(-0.25, 1.2, 0.15));
+        let edge = bounds.center + Vec3::new(0.03, 0.01, 0.0);
+        let near = edge + Vec3::new(1.0, 1.0, 0.0).normalize() * RADIUS / 2.0;
+        let world = transform.transform_point3(near);
+        let moved = transform
+            .inverse()
+            .transform_point3(cable.around(world, world, transform, &bounds));
+        assert!((moved.distance(edge) - RADIUS).abs() < 1e-6, "{moved}");
+        assert!((moved - edge).normalize().dot(near - edge) > 0.0);
+        let far = edge + Vec3::X * RADIUS * 2.0;
+        let world = transform.transform_point3(far);
+        assert_eq!(cable.around(world, world, transform, &bounds), world);
     }
 }
