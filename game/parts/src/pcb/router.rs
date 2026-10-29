@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::mem;
 
 use bevy::prelude::*;
 
@@ -35,6 +36,20 @@ pub struct Router {
     pitch: f32,
     cells: IVec2,
     owners: Vec<u32>,
+    search: Search,
+}
+
+/// What a search found so far, per cell and heading. Kept from route to
+/// route, so the board's worth of states is not filled anew each time.
+#[derive(Debug, Default)]
+struct Search {
+    cost: Vec<u32>,
+    came: Vec<u32>,
+    /// The round that set each state. Older ones count as unvisited.
+    seen: Vec<u32>,
+    /// The round that reached each cell in [`Router::reaches`].
+    flooded: Vec<u32>,
+    round: u32,
 }
 
 /// A pad that a trace can start from, see [`Router::pad`].
@@ -51,6 +66,7 @@ impl Router {
             pitch,
             cells,
             owners: vec![FREE; (cells.x * cells.y) as usize],
+            search: Search::default(),
         };
         let inner = size - 2.0 * margin;
         for y in 0..cells.y {
@@ -99,13 +115,19 @@ impl Router {
         targets: &[Vec2],
     ) -> Option<Vec<Vec2>> {
         let start_cell = self.cell(start)?;
-        let count = self.owners.len();
-        let mut cost = vec![u32::MAX; count * (START + 1)];
-        let mut came = vec![usize::MAX; count * (START + 1)];
+        let goals: Vec<IVec2> = targets.iter().filter_map(|&t| self.cell(t)).collect();
+        let mut search = mem::take(&mut self.search);
+        search.begin(self.owners.len());
+        // A way that is blocked costs the search the whole board, so a
+        // cheaper flood over the cells looks first.
+        if !self.reaches(&mut search, start_cell, from, net) {
+            self.search = search;
+            return None;
+        }
         let mut open = BinaryHeap::new();
         let first = self.index(start_cell) * (START + 1) + START;
-        cost[first] = 0;
-        open.push(Reverse((self.guess(start_cell, targets), first)));
+        search.reach(first, 0, u32::MAX);
+        open.push(Reverse((Self::guess(start_cell, &goals), first)));
         let mut goal = None;
         while let Some(Reverse((_, state))) = open.pop() {
             let (cell_index, heading) = (state / (START + 1), state % (START + 1));
@@ -117,7 +139,7 @@ impl Router {
                 goal = Some(state);
                 break;
             }
-            let here = cost[state];
+            let here = search.cost(state);
             for (direction, step) in STEPS.iter().enumerate() {
                 let next = cell + *step;
                 if !self.passable(next, from, net) {
@@ -141,28 +163,60 @@ impl Router {
                 }
                 let next_state = self.index(next) * (START + 1) + direction;
                 let total = here + price;
-                if total < cost[next_state] {
-                    cost[next_state] = total;
-                    came[next_state] = state;
-                    open.push(Reverse((total + self.guess(next, targets), next_state)));
+                if total < search.cost(next_state) {
+                    search.reach(next_state, total, state as u32);
+                    open.push(Reverse((total + Self::guess(next, &goals), next_state)));
                 }
             }
         }
-        let mut state = goal?;
-        let mut cells = Vec::new();
-        loop {
-            cells.push(state / (START + 1));
-            match came[state] {
-                usize::MAX => break,
-                previous => state = previous,
+        let path = goal.map(|mut state| {
+            let mut cells = Vec::new();
+            loop {
+                cells.push(state / (START + 1));
+                match search.came[state] {
+                    u32::MAX => break,
+                    previous => state = previous as usize,
+                }
             }
-        }
+            cells
+        });
+        self.search = search;
+        let mut cells = path?;
         cells.reverse();
         for &cell in &cells {
             self.owners[cell] = net;
         }
         self.join(from, net);
         Some(self.corners(start, &cells))
+    }
+
+    /// Whether a trace from `start` can get to `net` at all.
+    fn reaches(&self, search: &mut Search, start: IVec2, from: Pad, net: u32) -> bool {
+        let mut stack = vec![start];
+        search.flooded[self.index(start)] = search.round;
+        while let Some(cell) = stack.pop() {
+            if self.owners[self.index(cell)] == net {
+                return true;
+            }
+            for step in STEPS {
+                let next = cell + step;
+                if !self.passable(next, from, net)
+                    || search.flooded[self.index(next)] == search.round
+                {
+                    continue;
+                }
+                if step.x != 0
+                    && step.y != 0
+                    && !(self.passable(cell + IVec2::new(step.x, 0), from, net)
+                        && self.passable(cell + IVec2::new(0, step.y), from, net))
+                {
+                    continue;
+                }
+                search.flooded[self.index(next)] = search.round;
+                stack.push(next);
+            }
+        }
+        false
     }
 
     fn join(&mut self, pad: Pad, net: u32) {
@@ -197,12 +251,11 @@ impl Router {
         corners
     }
 
-    /// The octile distance to the nearest target, in steps.
-    fn guess(&self, cell: IVec2, targets: &[Vec2]) -> u32 {
-        targets
+    /// The octile distance to the nearest of `goals`, in steps.
+    fn guess(cell: IVec2, goals: &[IVec2]) -> u32 {
+        goals
             .iter()
-            .filter_map(|&target| self.cell(target))
-            .map(|target| {
+            .map(|&target| {
                 let d = (target - cell).abs();
                 let (long, short) = (d.max_element() as u32, d.min_element() as u32);
                 STRAIGHT * (long - short) + DIAGONAL * short
@@ -243,6 +296,37 @@ impl Router {
 
     fn index(&self, cell: IVec2) -> usize {
         (cell.y * self.cells.x + cell.x) as usize
+    }
+}
+
+impl Search {
+    /// Starts a search over `cells`, all unvisited.
+    fn begin(&mut self, cells: usize) {
+        let states = cells * (START + 1);
+        if self.seen.len() != states || self.round == u32::MAX {
+            *self = Self {
+                cost: vec![0; states],
+                came: vec![0; states],
+                seen: vec![0; states],
+                flooded: vec![0; cells],
+                round: 0,
+            };
+        }
+        self.round += 1;
+    }
+
+    fn cost(&self, state: usize) -> u32 {
+        if self.seen[state] == self.round {
+            self.cost[state]
+        } else {
+            u32::MAX
+        }
+    }
+
+    fn reach(&mut self, state: usize, cost: u32, from: u32) {
+        self.cost[state] = cost;
+        self.came[state] = from;
+        self.seen[state] = self.round;
     }
 }
 
