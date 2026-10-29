@@ -47,6 +47,7 @@ impl Plugin for DebugPortPlugin {
         .add_debug_method("ld60.screenshot", screenshot)
         .add_debug_method("ld60.state", state)
         .add_debug_method("ld60.where", place)
+        .add_debug_method("ld60.time", speed)
         .add_debug_method("ld60.input", input::input)
         .add_debug_method("ld60.diagnostics", profile::diagnostics)
         .add_debug_method("ld60.vsync", profile::vsync);
@@ -105,6 +106,20 @@ fn place(In(params): In<Option<Value>>, entities: Query<(&Name, &GlobalTransform
         })
         .collect();
     Ok(places.into())
+}
+
+/// `ld60.time { "speed": 0.1 }` runs game time at `speed` times real time.
+/// 0 freezes it. Returns the speed.
+fn speed(In(params): In<Option<Value>>, mut time: ResMut<Time<Virtual>>) -> BrpResult {
+    let speed = params
+        .as_ref()
+        .and_then(|params| params.get("speed"))
+        .and_then(Value::as_f64)
+        .filter(|speed| speed.is_finite() && *speed >= 0.0);
+    if let Some(speed) = speed {
+        time.set_relative_speed(speed as f32);
+    }
+    Ok(json!(time.relative_speed()))
 }
 
 /// `ld60.state` returns the game state, the focus, whether the window has
