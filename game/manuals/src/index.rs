@@ -108,14 +108,14 @@ impl Contents {
     /// with a band in the color of its section.
     pub(super) fn write(
         &self,
-        (page, sheet): (Page, Option<Sheet>),
+        (page, sheet): &(Page, Option<Sheet>),
         links: &Links,
         content: &mut ChildSpawnerCommands,
     ) {
         match sheet {
             None => self.write_index(links, content),
             Some(sheet) => {
-                content.spawn(sheet.band());
+                content.spawn(sheet.band(page));
                 page.write(content);
             }
         }
@@ -125,7 +125,7 @@ impl Contents {
     fn first_in_file(&self, entry: Entry, in_file: &InFile) -> Option<usize> {
         let start = self.start_of(entry)?;
         let page = in_file.from(start)?;
-        (in_file.number(page)? < start + entry.pages().len()).then_some(page)
+        (in_file.number(page)? < start + self.pages_of(entry).len()).then_some(page)
     }
 
     fn write_index(&self, links: &Links, page: &mut ChildSpawnerCommands) {
@@ -188,9 +188,9 @@ impl Contents {
                         Paper::text(Localized::verbatim((start + 1).to_string())),
                     ],
                 ));
-                let names: Vec<_> = entry
-                    .pages()
-                    .into_iter()
+                let names: Vec<_> = self
+                    .pages_of(entry)
+                    .iter()
                     .enumerate()
                     .filter_map(|(index, page)| Some((start + index, page.short_name()?)))
                     .collect();
@@ -227,12 +227,12 @@ impl Contents {
 impl Sheet {
     /// The band at the top of the page in the color of its section, with
     /// the names of the section, the entry and the page.
-    pub(super) fn band(self) -> impl Bundle {
+    pub(super) fn band(self, page: &Page) -> impl Bundle {
         let entry = self.entry();
         let names = [
             Some(entry.section().label().into()),
             Some(entry.label()),
-            self.page().and_then(Page::heading),
+            page.heading(),
         ];
         (
             Node {

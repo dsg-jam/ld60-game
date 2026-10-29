@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bevy::prelude::*;
 use ld60_calco::Revision;
 use ld60_devices::{ChipSpec, DeviceKind};
@@ -8,7 +10,7 @@ use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 use serde::{Deserialize, Serialize};
 
-use super::layout::{Layouts, ManualFile, PageLayout, Subject};
+use super::layout::{At, Layouts, ManualFile, PageLayout, Subject};
 use super::pins::Sheet;
 use ld60_game_device::DeviceName;
 
@@ -40,13 +42,13 @@ pub(super) enum Entry {
 }
 
 /// One page of the manuals file.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(super) enum Page {
     Index,
     /// A page from the layout files in `assets/manuals/`.
     Laid {
-        file: &'static ManualFile,
-        layout: &'static PageLayout,
+        file: Arc<ManualFile>,
+        at: At,
         subject: Subject,
     },
     Note(TutorialNote),
@@ -57,6 +59,8 @@ pub(super) enum Page {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct Contents {
     entries: Vec<Entry>,
+    /// The pages of each entry.
+    pages: Vec<Vec<Page>>,
 }
 
 impl Section {
@@ -113,8 +117,7 @@ impl Entry {
 
     /// How the shop's copy was printed, and on what paper. Each manual is a
     /// print run of its own.
-    pub(super) fn print(self) -> Print {
-        let layouts = Layouts::get();
+    pub(super) fn print(self, layouts: &Layouts) -> Print {
         let (file, run) = match self {
             Self::Manual(device) => {
                 let file = layouts.manual(device);
@@ -138,68 +141,65 @@ impl Entry {
         run.on(file.stock())
     }
 
-    pub(super) fn pages(self) -> Vec<Page> {
-        let layouts = Layouts::get();
-        let laid = |file: &'static ManualFile, subject| {
-            file.pages().iter().map(move |layout| Page::Laid {
-                file,
-                layout,
-                subject,
-            })
+    pub(super) fn pages(self, layouts: &Layouts) -> Vec<Page> {
+        let laid = |file: &Arc<ManualFile>, at, subject| Page::Laid {
+            file: file.clone(),
+            at,
+            subject,
         };
+        let all = |file: &Arc<ManualFile>| (0..file.pages().len()).map(At::Page);
         match self {
             Self::Manual(device) => {
                 let file = layouts.manual(device);
-                let boards = file.board_page().into_iter().flat_map(|layout| {
-                    device.boards().iter().map(move |board| Page::Laid {
-                        file,
-                        layout,
-                        subject: Subject::Board(board),
-                    })
-                });
-                boards.chain(laid(file, Subject::Device(device))).collect()
+                let boards = file.board_page().map_or(&[][..], |_| device.boards());
+                boards
+                    .iter()
+                    .map(|board| laid(file, At::BoardPage, Subject::Board(board)))
+                    .chain(all(file).map(|at| laid(file, at, Subject::Device(device))))
+                    .collect()
             }
             Self::Chip(revision) => {
                 let file = layouts.datasheet();
-                file.pages()
-                    .iter()
-                    .filter(|layout| layout.shows(revision))
-                    .map(|layout| Page::Laid {
-                        file,
-                        layout,
-                        subject: Subject::Chip(revision),
-                    })
+                all(file)
+                    .filter(|&at| file.page(at).is_some_and(|layout| layout.shows(revision)))
+                    .map(|at| laid(file, at, Subject::Chip(revision)))
                     .collect()
             }
-            Self::Errata(revision) => laid(layouts.errata(), Subject::Chip(revision)).collect(),
+            Self::Errata(revision) => {
+                let file = layouts.errata();
+                all(file)
+                    .map(|at| laid(file, at, Subject::Chip(revision)))
+                    .collect()
+            }
             Self::Note(note) => vec![Page::Note(note)],
         }
     }
 }
 
 impl Page {
-    pub(super) fn footer(self) -> Message {
+    pub(super) fn footer(&self) -> Message {
         match self {
             Self::Index => Message::new("manuals-footer"),
-            Self::Laid { file, subject, .. } => subject.args(Message::new(file.footer())),
+            Self::Laid { file, subject, .. } => {
+                subject.args(Message::new(file.footer().to_owned()))
+            }
             Self::Note(note) => note.footer(),
         }
     }
 
     /// What the band at the top of the page says after the entry, for the
     /// pages with a heading in their layout.
-    pub(super) fn heading(self) -> Option<Localized> {
-        match self {
-            Self::Laid {
-                layout, subject, ..
-            } => Some(subject.args(Message::new(layout.heading()?)).into()),
-            Self::Index | Self::Note(_) => None,
-        }
+    pub(super) fn heading(&self) -> Option<Localized> {
+        let heading = self.layout()?.heading()?.to_owned();
+        let Self::Laid { subject, .. } = self else {
+            return None;
+        };
+        Some(subject.args(Message::new(heading)).into())
     }
 
     /// How the index names the page under its entry: the board of a board
     /// page, otherwise the heading.
-    pub(super) fn short_name(self) -> Option<Localized> {
+    pub(super) fn short_name(&self) -> Option<Localized> {
         match self {
             Self::Laid {
                 subject: Subject::Board(board),
@@ -210,14 +210,23 @@ impl Page {
         }
     }
 
+    fn layout(&self) -> Option<&PageLayout> {
+        match self {
+            Self::Laid { file, at, .. } => file.page(*at),
+            Self::Index | Self::Note(_) => None,
+        }
+    }
+
     /// Writes everything but the index, which needs the [`Contents`].
-    pub(super) fn write(self, page: &mut ChildSpawnerCommands) {
+    pub(super) fn write(&self, page: &mut ChildSpawnerCommands) {
         match self {
             Self::Index => {}
-            Self::Laid {
-                layout, subject, ..
-            } => layout.write(subject, page),
-            Self::Note(note) => {
+            Self::Laid { subject, .. } => {
+                if let Some(layout) = self.layout() {
+                    layout.write(*subject, page);
+                }
+            }
+            &Self::Note(note) => {
                 page.spawn(Paper::heading(note.title()));
                 for paragraph in note.paragraphs() {
                     page.spawn(Paper::text(paragraph));
@@ -227,11 +236,37 @@ impl Page {
     }
 }
 
+impl PartialEq for Page {
+    /// Pages of a layout file are the same page only while the file stays
+    /// the same, so changed layouts refile the pages.
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Index, Self::Index) => true,
+            (Self::Note(a), Self::Note(b)) => a == b,
+            (
+                Self::Laid {
+                    file: a,
+                    at: at_a,
+                    subject: subject_a,
+                },
+                Self::Laid {
+                    file: b,
+                    at: at_b,
+                    subject: subject_b,
+                },
+            ) => Arc::ptr_eq(a, b) && at_a == at_b && subject_a == subject_b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Page {}
+
 impl Contents {
     /// The manuals the shop has in the order of [`DeviceKind::ALL`], the
     /// datasheets of their chips, the errata the shop bought and the notes
     /// it filed.
-    pub(super) fn of(run: &Run) -> Self {
+    pub(super) fn of(run: &Run, layouts: &Layouts) -> Self {
         let manuals = DeviceKind::ALL
             .into_iter()
             .filter(|&device| run.has_manual(device))
@@ -247,24 +282,35 @@ impl Contents {
             .into_iter()
             .filter_map(TutorialNote::new)
             .map(Entry::Note);
-        Self {
-            entries: manuals.chain(chips).chain(errata).chain(notes).collect(),
-        }
+        let entries: Vec<Entry> = manuals.chain(chips).chain(errata).chain(notes).collect();
+        let pages = entries.iter().map(|entry| entry.pages(layouts)).collect();
+        Self { entries, pages }
     }
 
     pub(super) fn entries(&self) -> &[Entry] {
         &self.entries
     }
 
+    /// The pages of `entry`, if it is filed.
+    pub(super) fn pages_of(&self, entry: Entry) -> &[Page] {
+        self.entries
+            .iter()
+            .position(|&other| other == entry)
+            .map_or(&[], |index| &self.pages[index])
+    }
+
     /// All pages, the index first, each as a [`Sheet`] of its entry.
     pub(super) fn pages(&self) -> Vec<(Page, Option<Sheet>)> {
-        let entries = self.entries.iter().flat_map(|&entry| {
-            entry
-                .pages()
-                .into_iter()
-                .enumerate()
-                .map(move |(index, page)| (page, Some(Sheet::new(entry, index))))
-        });
+        let entries = self
+            .entries
+            .iter()
+            .zip(&self.pages)
+            .flat_map(|(&entry, pages)| {
+                pages
+                    .iter()
+                    .enumerate()
+                    .map(move |(index, page)| (page.clone(), Some(Sheet::new(entry, index))))
+            });
         [(Page::Index, None)].into_iter().chain(entries).collect()
     }
 
@@ -323,9 +369,9 @@ impl Contents {
     fn starts(&self) -> Vec<usize> {
         let mut starts = vec![0];
         let mut next = 1;
-        for entry in &self.entries {
+        for pages in &self.pages {
             starts.push(next);
-            next += entry.pages().len();
+            next += pages.len();
         }
         starts
     }

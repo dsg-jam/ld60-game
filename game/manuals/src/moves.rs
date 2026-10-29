@@ -16,6 +16,7 @@ use ld60_game_player::focus::{Focus, Focused};
 
 use super::Filed;
 use super::index::Links;
+use super::layout::Layouts;
 use super::mechanism::sliding_off;
 use super::model::{COVER, HOLE_RADIUS, Parts, SHEET_SIZE};
 use super::pins::{Pins, Sheet};
@@ -156,7 +157,7 @@ impl SheetMoves {
         &mut self,
         (file, reading): (Entity, bool),
         (filed, paper, stack, pose): (&Filed, &Paper, &Stack, &Pose),
-        pins: &Pins,
+        (pins, layouts): (&Pins, &Layouts),
         commands: &mut Commands,
     ) -> bool {
         while let Some(next) = self.waiting.pop_front() {
@@ -187,7 +188,7 @@ impl SheetMoves {
             let print = if pin {
                 write_filed(commands, file, filed, sheet)
             } else {
-                sheet.spawn(commands, &filed.flight)
+                sheet.spawn(commands, &filed.flight, layouts)
             };
             self.flight = Some(Flight {
                 sheet,
@@ -219,7 +220,7 @@ impl SheetMoves {
     pub(super) fn fly(
         time: Res<Time>,
         (state, focused): (Res<State<Focus>>, Res<Focused>),
-        mut pins: ResMut<Pins>,
+        (mut pins, layouts): (ResMut<Pins>, Res<Layouts>),
         mut files: Query<(
             Entity,
             &mut SheetMoves,
@@ -255,7 +256,7 @@ impl SheetMoves {
                 && moves.start_next(
                     (file, reading),
                     (filed, paper, stack, pose),
-                    &pins,
+                    (&pins, &layouts),
                     &mut commands,
                 )
             {
@@ -305,9 +306,9 @@ impl SheetMoves {
                 let holes = holes(stray(flight.seed))
                     .map(|hole| (hole + SHEET_SIZE / 2.0).extend(HOLE_RADIUS));
                 file_side.extension.set_sheet(&flight.wrinkles, holes);
-                file_side.extension.set_print(flight.sheet.print());
+                file_side.extension.set_print(flight.sheet.print(&layouts));
                 let mut rail_side = reprinted(&rail_paper, filed.flight.image.clone());
-                rail_side.extension.set_print(flight.sheet.print());
+                rail_side.extension.set_print(flight.sheet.print(&layouts));
                 let paper = [materials.add(file_side), materials.add(rail_side)];
                 let (from, share) = if flight.pin {
                     let Ok((open, top, _)) = sheets.get(parts.sheet) else {
@@ -382,7 +383,7 @@ impl SheetMoves {
                     commands.entity(print).despawn();
                 }
                 flight.print = if flight.pin {
-                    flight.sheet.spawn(&mut commands, &filed.flight)
+                    flight.sheet.spawn(&mut commands, &filed.flight, &layouts)
                 } else {
                     write_filed(&mut commands, file, filed, flight.sheet)
                 };
@@ -510,7 +511,7 @@ fn write_filed(
     let contents = &filed.contents;
     let pages = contents.pages();
     let number = sheet.number(contents)?;
-    let page = *pages.get(number)?;
+    let page = pages.get(number)?;
     let links = Links {
         file,
         in_file: &filed.in_file,

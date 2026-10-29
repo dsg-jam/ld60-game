@@ -23,11 +23,10 @@ impl Plugin for SavePlugin {
             } = saved.reopened();
             run.file_past_notes();
             run.file_owned_datasheets();
-            let mut pins = pins.unwrap_or_default();
-            pins.keep_filed(&run);
+            // The manuals unpin what is not filed once they know their pages.
             app.insert_resource(run)
                 .insert_resource(clock)
-                .insert_resource(pins);
+                .insert_resource(pins.unwrap_or_default());
             if let Some(bench) = bench {
                 app.insert_resource(bench);
             }

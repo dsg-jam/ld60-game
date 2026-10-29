@@ -7,7 +7,7 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_manuals::{MoveSheet, Pins, RailSlot, Sheet};
+use ld60_game_manuals::{Layouts, MoveSheet, Pins, RailSlot, Sheet};
 use ld60_game_parts::paper::{Flutter, Paper};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_game_player::camera::{PlayerCamera, framing};
@@ -223,13 +223,13 @@ impl PinBoard {
     /// Hangs the pinned sheets. The [`Aside`] goes back to the screen once
     /// none are left.
     pub(super) fn follow_pins(
-        pins: Res<Pins>,
+        (pins, layouts): (Res<Pins>, Res<Layouts>),
         mut boards: Query<(&mut PinBoard, &mut Aside)>,
         mut visibilities: Query<&mut Visibility>,
         mut commands: Commands,
     ) {
         for (mut board, mut aside) in &mut boards {
-            if board.shown.as_ref() == Some(&*pins) {
+            if board.shown.as_ref() == Some(&*pins) && !layouts.is_changed() {
                 continue;
             }
             let slots = pins.slots();
@@ -247,8 +247,8 @@ impl PinBoard {
                 slot.page = slots[index].and_then(|sheet| {
                     commands
                         .entity(slot.sheet)
-                        .insert((sheet.print(), Hanging(sheet)));
-                    sheet.spawn(&mut commands, &slot.canvas)
+                        .insert((sheet.print(&layouts), Hanging(sheet)));
+                    sheet.spawn(&mut commands, &slot.canvas, &layouts)
                 });
                 if slot.page.is_none() {
                     commands.entity(slot.sheet).remove::<Hanging>();
