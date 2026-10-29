@@ -23,7 +23,7 @@ const SPREAD: f32 = 0.12;
 /// How far the plume sways sideways per meter it rises. Matches
 /// `steam/plume.wesl`.
 const SWAY: f32 = 0.12;
-const DENSITY: f32 = 0.04;
+const DENSITY: f32 = 0.12;
 /// Water droplets barely absorb light and scatter most of it forward.
 const ABSORPTION: f32 = 0.05;
 const SCATTERING: f32 = 0.9;
