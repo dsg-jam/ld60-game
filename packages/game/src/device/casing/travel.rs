@@ -44,7 +44,7 @@ impl Casing {
         time: Res<Time>,
         mut casings: Query<(&mut Casing, &Transform, &Holdable, &Children)>,
         mut covers: Query<&mut Transform, CoverOnly>,
-        mut asides: Query<(Entity, &mut Aside, &mut Transform), AsideOnly>,
+        mut asides: Query<(Entity, &mut Aside, &mut Transform, Has<Turning>), AsideOnly>,
         mut commands: Commands,
     ) {
         let dt = time.delta_secs();
@@ -53,7 +53,9 @@ impl Casing {
             let progress = casing
                 .cover
                 .map_or(goal, |progress| towards(progress, goal, dt / COVER_TIME));
-            casing.cover = Some(progress);
+            if casing.cover != Some(progress) {
+                casing.cover = Some(progress);
+            }
             let around = Around {
                 device: *device,
                 bounds: casing.bounds,
@@ -69,12 +71,15 @@ impl Casing {
                 }
             }
             for (index, &screw) in casing.aside.iter().enumerate() {
-                let Ok((entity, mut aside, mut transform)) = asides.get_mut(screw) else {
+                let Ok((entity, mut aside, mut transform, turned)) = asides.get_mut(screw) else {
                     continue;
                 };
                 let goal = if casing.loose[index] { 1.0 } else { 0.0 };
                 let before = aside.progress;
-                aside.progress = towards(before, goal, dt / SCREW_TIME);
+                let progress = towards(before, goal, dt / SCREW_TIME);
+                if progress != before {
+                    aside.progress = progress;
+                }
                 // The screw starts to turn, out of its hole or into it.
                 if before <= TURN_FROM && aside.progress > TURN_FROM {
                     commands.trigger(Play(Sound::ScrewOut));
@@ -86,9 +91,14 @@ impl Casing {
                 let (pose, turning) = screw_pose(aside.progress, hole, &around, mat);
                 transform.set_if_neq(pose);
                 match turning {
-                    Some(turning) => commands.entity(entity).insert(turning),
-                    None => commands.entity(entity).remove::<Turning>(),
-                };
+                    Some(turning) => {
+                        commands.entity(entity).insert(turning);
+                    }
+                    None if turned => {
+                        commands.entity(entity).remove::<Turning>();
+                    }
+                    None => {}
+                }
             }
         }
     }
