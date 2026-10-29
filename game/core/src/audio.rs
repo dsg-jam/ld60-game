@@ -12,6 +12,7 @@ use bevy::{
 use self::synth::{Noise, Samples};
 use crate::parts::keypad::PressableKey;
 use crate::player::camera::PlayerCamera;
+use crate::settings::Settings;
 
 /// How loud the game is while a menu is open.
 const DUCKED: f32 = 0.35;
@@ -293,6 +294,10 @@ impl Default for Mixer {
 }
 
 impl Mixer {
+    fn follow_settings(settings: Res<Settings>, mut mixer: ResMut<Mixer>) {
+        mixer.volume = settings.volume();
+    }
+
     /// What every sound is multiplied by.
     pub fn gain(&self) -> f32 {
         self.volume * Self::ducking(self.duck)
@@ -346,6 +351,7 @@ impl Plugin for AudioPlugin {
                 Update,
                 (
                     Sounds::click_keys.run_if(resource_exists::<Sounds>),
+                    Mixer::follow_settings.run_if(resource_changed::<Settings>),
                     Held::follow.run_if(resource_changed::<Mixer>),
                 ),
             )

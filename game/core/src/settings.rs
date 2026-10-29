@@ -5,8 +5,6 @@ use ld60_locale::Message;
 use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
-use crate::audio::Mixer;
-
 use self::quality::Quality;
 
 const VOLUME_STEPS: u8 = 10;
@@ -25,7 +23,6 @@ impl Plugin for SettingsPlugin {
             .map(Settings::checked)
             .unwrap_or_default();
         app.insert_resource(settings)
-            .add_systems(Update, Settings::apply.run_if(resource_changed::<Settings>))
             .add_systems(Last, Settings::save.run_if(resource_changed::<Settings>))
             .add_observer(Adjust::apply);
     }
@@ -89,10 +86,6 @@ impl Settings {
 
     pub const fn quality(&self) -> Quality {
         self.quality
-    }
-
-    fn apply(settings: Res<Settings>, mut mixer: ResMut<Mixer>) {
-        mixer.volume = settings.volume();
     }
 
     /// The settings with each value moved into its range, in case the save
