@@ -166,21 +166,24 @@ impl PcbArt {
     /// top.
     pub fn image(self) -> Image {
         let (width, height) = (self.texels.x as i32, self.texels.y as i32);
-        let copper = |x: i32, y: i32| {
-            let (x, y) = (x.clamp(0, width - 1), y.clamp(0, height - 1));
-            self.layers[(y * width + x) as usize][Layer::Copper as usize]
-        };
+        let at = |x: i32, y: i32| (y.clamp(0, height - 1) * width + x.clamp(0, width - 1)) as usize;
+        // The box blur, along the rows first and then down the columns.
+        let rows: Vec<f32> = (0..height)
+            .flat_map(|y| (0..width).map(move |x| (x, y)))
+            .map(|(x, y)| {
+                (-HEIGHT_BLUR..=HEIGHT_BLUR)
+                    .map(|dx| self.layers[at(x + dx, y)][Layer::Copper as usize])
+                    .sum()
+            })
+            .collect();
         let area = ((2 * HEIGHT_BLUR + 1) * (2 * HEIGHT_BLUR + 1)) as f32;
         let mut data = Vec::with_capacity(self.layers.len() * 4);
         for y in 0..height {
             for x in 0..width {
                 let texel = self.layers[(y * width + x) as usize];
-                let mut sum = 0.0;
-                for dy in -HEIGHT_BLUR..=HEIGHT_BLUR {
-                    for dx in -HEIGHT_BLUR..=HEIGHT_BLUR {
-                        sum += copper(x + dx, y + dy);
-                    }
-                }
+                let sum: f32 = (-HEIGHT_BLUR..=HEIGHT_BLUR)
+                    .map(|dy| rows[at(x, y + dy)])
+                    .sum();
                 let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
                 // Print never goes onto bare copper or into holes.
                 let silk = texel[2] * (1.0 - texel[1]);
