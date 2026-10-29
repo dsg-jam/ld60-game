@@ -8,7 +8,6 @@ mod edits;
 mod errors;
 mod footer;
 mod highlight;
-mod hint;
 mod history;
 mod lexer;
 mod listing;
@@ -46,7 +45,6 @@ use self::debugger::DebugPanel;
 use self::dump::{Dump, DumpPage};
 use self::footer::{Command, Run, Status};
 use self::highlight::Highlight;
-use self::hint::HintLine;
 use self::listing::Listing;
 use self::notes::Notes;
 use self::page::{ActivePage, Page, PageTitle};
@@ -102,7 +100,6 @@ impl Plugin for EditorPlugin {
             (
                 Editor::load_job,
                 DumpPage::stream,
-                HintLine::update,
                 Command::show_labels,
                 Command::show_owned,
                 (
@@ -212,16 +209,6 @@ impl Editor {
                 Notes::bundle(font.clone()),
                 VersionsPage::bundle(font.clone()),
                 DebugPanel::bundle(font.clone()),
-                (
-                    HintLine,
-                    Node {
-                        display: Display::None,
-                        ..default()
-                    },
-                    Localized::verbatim(""),
-                    font.clone(),
-                    TextColor(PHOSPHOR)
-                ),
                 (
                     Status,
                     Localized::verbatim(""),
