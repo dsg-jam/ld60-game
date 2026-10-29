@@ -214,7 +214,16 @@ impl Props<'_> {
                     .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
             ),
         ];
-        Self::spawn(parent, parts);
+        // It moves over the parts it works and must not hide them from the
+        // pointer.
+        for (mesh, material, transform) in parts {
+            parent.spawn((
+                Mesh3d(mesh),
+                MeshMaterial3d(material.clone()),
+                transform,
+                Pickable::IGNORE,
+            ));
+        }
     }
 
     fn spawn<const N: usize>(

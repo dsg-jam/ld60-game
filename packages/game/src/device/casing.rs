@@ -90,6 +90,11 @@ impl Plugin for CasingPlugin {
     }
 }
 
+/// Where the tool for a part touches it, in the part's space. The tool
+/// points along +Y, into the part.
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct ToolSpot(pub(crate) Vec3);
+
 /// The back cover of a device and its screws. The debug header on the board
 /// is under the cover.
 #[derive(Component, Debug)]
@@ -252,6 +257,7 @@ impl Casing {
                         .spawn((
                             Screw(index),
                             ClickTool::Screwdriver,
+                            ToolSpot(Vec3::NEG_Y * SCREW.y / 2.0),
                             Snap,
                             Shape::cylinder(&head, SCREW_METAL),
                             Finish::Metal,
@@ -262,6 +268,7 @@ impl Casing {
                     cover.spawn((
                         Hole(index),
                         ClickTool::Screwdriver,
+                        ToolSpot(Vec3::NEG_Y * HOLE.y / 2.0),
                         Snap,
                         Shape::cylinder(&hole, HOLE_DARK),
                         Finish::Plastic,
