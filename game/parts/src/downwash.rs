@@ -18,7 +18,7 @@ impl Plugin for DownwashPlugin {
         app.init_resource::<Downwash>();
         #[cfg(feature = "debug_port")]
         {
-            use crate::debug_port::DebugMethods;
+            use ld60_game_core::debug_port::DebugMethods;
             app.add_debug_method("ld60.wind", Downwash::debug_wind);
         }
     }

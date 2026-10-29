@@ -18,10 +18,10 @@ use bevy::{
     },
     prelude::*,
 };
-use ld60_game_core::parts::keypad::PressableKey;
 use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::player::focus::{Focus, FocusTarget, Focused, View};
 use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
+use ld60_game_parts::keypad::PressableKey;
 use ld60_locale::Message;
 
 pub use self::casing::{Casing, CasingTravel, Header, Turning};

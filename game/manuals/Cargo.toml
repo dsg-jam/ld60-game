@@ -17,6 +17,7 @@ ld60-calco = { workspace = true, features = ["serde"] }
 ld60-devices = { workspace = true, features = ["serde"] }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
+ld60-game-parts = { workspace = true }
 ld60-game-run = { workspace = true }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }

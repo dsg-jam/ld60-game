@@ -21,6 +21,9 @@ use bevy::{
     platform::hash::fixed_hash_one,
     prelude::*,
 };
+use ld60_game_core::player::focus::{self, Focus, Focused};
+use ld60_game_core::player::free_look::MODIFIERS;
+use ld60_game_core::player::hints::ClickHint;
 use ld60_locale::{Localized, Message};
 
 pub use self::back::BlankBack;
@@ -34,9 +37,6 @@ pub use self::sheet::{PaperMaterial, Pressed, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
 pub use self::stock::Stock;
 use super::screen::UiCanvas;
-use crate::player::focus::{self, Focus, Focused};
-use crate::player::free_look::MODIFIERS;
-use crate::player::hints::ClickHint;
 
 pub const PAPER: Color = Color::srgb_u8(0xf2, 0xec, 0xdc);
 pub const INK: Color = Color::srgb_u8(0x2a, 0x26, 0x22);

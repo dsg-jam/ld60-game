@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use ld60_calco::Revision;
 use ld60_calco::datasheet::Group;
 use ld60_devices::{Board, DeviceKind};
-use ld60_game_core::parts::paper::{Paper, Press, Stock};
+use ld60_game_parts::paper::{Paper, Press, Stock};
 use ld60_locale::Message;
 use serde::Deserialize;
 

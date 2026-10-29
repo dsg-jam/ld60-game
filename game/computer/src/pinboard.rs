@@ -7,11 +7,11 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
-use ld60_game_core::parts::paper::{Flutter, Paper};
-use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::camera::{PlayerCamera, framing};
 use ld60_game_core::player::focus::{Aside, Clickable, Focus, FocusOn};
 use ld60_game_manuals::{MoveSheet, Pins, RailSlot, Sheet};
+use ld60_game_parts::paper::{Flutter, Paper};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::tutorial::FirstNote;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;

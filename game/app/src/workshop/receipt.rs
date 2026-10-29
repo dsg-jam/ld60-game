@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 use ld60_game_core::audio::Sound;
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::parts::paper::{Flutter, Paper};
-use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::focus::{Focus, FocusTarget, View};
+use ld60_game_parts::paper::{Flutter, Paper};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::Leftover;
 use ld60_game_run::levels::Levels;
 use ld60_game_run::pickup::{Payment, Pickup, TRIES};

@@ -1,6 +1,6 @@
 use bevy::{input::keyboard::NativeKeyCode, prelude::*};
-use ld60_game_core::parts::keypad::KeyBinding::Code;
-use ld60_game_core::parts::keypad::{KeyDef, Keypad, KeypadStyle};
+use ld60_game_parts::keypad::KeyBinding::Code;
+use ld60_game_parts::keypad::{KeyDef, Keypad, KeypadStyle};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_calco::Revision;
 use ld60_devices::{ChipSpec, DeviceKind};
-use ld60_game_core::parts::paper::{Paper, Press, Print, Stock};
+use ld60_game_parts::paper::{Paper, Press, Print, Stock};
 use ld60_game_run::Run;
 use ld60_game_run::tutorial::TutorialNote;
 use ld60_levels::Level;

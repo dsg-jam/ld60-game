@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 use ld60_devices::{Annunciator, Board, DeviceKind};
-use ld60_game_core::parts::paper::Paper;
+use ld60_game_parts::paper::Paper;
 use ld60_locale::{Localized, Message};
 
 const KEY_WIDTH: f32 = 120.0;

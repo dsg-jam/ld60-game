@@ -1,8 +1,8 @@
 use bevy::prelude::*;
+use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
 use super::{Paper, ShowsOwnPages};
-use crate::player::hints::{Hint, Hints, Icon, Input};
 
 impl Paper {
     /// Papers with more than one page say how to turn them. A paper that

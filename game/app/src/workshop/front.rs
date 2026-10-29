@@ -3,7 +3,7 @@ mod sign;
 
 use bevy::prelude::*;
 use ld60_game_core::layout::shop::{FRONT, PILLAR, SIZE};
-use ld60_game_core::parts::script::ALPHABET;
+use ld60_game_parts::script::ALPHABET;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;

@@ -18,13 +18,13 @@ mod turning;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 use ld60_game_core::audio::{Play, Sound};
-use ld60_game_core::parts::paper::{
+use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
+use ld60_game_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use ld60_game_parts::paper::{
     Binding, Leaf, LeafShape, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Paper, ShowsOwnPages,
     Wrinkles,
 };
-use ld60_game_core::parts::screen::{ScreenSurface, UiCanvas};
-use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
-use ld60_game_core::player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use ld60_game_parts::screen::{ScreenSurface, UiCanvas};
 use ld60_game_run::Run;
 use ld60_game_run::job::{Job, JobId};
 use ld60_game_run::tutorial::{FirstNote, TutorialNote};

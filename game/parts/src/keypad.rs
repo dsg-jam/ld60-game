@@ -5,14 +5,14 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_game_core::audio::KeyClick;
+use ld60_game_core::player::cursor::WantsFinger;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
 use self::stroke::Stroke;
-use crate::audio::KeyClick;
-use crate::parts::screen::UiCanvas;
-use crate::player::cursor::WantsFinger;
+use crate::screen::UiCanvas;
 
 pub struct KeypadPlugin;
 

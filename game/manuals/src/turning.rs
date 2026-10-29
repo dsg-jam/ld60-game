@@ -8,7 +8,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::paper::{
+use ld60_game_parts::paper::{
     Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
     blank_print, reprinted,
 };

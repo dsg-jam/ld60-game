@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_core::parts::dot_matrix::DotMatrix;
+use ld60_game_parts::dot_matrix::DotMatrix;
 use ld60_geometry::block::Block;
 use ld60_geometry::frame::Frame;
 use ld60_geometry::shape::Shape;

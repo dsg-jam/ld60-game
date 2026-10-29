@@ -1,8 +1,8 @@
 use std::fmt;
 
 use bevy::prelude::*;
-use ld60_game_core::parts::paper::{Paper, Print};
-use ld60_game_core::parts::screen::UiCanvas;
+use ld60_game_parts::paper::{Paper, Print};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::tutorial::TutorialNote;
 use ld60_game_run::{NewRun, Run};
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};

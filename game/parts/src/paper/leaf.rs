@@ -9,9 +9,9 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
+use ld60_game_core::audio::{PlayAt, Sound};
 
 use super::sheet::{PaperMaterial, Wrinkles};
-use crate::audio::{PlayAt, Sound};
 
 /// How far a turning page bends at most, in radians over its free width.
 const CURL: f32 = 0.9;

@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use ld60_game_core::audio::{Play, Sound};
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::parts::paper::{Flutter, Paper, Press, Stock};
-use ld60_game_core::parts::screen::UiCanvas;
 use ld60_game_core::player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
 use ld60_game_core::state::AppState;
+use ld60_game_parts::paper::{Flutter, Paper, Press, Stock};
+use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::chore::PlanetSet;
 use ld60_game_run::{Leftover, Rent, Run};
 use ld60_locale::{Localized, Message};

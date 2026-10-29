@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use bevy::prelude::*;
 use ld60_game_core::layout::shop;
-use ld60_game_core::parts::script::Word;
+use ld60_game_parts::script::Word;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};

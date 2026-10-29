@@ -7,10 +7,10 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_game_core::GRAVITY;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::downwash::Downwash;
-use crate::GRAVITY;
 
 /// Surface tension over density of water, and so of coffee, in m³/s².
 const TENSION: f32 = 7.2e-5;

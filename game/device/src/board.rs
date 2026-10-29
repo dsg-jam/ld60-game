@@ -1,7 +1,7 @@
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
-use ld60_game_core::parts::pcb::{Pad, Pcb, PcbArt, PcbMaterial, Router};
+use ld60_game_parts::pcb::{Pad, Pcb, PcbArt, PcbMaterial, Router};
 use ld60_geometry::block::Block;
 use ld60_locale::{Locale, Message};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};

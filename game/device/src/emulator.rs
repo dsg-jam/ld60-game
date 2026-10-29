@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use ld60_devices::{AnyDevice, Device, MAX_STEPS, Readout, Rom};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
-use ld60_game_core::parts::lcd::LcdDisplay;
+use ld60_game_parts::lcd::LcdDisplay;
 use ld60_levels::TEST_SEEDS;
 use ld60_machine::{Cpu, Step};
 

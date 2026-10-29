@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
-use ld60_game_core::parts::liquid::{Foam, Liquid};
-use ld60_game_core::parts::steam::Steam;
+use ld60_game_parts::liquid::{Foam, Liquid};
+use ld60_game_parts::steam::Steam;
 
 use ld60_game_device::Phillips;
 

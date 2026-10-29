@@ -13,9 +13,9 @@ import ld60_geometry::{
     bump::bumped,
     noise::{TAU, hash, noise, visible},
 };
-import package::parts::paper::punch::punched;
-import package::parts::paper::press::printed;
-import package::parts::paper::stock::toned;
+import package::paper::punch::punched;
+import package::paper::press::printed;
+import package::paper::stock::toned;
 
 struct Sheet {
     size: vec2<f32>,
