@@ -63,11 +63,11 @@ fn vertex(vertex: Vertex) -> Droplet {
     let deep = smoothstep(DEEP.x, DEEP.y, water);
     // Thrown back and up by the tire, then falling. Deep water goes higher
     // and out to the side.
-    let throw = 1.0 + DEEP_THROW * deep;
+    let fling = 1.0 + DEEP_THROW * deep;
     let velocity = vec3<f32>(
         -mix(1.5, 4.5, r.y),
-        mix(0.6, 2.0, r.z) * throw,
-        r.w * mix(0.2, 1.0, r.y) * throw * throw,
+        mix(0.6, 2.0, r.z) * fling,
+        r.w * mix(0.2, 1.0, r.y) * fling * fling,
     );
     var local = vertex.anchor + velocity * t - vec3<f32>(0.0, 0.5 * spray.gravity * t * t, 0.0);
     local.y = max(local.y, 0.02);
