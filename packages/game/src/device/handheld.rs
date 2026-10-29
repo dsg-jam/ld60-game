@@ -14,9 +14,9 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use ld60_levels::{Level, LevelError};
-use ld60_locale::{Localized, Message};
+use ld60_locale::{Locale, Localized, Message};
 
-use super::board::{BoardLayout, BoardSpots, CHIP_BLACK, CHIP_INK};
+use super::board::{BoardLayout, BoardSpots, CHIP_BLACK, CHIP_INK, SilkWords};
 use super::casing::{COVER, Casing, CasingSpots, WALL};
 use super::emulator::Emulator;
 use super::silhouette::Silhouette;
@@ -349,6 +349,7 @@ impl Handheld {
         mut materials: ResMut<Assets<StandardMaterial>>,
         mut stickers: ResMut<Assets<StickerMaterial>>,
         mut pcbs: ResMut<Assets<PcbMaterial>>,
+        locale: Res<Locale>,
     ) {
         let Ok(unit) = units.get(add.entity) else {
             return;
@@ -398,7 +399,13 @@ impl Handheld {
         let name = format!("PCB {}", level.board().name());
         let artwork = Sticker::seed(&format!("{:?} {name}", level.device));
         let board = BoardLayout::new(&shell, COVER, &spots, artwork);
-        let faces = board.faces(&name, &mut meshes, &mut images, &mut pcbs);
+        let faces = board.faces(
+            &name,
+            &SilkWords::new(&locale),
+            &mut meshes,
+            &mut images,
+            &mut pcbs,
+        );
         let marking = images.add(Self::chip_marking(level));
         let (plating, platings) = board.platings();
         let plating = (

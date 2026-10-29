@@ -21,3 +21,9 @@ device-sticker =
     BOARD { $board }
     { $chip }
     DSG ELECTRONICS
+
+# Words printed on the circuit board, in a small font with the letters A to
+# Z and digits only. Keep them short.
+silk-debug = DEBUG
+silk-keys = KEYS
+silk-battery = BAT
