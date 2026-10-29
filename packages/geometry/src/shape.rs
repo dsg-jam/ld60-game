@@ -1,3 +1,5 @@
+mod drilled;
+
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 use super::bar::Bar;
@@ -45,6 +47,9 @@ enum Kind {
     Capsule,
     /// A round mesh of its own that fills its block.
     Turned(Handle<Mesh>),
+    /// Like [`Kind::Cuboid`], with round holes of a radius through it from
+    /// top to bottom.
+    Drilled(Vec<Vec2>, f32),
 }
 
 impl Shape {
@@ -71,6 +76,12 @@ impl Shape {
 
     pub fn capsule(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Capsule, block, color)
+    }
+
+    /// A cuboid with round holes of `radius` through it from top to bottom.
+    /// `holes` are on its top, in meters from its middle.
+    pub fn drilled(block: &Block, holes: &[Vec2], radius: f32, color: Color) -> impl Bundle {
+        Self::bundle(Kind::Drilled(holes.to_vec(), radius), block, color)
     }
 
     /// A round part with its own `mesh`, which fills `block` and is
@@ -110,6 +121,7 @@ impl Shape {
             Kind::Cylinder => Cylinder::new(self.size.x / 2.0, self.size.y).into(),
             Kind::Capsule => Capsule3d::new(self.size.x / 2.0, self.size.y - self.size.x).into(),
             Kind::Turned(mesh) => return mesh.clone(),
+            Kind::Drilled(holes, radius) => drilled::drilled(self.size, holes, *radius),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);
@@ -128,7 +140,7 @@ impl Shape {
             return;
         };
         let form = match shape.kind {
-            Kind::Cuboid => Form::Box(shape.size),
+            Kind::Cuboid | Kind::Drilled(..) => Form::Box(shape.size),
             Kind::Cylinder | Kind::Capsule | Kind::Turned(_) => Form::Cylinder(shape.size),
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;
