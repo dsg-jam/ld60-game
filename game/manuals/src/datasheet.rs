@@ -53,7 +53,10 @@ impl ChipSheet {
                 (Localized::verbatim(port.name), 60.0),
                 (Localized::verbatim(direction), 50.0),
                 (Localized::verbatim(format!("{:X}", port.port)), 30.0),
-                (Localized::verbatim(port.function), 404.0),
+                (
+                    Message::new(format!("datasheet-port-{}", port.name.to_lowercase())).into(),
+                    404.0,
+                ),
             ]));
         }
     }
@@ -84,7 +87,7 @@ impl ChipSheet {
                 table.spawn(row([
                     Localized::verbatim(doc.hex),
                     Localized::verbatim(doc.syntax),
-                    Localized::verbatim(doc.operation),
+                    Self::row(doc).attribute("operation").into(),
                     Localized::verbatim(doc.z.symbol()),
                     Localized::verbatim(doc.c.symbol()),
                 ]));
@@ -108,12 +111,20 @@ impl ChipSheet {
         for doc in docs {
             page.spawn(Paper::row([
                 (Localized::verbatim(doc.example), 130.0),
-                (Localized::verbatim(doc.meaning), 414.0),
+                (Self::row(doc).attribute("meaning").into(), 414.0),
             ]));
-            for note in NOTES.iter().filter(|note| note.op == doc.op) {
-                page.spawn(Paper::faded(Localized::verbatim(note.text)));
+            if NOTES.contains(&doc.op) {
+                page.spawn(Paper::faded(Self::row(doc).attribute("note")));
             }
         }
+    }
+
+    /// The words for the row of `doc` in the instruction table.
+    fn row(doc: &InstructionDoc) -> Message {
+        Message::new(format!(
+            "datasheet-op-{}",
+            doc.hex.to_lowercase().replace(' ', "-")
+        ))
     }
 
     fn docs(self, group: Group) -> impl Iterator<Item = &'static InstructionDoc> {
@@ -134,13 +145,13 @@ impl ChipSheet {
             ));
         }
         for erratum in errata {
-            page.spawn(Paper::text(Localized::verbatim(
-                erratum.title().to_uppercase(),
-            )));
+            let message = Message::new(format!("erratum-{}", erratum.id()));
+            page.spawn(Paper::text(message.clone().attribute("title")));
             page.spawn(Paper::faded(
-                Message::new("datasheet-affects").with("chips", erratum.affected_chips()),
+                Message::new("datasheet-affects")
+                    .with("chips", message.clone().attribute("affects")),
             ));
-            page.spawn(Paper::text(Localized::verbatim(erratum.description())));
+            page.spawn(Paper::text(message.attribute("description")));
         }
     }
 
@@ -153,6 +164,40 @@ impl ChipSheet {
             Group::Routines => "datasheet-group-routines",
             Group::Loops => "datasheet-group-loops",
             Group::Lights => "datasheet-group-lights",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ld60_locale::Locale;
+
+    use super::*;
+
+    #[test]
+    fn every_table_formats_on_every_revision() {
+        use Group::{Jumps, Keys, Lights, Loops, Math, Numbers, Routines};
+
+        let locale = Locale::on_disk();
+        for revision in Revision::ALL {
+            let sheet = ChipSheet::new(revision);
+            locale.assert_formats(Localized::spawned_by(|page| {
+                sheet.registers(page);
+                sheet.reset(page);
+                sheet.ports(page);
+                sheet.instructions(page);
+                for group in [Numbers, Keys, Jumps, Math, Routines, Loops, Lights] {
+                    sheet.group(group, page);
+                }
+                sheet.errata(page);
+            }));
+        }
+    }
+
+    #[test]
+    fn every_note_is_under_an_instruction_row() {
+        for op in NOTES {
+            assert!(INSTRUCTIONS.iter().any(|doc| doc.op == *op), "{op:?}");
         }
     }
 }

@@ -9,25 +9,10 @@ pub enum Erratum {
 impl Erratum {
     pub const ALL: &[Erratum] = &[Erratum::DsClearsCarryOnZero];
 
-    pub fn title(self) -> &'static str {
+    /// A stable name of the bug, like `ds-clears-carry-on-zero`.
+    pub fn id(self) -> &'static str {
         match self {
-            Self::DsClearsCarryOnZero => "DS clears C when the result is 0",
-        }
-    }
-
-    pub fn description(self) -> &'static str {
-        match self {
-            Self::DsClearsCarryOnZero => {
-                "When DS adds 10 and the result is 0, C is cleared instead of kept. \
-                 The borrow to the next digit is lost."
-            }
-        }
-    }
-
-    /// Which chips have the bug, as printed on the errata sheet.
-    pub fn affected_chips(self) -> &'static str {
-        match self {
-            Self::DsClearsCarryOnZero => "Rev B, date codes before 7624",
+            Self::DsClearsCarryOnZero => "ds-clears-carry-on-zero",
         }
     }
 
