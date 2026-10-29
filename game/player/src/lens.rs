@@ -4,13 +4,13 @@ use bevy::{
     input::mouse::{MouseScrollUnit, MouseWheel},
     prelude::*,
 };
+use ld60_game_core::state::AppState;
 
 use super::camera::PlayerCamera;
 use super::focus::Focused;
 use super::free_look::{FreeLook, MODIFIERS};
 use super::look::Gaze;
 use super::zoom::Zoom;
-use crate::state::AppState;
 
 /// Vertical field of view of the player camera, in radians, without the
 /// [`Lens`] zoom.

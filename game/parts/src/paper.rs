@@ -21,9 +21,9 @@ use bevy::{
     platform::hash::fixed_hash_one,
     prelude::*,
 };
-use ld60_game_core::player::focus::{self, Focus, Focused};
-use ld60_game_core::player::free_look::MODIFIERS;
-use ld60_game_core::player::hints::ClickHint;
+use ld60_game_player::focus::{self, Focus, Focused};
+use ld60_game_player::free_look::MODIFIERS;
+use ld60_game_player::hints::ClickHint;
 use ld60_locale::{Localized, Message};
 
 pub use self::back::BlankBack;

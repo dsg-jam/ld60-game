@@ -6,12 +6,12 @@ mod typing;
 mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
-use ld60_game_core::player::focus::{Focus, FocusTarget};
-use ld60_game_core::player::hints::Hints;
 use ld60_game_core::state::AppState;
 use ld60_game_parts::dust::Dust;
 use ld60_game_parts::keypad::PressableKey;
 use ld60_game_parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
+use ld60_game_player::focus::{Focus, FocusTarget};
+use ld60_game_player::hints::Hints;
 use ld60_game_run::tutorial::FirstNote;
 use ld60_geometry::block::Block;
 

@@ -15,6 +15,7 @@ debug_port = [
   "dep:serde_json",
   "ld60-game-core/debug_port",
   "ld60-game-parts/debug_port",
+  "ld60-game-player/debug_port",
 ]
 test-support = []
 
@@ -23,6 +24,7 @@ ld60-devices = { workspace = true, features = ["serde"] }
 ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-parts = { workspace = true }
+ld60-game-player = { workspace = true }
 ld60-geometry = { workspace = true }
 ld60-levels = { workspace = true }
 ld60-locale = { workspace = true }

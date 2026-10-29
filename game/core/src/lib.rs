@@ -1,5 +1,5 @@
-//! The seated player, and the shop layout, clock, state and settings that
-//! the workshop and the city share.
+//! The shop layout, clock, state and settings that the workshop and the city
+//! share.
 //!
 //! # Features
 //!
@@ -10,7 +10,6 @@ pub mod clock;
 #[cfg(feature = "debug_port")]
 pub mod debug_port;
 pub mod layout;
-pub mod player;
 pub mod settings;
 pub mod state;
 

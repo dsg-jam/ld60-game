@@ -7,7 +7,7 @@ use bevy::{
     },
     prelude::*,
 };
-use ld60_game_core::player::focus::{Focus, Focused};
+use ld60_game_player::focus::{Focus, Focused};
 
 /// How far from a [`Snap`] part the pointer still catches it, in logical
 /// pixels.

@@ -1,8 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-use ld60_game_core::player::camera::PlayerCamera;
-use ld60_game_core::player::focus::ClickTool;
+use ld60_game_player::camera::PlayerCamera;
+use ld60_game_player::focus::ClickTool;
 
 use super::props::Props;
 use ld60_game_device::{Aim, Phillips, Turning};

@@ -33,8 +33,8 @@ use bevy::{
 };
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::DebugMethods;
-use ld60_game_core::player::free_look::MODIFIERS;
 use ld60_game_parts::screen::UiCanvas;
+use ld60_game_player::free_look::MODIFIERS;
 use ld60_game_run::job::{Job, JobId};
 use ld60_locale::{Localized, Message};
 

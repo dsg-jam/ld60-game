@@ -5,8 +5,8 @@ use bevy::{
     prelude::*,
 };
 use ld60_game_audio::{Play, Sound};
-use ld60_game_core::player::focus::{Clickable, Focus, FocusTarget};
 use ld60_game_parts::paper::Sheltered;
+use ld60_game_player::focus::{Clickable, Focus, FocusTarget};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

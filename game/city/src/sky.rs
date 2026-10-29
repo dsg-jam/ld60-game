@@ -11,7 +11,7 @@ use bevy::{
     shader::ShaderRef,
 };
 use ld60_game_core::clock::{Clock, PLANET_SIZE};
-use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_player::camera::PlayerCamera;
 
 use super::atmosphere::SKY;
 use super::weather::{WIND, Weather};

@@ -2,9 +2,9 @@ mod drone;
 
 use bevy::prelude::*;
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::player::camera::PlayerCamera;
-use ld60_game_core::player::focus::Focus;
 use ld60_game_device::{Carried, Emulator, Handheld};
+use ld60_game_player::camera::PlayerCamera;
+use ld60_game_player::focus::Focus;
 use ld60_game_run::chore::{Busy, Chore};
 use ld60_game_run::job::{Job, JobOnBench};
 use ld60_game_run::pickup::Complaint;

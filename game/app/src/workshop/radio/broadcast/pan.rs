@@ -9,7 +9,7 @@ use bevy::{
     prelude::*,
 };
 
-use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_player::camera::PlayerCamera;
 
 /// How far a sound right at the side moves over, from 0 for the middle to 1
 /// for only one ear. Real heads let some sound round to the far ear.

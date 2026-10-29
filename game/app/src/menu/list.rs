@@ -6,8 +6,8 @@ use bevy::{
     },
     prelude::*,
 };
-use ld60_game_core::player::hints::{ACCENT, INK, SHADOW};
 use ld60_game_core::settings::{Adjust, Setting};
+use ld60_game_player::hints::{ACCENT, INK, SHADOW};
 use ld60_locale::{Localized, Message};
 
 use super::AppState;

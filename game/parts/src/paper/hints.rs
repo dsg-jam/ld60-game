@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_core::player::hints::{Hint, Hints, Icon, Input};
+use ld60_game_player::hints::{Hint, Hints, Icon, Input};
 use ld60_locale::Message;
 
 use super::{Paper, ShowsOwnPages};

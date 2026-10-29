@@ -1,4 +1,5 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, text::LineHeight};
+use ld60_game_core::settings::Settings;
 use ld60_locale::{Localized, Message};
 
 use super::{
@@ -6,7 +7,6 @@ use super::{
     focus::{Aside, Focused},
     look::Gaze,
 };
-use crate::settings::Settings;
 
 const ICON_FONT: &str = "fonts/kenney-input-keyboard-mouse.ttf";
 const ICON_SIZE: f32 = 64.0;

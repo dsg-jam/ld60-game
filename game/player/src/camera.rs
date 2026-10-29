@@ -10,16 +10,16 @@ use bevy::{
     post_process::bloom::Bloom,
     prelude::*,
 };
+#[cfg(feature = "debug_port")]
+use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::settings::Settings;
+use ld60_game_core::state::AppState;
 
 use super::focus::{Aside, FocusTarget, Focused};
 use super::free_look::FreeLook;
 use super::lens::FOV;
 use super::look::LookAngles;
 use super::zoom::Zoom;
-#[cfg(feature = "debug_port")]
-use crate::debug_port::DebugMethods;
-use crate::settings::Settings;
-use crate::state::AppState;
 
 /// Meters between the ears of the player.
 const EAR_GAP: f32 = 0.2;

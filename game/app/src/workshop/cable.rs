@@ -10,8 +10,8 @@ use bevy::{
 use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::COMPUTER_SPOT;
-use ld60_game_core::player::focus::ClickTool;
 use ld60_game_manuals::{Pose, ShopManuals};
+use ld60_game_player::focus::ClickTool;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;

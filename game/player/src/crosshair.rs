@@ -6,6 +6,8 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
+use ld60_game_core::settings::Settings;
+use ld60_game_core::state::KeepMouse;
 use ld60_locale::{Localized, Message};
 
 use super::{
@@ -14,8 +16,6 @@ use super::{
     hints::{self, Caption, ClickHint, Icon, IconFont},
     look::Gaze,
 };
-use crate::settings::Settings;
-use crate::state::KeepMouse;
 
 /// How much a [`Disabled`] prompt shows.
 const DISABLED_ALPHA: f32 = 0.45;

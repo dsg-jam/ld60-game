@@ -7,8 +7,8 @@ use bevy::{
     shader::ShaderRef,
 };
 use ld60_game_core::layout::shop;
-use ld60_game_core::player::camera::PlayerCamera;
 use ld60_game_core::settings::Settings;
+use ld60_game_player::camera::PlayerCamera;
 use ld60_geometry::quads::Quads;
 use rand::RngExt;
 

@@ -1,7 +1,7 @@
 mod cubemap;
 
 use bevy::prelude::*;
-use ld60_game_core::player::camera::PlayerCamera;
+use ld60_game_player::camera::PlayerCamera;
 
 use self::cubemap::Lobe;
 use super::lamp::Lamp;
