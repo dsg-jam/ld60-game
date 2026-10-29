@@ -1,5 +1,6 @@
 pub mod bulb;
 pub mod dot_matrix;
+pub mod downwash;
 pub mod gauge;
 pub mod keypad;
 pub mod knob;
@@ -23,6 +24,7 @@ impl Plugin for PartsPlugin {
         app.add_plugins((
             bulb::BulbPlugin,
             dot_matrix::DotMatrixPlugin,
+            downwash::DownwashPlugin,
             gauge::GaugePlugin,
             keypad::KeypadPlugin,
             knob::KnobPlugin,

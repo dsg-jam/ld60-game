@@ -61,7 +61,11 @@ impl Clutter {
         };
         commands.entity(add.entity).with_children(|clutter| {
             clutter
-                .spawn((counter.place(MUG_SPOT, 0.0), Visibility::default()))
+                .spawn((
+                    Name::new("mug"),
+                    counter.place(MUG_SPOT, 0.0),
+                    Visibility::default(),
+                ))
                 .with_children(|mug| props.mug(mug));
             let screwdriver = counter.place(SCREWDRIVER_SPOT, SCREWDRIVER_YAW);
             clutter

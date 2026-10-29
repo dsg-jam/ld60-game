@@ -46,7 +46,7 @@ impl Plugin for JobPlugin {
             Update,
             (
                 Job::follow_levels.run_if(resource_exists_and_changed::<Levels>),
-                (Flight::fly, Tether::follow).chain(),
+                (Flight::fly, Tether::follow, Drone::blow).chain(),
                 Drone::spin,
                 Job::deliver_first.run_if(resource_exists::<FirstDelivery>),
             ),
