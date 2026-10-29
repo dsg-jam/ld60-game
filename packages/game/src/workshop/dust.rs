@@ -1,4 +1,5 @@
 use bevy::{light::NotShadowCaster, prelude::*};
+use ld60_core::parts::downwash::Downwash;
 use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
@@ -8,6 +9,8 @@ const DRIFT: f32 = 0.012;
 /// Warm air rises over the counter.
 const RISE: f32 = 0.004;
 const MOTE: Color = Color::srgb(0.9, 0.88, 0.85);
+/// How many seconds a speck takes to go with a change in the air.
+const LAG: f32 = 0.3;
 
 pub(super) struct DustPlugin;
 
@@ -34,6 +37,9 @@ struct Mote {
     /// Random phases of its wandering.
     phase: Vec3,
     cloud: Block,
+    /// How fast the air moves it, apart from its wandering, in the space
+    /// of its cloud.
+    blown: Vec3,
 }
 
 impl Dust {
@@ -65,6 +71,7 @@ impl Dust {
                     Mote {
                         phase: Vec3::new(rng.random(), rng.random(), rng.random()) * 100.0,
                         cloud,
+                        blown: Vec3::ZERO,
                     },
                     Mesh3d(mesh.clone()),
                     MeshMaterial3d(material.clone()),
@@ -78,19 +85,33 @@ impl Dust {
 }
 
 impl Mote {
-    /// Wanders slowly on the air currents, and comes back in on the other
-    /// side when it leaves the cloud.
-    fn drift(time: Res<Time>, mut motes: Query<(&Mote, &mut Transform)>) {
+    /// Wanders slowly on the air currents and goes with the [`Downwash`],
+    /// and comes back in on the other side when it leaves the cloud.
+    fn drift(
+        time: Res<Time>,
+        downwash: Res<Downwash>,
+        clouds: Query<&GlobalTransform>,
+        mut motes: Query<(&mut Mote, &mut Transform, &GlobalTransform, &ChildOf)>,
+    ) {
         let t = time.elapsed_secs();
         let dt = time.delta_secs();
-        for (mote, mut transform) in &mut motes {
+        let follow = 1.0 - (-dt / LAG).exp();
+        for (mut mote, mut transform, at, cloud) in &mut motes {
+            let air = clouds.get(cloud.parent()).map_or(Vec3::ZERO, |cloud| {
+                cloud
+                    .affine()
+                    .inverse()
+                    .transform_vector3(downwash.at(at.translation()))
+            });
+            let blown = mote.blown;
+            mote.blown += (air - blown) * follow;
             let p = mote.phase;
             let wander = Vec3::new(
                 (t * 0.23 + p.x).sin() + 0.5 * (t * 0.61 + p.y).sin(),
                 (t * 0.19 + p.y).sin() + 0.5 * (t * 0.53 + p.z).sin(),
                 (t * 0.29 + p.z).sin() + 0.5 * (t * 0.47 + p.x).sin(),
             );
-            let moved = transform.translation + (wander * DRIFT + Vec3::Y * RISE) * dt;
+            let moved = transform.translation + (wander * DRIFT + Vec3::Y * RISE + mote.blown) * dt;
             let min = mote.cloud.min();
             transform.translation = min + (moved - min).rem_euclid(mote.cloud.size);
         }
