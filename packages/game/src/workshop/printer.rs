@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
 };
 use ld60_core::audio::{Play, Sound};
+use ld60_core::parts::paper::Sheltered;
 use ld60_core::player::focus::{Clickable, Focus, FocusTarget};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -222,11 +223,17 @@ impl Printing {
     }
 
     /// A sheet only shows once it comes out of the slot, not where it will
-    /// lie and not inside the printer while it waits.
-    fn hide(insert: On<Insert<Printing>>, mut visibilities: Query<&mut Visibility>) {
+    /// lie and not inside the printer while it waits. It keeps still in the
+    /// air until it lies where it goes.
+    fn hide(
+        insert: On<Insert<Printing>>,
+        mut visibilities: Query<&mut Visibility>,
+        mut commands: Commands,
+    ) {
         if let Ok(mut visibility) = visibilities.get_mut(insert.entity) {
             *visibility = Visibility::Hidden;
         }
+        commands.entity(insert.entity).insert(Sheltered);
     }
 
     fn animate(
@@ -298,7 +305,7 @@ impl Printing {
                     commands.trigger(Play(sound));
                 }
                 let mut entity = commands.entity(entity);
-                entity.remove::<Printing>();
+                entity.remove::<(Printing, Sheltered)>();
                 if let Some(target) = printing.target {
                     entity.insert(target);
                 }

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_core::parts::paper::{Binding, Paper};
+use ld60_core::parts::paper::{Binding, Flutter, Paper};
 use ld60_core::parts::screen::UiCanvas;
 use ld60_core::player::focus::{Focus, FocusTarget, View};
 use ld60_devices::{ChipSpec, RomKind};
@@ -127,6 +127,7 @@ impl JobTicket {
                     sheet_center,
                     &mut meshes,
                 ),
+                Flutter::default(),
                 ChildOf(add.entity),
             ))
             .id();

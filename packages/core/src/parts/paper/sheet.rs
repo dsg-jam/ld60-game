@@ -27,6 +27,8 @@ const FOLD_WIDTH: f32 = 0.02;
 const HELD_FLAT: f32 = 0.012;
 /// Distance from a held edge where the wrinkles are back in full.
 const HELD_REACH: f32 = 0.04;
+/// Share of the waves a sticky note keeps.
+const STICKY_WAVES: f32 = 0.3;
 
 pub(super) struct SheetPlugin;
 
@@ -278,6 +280,17 @@ impl Wrinkles {
         wrinkles
     }
 
+    /// The shape of a sticky note of `size` stuck down along its top edge.
+    /// It has no folds and only faint waves.
+    pub fn sticky(size: Vec2, document: impl Hash) -> Self {
+        let mut wrinkles = Self::held(size, document, &Binding::clip());
+        wrinkles.folds = [Vec4::ZERO; 2];
+        for wave in &mut wrinkles.waves {
+            wave.2 *= STICKY_WAVES;
+        }
+        wrinkles
+    }
+
     pub fn size(&self) -> Vec2 {
         self.size
     }
@@ -333,7 +346,14 @@ impl Wrinkles {
     }
 
     /// A grid facing +Z like a [`Rectangle`], displaced by the wrinkles.
-    pub(super) fn mesh(&self) -> Mesh {
+    pub fn mesh(&self) -> Mesh {
+        self.mesh_with(|_, height, _| height)
+    }
+
+    /// Like [`Wrinkles::mesh`], with `shape` turning the point in the
+    /// sheet's space, the wrinkled height there and how far the sheet may
+    /// rise there into the height of the mesh.
+    pub(super) fn mesh_with(&self, shape: impl Fn(Vec2, f32, f32) -> f32) -> Mesh {
         let size = self.size;
         let cells = (size / GRID).ceil().as_uvec2().max(UVec2::splat(4));
         let uvs: Vec<Vec2> = (0..=cells.y)
@@ -345,7 +365,8 @@ impl Wrinkles {
             .fold(f32::INFINITY, f32::min);
         let lifted = |p: Vec2| {
             let freedom = self.freedom(p);
-            (self.height(p) - lowest) * freedom * freedom * (3.0 - 2.0 * freedom)
+            let height = (self.height(p) - lowest) * freedom * freedom * (3.0 - 2.0 * freedom);
+            shape(p, height, freedom)
         };
         let positions: Vec<Vec3> = uvs
             .iter()

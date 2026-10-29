@@ -1,4 +1,5 @@
 mod back;
+mod flutter;
 mod hints;
 mod leaf;
 mod press;
@@ -23,6 +24,7 @@ use bevy::{
 use ld60_locale::{Localized, Message};
 
 pub use self::back::BlankBack;
+pub use self::flutter::{Flutter, Sheltered};
 pub use self::leaf::{
     Binding, Bulge, Leaf, LeafShape, LeafSide, LeafSpec, RELAX_TIME, Stiffness, blank_print,
     clearance, relaxing, reprinted,
@@ -70,7 +72,7 @@ pub struct PaperPlugin;
 
 impl Plugin for PaperPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((SheetPlugin, back::BackPlugin))
+        app.add_plugins((SheetPlugin, back::BackPlugin, flutter::FlutterPlugin))
             .add_systems(
                 Update,
                 (
