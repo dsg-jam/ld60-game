@@ -14,7 +14,7 @@ use ld60_game_core::state::AppState;
 use ld60_locale::Message;
 
 use super::pinboard::PinBoard;
-use crate::workshop::run::Run;
+use crate::workshop::manuals::Pins;
 
 /// How far the wide view looks down at the keyboard, in radians.
 const WIDE_PITCH: f32 = 0.3;
@@ -97,7 +97,7 @@ impl Views {
     /// Follows the shape of the window and the number of pinned sheets.
     fn frame(
         camera: Single<&Projection, With<PlayerCamera>>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut computers: Query<(&Views, &PinBoard, &mut FocusTarget, &mut Zoom, &mut Aside)>,
     ) {
         let Projection::Perspective(perspective) = *camera else {
@@ -117,7 +117,7 @@ impl Views {
             if zoom.close != close {
                 zoom.close = close;
             }
-            let pins = board.view(run.pins().used(), perspective);
+            let pins = board.view(pins.used(), perspective);
             if aside.view != pins {
                 aside.view = pins;
             }
@@ -129,7 +129,7 @@ impl Views {
     fn look_aside_on_key(
         keys: Res<ButtonInput<KeyCode>>,
         state: Res<State<Focus>>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut computers: Query<&mut Aside, With<Views>>,
     ) {
         if *state.get() != Focus::Computer
@@ -139,7 +139,7 @@ impl Views {
             return;
         }
         for mut aside in &mut computers {
-            if aside.open || !run.pins().is_empty() {
+            if aside.open || !pins.is_empty() {
                 aside.open = !aside.open;
             }
         }
@@ -147,7 +147,7 @@ impl Views {
 
     fn show_hints(
         state: Res<State<Focus>>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut computers: Query<(&Aside, &mut Hints), With<Views>>,
     ) {
         if *state.get() != Focus::Computer {
@@ -165,7 +165,7 @@ impl Views {
                     inputs: vec![Input::Icon(Icon::Wheel)],
                     action: Message::new("hint-scroll"),
                 }];
-                if !run.pins().is_empty() {
+                if !pins.is_empty() {
                     shown.push(look("hint-look-pins"));
                 }
                 shown
@@ -254,9 +254,9 @@ mod tests {
         let mut world = World::new();
         world.init_resource::<ButtonInput<KeyCode>>();
         world.insert_resource(State::new(Focus::Computer));
-        let mut run = Run::default();
-        run.pins_mut().pin(Sheet::example());
-        world.insert_resource(run);
+        let mut pins = Pins::default();
+        pins.pin(Sheet::example());
+        world.insert_resource(pins);
         let computer = world
             .spawn((
                 Views::new([Vec3::ZERO; 4], []),
@@ -275,10 +275,7 @@ mod tests {
         assert!(!press(&mut world, &[PINS_KEY]), "P alone types");
         assert!(press(&mut world, &[KeyCode::ControlLeft, PINS_KEY]));
         assert!(!press(&mut world, &[KeyCode::ControlRight, PINS_KEY]));
-        world
-            .resource_mut::<Run>()
-            .pins_mut()
-            .unpin(Sheet::example());
+        world.resource_mut::<Pins>().unpin(Sheet::example());
         assert!(!press(&mut world, &[KeyCode::ControlLeft, PINS_KEY]));
     }
 }

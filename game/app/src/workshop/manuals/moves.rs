@@ -22,7 +22,6 @@ use super::pins::{Pins, Sheet};
 use super::pose::Pose;
 use super::stack::{Stack, holes, middle, stray};
 use super::top_sheet::TopSheet;
-use crate::workshop::run::Run;
 
 /// Seconds the lever takes to open the rings.
 const OPEN_TIME: f32 = 0.15;
@@ -220,7 +219,7 @@ impl SheetMoves {
     pub(super) fn fly(
         time: Res<Time>,
         (state, focused): (Res<State<Focus>>, Res<Focused>),
-        mut run: ResMut<Run>,
+        mut pins: ResMut<Pins>,
         mut files: Query<(
             Entity,
             &mut SheetMoves,
@@ -256,7 +255,7 @@ impl SheetMoves {
                 && moves.start_next(
                     (file, reading),
                     (filed, paper, stack, pose),
-                    run.pins(),
+                    &pins,
                     &mut commands,
                 )
             {
@@ -397,7 +396,6 @@ impl SheetMoves {
             }
             if !flight.arrived && flight.elapsed >= flight.arrive() {
                 flight.arrived = true;
-                let pins = run.pins_mut();
                 if flight.pin {
                     pins.pin(flight.sheet);
                     commands.entity(slot).insert(Pressed {

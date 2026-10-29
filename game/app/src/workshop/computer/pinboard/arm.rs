@@ -3,8 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 use ld60_game_core::audio::{PlayAt, Sound};
 
-use crate::workshop::manuals::MoveSheet;
-use crate::workshop::run::Run;
+use crate::workshop::manuals::{MoveSheet, Pins};
 
 /// Seconds for the rod to swing all the way out or back.
 const SWING_TIME: f32 = 0.4;
@@ -69,12 +68,12 @@ impl Arm {
 
     pub(in crate::workshop::computer) fn swing(
         time: Res<Time>,
-        run: Res<Run>,
+        pins: Res<Pins>,
         mut arms: Query<(&mut Arm, &mut Transform, &GlobalTransform)>,
         mut commands: Commands,
     ) {
         let dt = time.delta_secs();
-        let empty = run.pins().is_empty();
+        let empty = pins.is_empty();
         for (mut arm, mut transform, hinge) in &mut arms {
             let before = arm.out;
             arm.step(empty, dt);

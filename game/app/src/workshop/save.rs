@@ -4,6 +4,7 @@ use ld60_store::{Slot, Store};
 use serde::{Deserialize, Serialize};
 
 use super::job::{Bench, Job};
+use super::manuals::Pins;
 use super::run::Run;
 use super::salvage::SalvageCrate;
 
@@ -12,21 +13,21 @@ pub(crate) struct SavePlugin;
 impl Plugin for SavePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Store>();
-        if let Some(saved) = app
-            .world()
-            .resource::<Store>()
-            .load::<SavedShop>(Slot::Shop)
-        {
+        if let Some(saved) = SavedShop::load(app.world().resource::<Store>()) {
             let SavedShop {
                 mut run,
                 clock,
                 bench,
                 salvage,
+                pins,
             } = saved.reopened();
             run.file_past_notes();
             run.file_owned_datasheets();
-            run.unpin_unfiled();
-            app.insert_resource(run).insert_resource(clock);
+            let mut pins = pins.unwrap_or_default();
+            pins.keep_filed(&run);
+            app.insert_resource(run)
+                .insert_resource(clock)
+                .insert_resource(pins);
             if let Some(bench) = bench {
                 app.insert_resource(bench);
             }
@@ -40,6 +41,7 @@ impl Plugin for SavePlugin {
             Last,
             SavedShop::write.run_if(
                 resource_changed::<Run>
+                    .or_else(resource_changed::<Pins>)
                     .or_else(resource_changed::<Clock>)
                     .or_else(resource_exists_and_changed::<Job>),
             ),
@@ -56,9 +58,35 @@ struct SavedShop {
     bench: Option<Bench>,
     /// What is left in the scrap trader's crate.
     salvage: Option<SalvageCrate>,
+    /// The sheets pinned at the monitor. Saves from before kept them in the
+    /// run, see [`PinsInRun`].
+    #[serde(default)]
+    pins: Option<Pins>,
+}
+
+/// The pins of a save from before they were saved apart from the run.
+#[derive(Deserialize)]
+struct PinsInRun {
+    run: RunWithPins,
+}
+
+#[derive(Deserialize)]
+struct RunWithPins {
+    #[serde(default)]
+    pins: Pins,
 }
 
 impl SavedShop {
+    /// The saved shop, with the pins of an older save taken out of its run.
+    fn load(store: &Store) -> Option<Self> {
+        let saved = store.load::<Self>(Slot::Shop)?;
+        if saved.pins.is_some() {
+            return Some(saved);
+        }
+        let pins = store.load::<PinsInRun>(Slot::Shop).map(|old| old.run.pins);
+        Some(Self { pins, ..saved })
+    }
+
     /// The shop as it opens again. If the landlord came and the till was
     /// short, the run is over and the next one starts.
     fn reopened(self) -> Self {
@@ -71,6 +99,7 @@ impl SavedShop {
             clock: Clock::default(),
             bench: None,
             salvage: None,
+            pins: None,
         }
     }
 
@@ -78,6 +107,7 @@ impl SavedShop {
     fn write(
         store: Res<Store>,
         run: Res<Run>,
+        pins: Res<Pins>,
         clock: Res<Clock>,
         job: Option<Res<Job>>,
         crates: Query<&SalvageCrate>,
@@ -88,6 +118,7 @@ impl SavedShop {
             clock: Clock::from(u32::from(clock.clone())),
             bench: job.map(|job| Bench::from(&*job)),
             salvage: crates.iter().next().cloned(),
+            pins: Some(pins.clone()),
         };
         if last.as_ref() == Some(&saved) {
             return;
@@ -106,6 +137,7 @@ mod tests {
     use super::*;
     use crate::workshop::chore::PlanetSet;
     use crate::workshop::levels::Levels;
+    use crate::workshop::manuals::Sheet;
     use crate::workshop::rent::RentNote;
     use crate::workshop::run::NewRun;
     use crate::workshop::salvage::Find;
@@ -114,8 +146,34 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(store);
         world.init_resource::<Run>();
+        world.init_resource::<Pins>();
         world.init_resource::<Clock>();
         world
+    }
+
+    #[test]
+    fn an_older_save_keeps_the_pins_it_kept_in_the_run() {
+        let mut world = world(Store::in_temp("pins-in-run"));
+        world.resource_mut::<Pins>().pin(Sheet::example());
+        let saved = written(&mut world);
+        // An older save keeps the pins in the run instead.
+        let pins = ron::to_string(&saved.pins).unwrap();
+        let text = ron::to_string(&saved)
+            .unwrap()
+            .replace(&format!(",pins:{pins}"), "")
+            .replacen(
+                "(run:(",
+                &format!(
+                    "(run:(pins:{}, ",
+                    ron::to_string(&saved.pins.clone().unwrap()).unwrap()
+                ),
+                1,
+            );
+        assert!(!text.contains(&format!(",pins:{pins}")), "{text}");
+        let older: SavedShop = ron::from_str(&text).unwrap();
+        assert_eq!(older.pins, None);
+        let kept = ron::from_str::<PinsInRun>(&text).unwrap().run.pins;
+        assert!(kept.contains(Sheet::example()));
     }
 
     fn written(world: &mut World) -> SavedShop {
@@ -141,6 +199,7 @@ mod tests {
                 clock: Clock::from(23),
                 bench: None,
                 salvage: Some(salvage),
+                pins: Some(Pins::default()),
             }
         );
         assert_eq!(saved.clone().reopened(), saved);
