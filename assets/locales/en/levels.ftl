@@ -36,13 +36,13 @@ tally2-t6 =
 
 tally2-01 =
     .customer = Drob, door guard
-    .complaint = I press C before the doors open, but it keeps counting from last night.
+    .complaint = I press C before the doors open. The right number goes to 0, but the left one keeps last night's count.
     .remark-tingle = C button poked with the tingle stick. Tingles fine.
     .remark-first-made = One of the first ones made. Still has its first thinking, version 0.9.
 
 tally2-02 =
     .customer = Ploof, seat finder
-    .complaint = My counter said 40 guests tonight. We have 20 chairs and nobody had to stand.
+    .complaint = After nine guests my counter starts again at 01. Ten guests is when the party starts, and it never does.
     .remark-works-fine = Both buttons and the little window work fine.
     .remark-first-thinking = Still has its first thinking, version 1.0.
 

@@ -1,6 +1,6 @@
 (
     id: "tally2-02",
-    title: "Double count",
+    title: "Back to one",
     device: Tally2,
     chip: Calco((revision: A, date_code: 7630)),
     unit: "00412",
@@ -14,5 +14,5 @@
         (keys: "+++C+", display: "01"),
     ],
     reward: 5,
-    firmware: Some((source: "tally2/firmware-1.0.fw", switches: ["double-count"])),
+    firmware: Some((source: "tally2/firmware-1.0.fw", switches: ["tens-cell"])),
 )

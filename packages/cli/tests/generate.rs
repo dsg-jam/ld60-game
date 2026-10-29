@@ -70,7 +70,7 @@ fn check_catches_stale_files_and_gen_fixes_them() {
 #[test]
 fn a_failing_level_stops_all_writes() {
     let dir = scratch("fail");
-    let fixed = dir.join("tally2/02-double-count/fixed.asm");
+    let fixed = dir.join("tally2/02-back-to-one/fixed.asm");
     std::fs::write(&fixed, "stale").unwrap();
     let source = dir.join("summa6/firmware.fw");
     let text = std::fs::read_to_string(&source).unwrap();

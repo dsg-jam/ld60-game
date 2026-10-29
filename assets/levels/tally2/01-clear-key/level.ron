@@ -1,6 +1,6 @@
 (
     id: "tally2-01",
-    title: "Clear key",
+    title: "Half clear",
     device: Tally2,
     boards: [A],
     keep_layout: true,
@@ -15,7 +15,8 @@
         (keys: "+++C", display: "00"),
         (keys: "+++C++", display: "02"),
         (keys: "++++++++++", display: "10"),
+        (keys: "+++++++++++C", display: "00"),
     ],
     reward: 3,
-    firmware: Some((source: "tally2/firmware-0.9.fw", switches: ["clear-code"])),
+    firmware: Some((source: "tally2/firmware-0.9.fw", switches: ["clear-tens"])),
 )

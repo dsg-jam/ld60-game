@@ -5,7 +5,13 @@ cell  last at M3        ; last key
 
 entry reset {
     a = 0
-    tally[1] = a
+    bug "clear-tens" {
+        fixed {
+            tally[1] = a
+        }
+        buggy {
+        }
+    }
     tally[2] = a
 }
 
@@ -14,7 +20,7 @@ block main {
     a = KEY
     last = a
     match a {
-        bug "clear-code" { fixed { 'C' } buggy { 12 } } => goto reset
+        'C' => goto reset
         '+' => goto count
     }
     goto main

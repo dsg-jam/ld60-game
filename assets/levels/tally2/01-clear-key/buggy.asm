@@ -4,12 +4,11 @@
 ; M3     last key
 
 reset:  LDI  A, 0
-        ST   M1
         ST   M2
 main:   WAIT
         IN   KEY
         ST   M3
-        CPI  12
+        CPI  13
         JZ   reset
         CPI  10
         JZ   count

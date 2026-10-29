@@ -17,7 +17,6 @@ main:   WAIT
 
 count:  LD   M2
         INC
-        INC
         CPI  10
         JC   ones
         LDI  A, 0
@@ -27,7 +26,7 @@ tens:   LD   M1
         CPI  10
         JC   tstore
         LDI  A, 0
-tstore: ST   M1
+tstore: ST   M2
         JMP  main
 
 ones:   ST   M2

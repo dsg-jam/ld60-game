@@ -22,11 +22,6 @@ block main {
 
 block count {
     a = tally[2] + 1
-    bug "double-count" {
-        buggy {
-            a += 1
-        }
-    }
     if a < 10 goto ones
     a = 0
     tally[2] = a
@@ -50,5 +45,12 @@ routine tens {
         buggy {
         }
     }
-    tally[1] = a
+    bug "tens-cell" {
+        fixed {
+            tally[1] = a
+        }
+        buggy {
+            tally[2] = a
+        }
+    }
 }
