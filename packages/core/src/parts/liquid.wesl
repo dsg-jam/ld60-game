@@ -35,6 +35,8 @@ struct Liquid {
     radius: f32,
     /// How far the liquid has turned in the container, in radians.
     turn: f32,
+    /// How far air has pushed the foam across the surface.
+    blown: vec2<f32>,
     /// Per mode: the heights of its two waves, its Bessel root and its
     /// number of waves around.
     waves: array<vec4<f32>, WAVES>,
@@ -115,13 +117,17 @@ fn bubble(p: vec2<f32>) -> Bubble {
     return best;
 }
 
-/// How much foam floats at `q`. Bubbles drift up the meniscus to the wall
-/// and to each other, after Vella and Mahadevan, "The Cheerios effect": a
-/// broken ring along the wall, and a few rafts.
-fn foam_cover(q: vec2<f32>) -> f32 {
+/// How much foam floats at `q`, `wall` from the middle of the container.
+/// Bubbles drift up the meniscus to the wall and to each other, after Vella
+/// and Mahadevan, "The Cheerios effect": a broken ring along the wall, and
+/// a few rafts. Air across the surface drives the rafts along and piles the
+/// ring up on the far side.
+fn foam_cover(q: vec2<f32>, wall: vec2<f32>) -> f32 {
     let cover = liquid.foam.a;
-    let r = length(q) / liquid.radius;
-    let reach = RING * cover * mix(0.3, 1.6, noise(q / RAFT * 0.8, 51.0));
+    let r = length(wall) / liquid.radius;
+    let downwind = dot(normalize(wall + vec2<f32>(1e-6, 0.0)), liquid.blown) / (0.35 * liquid.radius);
+    let piled = clamp(1.0 + 2.0 * downwind, 0.2, 3.0);
+    let reach = RING * cover * piled * mix(0.3, 1.6, noise(q / RAFT * 0.8, 51.0));
     let ring = smoothstep(1.0 - reach, 1.0 - reach * 0.5, r);
     let raft = smoothstep(0.82 - 0.1 * cover, 0.86 - 0.1 * cover, noise(q / RAFT, 52.0));
     return max(ring, raft * cover);
@@ -137,13 +143,14 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
 
     // Foam rides on the liquid as it sways and slowly turns.
     let turn = liquid.turn;
-    let moved = p - waves.drift;
+    let wall = p - waves.drift;
+    let moved = wall - liquid.blown;
     let q = vec2<f32>(cos(turn) * moved.x - sin(turn) * moved.y, sin(turn) * moved.x + cos(turn) * moved.y);
     let b = bubble(q / BUBBLE);
     let detail = visible(BUBBLE, pixel);
     // Bubbles in the foam, and the film between them.
     let inside = 1.0 - smoothstep(b.radius * 0.85, b.radius, b.distance);
-    let foam = foam_cover(q) * mix(0.7, 1.0, detail);
+    let foam = foam_cover(q, wall) * mix(0.7, 1.0, detail);
     let dome = sqrt(max(b.radius * b.radius - b.distance * b.distance, 0.0)) * BUBBLE * 0.6;
 
     var color = pbr_input.material.base_color.rgb;
