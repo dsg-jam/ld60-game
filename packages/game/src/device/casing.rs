@@ -18,7 +18,7 @@ use ld60_geometry::surface::Finish;
 
 pub(crate) use self::travel::Turning;
 use super::board::BoardLayout;
-use super::pick_area::PickArea;
+use super::snap::Snap;
 use super::{Connected, Holdable, Turned};
 
 /// Thickness of the walls of a device.
@@ -46,10 +46,6 @@ const SCREW_GAP: f32 = 0.014;
 const COVER_GAP: f32 = 0.02;
 const SCREW_METAL: Color = Color::srgb_u8(0xc8, 0xca, 0xce);
 const HOLE_DARK: Color = Color::srgb_u8(0x10, 0x10, 0x12);
-/// The area around a screw or its hole that catches the pointer.
-const SCREW_PICK: Vec3 = Vec3::new(0.012, 0.006, 0.012);
-/// How much the area that catches the pointer reaches past the header.
-const HEADER_PICK: Vec3 = Vec3::splat(0.008);
 
 /// The parts of a casing that say what a click does while the device is
 /// focused.
@@ -256,23 +252,20 @@ impl Casing {
                         .spawn((
                             Screw(index),
                             ClickTool::Screwdriver,
+                            Snap,
                             Shape::cylinder(&head, SCREW_METAL),
                             Finish::Metal,
                         ))
-                        .with_children(|screw| {
-                            screw.spawn(PickArea(SCREW_PICK));
-                            Self::cross(screw);
-                        });
+                        .with_children(Self::cross);
                     // Under the head, so it shows once the screw is out.
                     let hole = Block::new(HOLE).translated(underside(spot) - Vec3::Y * HOLE.y);
-                    cover
-                        .spawn((
-                            Hole(index),
-                            ClickTool::Screwdriver,
-                            Shape::cylinder(&hole, HOLE_DARK),
-                            Finish::Plastic,
-                        ))
-                        .with_child(PickArea(SCREW_PICK));
+                    cover.spawn((
+                        Hole(index),
+                        ClickTool::Screwdriver,
+                        Snap,
+                        Shape::cylinder(&hole, HOLE_DARK),
+                        Finish::Plastic,
+                    ));
                 }
                 cover.spawn(sticker);
             });
@@ -305,7 +298,7 @@ impl Casing {
                 Shape::cuboid(&layout.header, BoardLayout::header_color()),
                 Finish::Plastic,
             ))
-            .with_child(PickArea(layout.header.size + HEADER_PICK));
+            .insert(Snap);
         for (part, color) in layout.parts() {
             device.spawn((Shape::cuboid(part, color), Finish::Plastic));
         }
@@ -445,9 +438,11 @@ impl Casing {
         }
     }
 
-    /// `ld60.device { "open": true, "plugged": true }` opens or closes the
-    /// devices and plugs the cable in or pulls it, as the player would. Both
-    /// fields are optional. Returns the state of each device.
+    /// `ld60.device { "open": true, "plugged": true, "turn": [x, y, z] }`
+    /// opens or closes the devices and plugs the cable in or pulls it, as
+    /// the player would. `turn` sets how a held device is turned, as angles
+    /// in degrees around the camera's axes. All fields are optional.
+    /// Returns the state of each device.
     #[cfg(feature = "debug_port")]
     fn debug_device(
         In(params): In<Option<serde_json::Value>>,
@@ -460,8 +455,24 @@ impl Casing {
                 .and_then(|params| params.get(name))
                 .and_then(serde_json::Value::as_bool)
         };
+        let turn = params
+            .as_ref()
+            .and_then(|params| params.get("turn"))
+            .and_then(serde_json::Value::as_array)
+            .and_then(|angles| {
+                let angle = |i: usize| angles.get(i)?.as_f64().map(|a| (a as f32).to_radians());
+                Some(Quat::from_euler(
+                    EulerRot::XYZ,
+                    angle(0)?,
+                    angle(1)?,
+                    angle(2)?,
+                ))
+            });
         let mut states = Vec::new();
         for (device, mut casing, mut holdable, mut plugged) in &mut casings {
+            if let Some(turn) = turn {
+                holdable.spin = turn;
+            }
             if flag("plugged") == Some(false) && plugged {
                 commands.entity(device).remove::<Connected>();
                 plugged = false;

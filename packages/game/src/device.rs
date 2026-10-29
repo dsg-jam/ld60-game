@@ -4,8 +4,8 @@ mod emulator;
 mod handheld;
 mod link;
 mod name;
-mod pick_area;
 mod silhouette;
+mod snap;
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -48,6 +48,7 @@ impl Plugin for DevicePlugin {
             .add_plugins((
                 casing::CasingPlugin,
                 emulator::EmulatorPlugin,
+                snap::SnapPlugin,
                 handheld::HandheldPlugin,
             ))
             .add_systems(
@@ -66,7 +67,6 @@ impl Plugin for DevicePlugin {
             )
             .init_resource::<Turned>()
             .add_observer(Holdable::on_add)
-            .add_observer(pick_area::PickArea::on_add)
             .add_observer(Holdable::spin_on_drag)
             .add_observer(Turned::reset);
     }
