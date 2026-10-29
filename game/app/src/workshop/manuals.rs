@@ -40,7 +40,7 @@ use self::stack::Stack;
 use self::turning::{LeafKit, PageShape};
 use super::job::{Job, JobId};
 use super::run::Run;
-use super::tutorial::TutorialNote;
+use super::tutorial::{FirstNote, TutorialNote};
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);
 const PIN_KEY: KeyCode = KeyCode::KeyP;
@@ -55,6 +55,10 @@ impl ShopManuals {
 impl Plugin for ManualsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Pins>()
+            .add_systems(
+                Update,
+                Pins::pin_first_note.run_if(resource_added::<FirstNote>),
+            )
             .add_observer(Pins::clear_for_new_run)
             .add_observer(ShopManuals::on_add)
             .add_observer(ShopManuals::open_at_job)

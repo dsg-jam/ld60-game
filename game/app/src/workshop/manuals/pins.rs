@@ -111,6 +111,12 @@ impl Pins {
         self.0.iter().position(|&other| other == Some(sheet))
     }
 
+    /// Pins the first note at the monitor as it comes in, where it also
+    /// shows how pinning works.
+    pub(super) fn pin_first_note(mut pins: ResMut<Pins>) {
+        pins.pin(Sheet::note(TutorialNote(0)));
+    }
+
     /// Puts the pinned sheets back into the file, as a new run starts.
     pub(super) fn clear_for_new_run(_: On<NewRun>, mut pins: ResMut<Pins>) {
         *pins = Pins::default();
@@ -215,6 +221,16 @@ mod tests {
     use ld60_devices::DeviceKind;
 
     use super::*;
+
+    #[test]
+    fn the_first_note_comes_pinned() {
+        let mut world = World::new();
+        world.init_resource::<Pins>();
+        world.run_system_cached(Pins::pin_first_note).unwrap();
+        let pins = world.resource::<Pins>();
+        assert!(pins.contains(Sheet::note(TutorialNote(0))));
+        assert!(!pins.contains(Sheet::note(TutorialNote(1))));
+    }
 
     fn chip(page: usize) -> Sheet {
         Sheet::new(Entry::Chip(Revision::A), page)
