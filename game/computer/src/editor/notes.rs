@@ -61,9 +61,7 @@ mod tests {
     use ld60_locale::Localized;
 
     use super::*;
-    use crate::workshop::computer::editor::{
-        Editor, dump::Dump, footer::Status, page::ActivePage, undo::Undo,
-    };
+    use crate::editor::{Editor, dump::Dump, footer::Status, page::ActivePage, undo::Undo};
 
     #[test]
     fn notes_survive_a_new_job() {

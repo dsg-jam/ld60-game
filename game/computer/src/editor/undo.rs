@@ -170,7 +170,7 @@ mod tests {
     use bevy::input::ButtonState;
 
     use super::*;
-    use crate::workshop::computer::editor::notes::Notes;
+    use crate::editor::notes::Notes;
 
     #[test]
     fn ctrl_z_undoes_on_the_notes_page() {

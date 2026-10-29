@@ -40,7 +40,7 @@ const KEYBOARD_GAP: f32 = 0.04;
 /// would leave less of the window to the screen.
 const KEYBOARD_SHOWN: f32 = 0.6;
 
-pub(crate) struct ComputerPlugin;
+pub struct ComputerPlugin;
 
 impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
@@ -79,7 +79,7 @@ impl Plugin for ComputerPlugin {
 /// Pinned sheets of the manuals file hang left of the monitor.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
-pub(crate) struct Computer;
+pub struct Computer;
 
 impl Computer {
     /// The screen and the keyboard only react while the player sits at the
@@ -168,15 +168,21 @@ impl Computer {
 struct ComputerScreen;
 
 /// Geometry of a [`Computer`] in its own space.
-pub(super) struct ComputerLayout {
+pub struct ComputerLayout {
     monitor: Monitor,
     keyboard: Keyboard,
     /// Where the keyboard sits.
-    pub(super) keyboard_placement: Block,
+    pub keyboard_placement: Block,
+}
+
+impl Default for ComputerLayout {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ComputerLayout {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         let monitor = Monitor::new();
         let keyboard = Keyboard::new();
         let keyboard_placement = Block::new(keyboard.base.size)
@@ -189,7 +195,7 @@ impl ComputerLayout {
         }
     }
 
-    pub(super) fn monitor_body(&self) -> Block {
+    pub fn monitor_body(&self) -> Block {
         self.monitor.body
     }
 

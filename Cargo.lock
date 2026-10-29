@@ -3611,6 +3611,7 @@ dependencies = [
  "ld60-calco",
  "ld60-devices",
  "ld60-game-city",
+ "ld60-game-computer",
  "ld60-game-core",
  "ld60-game-device",
  "ld60-game-manuals",
@@ -3634,6 +3635,27 @@ dependencies = [
  "ld60-game-core",
  "ld60-geometry",
  "rand",
+ "serde_json",
+]
+
+[[package]]
+name = "ld60-game-computer"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-calco",
+ "ld60-devices",
+ "ld60-game-city",
+ "ld60-game-core",
+ "ld60-game-device",
+ "ld60-game-manuals",
+ "ld60-game-run",
+ "ld60-geometry",
+ "ld60-levels",
+ "ld60-locale",
+ "ld60-machine",
+ "rand",
+ "ron",
  "serde_json",
 ]
 

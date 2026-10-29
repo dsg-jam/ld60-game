@@ -1,7 +1,6 @@
 mod bin;
 mod cable;
 mod clutter;
-mod computer;
 mod counter;
 mod delivery;
 mod dial;
@@ -26,6 +25,7 @@ mod till;
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
+use ld60_game_computer::Computer;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
 use ld60_game_core::player::camera::PlayerCamera;
@@ -35,7 +35,6 @@ use ld60_game_run::NewRun;
 
 use self::bin::Bin;
 use self::clutter::Clutter;
-use self::computer::Computer;
 use self::counter::Counter;
 use self::dial::Dial;
 use self::front::Front;
@@ -78,7 +77,7 @@ impl Plugin for WorkshopPlugin {
             ld60_game_run::levels::LevelsPlugin,
             receipt::ReceiptPlugin,
             stamp::StampPlugin,
-            computer::ComputerPlugin,
+            ld60_game_computer::ComputerPlugin,
         ))
         .add_plugins((
             cable::CablePlugin,

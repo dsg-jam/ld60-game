@@ -7,6 +7,7 @@ use bevy::{
     camera::visibility::NoFrustumCulling, math::Affine3A, prelude::*,
     transform::helper::TransformHelper,
 };
+use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::COMPUTER_SPOT;
 use ld60_game_core::player::focus::ClickTool;
@@ -18,7 +19,6 @@ use ld60_geometry::surface::Finish;
 use self::rope::{Rope, RopeMaterial, RopePlugin};
 use self::solver::Ends;
 use super::COMPUTER_YAW;
-use super::computer::ComputerLayout;
 use ld60_game_device::{Aim, Casing, Connected, Header, Holdable};
 
 /// Where the plug of the debug cable lies while it is out, see

@@ -14,6 +14,7 @@ debug_port = [
   "bevy/bevy_remote",
   "dep:serde_json",
   "ld60-game-city/debug_port",
+  "ld60-game-computer/debug_port",
   "ld60-game-core/debug_port",
   "ld60-game-device/debug_port",
 ]
@@ -21,6 +22,7 @@ debug_port = [
 [dependencies]
 ld60-calco = { workspace = true, features = ["serde"] }
 ld60-game-city = { workspace = true }
+ld60-game-computer = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
 ld60-game-manuals = { workspace = true }

@@ -19,7 +19,7 @@ const FOLD_DELAY: f32 = 0.25;
 /// the monitor while nothing hangs from it, and swings out before a page
 /// arrives.
 #[derive(Component, Debug)]
-pub(in crate::workshop::computer) struct Arm {
+pub(crate) struct Arm {
     /// The angle when out, in radians.
     swing: f32,
     /// From 0 folded to 1 out.
@@ -53,10 +53,7 @@ impl Arm {
     }
 
     /// Starts swinging out as soon as a page is on its way.
-    pub(in crate::workshop::computer) fn expect_pages(
-        moved: On<MoveSheet>,
-        mut arms: Query<&mut Arm>,
-    ) {
+    pub(crate) fn expect_pages(moved: On<MoveSheet>, mut arms: Query<&mut Arm>) {
         for mut arm in &mut arms {
             arm.since_move = 0.0;
             if matches!(*moved, MoveSheet::Pin(_)) {
@@ -65,7 +62,7 @@ impl Arm {
         }
     }
 
-    pub(in crate::workshop::computer) fn swing(
+    pub(crate) fn swing(
         time: Res<Time>,
         pins: Res<Pins>,
         mut arms: Query<(&mut Arm, &mut Transform, &GlobalTransform)>,
