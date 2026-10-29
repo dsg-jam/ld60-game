@@ -35,6 +35,8 @@ use self::contents::{Contents, Entry};
 use self::dividers::{DividerTab, Tab};
 use self::in_file::InFile;
 use self::index::{Hover, Links, PageLink};
+pub use self::layout::Layouts;
+use self::layout::LayoutsPlugin;
 use self::model::{Parts, SHEET_SIZE, SPINE_CANVAS};
 use self::moves::SheetMoves;
 pub use self::moves::{MoveSheet, RailSlot};
@@ -55,10 +57,14 @@ impl ShopManuals {
 
 impl Plugin for ManualsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Pins>()
+        app.add_plugins(LayoutsPlugin)
+            .init_resource::<Pins>()
             .add_systems(
                 Update,
-                Pins::pin_first_note.run_if(resource_added::<FirstNote>),
+                (
+                    Pins::pin_first_note.run_if(resource_added::<FirstNote>),
+                    Pins::keep_filed_when_laid.run_if(resource_exists_and_changed::<Layouts>),
+                ),
             )
             .add_observer(Pins::clear_for_new_run)
             .add_observer(ShopManuals::on_add)
@@ -71,8 +77,8 @@ impl Plugin for ManualsPlugin {
             .add_systems(
                 Update,
                 (
-                    SheetMoves::fly,
-                    ShopManuals::file,
+                    SheetMoves::fly.run_if(resource_exists::<Layouts>),
+                    ShopManuals::file.run_if(resource_exists::<Layouts>),
                     ShopManuals::switch_on_keys,
                     ShopManuals::pin_on_key,
                     LeafKit::make,
@@ -227,7 +233,7 @@ impl ShopManuals {
     /// unpinned, and so does a page on its way to the rail. The file stays
     /// at the page it is open at, or the one after it if that page is out.
     fn file(
-        run: Res<Run>,
+        (run, layouts): (Res<Run>, Res<Layouts>),
         pinned: Res<Pins>,
         mut files: Query<(
             Entity,
@@ -245,10 +251,10 @@ impl ShopManuals {
         let mut shop = None;
         for (file, mut paper, mut filed, mut stack, parts, moves) in &mut files {
             let pins = moves.filed_pins(&pinned);
-            if !run.is_changed() && filed.pins == pins {
+            if !run.is_changed() && !layouts.is_changed() && filed.pins == pins {
                 continue;
             }
-            let contents: &Contents = shop.get_or_insert_with(|| Contents::of(&run));
+            let contents: &Contents = shop.get_or_insert_with(|| Contents::of(&run, &layouts));
             if filed.contents == *contents && filed.pins == pins {
                 continue;
             }
@@ -265,7 +271,7 @@ impl ShopManuals {
             let mut pages = Vec::new();
             filed.shapes.clear();
             for &number in in_file.numbers() {
-                let page = all[number];
+                let page = &all[number];
                 let seed = fixed_hash_one(("manuals", page.1));
                 let wrinkles = Wrinkles::held(SHEET_SIZE, seed, &Binding::rings());
                 filed.shapes.push(PageShape {
@@ -281,7 +287,7 @@ impl ShopManuals {
                     |content| contents.write(page, &links, content),
                 );
                 if let Some(sheet) = page.1 {
-                    commands.entity(spawned).insert(sheet.print());
+                    commands.entity(spawned).insert(sheet.print(&layouts));
                 }
                 pages.push(spawned);
             }
@@ -520,6 +526,7 @@ mod tests {
         let mut world = World::new();
         world.init_resource::<Run>();
         world.init_resource::<Pins>();
+        world.insert_resource(Layouts::on_disk());
         world.init_resource::<Assets<Image>>();
         world.init_resource::<Assets<Mesh>>();
         world.init_resource::<Assets<StandardMaterial>>();
@@ -538,7 +545,7 @@ mod tests {
 
     #[test]
     fn the_first_run_files_the_tally2_and_the_rev_a_datasheet() {
-        let contents = Contents::of(&Run::default());
+        let contents = Contents::of(&Run::default(), &Layouts::on_disk());
         assert_eq!(
             contents.entries(),
             [Entry::Manual(DeviceKind::Tally2), Entry::Chip(Revision::A)]
@@ -547,7 +554,7 @@ mod tests {
 
     #[test]
     fn sections_come_in_order() {
-        let contents = Contents::of(&rich_run());
+        let contents = Contents::of(&rich_run(), &Layouts::on_disk());
         let sections: Vec<_> = contents
             .entries()
             .iter()
@@ -578,7 +585,7 @@ mod tests {
 
     #[test]
     fn the_index_comes_first_and_lists_every_entry() {
-        let contents = Contents::of(&rich_run());
+        let contents = Contents::of(&rich_run(), &Layouts::on_disk());
         let pages = contents.pages();
         assert!(pages[0].1.is_none());
         for &entry in contents.entries() {
@@ -595,7 +602,7 @@ mod tests {
     fn every_page_formats() {
         let locale = Locale::on_disk();
         for run in [Run::default(), rich_run()] {
-            let contents = Contents::of(&run);
+            let contents = Contents::of(&run, &Layouts::on_disk());
             for page in contents.pages() {
                 locale.assert_formats([page.0.footer()]);
                 let in_file = InFile::new(&contents, &Pins::default());
@@ -604,7 +611,7 @@ mod tests {
                     in_file: &in_file,
                 };
                 locale.assert_formats(Localized::spawned_by(|content| {
-                    contents.write(page, &links, content);
+                    contents.write(&page, &links, content);
                 }));
             }
         }
@@ -626,11 +633,12 @@ mod tests {
 
     #[test]
     fn every_page_but_the_index_is_a_sheet() {
-        let contents = Contents::of(&rich_run());
+        let layouts = Layouts::on_disk();
+        let contents = Contents::of(&rich_run(), &layouts);
         for (index, (page, sheet)) in contents.pages().into_iter().enumerate() {
             assert_eq!(contents.sheet_at(index), sheet);
             if let Some(sheet) = sheet {
-                assert_eq!(format!("{:?}", sheet.page()), format!("{:?}", Some(page)));
+                assert_eq!(sheet.page(&layouts), Some(page));
             }
         }
         assert_eq!(contents.sheet_at(0), None);
@@ -673,7 +681,10 @@ mod tests {
         assert_eq!(paper.current_page(), 2);
         assert_eq!(
             paper.page_count(),
-            Contents::of(&Run::default()).pages().len() - 1
+            Contents::of(&Run::default(), &Layouts::on_disk())
+                .pages()
+                .len()
+                - 1
         );
         let open = world.get::<Filed>(file).unwrap().in_file.number(2);
         assert_eq!(open, Some(3));
@@ -695,7 +706,7 @@ mod tests {
 
     #[test]
     fn a_job_opens_its_board() {
-        let contents = Contents::of(&rich_run());
+        let contents = Contents::of(&rich_run(), &Layouts::on_disk());
         let mut level = Levels::on_disk().levels()[0].load().unwrap();
         level.device = DeviceKind::Summa6;
         level.board = BoardRev::C;
@@ -727,7 +738,7 @@ mod tests {
 
     #[test]
     fn arrows_go_from_entry_to_entry() {
-        let contents = Contents::of(&Run::default());
+        let contents = Contents::of(&Run::default(), &Layouts::on_disk());
         let chips = contents.start_of(Entry::Chip(Revision::A)).unwrap();
         assert_eq!(contents.next_entry(0, true), Some(1));
         assert_eq!(contents.next_entry(2, true), Some(chips));

@@ -48,10 +48,11 @@ mod tests {
     use ld60_game_run::Run;
 
     use super::*;
+    use crate::layout::Layouts;
 
     #[test]
     fn pinned_pages_are_not_in_the_file() {
-        let contents = Contents::of(&Run::default());
+        let contents = Contents::of(&Run::default(), &Layouts::on_disk());
         let mut pins = Pins::default();
         let pinned = contents.sheet_at(2).unwrap();
         pins.pin(pinned);

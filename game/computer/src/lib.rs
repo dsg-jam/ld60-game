@@ -7,6 +7,7 @@ mod views;
 
 use bevy::{mesh::MeshBuilder, prelude::*};
 use ld60_game_core::state::AppState;
+use ld60_game_manuals::Layouts;
 use ld60_game_parts::dust::Dust;
 use ld60_game_parts::keypad::PressableKey;
 use ld60_game_parts::screen::{CrtGlass, CrtLight, CrtMaterial, ScreenSurface, UiCanvas};
@@ -54,7 +55,7 @@ impl Plugin for ComputerPlugin {
             .add_systems(
                 Update,
                 (
-                    PinBoard::follow_pins,
+                    PinBoard::follow_pins.run_if(resource_exists::<Layouts>),
                     PinBoard::arm,
                     Arm::swing,
                     (Sway::tilt_new_pages, Sway::swing).chain(),

@@ -9,6 +9,7 @@ use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use super::contents::{Contents, Entry, Page};
+use super::layout::Layouts;
 
 /// One page of the manuals file, named by its entry so it stays the same
 /// page when more is filed.
@@ -50,28 +51,42 @@ impl Sheet {
         Some(contents.start_of(self.entry)? + self.page)
     }
 
-    /// The page, if the entry has it.
-    pub(super) fn page(self) -> Option<Page> {
-        if let Entry::Note(note) = self.entry {
-            TutorialNote::new(note.step())?;
+    /// Whether the sheet can be in a file at all. Saves can name notes that
+    /// are no more.
+    fn exists(self) -> bool {
+        match self.entry {
+            Entry::Note(note) => TutorialNote::new(note.step()).is_some(),
+            Entry::Manual(_) | Entry::Chip(_) | Entry::Errata(_) => true,
         }
-        self.entry.pages().get(self.page).copied()
+    }
+
+    /// The page, if the entry has it.
+    pub(super) fn page(self, layouts: &Layouts) -> Option<Page> {
+        if !self.exists() {
+            return None;
+        }
+        self.entry.pages(layouts).into_iter().nth(self.page)
     }
 
     /// Spawns the sheet on `canvas`, with the band of its section at the
     /// top.
-    pub fn spawn(self, commands: &mut Commands, canvas: &UiCanvas) -> Option<Entity> {
-        let page = self.page()?;
+    pub fn spawn(
+        self,
+        commands: &mut Commands,
+        canvas: &UiCanvas,
+        layouts: &Layouts,
+    ) -> Option<Entity> {
+        let page = self.page(layouts)?;
         let spawned = Paper::spawn_single(commands, canvas, page.footer(), |content| {
-            content.spawn(self.band());
+            content.spawn(self.band(&page));
             page.write(content);
         });
-        commands.entity(spawned).insert(self.print());
+        commands.entity(spawned).insert(self.print(layouts));
         Some(spawned)
     }
 
-    pub fn print(self) -> Print {
-        self.entry.print()
+    pub fn print(self, layouts: &Layouts) -> Print {
+        self.entry.print(layouts)
     }
 }
 
@@ -122,14 +137,25 @@ impl Pins {
         *pins = Pins::default();
     }
 
-    /// Unpins the sheets whose entry is not in the manuals file of `run`.
-    pub fn keep_filed(&mut self, run: &Run) {
-        let contents = Contents::of(run);
+    /// Unpins the sheets that are not pages of `contents`.
+    pub(super) fn keep_filed(&mut self, contents: &Contents) {
         for slot in &mut self.0 {
-            if slot.is_some_and(|sheet| !contents.entries().contains(&sheet.entry)) {
+            if slot.is_some_and(|sheet| sheet.page >= contents.pages_of(sheet.entry).len()) {
                 *slot = None;
             }
         }
+    }
+
+    /// Unpins what a save pinned that is not in the file, once the layouts
+    /// say which pages there are.
+    pub(super) fn keep_filed_when_laid(
+        run: Res<Run>,
+        layouts: Res<Layouts>,
+        mut pins: ResMut<Pins>,
+    ) {
+        let mut kept = pins.clone();
+        kept.keep_filed(&Contents::of(&run, &layouts));
+        pins.set_if_neq(kept);
     }
 
     /// Whether every slot holds a sheet already.
@@ -167,7 +193,7 @@ impl From<Vec<SavedSlot>> for Pins {
         let mut pins = Self::default();
         for (slot, SavedSlot(sheet)) in slots.into_iter().take(Self::MAX).enumerate() {
             if let Some(sheet) = sheet
-                && sheet.page().is_some()
+                && sheet.exists()
                 && !pins.contains(sheet)
             {
                 pins.0[slot] = Some(sheet);
@@ -232,6 +258,19 @@ mod tests {
         assert!(!pins.contains(Sheet::note(TutorialNote::new(1).unwrap())));
     }
 
+    #[test]
+    fn saved_pins_come_off_once_the_layouts_show_they_are_not_filed() {
+        let mut world = World::new();
+        world.init_resource::<Run>();
+        let mut pins = Pins::default();
+        pins.pin(Sheet::new(Entry::Chip(Revision::B), 0));
+        pins.pin(chip(0));
+        world.insert_resource(pins);
+        world.insert_resource(Layouts::on_disk());
+        world.run_system_cached(Pins::keep_filed_when_laid).unwrap();
+        assert_eq!(world.resource::<Pins>().slots(), [None, Some(chip(0))]);
+    }
+
     fn chip(page: usize) -> Sheet {
         Sheet::new(Entry::Chip(Revision::A), page)
     }
@@ -242,8 +281,12 @@ mod tests {
         let other = Sheet::new(Entry::Chip(Revision::B), 0);
         pins.pin(other);
         pins.pin(chip(0));
-        pins.keep_filed(&Run::default());
+        pins.keep_filed(&Contents::of(&Run::default(), &Layouts::on_disk()));
         assert_eq!(pins.slots(), [None, Some(chip(0))]);
+        let missing = Sheet::new(Entry::Manual(DeviceKind::Tally2), 99);
+        pins.pin(missing);
+        pins.keep_filed(&Contents::of(&Run::default(), &Layouts::on_disk()));
+        assert!(!pins.contains(missing));
     }
 
     #[test]
@@ -288,7 +331,7 @@ mod tests {
         };
         assert_eq!(
             load(vec![Some(missing), Some(chip(0))]).slots(),
-            [None, Some(chip(0))]
+            [Some(missing), Some(chip(0))]
         );
         assert_eq!(
             load(vec![Some(chip(0)), Some(chip(0))]).slots(),

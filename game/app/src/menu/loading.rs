@@ -2,6 +2,7 @@ mod pipelines;
 
 use bevy::prelude::*;
 use ld60_game_core::state::AppState;
+use ld60_game_manuals::Layouts;
 use ld60_game_player::camera::PlayerCamera;
 use ld60_game_player::hints::IconFont;
 use ld60_game_run::levels::Levels;
@@ -125,6 +126,7 @@ impl LoadingScreen {
         time: Res<Time<Real>>,
         locale: Res<Locale>,
         levels: Option<Res<Levels>>,
+        layouts: Option<Res<Layouts>>,
         icons: Res<IconFont>,
         assets: Res<AssetServer>,
         pipelines: Res<Pipelines>,
@@ -136,6 +138,7 @@ impl LoadingScreen {
         let loaded = [
             locale.is_ready(),
             levels.is_some(),
+            layouts.is_some(),
             icons.is_loaded(&assets),
         ];
         progress.frames += 1;
