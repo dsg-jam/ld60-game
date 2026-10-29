@@ -70,7 +70,7 @@ jobs:
           tar xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: trunk build --release --public-url ./
-        working-directory: packages/game
+        working-directory: game/app
       - run: cd dist && zip -r ../bugs-from-home-web.zip .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
