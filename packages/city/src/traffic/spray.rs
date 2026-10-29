@@ -10,6 +10,7 @@ use rand::RngExt;
 
 use super::super::rng;
 use super::super::weather::Weather;
+use super::Vehicle;
 use super::models::{TRACK, WHEELBASE};
 
 const SEED: u64 = 6;
@@ -32,10 +33,7 @@ impl Plugin for SprayPlugin {
         embedded_asset!(app, "spray.wesl");
         app.add_plugins(MaterialPlugin::<SprayMaterial>::default())
             .init_resource::<Spray>()
-            .add_systems(
-                Update,
-                Spray::follow_weather.run_if(resource_changed::<Weather>),
-            );
+            .add_systems(Update, Splash::follow);
     }
 }
 
@@ -43,11 +41,18 @@ impl Plugin for SprayPlugin {
 #[derive(Resource, Debug)]
 pub(super) struct Spray {
     mesh: Handle<Mesh>,
-    material: Handle<SprayMaterial>,
+    material: SprayMaterial,
 }
 
+/// The water under each wheel of a car, see [`Body::wheels`], which its
+/// spray throws. It drops away no faster than the thrown water falls.
+///
+/// [`Body::wheels`]: super::models::Body::wheels
+#[derive(Component, Debug, Default)]
+struct Splash([f32; 4]);
+
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct SprayMaterial {
+pub(super) struct SprayMaterial {
     #[uniform(0)]
     params: SprayParams,
 }
@@ -55,7 +60,8 @@ struct SprayMaterial {
 /// Matches `Spray` in `spray.wesl`.
 #[derive(ShaderType, Debug, Clone)]
 struct SprayParams {
-    wetness: f32,
+    /// Millimeters of water under each wheel.
+    water: Vec4,
     lifetime: f32,
     size: f32,
     tail: Vec3,
@@ -65,29 +71,28 @@ struct SprayParams {
 impl FromWorld for Spray {
     fn from_world(world: &mut World) -> Self {
         let mesh = world.resource_mut::<Assets<Mesh>>().add(Self::droplets());
-        let material = world
-            .resource_mut::<Assets<SprayMaterial>>()
-            .add(SprayMaterial {
-                params: SprayParams {
-                    wetness: 0.0,
-                    lifetime: LIFETIME,
-                    size: SIZE,
-                    tail: TAIL_LIGHT,
-                    gravity: GRAVITY,
-                },
-            });
+        let material = SprayMaterial {
+            params: SprayParams {
+                water: Vec4::ZERO,
+                lifetime: LIFETIME,
+                size: SIZE,
+                tail: TAIL_LIGHT,
+                gravity: GRAVITY,
+            },
+        };
         Self { mesh, material }
     }
 }
 
 impl Spray {
     /// The spray of one car, as a child of it.
-    pub(super) fn bundle(&self) -> impl Bundle {
+    pub(super) fn bundle(&self, materials: &mut Assets<SprayMaterial>) -> impl Bundle {
         (
             Mesh3d(self.mesh.clone()),
-            MeshMaterial3d(self.material.clone()),
+            MeshMaterial3d(materials.add(self.material.clone())),
             Transform::default(),
             Quads::unbounded(),
+            Splash::default(),
         )
     }
 
@@ -119,14 +124,34 @@ impl Spray {
         }
         quads.into_mesh()
     }
+}
 
-    fn follow_weather(
+impl Splash {
+    /// Follows the water under the wheels of each car, at once as it gets
+    /// deeper and as the thrown water falls as it gets shallower.
+    fn follow(
+        time: Res<Time>,
         weather: Res<Weather>,
-        spray: Res<Spray>,
+        cars: Query<(&Vehicle, &GlobalTransform)>,
+        mut sprays: Query<(&ChildOf, &mut Splash, &MeshMaterial3d<SprayMaterial>)>,
         mut materials: ResMut<Assets<SprayMaterial>>,
     ) {
-        if let Some(mut material) = materials.get_mut(&spray.material) {
-            material.params.wetness = weather.wetness;
+        let drain = 1.0 - (-time.delta_secs() / LIFETIME).exp();
+        for (parent, mut splash, material) in &mut sprays {
+            let Ok((vehicle, transform)) = cars.get(parent.parent()) else {
+                continue;
+            };
+            let water = vehicle.water(transform, weather.wetness);
+            for (shown, water) in splash.0.iter_mut().zip(water) {
+                *shown = if water > *shown {
+                    water
+                } else {
+                    *shown + (water - *shown) * drain
+                };
+            }
+            if let Some(mut material) = materials.get_mut(material) {
+                material.params.water = Vec4::from_array(splash.0);
+            }
         }
     }
 }
