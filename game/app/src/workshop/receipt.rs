@@ -11,6 +11,7 @@ use super::bin::Binned;
 use super::levels::Levels;
 use super::pickup::{Payment, Pickup, TRIES};
 use super::printer::Printing;
+use super::run::Leftover;
 use super::ticket::JobTicket;
 
 pub(super) const SPOT: Vec2 = Vec2::new(-0.41, -0.01);
@@ -35,7 +36,7 @@ impl Plugin for ReceiptPlugin {
 /// paid, what the bench measured on a working device and what the customer
 /// wrote.
 #[derive(Component, Clone, Debug)]
-#[require(Transform, Visibility)]
+#[require(Transform, Visibility, Leftover)]
 pub(crate) struct Receipt {
     job: Localized,
     customer: Message,

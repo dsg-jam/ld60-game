@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) use self::find::Find;
 use super::rent::RentNote;
-use super::run::{Rent, Run};
+use super::run::{Leftover, Rent, Run};
 
 /// At the front right of the counter, beside the keyboard.
 pub(super) const SPOT: Vec2 = Vec2::new(1.0, 0.72);
@@ -81,7 +81,7 @@ impl Plugin for SalvagePlugin {
 /// It holds a few finds, each with a paper tag that says what the trader
 /// thinks it is and what it costs. Click a find to buy it.
 #[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[require(Transform, Visibility)]
+#[require(Transform, Visibility, Leftover)]
 pub(crate) struct SalvageCrate {
     finds: Vec<Find>,
 }

@@ -8,7 +8,7 @@ use ld60_game_core::state::AppState;
 use ld60_locale::{Localized, Message};
 
 use super::chore::PlanetSet;
-use super::run::{Rent, Run};
+use super::run::{Leftover, Rent, Run};
 
 /// Next to the receipt, a little closer to the player.
 pub(super) const SPOT: Vec2 = Vec2::new(-0.6, -0.06);
@@ -33,7 +33,7 @@ impl Plugin for RentPlugin {
 
 /// The landlord's note, left on the counter when the planet sets.
 #[derive(Component, Clone, Copy, Debug)]
-#[require(Transform, Visibility)]
+#[require(Transform, Visibility, Leftover)]
 pub(crate) struct RentNote(Rent);
 
 impl RentNote {
