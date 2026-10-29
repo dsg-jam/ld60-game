@@ -119,11 +119,17 @@ impl Regulars {
         Some(due[rng.random_range(0..due.len())])
     }
 
-    /// Notes that `visit` took job `job` of the run.
-    pub(crate) fn record(&mut self, visit: Visit, job: u32) {
+    /// Notes that `visit` took job `job` of the run. A regular who was not
+    /// `served` still rests before coming back, but comes back with the
+    /// same visit, so their story goes on from where it was.
+    pub(crate) fn record(&mut self, visit: Visit, job: u32, served: bool) {
         let seen = Seen {
             regular: visit.regular,
-            visits: visit.number,
+            visits: if served {
+                visit.number
+            } else {
+                visit.number - 1
+            },
             job,
         };
         match self.seen.iter_mut().find(|s| s.regular == visit.regular) {
@@ -149,7 +155,7 @@ mod tests {
         let mut visits = Vec::new();
         for job in 0..jobs {
             if let Some(visit) = regulars.pick(job, u64::from(job) * 7919) {
-                regulars.record(visit, job);
+                regulars.record(visit, job, true);
                 visits.push((job, visit));
             }
         }
@@ -207,5 +213,23 @@ mod tests {
                 locale.assert_formats([visit.story(), visit.thanks()]);
             }
         }
+    }
+
+    #[test]
+    fn a_regular_left_unserved_comes_back_with_the_same_visit() {
+        let mut regulars = Regulars::default();
+        let job = (0..100)
+            .find(|&job| regulars.pick(job, 1).is_some())
+            .unwrap();
+        let visit = regulars.pick(job, 1).unwrap();
+        regulars.record(visit, job, false);
+        let again = (job + 1..job + 100)
+            .find_map(|later| {
+                regulars
+                    .pick(later, 1)
+                    .filter(|next| next.regular == visit.regular)
+            })
+            .unwrap();
+        assert_eq!(again.number, visit.number);
     }
 }
