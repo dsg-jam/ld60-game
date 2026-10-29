@@ -564,13 +564,19 @@ impl Handheld {
 mod tests {
     use ld60_locale::Locale;
 
+    use ld60_levels::Catalog;
+
     use super::*;
-    use crate::workshop::levels::Levels;
 
     #[test]
     fn stickers_format() {
         let locale = Locale::on_disk();
-        for source in Levels::on_disk().levels() {
+        let levels = Catalog::read(std::path::Path::new(concat!(
+            env!("LD60_ASSETS"),
+            "/levels"
+        )))
+        .unwrap();
+        for source in levels.levels() {
             let level = source.load().unwrap();
             locale.assert_formats([Handheld::sticker_text(&level)]);
         }

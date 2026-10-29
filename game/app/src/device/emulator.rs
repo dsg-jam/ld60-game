@@ -231,13 +231,16 @@ impl Emulator {
 
 #[cfg(test)]
 mod tests {
-    use ld60_levels::{device, initial_rom};
+    use ld60_levels::{Catalog, device, initial_rom};
 
     use super::*;
-    use crate::workshop::levels::Levels;
 
     fn tally() -> AnyDevice {
-        let levels = Levels::on_disk();
+        let levels = Catalog::read(std::path::Path::new(concat!(
+            env!("LD60_ASSETS"),
+            "/levels"
+        )))
+        .unwrap();
         let source = &levels.levels()[0];
         let level = source.load().unwrap();
         let rom = initial_rom(&level, &source.buggy).unwrap();
