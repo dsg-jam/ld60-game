@@ -7,6 +7,7 @@ pub mod noise;
 pub mod quads;
 pub mod shape;
 pub mod surface;
+pub mod triangles;
 
 use bevy::{prelude::*, shader::load_shader_library};
 
