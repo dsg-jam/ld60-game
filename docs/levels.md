@@ -50,3 +50,21 @@ Generated jobs share their text in `levels.ftl`:
 
 To try one, run `cli gen --procedural <device> <seed> <n>`. It writes a level
 folder and prints its path. Then run `cli play <folder>`.
+
+## Add a regular
+
+Regulars are locals who come back with one device after another and tell a
+little more of their story each time. They bring generated jobs.
+
+1. Add them to `regulars` in `catalog.ron`: an `id`, the job of the run `from`
+   which they may come, and how many `visits` their story has.
+2. Add their name as an attribute of `job-customer` in `levels.ftl`, named after
+   the `id`.
+3. Add a message `regular-<id>` with the attributes `visit-<n>` and `thanks-<n>`
+   for each visit, counted from 1. The last visit brings a gift.
+
+```ftl
+regular-pell =
+    .visit-1 = My boss gave me this box on my first day as a courier.
+    .thanks-1 = My boss did not notice anything!
+```

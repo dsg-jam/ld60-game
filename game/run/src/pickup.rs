@@ -34,7 +34,7 @@ pub enum Pickup {
 }
 
 /// What the customer paid for a working device.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Payment {
     /// The reward, less a share for each return.
     pub fee: u32,
@@ -73,7 +73,7 @@ impl Payment {
 
     /// What a regular adds on their last visit.
     pub fn gift(&self) -> u32 {
-        self.visit.map_or(0, Visit::gift)
+        self.visit.as_ref().map_or(0, Visit::gift)
     }
 
     /// Whether the repair changed no more words than the factory fix.
@@ -101,7 +101,7 @@ impl Payment {
         } else {
             "receipt-thanks-late"
         };
-        let thanks = match self.visit {
+        let thanks = match &self.visit {
             Some(visit) => visit.thanks(),
             None => Message::new(id).with("pick", pick % THANKS),
         };
