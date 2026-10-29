@@ -90,11 +90,6 @@ impl Material for ShimmerMaterial {
     }
 }
 
-/// A mesh the shimmer leaves out, like an invisible box that only catches
-/// the pointer.
-#[derive(Component, Debug, Default)]
-pub struct NoShimmer;
-
 /// Copy of a mesh that draws the shimmer on top of it.
 #[derive(Component)]
 struct ShimmerOverlay;
@@ -166,7 +161,7 @@ impl Shimmer {
     fn follow(
         shimmers: Query<(Entity, &Shimmer)>,
         children: Query<&Children>,
-        meshes: Query<&Mesh3d, (Without<ShimmerOverlay>, Without<NoShimmer>)>,
+        meshes: Query<&Mesh3d, Without<ShimmerOverlay>>,
         mut overlays: Query<&mut Mesh3d, With<ShimmerOverlay>>,
         mut commands: Commands,
     ) {

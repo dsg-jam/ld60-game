@@ -14,8 +14,6 @@ pub mod zoom;
 
 use bevy::prelude::*;
 
-pub use self::shimmer::NoShimmer;
-
 /// The seated player: camera, crosshair, cursor, focus, key hints, mouse look,
 /// free look and zoom while focused and hover shimmer.
 pub struct PlayerPlugin;
