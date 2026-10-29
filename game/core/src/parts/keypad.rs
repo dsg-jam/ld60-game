@@ -12,6 +12,7 @@ use ld60_geometry::surface::Finish;
 use self::stroke::Stroke;
 use crate::audio::KeyClick;
 use crate::parts::screen::UiCanvas;
+use crate::player::cursor::WantsFinger;
 
 pub struct KeypadPlugin;
 
@@ -339,6 +340,7 @@ impl<K: Copy> Keypad<K> {
 /// The key is pressed as soon as the input says so. It moves down and back
 /// up over a short [`Stroke`].
 #[derive(Component, Debug)]
+#[require(WantsFinger)]
 pub struct PressableKey {
     rest: Vec3,
     width: f32,
@@ -389,10 +391,16 @@ impl PressableKey {
         time: Res<Time>,
         codes: Res<ButtonInput<KeyCode>>,
         keys: Res<ButtonInput<Key>>,
-        mut caps: Query<(&mut PressableKey, &mut Transform, &GlobalTransform)>,
+        mut caps: Query<(
+            &mut PressableKey,
+            &mut Transform,
+            &GlobalTransform,
+            &mut WantsFinger,
+        )>,
         mut commands: Commands,
     ) {
-        for (mut cap, mut transform, placed) in &mut caps {
+        for (mut cap, mut transform, placed, mut finger) in &mut caps {
+            finger.set_if_neq(WantsFinger(cap.active));
             let pressed = cap.held_by_pointer
                 || cap.tapped_by_pointer
                 || (cap.active
@@ -456,5 +464,10 @@ mod tests {
             world.run_system_cached(PressableKey::update).unwrap();
         }
         assert_eq!(world.resource::<Clicks>().0, [true, false]);
+        let mut fingers = world.query::<&WantsFinger>();
+        assert_eq!(
+            fingers.iter(&world).collect::<Vec<_>>(),
+            [&WantsFinger(true)]
+        );
     }
 }

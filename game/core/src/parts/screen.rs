@@ -15,6 +15,7 @@ use bevy::{
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 
+use crate::player::cursor::WantsArrow;
 use crate::state::AppState;
 
 pub use self::crt::{CrtGlass, CrtLight, CrtMaterial};
@@ -155,7 +156,7 @@ impl UiCanvas {
 /// The mesh UVs must span the whole canvas, like [`CrtGlass`] does. The
 /// surface entity is also the virtual pointer that drives the canvas UI.
 #[derive(Component, Debug)]
-#[require(Transform)]
+#[require(Transform, WantsArrow)]
 pub struct ScreenSurface {
     target: NormalizedRenderTarget,
     size: Vec2,
@@ -177,11 +178,6 @@ impl ScreenSurface {
             cursor: None,
             active: false,
         }
-    }
-
-    /// Whether the mouse is over this surface.
-    pub fn hovered(&self) -> bool {
-        self.cursor.is_some()
     }
 
     fn add_pointer(add: On<Add<ScreenSurface>>, mut commands: Commands) {
@@ -210,7 +206,7 @@ impl ScreenSurface {
         mut raycast: MeshRayCast,
         window: Single<&Window, With<PrimaryWindow>>,
         cameras: Query<(&Camera, &GlobalTransform, &RenderTarget), With<Camera3d>>,
-        mut surfaces: Query<(Entity, &mut ScreenSurface, &PointerId)>,
+        mut surfaces: Query<(Entity, &mut ScreenSurface, &PointerId, &mut WantsArrow)>,
         mut window_events: MessageReader<WindowEvent>,
         mut inputs: MessageWriter<PointerInput>,
     ) {
@@ -228,7 +224,7 @@ impl ScreenSurface {
             filter: &|entity| {
                 surfaces
                     .get(entity)
-                    .is_ok_and(|(_, surface, _)| surface.active)
+                    .is_ok_and(|(_, surface, ..)| surface.active)
             },
             early_exit_test: &|_| true,
         };
@@ -250,7 +246,7 @@ impl ScreenSurface {
             .filter_map(Self::pointer_action)
             .collect();
 
-        for (entity, mut surface, &id) in &mut surfaces {
+        for (entity, mut surface, &id, mut arrow) in &mut surfaces {
             let hit = hit
                 .filter(|(e, _)| *e == entity)
                 .map(|(_, uv)| uv * surface.size);
@@ -280,6 +276,7 @@ impl ScreenSurface {
                 }
             }
             surface.cursor = hit;
+            arrow.set_if_neq(WantsArrow(hit.is_some()));
         }
     }
 
