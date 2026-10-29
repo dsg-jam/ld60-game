@@ -139,7 +139,11 @@ impl Cable {
                     -BOOT.y / 2.0,
                     -(from + to) / 2.0,
                 ));
-                boot.spawn((Shape::cuboid(&flange, PLUG_BLACK), Finish::Plastic));
+                boot.spawn((
+                    Shape::cuboid(&flange, PLUG_BLACK),
+                    Finish::Plastic,
+                    Pickable::IGNORE,
+                ));
                 Self::relief(boot, along(FLANGE, BOOT_STEP), BOOT_RELIEF[0], Vec3::NEG_Z);
                 Self::relief(boot, along(BOOT_STEP, BOOT.z), BOOT_RELIEF[1], Vec3::NEG_Z);
             });
@@ -158,7 +162,12 @@ impl Cable {
                     -PLUG.y / 2.0,
                     -PLUG.z / 2.0 + housing / 2.0,
                 ));
-                plug.spawn((Shape::cuboid(&body, PLUG_BLACK), Finish::Plastic));
+                // Clicks go through to the header under it.
+                plug.spawn((
+                    Shape::cuboid(&body, PLUG_BLACK),
+                    Finish::Plastic,
+                    Pickable::IGNORE,
+                ));
                 let start = -PLUG.z / 2.0 + housing;
                 Self::relief(plug, (start, PLUG.z / 2.0), PLUG_RELIEF, Vec3::Z);
             });
@@ -211,7 +220,11 @@ impl Cable {
                     .with_rotation(Quat::from_rotation_arc(Vec3::Y, axis)),
                 Visibility::default(),
             ))
-            .with_child((Shape::cylinder(&tube, PLUG_BLACK), Finish::Plastic));
+            .with_child((
+                Shape::cylinder(&tube, PLUG_BLACK),
+                Finish::Plastic,
+                Pickable::IGNORE,
+            ));
     }
 
     /// Puts the plug on the header of the plugged in device, over a header
