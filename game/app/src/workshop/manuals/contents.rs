@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_calco::Revision;
 use ld60_devices::{ChipSpec, DeviceKind};
-use ld60_game_core::parts::paper::Print;
+use ld60_game_core::parts::paper::{Paper, Press, Print, Stock};
 use ld60_levels::Level;
 use ld60_locale::{Localized, Message};
 use serde::{Deserialize, Serialize};
@@ -128,7 +128,12 @@ impl Entry {
                 let file = layouts.errata();
                 (file, file.press().run(("errata", revision)))
             }
-            Self::Note(note) => return note.print(),
+            // Marta typed her notes.
+            Self::Note(note) => {
+                return Press::Typewriter
+                    .run(("tutorial", note.0))
+                    .on(Stock::TYPING);
+            }
         };
         run.on(file.stock())
     }
@@ -212,7 +217,12 @@ impl Page {
             Self::Laid {
                 layout, subject, ..
             } => layout.write(subject, page),
-            Self::Note(note) => note.write(page),
+            Self::Note(note) => {
+                page.spawn(Paper::heading(note.title()));
+                for paragraph in note.paragraphs() {
+                    page.spawn(Paper::text(paragraph));
+                }
+            }
         }
     }
 }
