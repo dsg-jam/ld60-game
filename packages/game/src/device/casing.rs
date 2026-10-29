@@ -45,6 +45,11 @@ const COVER_GAP: f32 = 0.02;
 const SCREW_METAL: Color = Color::srgb_u8(0xc8, 0xca, 0xce);
 const HOLE_DARK: Color = Color::srgb_u8(0x10, 0x10, 0x12);
 
+/// Moves the cover and the screws, see [`Casing::travel`]. Whatever follows
+/// a screw runs after it.
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct CasingTravel;
+
 /// The parts of a casing that say what a click does while the device is
 /// focused.
 type Prompted = (
@@ -73,7 +78,7 @@ impl Plugin for CasingPlugin {
             Update,
             (
                 Casing::lay_out,
-                Casing::travel.after(Holdable::follow),
+                Casing::travel.after(Holdable::follow).in_set(CasingTravel),
                 Casing::show,
             )
                 .chain(),

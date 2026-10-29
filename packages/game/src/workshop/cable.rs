@@ -280,17 +280,16 @@ impl Cable {
     /// Puts the plug on the header of the plugged in device, over a header
     /// the pointer is on, or back on the counter, and lets the cable move to
     /// it.
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
+    #[expect(clippy::type_complexity, reason = "Bevy system")]
     fn follow(
         headers: Query<(Entity, &ChildOf), With<Header>>,
         plugged: Query<&Casing, With<Connected>>,
         // The device may have moved this frame, after the last transform
         // propagation, so its pose comes from the transforms.
-        mut places: ParamSet<(TransformHelper, Single<(&Plug, &mut Transform)>)>,
+        mut places: ParamSet<(TransformHelper, Single<(&Plug, &mut Transform)>, Aim)>,
         cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
-        aim: Aim,
         time: Res<Time>,
     ) {
         let (mut cable, material) = cable.into_inner();
@@ -304,6 +303,7 @@ impl Cable {
                 let device_at = places.p0().compute_global_transform(device).ok()?;
                 Some((at, device_at.affine(), *casing.bounds()))
             });
+        let hovered = places.p2().at(ClickTool::Plug);
         let mut plug = places.p1();
         let (rest, transform) = &mut *plug;
         // The plug stands straight up off the board, so the cable leaves the
@@ -316,9 +316,7 @@ impl Cable {
         **transform = match header {
             Some((header, _, _)) => on(header.compute_transform(), 0.0),
             None => {
-                let goal = aim
-                    .at(ClickTool::Plug)
-                    .map_or(rest.rest, |header| on(header, PLUG_HOVER));
+                let goal = hovered.map_or(rest.rest, |header| on(header, PLUG_HOVER));
                 let dt = time.delta_secs();
                 let mut moved = **transform;
                 moved

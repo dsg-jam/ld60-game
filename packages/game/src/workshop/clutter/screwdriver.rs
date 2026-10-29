@@ -36,25 +36,31 @@ impl Screwdriver {
     /// Puts the tip on the screw that turns, if any, and turns with it.
     /// Otherwise it waits over the screw the pointer is on, if any. The
     /// clutter stays at the origin, so its space is the world.
+    #[expect(clippy::type_complexity, reason = "Bevy system")]
     pub(super) fn follow(
         time: Res<Time>,
         turning: Query<&Turning>,
-        aim: Aim,
-        camera: Single<&Transform, (With<PlayerCamera>, Without<Screwdriver>)>,
-        mut screwdrivers: Query<(&mut Screwdriver, &mut Transform)>,
+        mut places: ParamSet<(
+            Aim,
+            Single<&Transform, With<PlayerCamera>>,
+            Query<(&mut Screwdriver, &mut Transform)>,
+        )>,
     ) {
         let screw = turning.iter().next();
-        let waiting = aim
+        let waiting = places
+            .p0()
             .at(ClickTool::Screwdriver)
             .map(|spot| spot * Transform::from_translation(Vec3::NEG_Y * HOVER));
+        let camera = places.p1().translation;
+        let mut screwdrivers = places.p2();
         let dt = time.delta_secs();
         for (mut screwdriver, mut transform) in &mut screwdrivers {
             let goal = match (screw, waiting) {
                 (Some(screw), _) => Self::clear_of(
                     screw.at * Transform::from_translation(Vec3::Y * Phillips::SEAT),
-                    camera.translation,
+                    camera,
                 ),
-                (None, Some(spot)) => Self::clear_of(spot, camera.translation),
+                (None, Some(spot)) => Self::clear_of(spot, camera),
                 (None, None) => screwdriver.rest * Self::tip_to_rest(),
             };
             let tip = &mut screwdriver.tip;
