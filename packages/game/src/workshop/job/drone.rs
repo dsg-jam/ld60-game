@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, TAU};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, PI, TAU};
 
 use bevy::{light::NotShadowCaster, prelude::*};
+use ld60_core::GRAVITY;
 use ld60_core::audio::{Play, Sound};
 use ld60_core::layout::counter::CounterLayout;
 use ld60_core::parts::downwash::{Downwash, Jet};
@@ -37,6 +38,12 @@ const STOWED: f32 = 0.08;
 const TRY_TIME: f32 = 1.2;
 /// How far the drone leans into its flight, in radians.
 const TILT: f32 = 0.25;
+/// How quickly the drone turns its front the way it flies.
+const YAW_RATE: f32 = 3.0;
+/// How quickly hanging cargo stops swinging, as a share of critical
+/// damping, and how far out it swings at most, as a share of its line.
+const SWING_DAMPING: f32 = 0.12;
+const SWING_MOST: f32 = 0.35;
 /// Turns of the rotors each second.
 /// Turns per second the blades show. The real ones turn too fast to see,
 /// so these turn slow enough not to stand still on screen, over a blur.
@@ -173,6 +180,10 @@ pub(crate) struct Flight {
     carried: Vec<Cargo>,
     /// Whether it has come out of the street yet.
     came: bool,
+    /// Which way its front faces, as a turn around Y, once it has moved.
+    heading: Option<f32>,
+    /// How fast it went over the last frame.
+    velocity: Vec3,
 }
 
 /// Something a [`Drone`] carries.
@@ -183,6 +194,34 @@ struct Cargo {
     offset: Vec3,
     /// How far it went into the pod, from 0 to 1, if it goes there.
     stowing: Option<f32>,
+    swing: Swing,
+}
+
+/// How a hanging thing swings under the drone, like a pendulum the drone
+/// pushes as it speeds up and slows down.
+#[derive(Debug, Default)]
+struct Swing {
+    /// How far it is out to the side, and how fast it goes.
+    out: Vec2,
+    speed: Vec2,
+    /// How it turned when it was picked up.
+    rotation: Option<Quat>,
+}
+
+impl Swing {
+    /// Swings on by `dt` seconds on a line `length` long while the drone
+    /// speeds up by `push` to the side.
+    fn step(&mut self, push: Vec2, length: f32, dt: f32) {
+        let tune = (GRAVITY / length.max(0.01)).sqrt();
+        let pull = -tune * tune * self.out - 2.0 * SWING_DAMPING * tune * self.speed - push;
+        self.speed += pull * dt;
+        self.out += self.speed * dt;
+        let most = SWING_MOST * length;
+        if self.out.length() > most {
+            self.out = self.out.normalize() * most;
+            self.speed = Vec2::ZERO;
+        }
+    }
 }
 
 impl Flight {
@@ -209,6 +248,8 @@ impl Flight {
             from: Self::away(seed),
             carried,
             came: false,
+            heading: None,
+            velocity: Vec3::ZERO,
         }
     }
 
@@ -322,6 +363,7 @@ impl Flight {
             item,
             offset: Vec3::NEG_Y * HOLD,
             stowing: None,
+            swing: Swing::default(),
         };
         let flight = Self::new(seed, delay, vec![cargo], steps);
         let landed = flight.landed();
@@ -383,6 +425,7 @@ impl Flight {
                 continue;
             }
             flight.elapsed += dt;
+            let before = transform.translation;
             let mut tilt = Quat::IDENTITY;
             match flight.steps.front() {
                 Some(&Step::Fly { to, time }) => {
@@ -398,6 +441,11 @@ impl Flight {
                     let along = (to - flight.from).with_y(0.0);
                     if let Some(axis) = Vec3::Y.cross(along).try_normalize() {
                         tilt = Quat::from_axis_angle(axis, TILT * (1.0 - 2.0 * t));
+                        // Turns its front, -Z, the way it goes.
+                        let wanted = (-along.x).atan2(-along.z);
+                        let heading = flight.heading.get_or_insert(wanted);
+                        let turn = (wanted - *heading + PI).rem_euclid(TAU) - PI;
+                        *heading += turn * (1.0 - (-YAW_RATE * dt).exp());
                     }
                     if t >= 1.0 {
                         flight.from = to;
@@ -420,6 +468,7 @@ impl Flight {
                             item,
                             offset: item_at.translation - transform.translation,
                             stowing: stow.then_some(0.0),
+                            swing: Swing::default(),
                         });
                         commands.entity(item).try_insert(Carried);
                     }
@@ -449,7 +498,18 @@ impl Flight {
                     continue;
                 }
             }
-            transform.rotation = tilt;
+            transform.rotation = tilt * Quat::from_rotation_y(flight.heading.unwrap_or(0.0));
+            let velocity = if dt > 0.0 {
+                (transform.translation - before) / dt
+            } else {
+                flight.velocity
+            };
+            let push = if dt > 0.0 {
+                ((velocity - flight.velocity) / dt).xz()
+            } else {
+                Vec2::ZERO
+            };
+            flight.velocity = velocity;
             for cargo in &mut flight.carried {
                 let Ok((mut item_at, mut shown)) = items.get_mut(cargo.item) else {
                     continue;
@@ -464,6 +524,17 @@ impl Flight {
                     if *stowing >= 1.0 {
                         shown.set_if_neq(Visibility::Hidden);
                     }
+                }
+                if cargo.stowing.is_none() && dt > 0.0 {
+                    let swing = &mut cargo.swing;
+                    let length = -offset.y;
+                    swing.step(push, length, dt);
+                    let out = Vec3::new(swing.out.x, 0.0, swing.out.y);
+                    // Tilts to hang along its line.
+                    let rotation = *swing.rotation.get_or_insert(item_at.rotation);
+                    let hang = Quat::from_rotation_arc(Vec3::NEG_Y, (offset + out).normalize());
+                    item_at.rotation = hang * rotation;
+                    offset += out;
                 }
                 item_at.translation = transform.translation + offset;
             }
@@ -689,5 +760,25 @@ impl Drone {
         for mut rotor in &mut rotors {
             rotor.rotation = turn * rotor.rotation;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cargo_swings_back_as_the_drone_speeds_up_and_settles_when_it_flies_on() {
+        let mut swing = Swing::default();
+        let dt = 1.0 / 60.0;
+        for _ in 0..30 {
+            swing.step(Vec2::new(3.0, 0.0), HOLD, dt);
+        }
+        assert!(swing.out.x < 0.0, "{:?}", swing.out);
+        assert!(swing.out.length() <= SWING_MOST * HOLD + 1e-6);
+        for _ in 0..1200 {
+            swing.step(Vec2::ZERO, HOLD, dt);
+        }
+        assert!(swing.out.length() < 1e-3, "{:?}", swing.out);
     }
 }
