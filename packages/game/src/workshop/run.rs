@@ -78,6 +78,10 @@ pub(crate) struct Run {
     /// The tutorial steps whose notes are filed in the manuals file.
     #[serde(default)]
     notes: Vec<usize>,
+    /// Manuals in the file without a sign, like that of the gadget of a
+    /// tutorial job, which Marta left with her note.
+    #[serde(default)]
+    manuals: Vec<DeviceKind>,
     /// The sheets of the manuals file pinned to the monitor.
     #[serde(default)]
     pins: Pins,
@@ -163,6 +167,7 @@ impl Default for Run {
             datasheets: vec![Self::shipped_chip(DeviceKind::Tally2)],
             errata: Vec::new(),
             notes: Vec::new(),
+            manuals: Vec::new(),
             pins: Pins::default(),
             tools: Vec::new(),
             demand: Demand::default(),
@@ -185,6 +190,7 @@ impl Run {
             number: self.number + 1,
             tutorial: false,
             notes: self.notes.clone(),
+            manuals: self.manuals.clone(),
             ..Self::default()
         }
     }
@@ -325,6 +331,18 @@ impl Run {
     /// Whether the shop computer has `tool`.
     pub(crate) fn has(&self, tool: ComputerTool) -> bool {
         self.tools.contains(&tool)
+    }
+
+    /// Whether the manual of `device` is in the manuals file.
+    pub(crate) fn has_manual(&self, device: DeviceKind) -> bool {
+        self.signs.contains(&device) || self.manuals.contains(&device)
+    }
+
+    /// Files the manual of `device`, which came without a sign.
+    pub(crate) fn file_manual(&mut self, device: DeviceKind) {
+        if !self.has_manual(device) {
+            self.manuals.push(device);
+        }
     }
 
     pub(crate) fn owns(&self, find: Find) -> bool {
@@ -1066,5 +1084,17 @@ mod tests {
             }
         );
         assert_eq!((run.till, run.stats.cycles), (RENT - 1, 0));
+    }
+
+    #[test]
+    fn a_manual_left_with_a_note_stays_in_the_file() {
+        let mut run = Run::default();
+        assert!(!run.has_manual(DeviceKind::Tally1));
+        run.file_manual(DeviceKind::Tally1);
+        run.file_manual(DeviceKind::Tally1);
+        assert!(run.has_manual(DeviceKind::Tally1));
+        assert_eq!(run.manuals, [DeviceKind::Tally1]);
+        assert!(run.next().has_manual(DeviceKind::Tally1));
+        assert!(!run.signs.contains(&DeviceKind::Tally1));
     }
 }

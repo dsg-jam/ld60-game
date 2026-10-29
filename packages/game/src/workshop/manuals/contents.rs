@@ -218,13 +218,13 @@ impl Page {
 }
 
 impl Contents {
-    /// The manuals of the devices with a sign in the order of
-    /// [`DeviceKind::ALL`], the datasheets of their chips, the errata the
-    /// shop bought and the notes it filed.
+    /// The manuals the shop has in the order of [`DeviceKind::ALL`], the
+    /// datasheets of their chips, the errata the shop bought and the notes
+    /// it filed.
     pub(super) fn of(run: &Run) -> Self {
         let manuals = DeviceKind::ALL
             .into_iter()
-            .filter(|device| run.signs().contains(device))
+            .filter(|&device| run.has_manual(device))
             .map(Entry::Manual);
         let chips = run.chips().into_iter().map(Entry::Chip);
         let errata = Revision::ALL

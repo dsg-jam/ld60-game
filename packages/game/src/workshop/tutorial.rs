@@ -96,11 +96,12 @@ impl TutorialNote {
     }
 
     /// Files the note about the job that came in, unless it is filed
-    /// already.
+    /// already, with the manual of its gadget.
     fn file_for_job(job: Res<Job>, mut run: ResMut<Run>, mut commands: Commands) {
         let Some(note) = Self::for_job(&job) else {
             return;
         };
+        run.file_manual(job.level.device);
         if run.notes().contains(&note.0) {
             return;
         }
