@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use super::breakpoints::Breakpoints;
 use super::listing::Listing;
 use super::trace::TraceView;
-use crate::device::{Connected, Emulator};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
+use ld60_game_device::{Connected, Emulator};
 
 /// Lines the chip ran recently.
 const TRACED: Color = Color::srgba(0.1, 0.26, 0.14, 0.4);

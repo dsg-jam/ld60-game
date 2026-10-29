@@ -8,7 +8,7 @@ use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use ld60_game_core::parts::liquid::{Foam, Liquid};
 use ld60_game_core::parts::steam::Steam;
 
-use crate::device::Phillips;
+use ld60_game_device::Phillips;
 
 const MUG_RADIUS: f32 = 0.04;
 const MUG_HEIGHT: f32 = 0.095;

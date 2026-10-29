@@ -14,7 +14,7 @@ use ld60_geometry::surface::Finish;
 use super::job::{Flight, HandIn, Job, JobItem};
 use super::printer::Printing;
 use super::ticket::JobTicket;
-use crate::device::Casing;
+use ld60_game_device::Casing;
 
 pub(super) const STAMP_BASE_SIZE: Vec3 = Vec3::new(0.06, 0.018, 0.04);
 const STAMP_PAD_SIZE: Vec3 = Vec3::new(0.058, 0.005, 0.038);

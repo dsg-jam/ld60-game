@@ -9,7 +9,7 @@ use self::props::{Finishes, Props};
 use self::screwdriver::Screwdriver;
 #[cfg(test)]
 use super::footprint::Footprint;
-use crate::device::CasingTravel;
+use ld60_game_device::CasingTravel;
 
 const MUG_SPOT: Vec2 = Vec2::new(-0.62, 0.45);
 const SCREWDRIVER_SPOT: Vec2 = Vec2::new(-0.38, 0.62);

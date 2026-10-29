@@ -5,6 +5,7 @@ members = [
   "game/city",
   "game/cli",
   "game/core",
+  "game/device",
   "game/geometry",
   "game/levels",
   "game/locale",
@@ -33,6 +34,7 @@ ld60-devices = { path = "silicon/devices" }
 ld60-dsl = { path = "silicon/dsl" }
 ld60-game-city = { path = "game/city" }
 ld60-game-core = { path = "game/core" }
+ld60-game-device = { path = "game/device" }
 ld60-geometry = { path = "game/geometry" }
 ld60-levels = { path = "game/levels" }
 ld60-locale = { path = "game/locale" }

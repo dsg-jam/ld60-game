@@ -9,12 +9,12 @@ use super::handheld::Model;
 /// The rectangles are in meters, centered on the device, with +Y towards the
 /// back of the device. The first one is the body, the others lie on it.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Silhouette {
+pub struct Silhouette {
     parts: Vec<(Rect, Color)>,
 }
 
 impl Silhouette {
-    pub(crate) fn of(device: DeviceKind) -> Self {
+    pub fn of(device: DeviceKind) -> Self {
         Model::of(device).silhouette(device.digits())
     }
 
@@ -27,12 +27,12 @@ impl Silhouette {
         Rect::from_center_size(Vec2::new(block.center.x, -block.center.z), block.size.xz())
     }
 
-    pub(crate) fn parts(&self) -> &[(Rect, Color)] {
+    pub fn parts(&self) -> &[(Rect, Color)] {
         &self.parts
     }
 
     /// The rectangle around all parts.
-    pub(crate) fn bounds(&self) -> Rect {
+    pub fn bounds(&self) -> Rect {
         self.parts
             .iter()
             .fold(Rect::EMPTY, |bounds, (part, _)| bounds.union(*part))

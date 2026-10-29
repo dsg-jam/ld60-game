@@ -37,13 +37,13 @@ impl Plugin for PhillipsPlugin {
 }
 
 /// A Phillips screw head and the screwdriver tip that fits it.
-pub(crate) struct Phillips;
+pub struct Phillips;
 
 impl Phillips {
     /// The size of the head, like a cylinder.
     pub(crate) const HEAD: Vec3 = Vec3::new(2.0 * HEAD_RADIUS, HEAD_HEIGHT, 2.0 * HEAD_RADIUS);
     /// How deep the point of a tip sits in the head.
-    pub(crate) const SEAT: f32 = DEPTH - POINT_GAP;
+    pub const SEAT: f32 = DEPTH - POINT_GAP;
 
     /// The mesh of a head of size [`Phillips::HEAD`] centered on the origin,
     /// with the cross in its face at -Y. The arms run along X and Z.
@@ -175,7 +175,7 @@ impl Phillips {
     /// is centered on the origin with its point at +Y, and its wings run
     /// along X and Z. Each wing slopes back like the floor of the cross, and
     /// the grooves between them close up towards the shaft.
-    pub(crate) fn tip(radius: f32, length: f32) -> Mesh {
+    pub fn tip(radius: f32, length: f32) -> Mesh {
         let wing = HALF_WIDTH * WING_FIT;
         // Seated, the edge of a wing meets the end of an arm of the cross.
         let spread = REACH / (DEPTH - END_DEPTH);

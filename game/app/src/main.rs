@@ -6,7 +6,6 @@
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
 
-mod device;
 mod menu;
 mod workshop;
 
@@ -48,7 +47,7 @@ fn main() -> AppExit {
         ld60_game_core::player::PlayerPlugin,
         ld60_locale::TypefacePlugin,
         workshop::WorkshopPlugin,
-        device::DevicePlugin,
+        ld60_game_device::DevicePlugin,
     ));
     app.run()
 }

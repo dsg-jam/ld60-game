@@ -5,8 +5,8 @@ use ld60_machine::{Cpu, Step};
 use super::PHOSPHOR;
 use super::footer::{Command, Run, Status};
 use super::listing::Listing;
-use crate::device::{Connected, Emulator, Stop};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
+use ld60_game_device::{Connected, Emulator, Stop};
 
 /// RAM cells the panel shows.
 const RAM_CELLS: usize = 16;

@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use super::layout::{Layouts, ManualFile, PageLayout, Subject};
 use super::pins::Sheet;
-use crate::device::DeviceName;
 use crate::workshop::run::Run;
 use crate::workshop::tutorial::TutorialNote;
+use ld60_game_device::DeviceName;
 
 const GADGETS: Color = Color::srgb_u8(0xe8, 0xcc, 0x6a);
 const CHIPS: Color = Color::srgb_u8(0x9a, 0xc0, 0xd8);

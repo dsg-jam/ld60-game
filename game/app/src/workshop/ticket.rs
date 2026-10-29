@@ -12,7 +12,7 @@ use ld60_locale::{Localized, Message};
 use super::job::Job;
 use super::levels::Levels;
 use super::regulars::Visit;
-use crate::device::DeviceName;
+use ld60_game_device::DeviceName;
 
 const SHEET_SIZE: Vec2 = Vec2::new(0.16, 0.22);
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);

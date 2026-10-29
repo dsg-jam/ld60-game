@@ -13,9 +13,9 @@ use super::Editor;
 use super::footer::{Command, Run, Status};
 use super::highlight::Highlight;
 use super::listing::Listing;
-use crate::device::{Connected, Emulator};
 use crate::workshop::job::{Job, JobId};
 use crate::workshop::run::{ComputerTool, Run as ShopRun};
+use ld60_game_device::{Connected, Emulator};
 
 /// The 0-based source lines where the chip stops for the debugger.
 ///
