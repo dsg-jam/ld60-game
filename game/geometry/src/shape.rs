@@ -46,6 +46,8 @@ enum Kind {
     Cylinder,
     /// Like [`Kind::Cylinder`], with round ends inside its block.
     Capsule,
+    /// A ring lying flat, as wide as its block and as thick as it is high.
+    Ring,
     /// A round mesh of its own that fills its block.
     Turned(Handle<Mesh>),
     /// Like [`Kind::Cuboid`], with round holes of a radius through it from
@@ -80,6 +82,11 @@ impl Shape {
 
     pub fn capsule(block: &Block, color: Color) -> impl Bundle {
         Self::bundle(Kind::Capsule, block, color)
+    }
+
+    /// A ring lying flat in `block`, like a coil of cable.
+    pub fn ring(block: &Block, color: Color) -> impl Bundle {
+        Self::bundle(Kind::Ring, block, color)
     }
 
     /// A keycap filling `block`, with sides that lean in by `taper` and a
@@ -148,6 +155,14 @@ impl Shape {
             Kind::Cuboid => Cuboid::from_size(self.size).into(),
             Kind::Cylinder => Cylinder::new(self.size.x / 2.0, self.size.y).into(),
             Kind::Capsule => Capsule3d::new(self.size.x / 2.0, self.size.y - self.size.x).into(),
+            Kind::Ring => {
+                let outer = self.size.x / 2.0;
+                Torus::new(outer - self.size.y, outer)
+                    .mesh()
+                    .minor_resolution(8)
+                    .major_resolution(24)
+                    .build()
+            }
             Kind::Turned(mesh) => return mesh.clone(),
             Kind::Drilled(holes, radius) => drilled::drilled(self.size, holes, *radius),
             Kind::Keycap(taper, dish) => keycap::keycap(self.size, *taper, *dish),
@@ -170,7 +185,9 @@ impl Shape {
         };
         let form = match shape.kind {
             Kind::Cuboid | Kind::Drilled(..) | Kind::Keycap(..) => Form::Box(shape.size),
-            Kind::Cylinder | Kind::Capsule | Kind::Turned(_) => Form::Cylinder(shape.size),
+            Kind::Cylinder | Kind::Capsule | Kind::Ring | Kind::Turned(_) => {
+                Form::Cylinder(shape.size)
+            }
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;
         commands.entity(add.entity).insert((
