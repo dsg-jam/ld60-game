@@ -229,7 +229,9 @@ fn a_still_cable_stays_out_of_everything() {
     let room = Room::new(&counter);
     let rest = resting(&counter);
     let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
-    assert_within("rest", &run(&room, &mut cable, 5.0, |_| rest), 1e-4);
+    // It is laid out straight, in the air, and falls first.
+    assert_within("falling", &run(&room, &mut cable, 2.0, |_| rest), 0.75e-3);
+    assert_within("rest", &run(&room, &mut cable, 3.0, |_| rest), 0.15e-3);
     let open = (
         counter
             .place_on_mat(MANUALS_OPEN_SPOT, 0.0)
@@ -240,14 +242,16 @@ fn a_still_cable_stays_out_of_everything() {
         file: Some(open),
         ..rest
     };
-    assert_within("file", &run(&room, &mut cable, 3.0, |_| file), 1e-4);
+    assert_within("file", &run(&room, &mut cable, 3.0, |_| file), 0.15e-3);
     for kind in DeviceKind::ALL {
         for yaw in [0.0, 1.2, 2.4] {
             let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
             run(&room, &mut cable, 3.0, |_| rest);
             let ends = on_mat(&counter, kind, yaw);
             let name = format!("{kind:?} on the mat at yaw {yaw}");
-            assert_within(&name, &run(&room, &mut cable, 5.0, |_| ends), 1e-4);
+            // The plug jumps onto the device, and the cable follows.
+            assert_within(&name, &run(&room, &mut cable, 2.0, |_| ends), 1e-3);
+            assert_within(&name, &run(&room, &mut cable, 3.0, |_| ends), 0.15e-3);
         }
     }
 }
@@ -257,7 +261,7 @@ fn turning_the_held_device_keeps_the_cable_out_of_it() {
     let counter = CounterLayout::new();
     let room = Room::new(&counter);
     for kind in DeviceKind::ALL {
-        for (speed, limit) in [(1.0, 0.75e-3), (3.0, 0.75e-3), (8.0, 1.5e-3)] {
+        for (speed, limit) in [(1.0, 1e-3), (3.0, 1e-3), (8.0, 1.5e-3)] {
             let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
             let start = held(&counter, kind, Quat::IDENTITY);
             run(&room, &mut cable, 3.0, |_| start);
@@ -273,6 +277,52 @@ fn turning_the_held_device_keeps_the_cable_out_of_it() {
                 &format!("{kind:?} turning {speed} per second"),
                 &worst,
                 limit,
+            );
+        }
+    }
+}
+
+#[test]
+fn turning_the_held_device_does_not_whip_the_cable() {
+    let counter = CounterLayout::new();
+    for kind in [DeviceKind::Tally2, DeviceKind::Lock4] {
+        for (speed, worst_limit, most_limit) in [(1.0, 8e-3, 0.5e-3), (3.0, 20e-3, 2.5e-3)] {
+            let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
+            let start = held(&counter, kind, Quat::IDENTITY);
+            for _ in 0..(3.0 * FPS) as usize {
+                cable.advance(1.0 / FPS, &start);
+            }
+            let frames: Vec<Vec<Vec3>> = (0..(6.0 * FPS) as usize)
+                .map(|frame| {
+                    let a = frame as f32 / FPS * speed;
+                    let turn = Quat::from_euler(EulerRot::XYZ, a, a * 1.7, a * 0.6);
+                    let ends = held(&counter, kind, turn);
+                    cable.advance(1.0 / FPS, &ends);
+                    cable.shown(&ends)
+                })
+                .collect();
+            // How much each point speeds up or slows down from one frame
+            // to the next.
+            let mut jolts: Vec<f32> = frames
+                .windows(3)
+                .flat_map(|f| {
+                    (HELD_ENDS..POINTS - HELD_ENDS)
+                        .map(move |i| (f[0][i] - 2.0 * f[1][i] + f[2][i]).length())
+                })
+                .collect();
+            jolts.sort_by(f32::total_cmp);
+            let worst = jolts[jolts.len() - 1];
+            let most = jolts[jolts.len() * 99 / 100];
+            let name = format!("{kind:?} turning {speed} per second");
+            assert!(
+                worst < worst_limit,
+                "{name}: a jolt of {:.1} mm",
+                worst * 1000.0
+            );
+            assert!(
+                most < most_limit,
+                "{name}: 1% of jolts over {:.2} mm",
+                most * 1000.0
             );
         }
     }

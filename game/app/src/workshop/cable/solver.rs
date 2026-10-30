@@ -21,9 +21,14 @@ const MAX_TICKS: u32 = 4;
 /// ticks.
 const CATCH_UP: usize = 8;
 /// How soft the cable bends, in meters per newton. Zero would be a rod.
-const BEND_COMPLIANCE: f32 = 2e-7;
+/// Much stiffer, and the cable snaps from one bend to another as the plug
+/// turns.
+const BEND_COMPLIANCE: f32 = 5e-6;
 /// How much of its speed the cable loses per second.
 const DAMPING: f32 = 8.0;
+/// The fastest a point of the cable moves on, in meters per second. A plug
+/// that jumps would otherwise fling the cable.
+const MAX_SPEED: f32 = 3.0;
 /// How much of its sliding a point on the counter keeps per step.
 const FRICTION: f32 = 0.3;
 /// A point on the counter slower than this, in meters per second, stops.
@@ -246,7 +251,7 @@ impl Cable {
         let keep = (1.0 - DAMPING * dt).max(0.0);
         for index in free.clone() {
             let point = self.points[index];
-            let speed = (point - self.previous[index]) * keep;
+            let speed = ((point - self.previous[index]) * keep).clamp_length_max(MAX_SPEED * dt);
             self.previous[index] = point;
             self.points[index] = point + speed + Vec3::NEG_Y * GRAVITY * dt * dt;
         }

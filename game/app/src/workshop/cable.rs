@@ -220,6 +220,7 @@ impl Cable {
             solids: vec![
                 (at_computer, layout.monitor_body()),
                 (at_computer, layout.keyboard_placement),
+                (Affine3A::IDENTITY, counter.top),
             ],
             points: Vec::new(),
             previous: Vec::new(),
