@@ -1,3 +1,4 @@
+mod bag;
 mod pan;
 mod program;
 
@@ -9,10 +10,11 @@ use ld60_game_audio::{Mixer, Sound, Takes};
 use ld60_game_core::state::AppState;
 
 use self::pan::{Pan, Panned};
-use self::program::OnAir;
+pub(super) use self::program::STATIONS;
+use self::program::{OnAir, Stations};
 use super::{Front, Radio};
 
-/// Station n starts with track n and plays on through the ones after it.
+/// The music the stations play, see [`Stations`].
 pub(super) const TRACKS: [Track; 11] = [
     Track::new("stargazer-01-synthetic", ESCP, "Synthetic", 240.6),
     Track::new("nostalgia", "GLORYTOTHEMACHINE", "NOSTALGIA", 183.0),
@@ -57,9 +59,15 @@ impl Plugin for BroadcastPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(pan::PanPlugin)
             .insert_resource(StaticTakes(Takes::new(Sound::Static.sources(), 0)))
+            .init_resource::<Stations>()
             .add_systems(
                 Update,
-                (Tuner::tune, Broadcast::start, Broadcast::set_volume)
+                (
+                    Stations::follow,
+                    Tuner::tune,
+                    Broadcast::start,
+                    Broadcast::set_volume,
+                )
                     .chain()
                     .run_if(not(in_state(AppState::Loading))),
             );
@@ -120,6 +128,7 @@ impl Tuner {
         time: Res<Time<Real>>,
         mixer: Res<Mixer>,
         assets: Res<AssetServer>,
+        stations: Res<Stations>,
         mut statics: ResMut<StaticTakes>,
         mut panned: ResMut<Assets<Panned>>,
         mut radios: Query<(Entity, &Radio, &mut Tuner, Option<&Children>)>,
@@ -135,7 +144,7 @@ impl Tuner {
                 .copied()
                 .find(|&child| broadcasts.contains(child));
             let next = match *tuner {
-                Self::Idle => Self::on_air(station, clock),
+                Self::Idle => Self::on_air(&stations, station, clock),
                 Self::Playing { station: was, .. } | Self::Pause { station: was, .. }
                     if was != station =>
                 {
@@ -160,28 +169,27 @@ impl Tuner {
                             Radio::speaker(),
                         ));
                     }
-                    Self::on_air(station, clock)
+                    Self::on_air(&stations, station, clock)
                 }
                 Self::Playing { track, .. } => {
                     if playing.is_some() {
                         continue;
                     }
-                    match OnAir::at(station, clock) {
-                        // Ended a little early, so the rest of its slot is
-                        // part of the pause.
-                        OnAir::Track { track: on, at } if on == track => Self::Pause {
+                    match stations.on_air(station, clock) {
+                        // Ended a little early, so it waits out the rest.
+                        Some(OnAir::Track { track: on, at }) if on == track => Self::Pause {
                             station,
-                            track: (track + 1) % TRACKS.len(),
-                            until: clock + f64::from(TRACKS[track].length - at + PAUSE),
+                            track,
+                            until: clock + f64::from(TRACKS[track].length - at),
                         },
-                        _ => Self::on_air(station, clock),
+                        _ => Self::on_air(&stations, station, clock),
                     }
                 }
-                Self::Pause { track, until, .. } => {
+                Self::Pause { until, .. } => {
                     if clock < until {
                         continue;
                     }
-                    Self::Playing { station, track }
+                    Self::on_air(&stations, station, clock)
                 }
             };
             if let Self::Playing { track, .. } = next {
@@ -199,14 +207,15 @@ impl Tuner {
     }
 
     /// What `station` has on air at `clock`.
-    fn on_air(station: usize, clock: f64) -> Self {
-        match OnAir::at(station, clock) {
-            OnAir::Track { track, .. } => Self::Playing { station, track },
-            OnAir::Pause { next, left } => Self::Pause {
+    fn on_air(stations: &Stations, station: usize, clock: f64) -> Self {
+        match stations.on_air(station, clock) {
+            Some(OnAir::Track { track, .. }) => Self::Playing { station, track },
+            Some(OnAir::Pause { next, left }) => Self::Pause {
                 station,
                 track: next,
                 until: clock + f64::from(left),
             },
+            None => Self::Idle,
         }
     }
 }
@@ -220,6 +229,7 @@ impl Broadcast {
         time: Res<Time<Real>>,
         assets: Res<AssetServer>,
         mixer: Res<Mixer>,
+        stations: Res<Stations>,
         sources: Res<Assets<AudioSource>>,
         mut panned: ResMut<Assets<Panned>>,
         broadcasts: Query<(Entity, &Broadcast, &Pan, &ChildOf), Without<AudioPlayer<Panned>>>,
@@ -236,8 +246,8 @@ impl Broadcast {
             else {
                 continue;
             };
-            let start = match OnAir::at(broadcast.station, time.elapsed_secs_f64()) {
-                OnAir::Track { track, at } if track == broadcast.track => at,
+            let start = match stations.on_air(broadcast.station, time.elapsed_secs_f64()) {
+                Some(OnAir::Track { track, at }) if track == broadcast.track => at,
                 _ => 0.0,
             };
             let music =

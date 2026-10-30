@@ -14,7 +14,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use ld60_locale::Message;
 
-use self::broadcast::{TRACKS, Tuner};
+use self::broadcast::{STATIONS, TRACKS, Tuner};
 use self::front::Front;
 
 pub(super) const CASE: Vec3 = Vec3::new(0.3, 0.19, 0.11);
@@ -106,14 +106,14 @@ impl Radio {
         );
         let gauge = Gauge {
             size: dial_size,
-            marks: TRACKS.len(),
+            marks: STATIONS,
             value: 0.0,
             lit: radio.on,
         };
         let volume = Knob::Smooth(radio.volume);
         let tuning = Knob::Stepped {
             position: radio.station,
-            count: TRACKS.len(),
+            count: STATIONS,
         };
         let power = LatchButton {
             down: radio.on,
