@@ -1,10 +1,15 @@
+use bevy::prelude::*;
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
+
+use super::bag::{Drawn, ShuffleBag};
 use super::{PAUSE, TRACKS};
 
+/// One station fewer than tracks, so a station that ends a track always
+/// has another one to go on with.
+pub(in super::super) const STATIONS: usize = TRACKS.len() - 1;
+const SEED: u64 = 11;
+
 /// What a station is playing at a moment of the broadcast clock.
-///
-/// Every station plays all the tracks in turn with a pause after each.
-/// Station n starts the clock with track n, so each station is a track
-/// ahead of the one before.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum OnAir {
     /// `track` has played for `at` seconds.
@@ -13,31 +18,81 @@ pub(super) enum OnAir {
     Pause { next: usize, left: f32 },
 }
 
-impl OnAir {
-    /// On `station` at `clock` seconds.
-    pub(super) fn at(station: usize, clock: f64) -> Self {
-        let slot = |track: &super::Track| f64::from(track.length + PAUSE);
-        let lead: f64 = TRACKS[..station].iter().map(slot).sum();
-        let program: f64 = TRACKS.iter().map(slot).sum();
-        let mut time = (clock + lead).rem_euclid(program);
-        for (track, entry) in TRACKS.iter().enumerate() {
-            let length = f64::from(entry.length);
-            if time < length {
-                return Self::Track {
-                    track,
-                    at: time as f32,
-                };
+/// The program of every station. Each plays one track at a time, and no
+/// two play the same track: at the end of a track a station takes its
+/// next one from the tracks no station has, then puts its old one back.
+/// The stations play on while the radio is tuned elsewhere.
+#[derive(Resource, Debug)]
+pub(super) struct Stations {
+    bag: ShuffleBag<usize>,
+    rng: SmallRng,
+    stations: Vec<Slot>,
+}
+
+/// The track of one station.
+#[derive(Debug)]
+struct Slot {
+    track: Drawn<usize>,
+    /// When the track starts on the broadcast clock. Ahead of the clock
+    /// during the pause before it.
+    start: f64,
+}
+
+impl Default for Stations {
+    /// Each station is somewhere in its first track at clock 0.
+    fn default() -> Self {
+        let mut rng = SmallRng::seed_from_u64(SEED);
+        let mut bag = ShuffleBag::new(0..TRACKS.len());
+        let stations = std::iter::from_fn(|| {
+            let track = bag.draw(&mut rng)?;
+            let into = rng.random::<f64>() * f64::from(TRACKS[*track.get()].length);
+            Some(Slot {
+                track,
+                start: -into,
+            })
+        })
+        .take(STATIONS)
+        .collect();
+        Self { bag, rng, stations }
+    }
+}
+
+impl Stations {
+    /// Plays the stations on up to `clock`.
+    pub(super) fn advance(&mut self, clock: f64) {
+        for slot in &mut self.stations {
+            loop {
+                let end = slot.start + f64::from(TRACKS[*slot.track.get()].length);
+                if clock < end {
+                    break;
+                }
+                self.bag.exchange(&mut self.rng, &mut slot.track);
+                slot.start = end + f64::from(PAUSE);
             }
-            time -= length;
-            if time < f64::from(PAUSE) || track + 1 == TRACKS.len() {
-                return Self::Pause {
-                    next: (track + 1) % TRACKS.len(),
-                    left: (f64::from(PAUSE) - time).max(0.0) as f32,
-                };
-            }
-            time -= f64::from(PAUSE);
         }
-        unreachable!("the program has tracks")
+    }
+
+    /// What `station` has on air at `clock`, which the stations have been
+    /// played on to with [`Self::advance`].
+    pub(super) fn on_air(&self, station: usize, clock: f64) -> Option<OnAir> {
+        let slot = self.stations.get(station)?;
+        let track = *slot.track.get();
+        Some(if clock < slot.start {
+            OnAir::Pause {
+                next: track,
+                left: (slot.start - clock) as f32,
+            }
+        } else {
+            OnAir::Track {
+                track,
+                at: (clock - slot.start) as f32,
+            }
+        })
+    }
+
+    /// Follows the clock of `Tuner` and `Broadcast`.
+    pub(super) fn follow(time: Res<Time<Real>>, mut stations: ResMut<Stations>) {
+        stations.advance(time.elapsed_secs_f64());
     }
 }
 
@@ -48,54 +103,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stations_start_with_their_own_track() {
-        for station in 0..TRACKS.len() {
-            assert_eq!(
-                OnAir::at(station, 0.0),
-                OnAir::Track {
-                    track: station,
-                    at: 0.0
-                }
-            );
+    fn there_is_a_station_for_all_but_one_track() {
+        assert_eq!(Stations::default().stations.len(), STATIONS);
+    }
+
+    #[test]
+    fn no_two_stations_play_the_same_track() {
+        let mut stations = Stations::default();
+        for second in 0..10 * 3600 {
+            let clock = f64::from(second);
+            stations.advance(clock);
+            let mut tracks: Vec<_> = (0..STATIONS)
+                .map(|station| match stations.on_air(station, clock).unwrap() {
+                    OnAir::Track { track, .. } | OnAir::Pause { next: track, .. } => track,
+                })
+                .collect();
+            tracks.sort_unstable();
+            tracks.dedup();
+            assert_eq!(tracks.len(), STATIONS, "at {clock}");
         }
     }
 
     #[test]
-    fn a_pause_follows_each_track() {
-        let after = f64::from(TRACKS[0].length) + 1.0;
-        assert_eq!(
-            OnAir::at(0, after),
-            OnAir::Pause {
-                next: 1,
-                left: PAUSE - 1.0
-            }
-        );
-        assert_eq!(
-            OnAir::at(0, after + f64::from(PAUSE)),
-            OnAir::Track { track: 1, at: 1.0 }
-        );
-    }
-
-    #[test]
-    fn each_station_is_a_track_ahead() {
-        for (station, track) in TRACKS.iter().enumerate().take(TRACKS.len() - 1) {
-            let slot = f64::from(track.length + PAUSE);
-            for clock in [0.0, 100.0, 1000.0, 5000.0] {
-                assert_eq!(
-                    OnAir::at(station + 1, clock),
-                    OnAir::at(station, clock + slot)
-                );
-            }
-        }
-    }
-
-    /// After the first track, the next station is not starting the same
-    /// track over.
-    #[test]
-    fn the_next_station_is_not_a_rerun() {
-        let clock = f64::from(TRACKS[0].length + PAUSE);
-        assert_eq!(OnAir::at(0, clock), OnAir::Track { track: 1, at: 0.0 });
-        assert_ne!(OnAir::at(1, clock), OnAir::Track { track: 1, at: 0.0 });
+    fn a_pause_follows_each_track_and_the_next_one_is_another() {
+        let mut stations = Stations::default();
+        stations.advance(0.0);
+        let Some(OnAir::Track { track, at }) = stations.on_air(0, 0.0) else {
+            panic!("station 0 starts in a track");
+        };
+        let end = f64::from(TRACKS[track].length - at);
+        stations.advance(end + 1.0);
+        let Some(OnAir::Pause { next, left }) = stations.on_air(0, end + 1.0) else {
+            panic!("a pause follows the track");
+        };
+        assert_ne!(next, track);
+        assert!((left - (PAUSE - 1.0)).abs() < 1e-3, "{left}");
+        let after = end + f64::from(PAUSE) + 1.0;
+        stations.advance(after);
+        let Some(OnAir::Track { track: on, at }) = stations.on_air(0, after) else {
+            panic!("the next track follows the pause");
+        };
+        assert_eq!(on, next);
+        assert!((at - 1.0).abs() < 1e-3, "{at}");
     }
 
     /// The lengths match the music files, read from the granule position of
