@@ -3618,6 +3618,7 @@ dependencies = [
  "ld60-game-manuals",
  "ld60-game-parts",
  "ld60-game-player",
+ "ld60-game-props",
  "ld60-game-run",
  "ld60-geometry",
  "ld60-levels",
@@ -3753,6 +3754,15 @@ dependencies = [
  "serde_json",
  "web-sys",
  "winit",
+]
+
+[[package]]
+name = "ld60-game-props"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-geometry",
+ "rand",
 ]
 
 [[package]]
