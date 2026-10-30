@@ -164,6 +164,26 @@ impl Icon {
     }
 
     pub(super) fn spawn(self, parent: &mut RelatedSpawnerCommands<ChildOf>, font: &IconFont) {
+        self.spawn_in(parent, font, Some(ACCENT), INK);
+    }
+
+    /// The outline alone in `ink`, without the accent.
+    pub(super) fn spawn_muted(
+        self,
+        parent: &mut RelatedSpawnerCommands<ChildOf>,
+        font: &IconFont,
+        ink: Color,
+    ) {
+        self.spawn_in(parent, font, None, ink);
+    }
+
+    fn spawn_in(
+        self,
+        parent: &mut RelatedSpawnerCommands<ChildOf>,
+        font: &IconFont,
+        accent: Option<Color>,
+        ink: Color,
+    ) {
         let glyph = |text, color| {
             (
                 Text::new(text),
@@ -187,13 +207,14 @@ impl Icon {
                 Pickable::IGNORE,
             ))
             .with_children(|icon| {
-                let Some(outline) = self.outline() else {
-                    icon.spawn((glyph(self.glyph(), INK), SHADOW));
+                let (Some(outline), Some(accent)) = (self.outline(), accent) else {
+                    let shape = self.outline().unwrap_or(self.glyph());
+                    icon.spawn((glyph(shape, ink), SHADOW));
                     return;
                 };
-                icon.spawn((glyph(self.glyph(), ACCENT), SHADOW));
+                icon.spawn((glyph(self.glyph(), accent), SHADOW));
                 icon.spawn((
-                    glyph(outline, INK),
+                    glyph(outline, ink),
                     Node {
                         position_type: PositionType::Absolute,
                         ..default()
