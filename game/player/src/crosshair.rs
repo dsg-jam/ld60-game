@@ -48,10 +48,10 @@ enum Shape {
 #[derive(Component, Debug)]
 struct PromptCaption;
 
-/// The mouse button of [`Shape::Prompt`], hidden while the action is
-/// [`Disabled`].
+/// The mouse button of [`Shape::Prompt`]. The one for a [`Disabled`]
+/// action, with `true`, is faded and has no accent.
 #[derive(Component, Debug)]
-struct PromptIcon;
+struct PromptIcon(bool);
 
 impl Crosshair {
     fn spawn(mut commands: Commands, font: Res<IconFont>) {
@@ -94,8 +94,20 @@ impl Crosshair {
                     ))
                     .with_children(|prompt| {
                         prompt
-                            .spawn((PromptIcon, Node::default(), Pickable::IGNORE))
+                            .spawn((PromptIcon(false), Node::default(), Pickable::IGNORE))
                             .with_children(|icon| Icon::MouseLeft.spawn(icon, &font));
+                        prompt
+                            .spawn((
+                                PromptIcon(true),
+                                Node {
+                                    display: Display::None,
+                                    ..default()
+                                },
+                                Pickable::IGNORE,
+                            ))
+                            .with_children(|icon| {
+                                Icon::MouseLeft.spawn_muted(icon, &font, Self::disabled_ink());
+                            });
                         // Hangs below the icon, so the icon stays in the
                         // middle.
                         prompt.spawn((
@@ -126,9 +138,9 @@ impl Crosshair {
         window: Single<&Window, With<PrimaryWindow>>,
         ui_scale: Res<UiScale>,
         crosshair: Single<(&mut Visibility, &mut UiTransform), With<Crosshair>>,
-        mut shapes: Query<(&Shape, &mut Node)>,
+        mut shapes: Query<(&Shape, &mut Node), Without<PromptIcon>>,
         caption: Single<(Entity, Option<&Localized>, &mut TextColor), With<PromptCaption>>,
-        mut icon: Single<&mut Visibility, (With<PromptIcon>, Without<Crosshair>)>,
+        mut icons: Query<(&PromptIcon, &mut Node)>,
         mut commands: Commands,
     ) {
         let (mut visibility, mut transform) = crosshair.into_inner();
@@ -161,13 +173,26 @@ impl Crosshair {
                 commands.entity(entity).insert(text);
             }
         }
-        let (shown, ink) = if prompt.disabled {
-            (Visibility::Hidden, hints::INK.with_alpha(DISABLED_ALPHA))
+        for (icon, mut node) in &mut icons {
+            let display = if icon.0 == prompt.disabled {
+                Display::Flex
+            } else {
+                Display::None
+            };
+            if node.display != display {
+                node.display = display;
+            }
+        }
+        let ink = if prompt.disabled {
+            Self::disabled_ink()
         } else {
-            (Visibility::Inherited, hints::INK)
+            hints::INK
         };
-        icon.set_if_neq(shown);
         color.set_if_neq(TextColor(ink));
+    }
+
+    fn disabled_ink() -> Color {
+        hints::INK.with_alpha(DISABLED_ALPHA)
     }
 }
 
