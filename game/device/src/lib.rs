@@ -7,6 +7,7 @@ mod name;
 mod phillips;
 mod silhouette;
 mod snap;
+mod thread;
 mod tool;
 
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -54,6 +55,7 @@ impl Plugin for DevicePlugin {
                 emulator::EmulatorPlugin,
                 snap::SnapPlugin,
                 phillips::PhillipsPlugin,
+                thread::ThreadPlugin,
                 handheld::HandheldPlugin,
             ))
             .add_systems(
