@@ -1,4 +1,5 @@
 use bevy::{
+    diagnostic::{FrameCount, update_frame_count},
     ecs::message::{MessageUpdateSystems, signal_message_update_system},
     input::{
         InputSystems,
@@ -32,33 +33,63 @@ pub(super) struct PausePlugin;
 
 impl Plugin for PausePlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(
-            PreUpdate,
-            InputFocusSystems::Dispatch.run_if(in_state(AppState::Playing)),
-        )
-        .add_systems(
-            PreUpdate,
-            hold_input
-                .after(InputSystems)
-                .after(Navigation)
-                .run_if(not(in_state(AppState::Playing))),
-        )
-        .add_systems(
-            Update,
-            (pause_on_escape, pause_on_blur, pause_on_lost_lock)
-                .run_if(in_state(AppState::Playing)),
-        )
-        // Messages expire after fixed updates, which stop with virtual time.
-        // Without this, systems that wait out the pause read its messages
-        // after it, like a lost focus that pauses again.
-        .add_systems(
-            First,
-            signal_message_update_system
-                .before(MessageUpdateSystems)
-                .run_if(|time: Res<Time<Virtual>>| time.is_paused()),
-        )
-        .add_systems(OnEnter(AppState::Paused), (spawn, stop_time))
-        .add_systems(OnExit(AppState::Paused), start_time);
+        app.init_resource::<FrameCount>()
+            .configure_sets(
+                PreUpdate,
+                InputFocusSystems::Dispatch.run_if(in_state(AppState::Playing)),
+            )
+            .add_systems(
+                PreUpdate,
+                hold_input
+                    .after(InputSystems)
+                    .after(Navigation)
+                    .run_if(not(in_state(AppState::Playing))),
+            )
+            .add_systems(
+                Update,
+                (pause_on_escape, pause_on_blur, pause_on_lost_lock)
+                    .run_if(in_state(AppState::Playing)),
+            )
+            // Messages expire after fixed updates, which stop with virtual time.
+            // Without this, systems that wait out the pause read its messages
+            // after it, like a lost focus that pauses again.
+            .add_systems(
+                First,
+                signal_message_update_system
+                    .before(MessageUpdateSystems)
+                    .run_if(|time: Res<Time<Virtual>>| time.is_paused()),
+            )
+            .add_systems(
+                Last,
+                HeldFrame::hold
+                    .after(update_frame_count)
+                    .run_if(resource_exists::<HeldFrame>),
+            )
+            .add_systems(
+                OnEnter(AppState::Paused),
+                (spawn, stop_time, HeldFrame::take),
+            )
+            .add_systems(OnExit(AppState::Paused), (start_time, HeldFrame::release));
+    }
+}
+
+/// The frame count the view stays at while paused. The noise of the screen
+/// space reflections, the haze and the ambient occlusion changes with it, so
+/// a counting frame would make the still view flicker.
+#[derive(Resource, Debug)]
+struct HeldFrame(FrameCount);
+
+impl HeldFrame {
+    fn take(frame: Res<FrameCount>, mut commands: Commands) {
+        commands.insert_resource(Self(*frame));
+    }
+
+    fn hold(held: Res<Self>, mut frame: ResMut<FrameCount>) {
+        *frame = held.0;
+    }
+
+    fn release(mut commands: Commands) {
+        commands.remove_resource::<Self>();
     }
 }
 
