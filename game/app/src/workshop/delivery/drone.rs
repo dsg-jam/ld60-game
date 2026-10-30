@@ -1,3 +1,5 @@
+mod lean;
+
 use std::collections::VecDeque;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, PI, TAU};
 
@@ -13,6 +15,8 @@ use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use ld60_game_device::{Carried, Casing};
 use ld60_game_run::{Leftover, NewRun};
+
+use self::lean::Lean;
 
 /// The lane the drone flies along the street, just outside the shop, see
 /// [`CounterLayout::place`]. It turns in over the counter from there.
@@ -37,8 +41,6 @@ const STOW_TIME: f32 = 0.6;
 const STOWED: f32 = 0.08;
 /// Seconds the customer takes to try a device they hand back.
 const TRY_TIME: f32 = 1.2;
-/// How far the drone leans into its flight, in radians.
-const TILT: f32 = 0.25;
 /// How quickly the drone turns its front the way it flies.
 const YAW_RATE: f32 = 3.0;
 /// How quickly hanging cargo stops swinging, as a share of critical
@@ -185,6 +187,7 @@ pub(crate) struct Flight {
     heading: Option<f32>,
     /// How fast it went over the last frame.
     velocity: Vec3,
+    lean: Lean,
 }
 
 /// Something a [`Drone`] carries.
@@ -251,6 +254,7 @@ impl Flight {
             came: false,
             heading: None,
             velocity: Vec3::ZERO,
+            lean: Lean::new((seed % 1000) as f32),
         }
     }
 
@@ -439,7 +443,6 @@ impl Flight {
             }
             flight.elapsed += dt;
             let before = transform.translation;
-            let mut tilt = Quat::IDENTITY;
             match flight.steps.front() {
                 Some(&Step::Fly { to, time }) => {
                     let t = if time > 0.0 {
@@ -447,13 +450,12 @@ impl Flight {
                     } else {
                         1.0
                     };
-                    let eased = t * t * (3.0 - 2.0 * t);
+                    // Starts and stops without a jolt, so the lean grows and
+                    // fades smoothly too.
+                    let eased = t * t * t * (t * (6.0 * t - 15.0) + 10.0);
                     transform.translation = flight.from.lerp(to, eased);
-                    // Leans into the way it goes while it speeds up, and back
-                    // while it slows down.
                     let along = (to - flight.from).with_y(0.0);
-                    if let Some(axis) = Vec3::Y.cross(along).try_normalize() {
-                        tilt = Quat::from_axis_angle(axis, TILT * (1.0 - 2.0 * t));
+                    if along.length_squared() > 0.0 {
                         // Turns its front, -Z, the way it goes.
                         let wanted = (-along.x).atan2(-along.z);
                         let heading = flight.heading.get_or_insert(wanted);
@@ -511,18 +513,21 @@ impl Flight {
                     continue;
                 }
             }
-            transform.rotation = tilt * Quat::from_rotation_y(flight.heading.unwrap_or(0.0));
             let velocity = if dt > 0.0 {
                 (transform.translation - before) / dt
             } else {
                 flight.velocity
             };
-            let push = if dt > 0.0 {
-                ((velocity - flight.velocity) / dt).xz()
+            let acceleration = if dt > 0.0 {
+                (velocity - flight.velocity) / dt
             } else {
-                Vec2::ZERO
+                Vec3::ZERO
             };
+            let push = acceleration.xz();
             flight.velocity = velocity;
+            flight.lean.step(acceleration, velocity, dt);
+            transform.rotation =
+                flight.lean.rotation() * Quat::from_rotation_y(flight.heading.unwrap_or(0.0));
             for cargo in &mut flight.carried {
                 let Ok((mut item_at, mut shown)) = items.get_mut(cargo.item) else {
                     continue;
