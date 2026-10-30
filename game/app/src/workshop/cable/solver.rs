@@ -224,6 +224,7 @@ impl Cable {
                 0.0
             }
         };
+        Self::keep_apart(&mut shown, &held);
         let came = shown.clone();
         let solids = self.solids(ends, ends);
         for _ in 0..SHOWN_PASSES {
@@ -273,6 +274,7 @@ impl Cable {
                 [weight(index - 1), weight(index), weight(index + 1)],
             );
         }
+        Self::keep_apart(&mut self.points, &weight);
         let solids = self.solids(ends, before);
         for index in free.clone() {
             let mut point = self.keep_out(self.points[index], self.previous[index], &solids);
@@ -348,6 +350,37 @@ impl Cable {
         let fix = off / length * (length - spacing) / (a + b);
         self.points[index] += fix * a;
         self.points[index + 1] -= fix * b;
+    }
+
+    /// Keeps pieces of the cable that are not neighbours a cable apart, so
+    /// it does not go through itself.
+    fn keep_apart(points: &mut [Vec3], weight: &impl Fn(usize) -> f32) {
+        let pieces = points.len() - 1;
+        for i in 0..pieces {
+            for j in i + 2..pieces {
+                let [a0, a1, b0, b1] = [i, i + 1, j, j + 1].map(|k| points[k]);
+                let reach = (a0.distance(a1) + b0.distance(b1)) / 2.0 + 2.0 * RADIUS;
+                if (a0 + a1).distance(b0 + b1) / 2.0 > reach {
+                    continue;
+                }
+                let (s, t) = closest_between(a0, a1, b0, b1);
+                let off = b0.lerp(b1, t) - a0.lerp(a1, s);
+                let distance = off.length();
+                if distance >= 2.0 * RADIUS || distance < 1e-9 {
+                    continue;
+                }
+                let shares = [(i, -(1.0 - s)), (i + 1, -s), (j, 1.0 - t), (j + 1, t)]
+                    .map(|(k, share)| (k, share, weight(k)));
+                let sum: f32 = shares.iter().map(|(_, share, w)| share * share * w).sum();
+                if sum == 0.0 {
+                    continue;
+                }
+                let push = off / distance * (2.0 * RADIUS - distance) / sum;
+                for (k, share, w) in shares {
+                    points[k] += push * share * w;
+                }
+            }
+        }
     }
 
     /// Straightens the bend at `index` against its neighbours, as far as
@@ -450,6 +483,40 @@ impl Cable {
             self.floor
         }
     }
+}
+
+/// Where the pieces from `a0` to `a1` and from `b0` to `b1` come closest,
+/// as a share of the way along each. After Ericson, "Real-Time Collision
+/// Detection" (2004), 5.1.9.
+fn closest_between(a0: Vec3, a1: Vec3, b0: Vec3, b1: Vec3) -> (f32, f32) {
+    let (d1, d2, r) = (a1 - a0, b1 - b0, a0 - b0);
+    let (a, e, f) = (d1.length_squared(), d2.length_squared(), d2.dot(r));
+    if a < 1e-12 && e < 1e-12 {
+        return (0.0, 0.0);
+    }
+    if a < 1e-12 {
+        return (0.0, (f / e).clamp(0.0, 1.0));
+    }
+    let c = d1.dot(r);
+    if e < 1e-12 {
+        return ((-c / a).clamp(0.0, 1.0), 0.0);
+    }
+    let b = d1.dot(d2);
+    let denom = a * e - b * b;
+    let mut s = if denom > 1e-12 {
+        ((b * f - c * e) / denom).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let mut t = (b * s + f) / e;
+    if t < 0.0 {
+        t = 0.0;
+        s = (-c / a).clamp(0.0, 1.0);
+    } else if t > 1.0 {
+        t = 1.0;
+        s = ((b - c) / a).clamp(0.0, 1.0);
+    }
+    (s, t)
 }
 
 #[cfg(test)]
@@ -697,6 +764,24 @@ mod tests {
         };
         let (smooth, stepped) = (jolt(&shown), jolt(&ticked));
         assert!(smooth < stepped / 2.0, "{smooth} {stepped}");
+    }
+
+    #[test]
+    fn closest_points_of_two_pieces() {
+        let (s, t) = closest_between(
+            Vec3::new(-1.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.5, 1.0, -1.0),
+            Vec3::new(0.5, 1.0, 1.0),
+        );
+        assert!((s - 0.75).abs() < 1e-6 && (t - 0.5).abs() < 1e-6, "{s} {t}");
+        let (s, t) = closest_between(
+            Vec3::ZERO,
+            Vec3::X,
+            Vec3::new(2.0, 1.0, 0.0),
+            Vec3::new(3.0, 1.0, 0.0),
+        );
+        assert_eq!((s, t), (1.0, 0.0));
     }
 
     #[test]
