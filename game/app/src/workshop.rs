@@ -134,7 +134,7 @@ fn spawn_stage(mut commands: Commands) {
     commands.spawn((
         Name::new("rent reminder"),
         Reminder,
-        counter.place(reminder::SPOT, reminder::YAW),
+        Reminder::place(counter.place(COMPUTER_SPOT, COMPUTER_YAW)),
     ));
     commands.spawn((
         Name::new("ticket printer"),

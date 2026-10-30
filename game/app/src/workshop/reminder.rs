@@ -1,19 +1,18 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::prelude::*;
+use ld60_game_computer::ComputerLayout;
 use ld60_game_parts::paper::{Flutter, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_game_run::Run;
 use ld60_locale::{Locale, Localized, Message};
 
-/// In front of the till, where the player sees it, see
-/// [`CounterLayout::place`].
-///
-/// [`CounterLayout::place`]: ld60_game_core::layout::counter::CounterLayout::place
-pub(super) const SPOT: Vec2 = Vec2::new(-0.02, -0.5);
-pub(super) const YAW: f32 = 0.2;
-pub(super) const SIZE: Vec3 = Vec3::new(0.075, 0.002, 0.075);
-/// Keeps the note off the counter under it.
+const SIZE: Vec2 = Vec2::splat(0.075);
+/// How far the middle of the note sits in from the left end of the bezel.
+const IN_FROM_LEFT: f32 = 0.06;
+/// How far the top of the note sits below the top of the bezel bar.
+const BELOW_TOP: f32 = 0.006;
+/// Turns the note a little, as stuck on by hand.
+const ROLL: f32 = 0.06;
+/// Keeps the note off the monitor under it.
 const LIFT: f32 = 0.0003;
 const CANVAS: UVec2 = UVec2::new(300, 300);
 const PAPER: Color = Color::srgb_u8(0xe8, 0xd4, 0x6a);
@@ -32,7 +31,7 @@ impl Plugin for ReminderPlugin {
     }
 }
 
-/// A sticky note in front of the till that says what the next rent is.
+/// A sticky note on the monitor that says what the next rent is.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Reminder;
@@ -42,6 +41,21 @@ pub(crate) struct Reminder;
 struct Line(usize);
 
 impl Reminder {
+    /// Stuck to the bezel below the glass, at the left, hanging over the
+    /// bottom edge. `computer` is where the computer stands.
+    pub(super) fn place(computer: Transform) -> Transform {
+        let bezel = ComputerLayout::new().bezel_bottom();
+        let top = Vec3::new(
+            bezel.min().x + IN_FROM_LEFT,
+            bezel.max().y - BELOW_TOP,
+            bezel.max().z,
+        );
+        let roll = Quat::from_rotation_z(ROLL);
+        computer
+            * Transform::from_translation(top + roll * Vec3::NEG_Y * SIZE.y / 2.0)
+                .with_rotation(roll)
+    }
+
     fn on_add(
         add: On<Add<Reminder>>,
         mut commands: Commands,
@@ -81,7 +95,7 @@ impl Reminder {
                 },
             ))),
         ));
-        let wrinkles = Wrinkles::sticky(SIZE.xz(), "reminder");
+        let wrinkles = Wrinkles::sticky(SIZE, "reminder");
         commands.entity(add.entity).with_child((
             Mesh3d(meshes.add(wrinkles.mesh())),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -94,7 +108,7 @@ impl Reminder {
             })),
             wrinkles,
             Flutter::default(),
-            Transform::from_xyz(0.0, LIFT, 0.0).with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
+            Transform::from_xyz(0.0, 0.0, LIFT),
         ));
     }
 
