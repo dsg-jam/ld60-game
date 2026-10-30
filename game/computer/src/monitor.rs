@@ -26,7 +26,8 @@ pub(super) struct Monitor {
     neck: Block,
     /// Flat bounds of the glass. The mesh bulges forward from here.
     pub(super) glass: Block,
-    bezel: [Block; 4],
+    /// Above, below, left and right of the glass.
+    pub(super) bezel: [Block; 4],
 }
 
 impl Monitor {

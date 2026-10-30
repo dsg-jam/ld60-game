@@ -10,8 +10,7 @@ use ld60_geometry::block::Block;
 use super::clutter::Clutter;
 use super::{
     COMPUTER_YAW, LAMP_YAW, MANUALS_SPOT, MANUALS_YAW, RADIO_SPOT, RADIO_YAW, STAMP_SPOT,
-    STAMP_YAW, cable, delivery, lamp, printer, radio, receipt, reminder, rent, salvage, stamp,
-    ticket, till,
+    STAMP_YAW, cable, delivery, lamp, printer, radio, receipt, rent, salvage, stamp, ticket, till,
 };
 
 /// The rectangle a prop covers on the counter, seen from above.
@@ -95,11 +94,6 @@ pub(super) fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
             "job ticket",
             counter.place(delivery::TICKET_SPOT, delivery::TICKET_YAW),
             Block::new(ticket::BOARD_SIZE),
-        ),
-        Footprint::new(
-            "note",
-            counter.place(reminder::SPOT, reminder::YAW),
-            Block::new(reminder::SIZE),
         ),
         Footprint::new(
             "ticket printer",
@@ -262,11 +256,10 @@ mod tests {
             Block::new(ShopManuals::OPEN),
         );
         let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
-        // The closed file stands elsewhere while it lies open, and paper notes
-        // lie flat under it.
+        // The closed file stands elsewhere while it lies open.
         let mut others: Vec<_> = counter_props(&counter)
             .into_iter()
-            .filter(|prop| !matches!(prop.name, "shop manuals" | "note"))
+            .filter(|prop| prop.name != "shop manuals")
             .collect();
         for kind in DeviceKind::ALL {
             let bounds = Block::new(Handheld::body_size(kind));

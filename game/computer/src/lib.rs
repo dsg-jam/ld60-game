@@ -200,6 +200,11 @@ impl ComputerLayout {
         self.monitor.body
     }
 
+    /// The bar of the bezel below the glass.
+    pub fn bezel_bottom(&self) -> Block {
+        self.monitor.bezel[1]
+    }
+
     /// The wide view shows the glass and the back of the keyboard. It holds
     /// on to the middle of the keyboard, so narrow windows cut off its sides
     /// and not the glass.
