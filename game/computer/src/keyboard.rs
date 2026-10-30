@@ -16,8 +16,8 @@ const WELL: f32 = 0.004;
 const FLOOR: Color = Color::srgb_u8(0x3a, 0x37, 0x32);
 
 const STYLE: KeypadStyle = KeypadStyle {
-    pitch: 0.0215,
-    key_size: Vec3::new(0.018, 0.008, 0.017),
+    pitch: 0.02,
+    key_size: Vec3::new(0.0185, 0.008, 0.018),
     travel: 0.003,
     label_cell: 96.0,
     font_size: 40.0,
