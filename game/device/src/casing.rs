@@ -19,6 +19,7 @@ pub use self::travel::Turning;
 use super::board::{BoardLayout, CHIP_BLACK, LEG_TIN};
 use super::phillips::Phillips;
 use super::snap::Snap;
+use super::thread::Thread;
 use super::tool::ToolSpot;
 use super::{Connected, Holdable};
 
@@ -32,7 +33,6 @@ const BOSS: f32 = 0.0026;
 /// The hole in the end of a post that takes a screw.
 const PILOT: Vec3 = Vec3::new(0.0018, 0.0002, 0.0018);
 const SCREW: Vec3 = Phillips::HEAD;
-const SHANK: Vec3 = Vec3::new(0.0022, 0.008, 0.0022);
 /// The hole through the cover that a screw goes through.
 const COVER_HOLE: f32 = 0.0013;
 /// Screws that are out lie this far from the left side of the device, and
@@ -381,12 +381,15 @@ impl Casing {
                         ))
                         .with_children(|screw| {
                             let head = Block::new(SCREW).translated(-Vec3::Y * SCREW.y / 2.0);
-                            let shank = Block::new(SHANK).on_top_of(&head);
+                            let shank = Block::new(Thread::SIZE).on_top_of(&head);
                             screw.spawn((
                                 Shape::turned(Phillips::head(), &head, SCREW_METAL),
                                 Finish::Plated,
                             ));
-                            screw.spawn((Shape::cylinder(&shank, SCREW_METAL), Finish::Plated));
+                            screw.spawn((
+                                Shape::turned(Thread::shank(), &shank, SCREW_METAL),
+                                Finish::Plated,
+                            ));
                         })
                         .id()
                 })
