@@ -458,6 +458,8 @@ impl Handheld {
                     sticker_seed,
                     STICKER_WEAR,
                 ))),
+                // The cover behind it takes the clicks.
+                Pickable::IGNORE,
                 // Faces down, readable when the device is flipped over
                 // sideways.
                 Transform::from_translation(sticker_spot)
