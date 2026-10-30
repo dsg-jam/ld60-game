@@ -104,11 +104,29 @@ fn curve(points: &[Vec3]) -> Vec<Vec3> {
         .collect()
 }
 
+/// How deep the drawn cable goes into itself: twice its radius less the
+/// distance of the closest two samples that are not near each other along
+/// it.
+fn crossing(points: &[Vec3]) -> (f32, f32) {
+    let samples = curve(points);
+    let apart = 4 * SAMPLES;
+    let mut worst = (0.0, 0.0);
+    for i in 0..samples.len() {
+        for j in i + apart..samples.len() {
+            let depth = 2.0 * RADIUS - samples[i].distance(samples[j]);
+            if depth > worst.0 {
+                worst = (depth, HELD_ENDS as f32 + i as f32 / SAMPLES as f32);
+            }
+        }
+    }
+    worst
+}
+
 /// Runs the cable for `seconds` with the ends at each time, frame by frame
 /// as the game does, and finds where it goes deepest: by the points the
-/// solver keeps, and by the curve it draws.
-fn run(room: &Room, cable: &mut Cable, seconds: f32, ends: impl Fn(f32) -> Ends) -> [Worst; 2] {
-    let mut worst = [Worst::default(), Worst::default()];
+/// solver keeps, by the curve it draws, and into itself.
+fn run(room: &Room, cable: &mut Cable, seconds: f32, ends: impl Fn(f32) -> Ends) -> [Worst; 3] {
+    let mut worst = [Worst::default(), Worst::default(), Worst::default()];
     for frame in 0..(seconds * FPS) as usize {
         let ends = ends(frame as f32 / FPS);
         cable.advance(1.0 / FPS, &ends);
@@ -116,7 +134,8 @@ fn run(room: &Room, cable: &mut Cable, seconds: f32, ends: impl Fn(f32) -> Ends)
         // ends of that tick.
         let ticked = cable.last.unwrap_or(ends);
         let solved = cable.points[HELD_ENDS..POINTS - HELD_ENDS].to_vec();
-        let drawn = curve(&cable.shown(&ends));
+        let shown = cable.shown(&ends);
+        let drawn = curve(&shown);
         for (slot, (samples, ends)) in [(solved, ticked), (drawn, ends)].iter().enumerate() {
             let per_piece = if slot == 0 { 1.0 } else { SAMPLES as f32 };
             for (index, &point) in samples.iter().enumerate() {
@@ -130,6 +149,15 @@ fn run(room: &Room, cable: &mut Cable, seconds: f32, ends: impl Fn(f32) -> Ends)
                     };
                 }
             }
+        }
+        let (depth, piece) = crossing(&shown);
+        if depth > worst[2].depth {
+            worst[2] = Worst {
+                depth,
+                what: "itself",
+                tick: frame,
+                piece,
+            };
         }
     }
     worst
@@ -181,9 +209,9 @@ fn resting(counter: &CounterLayout) -> Ends {
 }
 
 /// Asserts that the cable, solved and drawn, went no deeper than `limit`
-/// meters into anything.
-fn assert_within(name: &str, [solved, drawn]: &[Worst; 2], limit: f32) {
-    for (kind, worst) in [("solved", solved), ("drawn", drawn)] {
+/// meters into anything or into itself.
+fn assert_within(name: &str, [solved, drawn, crossed]: &[Worst; 3], limit: f32) {
+    for (kind, worst) in [("solved", solved), ("drawn", drawn), ("crossing", crossed)] {
         assert!(
             worst.depth <= limit,
             "{name}: {kind} cable {:.2} mm into {} at frame {}, piece {:.1}",
