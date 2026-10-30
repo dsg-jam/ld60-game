@@ -7,7 +7,6 @@ use ld60_geometry::surface::SurfaceMaterial;
 
 use self::props::{Finishes, Props};
 use self::screwdriver::Screwdriver;
-#[cfg(test)]
 use super::footprint::Footprint;
 use ld60_game_device::CasingTravel;
 
@@ -29,7 +28,6 @@ impl Plugin for ClutterPlugin {
 #[require(Transform, Visibility)]
 pub(crate) struct Clutter;
 
-#[cfg(test)]
 impl Clutter {
     pub(super) fn footprints(counter: &CounterLayout) -> Vec<Footprint> {
         vec![

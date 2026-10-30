@@ -50,8 +50,8 @@ const PIN_KEY: KeyCode = KeyCode::KeyP;
 
 pub struct ManualsPlugin;
 
-#[cfg(any(test, feature = "test-support"))]
 impl ShopManuals {
+    /// The size of the closed file standing on the counter.
     pub const CLOSED: Vec3 = model::CLOSED;
 }
 

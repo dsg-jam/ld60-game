@@ -1,7 +1,6 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
-#[cfg(test)]
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 
@@ -75,7 +74,6 @@ pub(super) struct Props<'a> {
     pub(super) finishes: &'a Finishes,
 }
 
-#[cfg(test)]
 impl Props<'_> {
     /// The ground under the mug and its handle.
     pub(super) fn mug_area() -> Block {

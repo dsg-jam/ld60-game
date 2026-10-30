@@ -1,16 +1,15 @@
 use bevy::{math::Affine3A, prelude::*};
 use ld60_geometry::block::Block;
 
-use super::{Cable, POINTS, RADIUS};
+use super::{Cable, LENGTH, POINTS, RADIUS};
 
-/// The cable is this much longer than the way between its ends, so it
-/// hangs a little, and comes out of the computer or goes back in to keep it
-/// so.
-const SLACK: f32 = 1.25;
-const EXTRA: f32 = 0.05;
-/// How fast the cable comes out of or goes back into the computer, in
-/// meters per second.
-const REEL: f32 = 0.6;
+/// The cable was kept rolled up, so where nothing pulls it straight it
+/// curls into loops about this wide, in meters.
+const COIL: f32 = 0.025;
+/// Loops of the cable as it is laid out to fall into place.
+const LAY_LOOPS: f32 = 3.0;
+/// How high over the way between its ends it is laid out, in meters.
+const LAY_HEIGHT: f32 = 0.03;
 /// Steps of the simulation per tick. Small steps keep it stiff and calm.
 const SUBSTEPS: usize = 12;
 /// The simulation moves on in ticks of this many seconds.
@@ -32,18 +31,17 @@ const MAX_SPEED: f32 = 3.0;
 /// How much of its sliding a point on the counter keeps per step.
 const FRICTION: f32 = 0.3;
 /// A point on the counter slower than this, in meters per second, stops.
-const STICK: f32 = 0.05;
+const STICK: f32 = 0.01;
 /// The cable sleeps once no point moves farther than this in a tick.
 const SLEEP: f32 = 5e-5;
 const GRAVITY: f32 = 9.81;
 /// Times the shown curve is pushed out of things each frame.
 const SHOWN_PASSES: usize = 2;
-/// How the drawn curve, a uniform cubic B-spline, mixes the points around
-/// a point of the cable, and around the middle of a piece.
-const KNOT: [f32; 3] = [1.0 / 6.0, 4.0 / 6.0, 1.0 / 6.0];
-const QUARTER: [f32; 4] = [27.0 / 384.0, 235.0 / 384.0, 121.0 / 384.0, 1.0 / 384.0];
-const MIDDLE: [f32; 4] = [1.0 / 48.0, 23.0 / 48.0, 23.0 / 48.0, 1.0 / 48.0];
-const THREE_QUARTERS: [f32; 4] = [1.0 / 384.0, 121.0 / 384.0, 235.0 / 384.0, 27.0 / 384.0];
+/// Places on each piece of the drawn curve that the solver keeps out of
+/// things, and that the shown curve keeps out of them. Fewer on the curve
+/// that is shown can cut the corners of small boxes.
+const SOLVED_SAMPLES: usize = 4;
+const SHOWN_SAMPLES: usize = 8;
 /// Points this close to the device turn along with it between ticks, in
 /// meters from its box.
 const CARRY_REACH: f32 = 0.03;
@@ -105,14 +103,50 @@ impl Ends {
 }
 
 impl Cable {
-    /// Lays the cable out straight from the computer to `end` to fall into
-    /// place from.
+    /// Lays the cable out in loops from the computer to `end`, in the air
+    /// over the way between them, to fall into place from.
     pub(super) fn lay(&mut self, end: Vec3) {
-        self.length = Self::length_for(self.socket, end);
+        let along = (end - self.socket)
+            .with_y(0.0)
+            .try_normalize()
+            .unwrap_or(self.out);
+        let aside = Vec3::Y.cross(along);
+        let path = |t: f32, radius: f32| {
+            let turn = std::f32::consts::TAU * LAY_LOOPS * t;
+            self.socket.lerp(end, t)
+                + radius * (turn.sin() * along + (1.0 - turn.cos()) * aside)
+                + Vec3::Y * LAY_HEIGHT * (std::f32::consts::PI * t).sin()
+        };
+        let samples = 32 * POINTS;
+        let walk = |radius: f32| {
+            let mut covered = vec![0.0];
+            for k in 1..=samples {
+                let [a, b] = [k - 1, k].map(|k| path(k as f32 / samples as f32, radius));
+                covered.push(covered[k - 1] + a.distance(b));
+            }
+            covered
+        };
+        // The loops as wide as it takes for the cable to reach.
+        let (mut narrow, mut wide) = (0.0, LENGTH);
+        for _ in 0..32 {
+            let radius = (narrow + wide) / 2.0;
+            if walk(radius)[samples] < LENGTH {
+                narrow = radius;
+            } else {
+                wide = radius;
+            }
+        }
+        let covered = walk(wide);
+        let mut sample = 0;
         self.points = (0..POINTS)
             .map(|index| {
-                let t = index as f32 / (POINTS - 1) as f32;
-                let point = self.socket.lerp(end, t);
+                let goal = LENGTH * index as f32 / (POINTS - 1) as f32;
+                while sample + 1 < samples && covered[sample + 1] < goal {
+                    sample += 1;
+                }
+                let part = (goal - covered[sample]) / (covered[sample + 1] - covered[sample]);
+                let t = (sample as f32 + part.clamp(0.0, 1.0)) / samples as f32;
+                let point = path(t, wide);
                 point.with_y(point.y.max(self.floor_at(point)))
             })
             .collect();
@@ -137,13 +171,11 @@ impl Cable {
     /// Moves the cable on by one tick, unless it sleeps and the plug has not
     /// moved. Returns whether it moved.
     pub(super) fn tick(&mut self, ends: &Ends) -> bool {
-        let wanted = Self::length_for(self.socket, ends.end);
         // Something the cable lies on or around moving wakes it too.
         let same_solids = self
             .last
             .is_some_and(|last| last.device == ends.device && last.file == ends.file);
-        if wanted == self.length
-            && same_solids
+        if same_solids
             && self
                 .asleep
                 .is_some_and(|end| end.distance(ends.end) < SLEEP)
@@ -152,7 +184,6 @@ impl Cable {
             self.before_last = self.last;
             return false;
         }
-        self.length += (wanted - self.length).clamp(-REEL * TICK, REEL * TICK);
         let before = self.points.clone();
         self.ticked.clone_from(&before);
         let from = self.last.unwrap_or(*ends);
@@ -216,7 +247,7 @@ impl Cable {
                 }
             }
         }
-        let spacing = self.length / last as f32;
+        let spacing = LENGTH / last as f32;
         for k in 0..3 {
             shown[last - k] = ends.end + ends.exit * k as f32 * spacing;
         }
@@ -233,20 +264,15 @@ impl Cable {
         let came = shown.clone();
         let solids = self.solids(ends, ends);
         for _ in 0..SHOWN_PASSES {
-            self.keep_curve_out(&mut shown, &came, &solids, &held);
+            self.keep_curve_out(&mut shown, &came, &solids, &held, SHOWN_SAMPLES);
         }
         shown
-    }
-
-    /// How long the cable wants to be between `socket` and `end`.
-    fn length_for(socket: Vec3, end: Vec3) -> f32 {
-        socket.distance(end) * SLACK + EXTRA
     }
 
     /// One small step of `dt` seconds, from the ends `before` to `ends`.
     fn step(&mut self, dt: f32, ends: &Ends, before: &Ends) {
         let last = POINTS - 1;
-        let spacing = self.length / last as f32;
+        let spacing = LENGTH / last as f32;
         let free = 3..last - 2;
         let keep = (1.0 - DAMPING * dt).max(0.0);
         for index in free.clone() {
@@ -272,10 +298,11 @@ impl Cable {
             self.stretch(index, spacing, weight(index), weight(index + 1));
         }
         let bend = BEND_COMPLIANCE / (dt * dt);
+        let curl = spacing * spacing / COIL;
         for index in 1..last {
             self.bend(
                 index,
-                bend,
+                (bend, curl),
                 [weight(index - 1), weight(index), weight(index + 1)],
             );
         }
@@ -299,24 +326,36 @@ impl Cable {
             self.points[index] = point;
         }
         let mut points = std::mem::take(&mut self.points);
-        self.keep_curve_out(&mut points, &self.previous, &solids, &weight);
+        self.keep_curve_out(
+            &mut points,
+            &self.previous,
+            &solids,
+            &weight,
+            SOLVED_SAMPLES,
+        );
         self.points = points;
     }
 
     /// Moves `points` so the curve drawn through them keeps out of things,
     /// at each point and between them, since the curve cuts the corners of
-    /// the chain. The points were at `came` with the ends `before`. Each
-    /// point moves as far as its share of the curve and its `weight` allow,
-    /// as in XPBD.
+    /// the chain, at `samples` places on each piece. The points were at
+    /// `came` with the ends `before`. Each point moves as far as its share
+    /// of the curve and its `weight` allow, as in XPBD.
     fn keep_curve_out(
         &self,
         points: &mut [Vec3],
         came: &[Vec3],
         solids: &[Solid],
         weight: &impl Fn(usize) -> f32,
+        samples: usize,
     ) {
+        let mixes: Vec<[f32; 4]> = (0..samples)
+            .map(|k| Self::mix(k as f32 / samples as f32))
+            .collect();
         for start in 0..points.len() - 2 {
-            for mix in [&KNOT[..], &QUARTER, &MIDDLE, &THREE_QUARTERS] {
+            for (k, mix) in mixes.iter().enumerate() {
+                // On a point of the chain, the fourth point has no share.
+                let mix = if k == 0 { &mix[..3] } else { &mix[..] };
                 let Some(from) = points.get(start..start + mix.len()) else {
                     continue;
                 };
@@ -340,6 +379,19 @@ impl Cable {
                 }
             }
         }
+    }
+
+    /// How the drawn curve, a uniform cubic B-spline, mixes the four points
+    /// around a piece `t` of the way along it.
+    fn mix(t: f32) -> [f32; 4] {
+        let s = 1.0 - t;
+        [
+            s * s * s,
+            3.0 * t * t * t - 6.0 * t * t + 4.0,
+            -3.0 * t * t * t + 3.0 * t * t + 3.0 * t + 1.0,
+            t * t * t,
+        ]
+        .map(|w| w / 6.0)
     }
 
     /// Keeps the points `index` and the next one `spacing` apart.
@@ -388,10 +440,13 @@ impl Cable {
         }
     }
 
-    /// Straightens the bend at `index` against its neighbours, as far as
-    /// `compliance` lets it.
-    fn bend(&mut self, index: usize, compliance: f32, [a, b, c]: [f32; 3]) {
-        let curve = self.points[index - 1] - 2.0 * self.points[index] + self.points[index + 1];
+    /// Bends the cable at `index` back to how it was rolled up, as far as
+    /// `compliance` lets it. Rolled up, it turned the same way round the
+    /// vertical by `curl`, the bend between neighbours in a loop.
+    fn bend(&mut self, index: usize, (compliance, curl): (f32, f32), [a, b, c]: [f32; 3]) {
+        let [before, at, after] = [index - 1, index, index + 1].map(|k| self.points[k]);
+        let along = (after - before).normalize_or_zero();
+        let curve = before - 2.0 * at + after - Vec3::Y.cross(along) * curl;
         let length = curve.length();
         let weights = a + 4.0 * b + c;
         if length < 1e-7 || weights == 0.0 {
@@ -410,12 +465,27 @@ impl Cable {
         let moving = |now: Option<(Affine3A, Block)>, then: Option<(Affine3A, Block)>| {
             now.map(|(at, bounds)| Solid::new(at, then.map_or(at, |(then, _)| then), bounds))
         };
+        // The cable moves a good way in a tick at most, so props farther
+        // than that from all of it are left out.
+        let (low, high) = self
+            .points
+            .iter()
+            .fold((Vec3::MAX, Vec3::MIN), |(low, high), point| {
+                (low.min(*point), high.max(*point))
+            });
+        let reach = MAX_SPEED * TICK + RADIUS;
+        let near = |(at, bounds): &&(Affine3A, Block)| {
+            let middle = at.transform_point3(bounds.center);
+            let gap = (low - middle).max(middle - high).max(Vec3::ZERO).length();
+            gap <= bounds.size.length() / 2.0 + reach
+        };
         moving(ends.device, before.device)
             .into_iter()
             .chain(moving(ends.file, before.file))
             .chain(
                 self.solids
                     .iter()
+                    .filter(near)
                     .chain([&(Affine3A::IDENTITY, self.mat)])
                     .map(|&(at, bounds)| Solid::new(at, at, bounds)),
             )
@@ -538,7 +608,6 @@ mod tests {
             points: Vec::new(),
             previous: Vec::new(),
             ticked: Vec::new(),
-            length: 0.0,
             asleep: None,
             behind: 0.0,
             last: None,
