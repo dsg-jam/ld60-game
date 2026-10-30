@@ -495,10 +495,11 @@ impl Casing {
         }
     }
 
-    /// `ld60.device { "open": true, "plugged": true, "turn": [x, y, z] }`
-    /// opens or closes the devices and plugs the cable in or pulls it, as
-    /// the player would. `turn` sets how a held device is turned, as angles
-    /// in degrees around the camera's axes. All fields are optional.
+    /// `ld60.device { "open": true, "plugged": true, "turn": [x, y, z],
+    /// "screw": 0 }` opens or closes the devices and plugs the cable in or
+    /// pulls it, as the player would. `turn` sets how a held device is
+    /// turned, as angles in degrees around the camera's axes. `screw` turns
+    /// one screw in or out, like a click on it. All fields are optional.
     /// Returns the state of each device.
     #[cfg(feature = "debug_port")]
     fn debug_device(
@@ -529,6 +530,13 @@ impl Casing {
         for (device, mut casing, mut holdable, mut plugged) in &mut casings {
             if let Some(turn) = turn {
                 holdable.spin = turn;
+            }
+            if let Some(screw) = params
+                .as_ref()
+                .and_then(|params| params.get("screw"))
+                .and_then(serde_json::Value::as_u64)
+            {
+                casing.turn_screw(screw as usize);
             }
             if flag("plugged") == Some(false) && plugged {
                 commands.entity(device).remove::<Connected>();
