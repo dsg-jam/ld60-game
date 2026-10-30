@@ -14,6 +14,7 @@ members = [
   "game/manuals",
   "game/parts",
   "game/player",
+  "game/props",
   "game/run",
   "game/store",
   "silicon/asm",
@@ -46,6 +47,7 @@ ld60-game-device = { path = "game/device" }
 ld60-game-manuals = { path = "game/manuals" }
 ld60-game-parts = { path = "game/parts" }
 ld60-game-player = { path = "game/player" }
+ld60-game-props = { path = "game/props" }
 ld60-game-run = { path = "game/run" }
 ld60-geometry = { path = "game/geometry" }
 ld60-levels = { path = "game/levels" }

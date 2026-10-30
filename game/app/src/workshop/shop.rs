@@ -1,5 +1,8 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::prelude::*;
 use ld60_game_core::layout::shop::{FRONT, PILLAR, PLATFORM, SIZE, ShopLayout, WALL};
+use ld60_game_props::Theme;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -7,6 +10,16 @@ use ld60_geometry::surface::Finish;
 use super::rug::Rug;
 
 const SHELF_BOARDS: usize = 5;
+/// From the bottom board up.
+const SHELF_THEMES: [Theme; SHELF_BOARDS] = [
+    Theme::Stock,
+    Theme::Salvage,
+    Theme::Parts,
+    Theme::Papers,
+    Theme::Stock,
+];
+/// How high things are piled on top of the shelf.
+const ON_TOP: f32 = 0.5;
 const BOARD: f32 = 0.025;
 const UPRIGHT: f32 = 0.03;
 
@@ -16,12 +29,6 @@ const BOARDS: Color = Color::srgb_u8(0x5a, 0x40, 0x2c);
 const CONCRETE: Color = Color::srgb_u8(0x4a, 0x46, 0x44);
 const SHELF_WOOD: Color = Color::srgb_u8(0x6a, 0x4e, 0x36);
 const CABINET_GREEN: Color = Color::srgb_u8(0x4a, 0x5a, 0x4c);
-const BOXES: [Color; 4] = [
-    Color::srgb_u8(0x8a, 0x70, 0x50),
-    Color::srgb_u8(0x6a, 0x6e, 0x70),
-    Color::srgb_u8(0x9a, 0x86, 0x66),
-    Color::srgb_u8(0x50, 0x58, 0x60),
-];
 
 pub(crate) struct ShopPlugin;
 
@@ -75,7 +82,7 @@ impl Shop {
         });
     }
 
-    /// Open shelves with boxes on each board.
+    /// Open shelves, each board filled with what the shop keeps there.
     fn spawn_shelf(shop: &mut ChildSpawnerCommands, shelf: &Block) {
         for end in [-1.0, 1.0] {
             let upright = Block::new(shelf.size.with_z(UPRIGHT)).translated(
@@ -84,32 +91,21 @@ impl Shop {
             shop.spawn((Shape::cuboid(&upright, SHELF_WOOD), Finish::Wood));
         }
         let pitch = (shelf.size.y - BOARD) / (SHELF_BOARDS - 1) as f32;
-        for index in 0..SHELF_BOARDS {
+        for (index, theme) in SHELF_THEMES.into_iter().enumerate() {
             let board = Block::new(shelf.size.with_y(BOARD))
                 .translated(shelf.center.with_y(shelf.min().y + index as f32 * pitch));
             shop.spawn((Shape::cuboid(&board, SHELF_WOOD), Finish::Wood));
-            if index + 1 == SHELF_BOARDS {
-                continue;
-            }
-            // A few boxes of different sizes, filling the board from one end.
-            let mut z = board.min().z + UPRIGHT;
-            for (n, color) in BOXES.iter().cycle().skip(index).take(4).enumerate() {
-                let size = Vec3::new(
-                    shelf.size.x * 0.8,
-                    pitch * (0.45 + 0.1 * ((index + n) % 4) as f32),
-                    0.18 + 0.08 * ((index * 3 + n) % 3) as f32,
-                );
-                if z + size.z > board.max().z - UPRIGHT {
-                    break;
-                }
-                let item = Block::new(size).on_top_of(&board).translated(Vec3::new(
-                    board.center.x,
-                    0.0,
-                    z + size.z / 2.0,
-                ));
-                shop.spawn((Shape::cuboid(&item, *color), Finish::Paper));
-                z += size.z + 0.03;
-            }
+            let height = if index + 1 == SHELF_BOARDS {
+                ON_TOP
+            } else {
+                pitch - BOARD
+            };
+            let room = Vec3::new(shelf.size.z - 2.0 * UPRIGHT, height, shelf.size.x);
+            // The front of the board faces the room, towards +X.
+            let at = Transform::from_translation(board.center.with_y(board.max().y))
+                .with_rotation(Quat::from_rotation_y(FRAC_PI_2));
+            shop.spawn((at, Visibility::default()))
+                .with_children(|board| theme.fill(index as u64, room, board));
         }
     }
 }
