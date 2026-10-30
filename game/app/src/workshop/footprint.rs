@@ -166,6 +166,12 @@ mod tests {
         }
     }
 
+    /// Where the screws of a device with `bounds` resting at `rest` roll.
+    fn room(bounds: &Block, rest: &Transform) -> Footprint {
+        let (at, size) = Casing::screw_room(bounds, rest);
+        Footprint::new("screw room", at, Block::new(size.extend(0.01).xzy()))
+    }
+
     #[test]
     fn the_keyboard_stays_off_the_mat() {
         let counter = CounterLayout::new();
@@ -200,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn screws_taken_out_lie_clear_of_everything() {
+    fn screws_taken_out_roll_clear_of_everything() {
         let counter = CounterLayout::new();
         let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
         let others: Vec<_> = counter_props(&counter)
@@ -210,22 +216,13 @@ mod tests {
         for kind in DeviceKind::ALL {
             let bounds = Block::new(Handheld::body_size(kind));
             let device = Footprint::new("device", rest, bounds);
-            for index in 0..Handheld::screw_count(kind) {
-                let at = Casing::aside_at(&bounds, index, &rest);
-                // The screw lies along the row, so only its turn on the counter
-                // counts.
-                let along = at.rotation * Vec3::Y;
-                let yaw = Quat::from_rotation_y(along.x.atan2(along.z));
-                let area =
-                    Block::new(Vec3::new(0.0055, 0.0055, 0.0094)).translated(Vec3::Z * 0.0033);
-                let screw = Footprint::new("screw aside", at.with_rotation(yaw), area);
-                for other in others.iter().chain([&device]) {
-                    assert!(
-                        !screw.overlaps(other),
-                        "{kind:?} screw {index} overlaps {}",
-                        other.name
-                    );
-                }
+            let screws = room(&bounds, &rest);
+            for other in others.iter().chain([&device]) {
+                assert!(
+                    !screws.overlaps(other),
+                    "{kind:?} screws roll into {}",
+                    other.name
+                );
             }
         }
     }
@@ -278,15 +275,7 @@ mod tests {
                 Casing::cover_at(&bounds, &rest),
                 Block::new(bounds.size.with_y(0.005)),
             ));
-            for index in 0..Handheld::screw_count(kind) {
-                let at = Casing::aside_at(&bounds, index, &rest);
-                let area = Block::new(Vec3::splat(0.012));
-                others.push(Footprint::new(
-                    "screw aside",
-                    at.with_rotation(rest.rotation),
-                    area,
-                ));
-            }
+            others.push(room(&bounds, &rest));
         }
         for other in &others {
             assert!(

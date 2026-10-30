@@ -325,13 +325,6 @@ impl Handheld {
     }
 }
 
-#[cfg(any(test, feature = "test-support"))]
-impl Handheld {
-    pub fn screw_count(kind: DeviceKind) -> usize {
-        Model::of(kind).casing.screws.len()
-    }
-}
-
 impl Handheld {
     /// A unit as it comes in for `level`, running `buggy`.
     pub fn for_job(level: &Level, buggy: &str) -> Self {

@@ -1,4 +1,5 @@
 mod click;
+mod fall;
 mod travel;
 
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -15,6 +16,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
+use self::fall::Fall;
 pub use self::travel::Turning;
 use super::board::{BoardLayout, CHIP_BLACK, LEG_TIN};
 use super::phillips::Phillips;
@@ -41,6 +43,9 @@ const ASIDE: f32 = 0.014;
 const SCREW_GAP: f32 = 0.014;
 /// Gap between the device and its cover lying on the mat.
 const COVER_GAP: f32 = 0.02;
+/// Screws that are out roll no closer than this to the device and its
+/// cover.
+const ROOM_MARGIN: f32 = 0.002;
 const SCREW_METAL: Color = Color::srgb_u8(0xc8, 0xca, 0xce);
 const HOLE_DARK: Color = Color::srgb_u8(0x10, 0x10, 0x12);
 
@@ -139,8 +144,15 @@ struct Hole(usize);
 /// between there and its hole.
 #[derive(Component, Debug)]
 struct Aside {
-    /// How far it is on its way from its hole to the mat, from 0 to 1.
+    /// How far it is on its way from its hole to the mat, from 0 to 1. At 1
+    /// it falls and lies where it lands.
     progress: f32,
+    /// Where it is let go over the mat, and how it moves then.
+    drop: Option<Fall>,
+    /// Where it falls and lies.
+    fall: Option<Fall>,
+    /// How often it was taken out, which picks how it falls.
+    drops: u32,
 }
 
 #[derive(Component, Debug)]
@@ -162,11 +174,11 @@ impl Casing {
         }
     }
 
-    /// Where the screw `index` of a device with `bounds` lies while it is
-    /// out, in a row along the left side, from the device's spot on the
-    /// counter. Yaw and spot only, so it stays put when the device is turned
-    /// over.
-    pub fn aside_at(bounds: &Block, index: usize, rest: &Transform) -> Transform {
+    /// Where the screw `index` of a device with `bounds` is let go over
+    /// the mat while it comes out, in a row along the left side, from the
+    /// device's spot on the counter. Yaw and spot only, so it stays put when
+    /// the device is turned over.
+    pub(crate) fn aside_at(bounds: &Block, index: usize, rest: &Transform) -> Transform {
         let yaw = Self::yaw(rest);
         let offset = Vec3::new(
             -bounds.size.x / 2.0 - ASIDE,
@@ -177,6 +189,18 @@ impl Casing {
         // Lying on its side, with the shank along the row.
         Transform::from_translation(at.with_y(Self::ground(at) + SCREW.x / 2.0))
             .with_rotation(yaw * Quat::from_rotation_z(-FRAC_PI_2))
+    }
+
+    /// Where the screws of a device with `bounds` may roll once they are
+    /// out: the box between the device and its cover on the mat, from the
+    /// device's spot on the counter, and its size.
+    pub fn screw_room(bounds: &Block, rest: &Transform) -> (Transform, Vec2) {
+        let yaw = Self::yaw(rest);
+        let between = ASIDE + SCREW.x + COVER_GAP;
+        let middle = Vec3::NEG_X * (bounds.size.x + between) / 2.0;
+        let at = rest.translation.with_y(0.0) + yaw * middle;
+        let size = Vec2::new(between - 2.0 * ROOM_MARGIN, bounds.size.z);
+        (Transform::from_translation(at).with_rotation(yaw), size)
     }
 
     /// Where the cover of a device with `bounds` lies while it is off, on
@@ -375,6 +399,9 @@ impl Casing {
                             Name::new("screw aside"),
                             Aside {
                                 progress: if casing.loose[index] { 1.0 } else { 0.0 },
+                                drop: None,
+                                fall: None,
+                                drops: 0,
                             },
                             Transform::default(),
                             Visibility::Hidden,
