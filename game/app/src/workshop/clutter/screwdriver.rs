@@ -7,8 +7,12 @@ use ld60_game_player::focus::ClickTool;
 use super::props::Props;
 use ld60_game_device::{Aim, Phillips, Turning};
 
-/// How fast the screwdriver moves to a screw and back.
-const DECAY_RATE: f32 = 14.0;
+/// How fast the screwdriver moves to a screw and back, as the angular
+/// frequency of a critically damped spring. It settles in about 5 / this
+/// seconds.
+const STIFFNESS: f32 = 11.0;
+/// Longer frames are cut to this, so the spring stays stable.
+const MAX_STEP: f32 = 1.0 / 30.0;
 /// How far above a hovered screw the tip waits.
 const HOVER: f32 = 0.012;
 /// The handle points at least this far away from the camera, in radians.
@@ -23,6 +27,10 @@ pub(super) struct Screwdriver {
     /// Where the tip is, as the head of a screw it sits on. It eases between
     /// the screws and its rest.
     tip: Transform,
+    /// How fast the tip moves, in meters per second.
+    velocity: Vec3,
+    /// How fast the tip turns, as a scaled axis per second.
+    spin: Vec3,
 }
 
 impl Screwdriver {
@@ -30,7 +38,22 @@ impl Screwdriver {
         Self {
             rest,
             tip: rest * Self::tip_to_rest(),
+            velocity: Vec3::ZERO,
+            spin: Vec3::ZERO,
         }
+    }
+
+    /// Moves the tip towards `goal` for `dt` seconds. It starts slowly and
+    /// comes to rest on the goal without passing it.
+    fn ease(&mut self, goal: &Transform, dt: f32) {
+        let dt = dt.min(MAX_STEP);
+        let pull = |off: Vec3, speed: Vec3| STIFFNESS * STIFFNESS * off - 2.0 * STIFFNESS * speed;
+        self.velocity += pull(goal.translation - self.tip.translation, self.velocity) * dt;
+        self.tip.translation += self.velocity * dt;
+        let turn = (goal.rotation * self.tip.rotation.inverse()).to_scaled_axis();
+        self.spin += pull(turn, self.spin) * dt;
+        self.tip.rotation =
+            (Quat::from_scaled_axis(self.spin * dt) * self.tip.rotation).normalize();
     }
 
     /// Puts the tip on the screw that turns, if any, and turns with it.
@@ -63,10 +86,7 @@ impl Screwdriver {
                 (None, Some(spot)) => Self::clear_of(spot, camera),
                 (None, None) => screwdriver.rest * Self::tip_to_rest(),
             };
-            let tip = &mut screwdriver.tip;
-            tip.translation
-                .smooth_nudge(&goal.translation, DECAY_RATE, dt);
-            tip.rotation.smooth_nudge(&goal.rotation, DECAY_RATE, dt);
+            screwdriver.ease(&goal, dt);
             let angle = screw.map_or(0.0, |screw| screw.angle);
             transform.set_if_neq(
                 screwdriver.tip
@@ -124,5 +144,24 @@ mod tests {
         assert!(handle.angle_between(camera) >= CLEAR - 1e-4, "{handle}");
         let sideways = Transform::from_rotation(Quat::from_rotation_z(FRAC_PI_2));
         assert_eq!(Screwdriver::clear_of(sideways, camera), sideways);
+    }
+
+    #[test]
+    fn the_tip_starts_slowly_and_settles_on_the_goal() {
+        let mut screwdriver = Screwdriver::new(Transform::IDENTITY);
+        let start = screwdriver.tip;
+        let goal = Transform::from_xyz(0.1, 0.0, 0.0).with_rotation(Quat::from_rotation_y(1.0));
+        let dt = 1.0 / 144.0;
+        screwdriver.ease(&goal, dt);
+        let first = screwdriver.tip.translation.distance(start.translation);
+        assert!(first < 0.1 * 0.01, "{first}");
+        let mut farthest = 0.0f32;
+        for _ in 0..144 {
+            screwdriver.ease(&goal, dt);
+            farthest = farthest.max(screwdriver.tip.translation.x - start.translation.x);
+        }
+        assert!(farthest <= 0.1 + 1e-4, "{farthest}");
+        assert!(screwdriver.tip.translation.distance(goal.translation) < 1e-3);
+        assert!(screwdriver.tip.rotation.angle_between(goal.rotation) < 1e-2);
     }
 }
