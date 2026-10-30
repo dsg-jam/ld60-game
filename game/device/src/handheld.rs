@@ -319,12 +319,14 @@ pub struct Handheld {
     buggy: String,
 }
 
-#[cfg(any(test, feature = "test-support"))]
 impl Handheld {
     pub fn body_size(kind: DeviceKind) -> Vec3 {
         Model::of(kind).body_size
     }
+}
 
+#[cfg(any(test, feature = "test-support"))]
+impl Handheld {
     pub fn screw_count(kind: DeviceKind) -> usize {
         Model::of(kind).casing.screws.len()
     }

@@ -4,7 +4,6 @@ mod clutter;
 mod counter;
 mod delivery;
 mod dial;
-#[cfg(test)]
 mod footprint;
 mod front;
 mod lamp;

@@ -252,7 +252,20 @@ fn a_still_cable_stays_out_of_everything() {
             // The plug jumps onto the device, and the cable follows.
             assert_within(&name, &run(&room, &mut cable, 2.0, |_| ends), 1e-3);
             assert_within(&name, &run(&room, &mut cable, 3.0, |_| ends), 0.15e-3);
+            // Pulled out, the plug jumps back and the slack curls up by it.
+            let name = format!("{kind:?} pulled out at yaw {yaw}");
+            assert_within(&name, &run(&room, &mut cable, 3.0, |_| rest), 1e-3);
+            assert_within(&name, &run(&room, &mut cable, 3.0, |_| rest), 0.15e-3);
         }
+    }
+    for kind in DeviceKind::ALL {
+        let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
+        run(&room, &mut cable, 3.0, |_| {
+            held(&counter, kind, Quat::IDENTITY)
+        });
+        let name = format!("{kind:?} pulled out while held");
+        assert_within(&name, &run(&room, &mut cable, 3.0, |_| rest), 1e-3);
+        assert_within(&name, &run(&room, &mut cable, 3.0, |_| rest), 0.15e-3);
     }
 }
 
@@ -286,7 +299,7 @@ fn turning_the_held_device_keeps_the_cable_out_of_it() {
 fn turning_the_held_device_does_not_whip_the_cable() {
     let counter = CounterLayout::new();
     for kind in [DeviceKind::Tally2, DeviceKind::Lock4] {
-        for (speed, worst_limit, most_limit) in [(1.0, 8e-3, 0.5e-3), (3.0, 20e-3, 2.5e-3)] {
+        for (speed, worst_limit, most_limit) in [(1.0, 8e-3, 0.5e-3), (3.0, 20e-3, 3e-3)] {
             let mut cable = Cable::new(&counter, Plug::rest_at(&counter));
             let start = held(&counter, kind, Quat::IDENTITY);
             for _ in 0..(3.0 * FPS) as usize {

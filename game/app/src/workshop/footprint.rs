@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use ld60_devices::DeviceKind;
 use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT, MANUALS_OPEN_SPOT};
+use ld60_game_core::layout::desk::{COMPUTER_SPOT, LAMP_SPOT};
+use ld60_game_device::Handheld;
 use ld60_game_manuals::ShopManuals;
 use ld60_geometry::block::Block;
 
@@ -12,10 +13,6 @@ use super::{
     STAMP_YAW, cable, delivery, lamp, printer, radio, receipt, reminder, rent, salvage, stamp,
     ticket, till,
 };
-use ld60_game_device::{Casing, Handheld};
-
-/// Space kept between the keyboard and the mat.
-const MAT_MARGIN: f32 = 0.01;
 
 /// The rectangle a prop covers on the counter, seen from above.
 pub(super) struct Footprint {
@@ -37,39 +34,6 @@ impl Footprint {
     /// The box of the prop, where it stands.
     pub(super) fn solid(&self) -> (bevy::math::Affine3A, Block) {
         (self.at.compute_affine(), self.area)
-    }
-
-    fn corners(&self) -> [Vec2; 4] {
-        let (min, max) = (self.area.min(), self.area.max());
-        [
-            Vec3::new(min.x, min.y, min.z),
-            Vec3::new(max.x, min.y, min.z),
-            Vec3::new(max.x, min.y, max.z),
-            Vec3::new(min.x, min.y, max.z),
-        ]
-        .map(|corner| self.at.transform_point(corner).xz())
-    }
-
-    fn axes(&self) -> [Vec2; 2] {
-        [Vec3::X, Vec3::Z].map(|axis| (self.at.rotation * axis).xz())
-    }
-
-    /// Whether the two rectangles share any area, by the separating axis
-    /// test.
-    fn overlaps(&self, other: &Self) -> bool {
-        let (ours, theirs) = (self.corners(), other.corners());
-        let span = |corners: &[Vec2; 4], axis: Vec2| {
-            corners
-                .iter()
-                .map(|corner| corner.dot(axis))
-                .fold((f32::MAX, f32::MIN), |(min, max), at| {
-                    (min.min(at), max.max(at))
-                })
-        };
-        self.axes().into_iter().chain(other.axes()).all(|axis| {
-            let (a, b) = (span(&ours, axis), span(&theirs, axis));
-            a.1 > b.0 && b.1 > a.0
-        })
     }
 }
 
@@ -157,132 +121,179 @@ pub(super) fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
     props
 }
 
-#[test]
-fn the_keyboard_stays_off_the_mat() {
-    let counter = CounterLayout::new();
-    let keyboard = Footprint::new(
-        "keyboard",
-        counter.place(COMPUTER_SPOT, COMPUTER_YAW),
-        ComputerLayout::new().keyboard_placement,
-    );
-    let mat_min = counter.mat.min().xz() - MAT_MARGIN;
-    let mat_max = counter.mat.max().xz() + MAT_MARGIN;
-    for corner in keyboard.corners() {
-        assert!(
-            corner.cmplt(mat_min).any() || corner.cmpgt(mat_max).any(),
-            "keyboard corner {corner} lies on the mat"
-        );
-    }
-}
+#[cfg(test)]
+mod tests {
+    use ld60_game_core::layout::desk::MANUALS_OPEN_SPOT;
+    use ld60_game_device::Casing;
 
-#[test]
-fn no_two_counter_props_overlap() {
-    let props = counter_props(&CounterLayout::new());
-    for (index, prop) in props.iter().enumerate() {
-        for other in &props[index + 1..] {
+    use super::*;
+
+    /// Space kept between the keyboard and the mat.
+    const MAT_MARGIN: f32 = 0.01;
+
+    impl Footprint {
+        fn corners(&self) -> [Vec2; 4] {
+            let (min, max) = (self.area.min(), self.area.max());
+            [
+                Vec3::new(min.x, min.y, min.z),
+                Vec3::new(max.x, min.y, min.z),
+                Vec3::new(max.x, min.y, max.z),
+                Vec3::new(min.x, min.y, max.z),
+            ]
+            .map(|corner| self.at.transform_point(corner).xz())
+        }
+
+        fn axes(&self) -> [Vec2; 2] {
+            [Vec3::X, Vec3::Z].map(|axis| (self.at.rotation * axis).xz())
+        }
+
+        /// Whether the two rectangles share any area, by the separating axis
+        /// test.
+        fn overlaps(&self, other: &Self) -> bool {
+            let (ours, theirs) = (self.corners(), other.corners());
+            let span = |corners: &[Vec2; 4], axis: Vec2| {
+                corners
+                    .iter()
+                    .map(|corner| corner.dot(axis))
+                    .fold((f32::MAX, f32::MIN), |(min, max), at| {
+                        (min.min(at), max.max(at))
+                    })
+            };
+            self.axes().into_iter().chain(other.axes()).all(|axis| {
+                let (a, b) = (span(&ours, axis), span(&theirs, axis));
+                a.1 > b.0 && b.1 > a.0
+            })
+        }
+    }
+
+    #[test]
+    fn the_keyboard_stays_off_the_mat() {
+        let counter = CounterLayout::new();
+        let keyboard = Footprint::new(
+            "keyboard",
+            counter.place(COMPUTER_SPOT, COMPUTER_YAW),
+            ComputerLayout::new().keyboard_placement,
+        );
+        let mat_min = counter.mat.min().xz() - MAT_MARGIN;
+        let mat_max = counter.mat.max().xz() + MAT_MARGIN;
+        for corner in keyboard.corners() {
             assert!(
-                !prop.overlaps(other),
-                "{} overlaps {}",
-                prop.name,
-                other.name
+                corner.cmplt(mat_min).any() || corner.cmpgt(mat_max).any(),
+                "keyboard corner {corner} lies on the mat"
             );
         }
     }
-}
 
-#[test]
-fn screws_taken_out_lie_clear_of_everything() {
-    let counter = CounterLayout::new();
-    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
-    let others: Vec<_> = counter_props(&counter)
-        .into_iter()
-        .filter(|prop| prop.name != "device")
-        .collect();
-    for kind in DeviceKind::ALL {
-        let bounds = Block::new(Handheld::body_size(kind));
-        let device = Footprint::new("device", rest, bounds);
-        for index in 0..Handheld::screw_count(kind) {
-            let at = Casing::aside_at(&bounds, index, &rest);
-            // The screw lies along the row, so only its turn on the counter
-            // counts.
-            let along = at.rotation * Vec3::Y;
-            let yaw = Quat::from_rotation_y(along.x.atan2(along.z));
-            let area = Block::new(Vec3::new(0.0055, 0.0055, 0.0094)).translated(Vec3::Z * 0.0033);
-            let screw = Footprint::new("screw aside", at.with_rotation(yaw), area);
-            for other in others.iter().chain([&device]) {
+    #[test]
+    fn no_two_counter_props_overlap() {
+        let props = counter_props(&CounterLayout::new());
+        for (index, prop) in props.iter().enumerate() {
+            for other in &props[index + 1..] {
                 assert!(
-                    !screw.overlaps(other),
-                    "{kind:?} screw {index} overlaps {}",
+                    !prop.overlaps(other),
+                    "{} overlaps {}",
+                    prop.name,
                     other.name
                 );
             }
         }
     }
-}
 
-#[test]
-fn the_cover_taken_off_lies_clear_of_everything() {
-    let counter = CounterLayout::new();
-    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
-    let others: Vec<_> = counter_props(&counter)
-        .into_iter()
-        .filter(|prop| prop.name != "device")
-        .collect();
-    for kind in DeviceKind::ALL {
-        let bounds = Block::new(Handheld::body_size(kind));
-        let device = Footprint::new("device", rest, bounds);
-        let cover = Footprint::new(
-            "cover",
-            Casing::cover_at(&bounds, &rest),
-            Block::new(bounds.size.with_y(0.005)),
+    #[test]
+    fn screws_taken_out_lie_clear_of_everything() {
+        let counter = CounterLayout::new();
+        let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
+        let others: Vec<_> = counter_props(&counter)
+            .into_iter()
+            .filter(|prop| prop.name != "device")
+            .collect();
+        for kind in DeviceKind::ALL {
+            let bounds = Block::new(Handheld::body_size(kind));
+            let device = Footprint::new("device", rest, bounds);
+            for index in 0..Handheld::screw_count(kind) {
+                let at = Casing::aside_at(&bounds, index, &rest);
+                // The screw lies along the row, so only its turn on the counter
+                // counts.
+                let along = at.rotation * Vec3::Y;
+                let yaw = Quat::from_rotation_y(along.x.atan2(along.z));
+                let area =
+                    Block::new(Vec3::new(0.0055, 0.0055, 0.0094)).translated(Vec3::Z * 0.0033);
+                let screw = Footprint::new("screw aside", at.with_rotation(yaw), area);
+                for other in others.iter().chain([&device]) {
+                    assert!(
+                        !screw.overlaps(other),
+                        "{kind:?} screw {index} overlaps {}",
+                        other.name
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_cover_taken_off_lies_clear_of_everything() {
+        let counter = CounterLayout::new();
+        let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
+        let others: Vec<_> = counter_props(&counter)
+            .into_iter()
+            .filter(|prop| prop.name != "device")
+            .collect();
+        for kind in DeviceKind::ALL {
+            let bounds = Block::new(Handheld::body_size(kind));
+            let device = Footprint::new("device", rest, bounds);
+            let cover = Footprint::new(
+                "cover",
+                Casing::cover_at(&bounds, &rest),
+                Block::new(bounds.size.with_y(0.005)),
+            );
+            for other in others.iter().chain([&device]) {
+                assert!(
+                    !cover.overlaps(other),
+                    "{kind:?} cover overlaps {}",
+                    other.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_open_manuals_lie_clear_of_the_device_its_screws_and_cover() {
+        let counter = CounterLayout::new();
+        let open = Footprint::new(
+            "open shop manuals",
+            counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0),
+            Block::new(ShopManuals::OPEN),
         );
-        for other in others.iter().chain([&device]) {
+        let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
+        // The closed file stands elsewhere while it lies open, and paper notes
+        // lie flat under it.
+        let mut others: Vec<_> = counter_props(&counter)
+            .into_iter()
+            .filter(|prop| !matches!(prop.name, "shop manuals" | "note"))
+            .collect();
+        for kind in DeviceKind::ALL {
+            let bounds = Block::new(Handheld::body_size(kind));
+            others.push(Footprint::new(
+                "cover",
+                Casing::cover_at(&bounds, &rest),
+                Block::new(bounds.size.with_y(0.005)),
+            ));
+            for index in 0..Handheld::screw_count(kind) {
+                let at = Casing::aside_at(&bounds, index, &rest);
+                let area = Block::new(Vec3::splat(0.012));
+                others.push(Footprint::new(
+                    "screw aside",
+                    at.with_rotation(rest.rotation),
+                    area,
+                ));
+            }
+        }
+        for other in &others {
             assert!(
-                !cover.overlaps(other),
-                "{kind:?} cover overlaps {}",
+                !open.overlaps(other),
+                "the open file overlaps {}",
                 other.name
             );
         }
-    }
-}
-
-#[test]
-fn the_open_manuals_lie_clear_of_the_device_its_screws_and_cover() {
-    let counter = CounterLayout::new();
-    let open = Footprint::new(
-        "open shop manuals",
-        counter.place_on_mat(MANUALS_OPEN_SPOT, 0.0),
-        Block::new(ShopManuals::OPEN),
-    );
-    let rest = counter.place(delivery::DEVICE_SPOT, delivery::DEVICE_YAW);
-    // The closed file stands elsewhere while it lies open, and paper notes
-    // lie flat under it.
-    let mut others: Vec<_> = counter_props(&counter)
-        .into_iter()
-        .filter(|prop| !matches!(prop.name, "shop manuals" | "note"))
-        .collect();
-    for kind in DeviceKind::ALL {
-        let bounds = Block::new(Handheld::body_size(kind));
-        others.push(Footprint::new(
-            "cover",
-            Casing::cover_at(&bounds, &rest),
-            Block::new(bounds.size.with_y(0.005)),
-        ));
-        for index in 0..Handheld::screw_count(kind) {
-            let at = Casing::aside_at(&bounds, index, &rest);
-            let area = Block::new(Vec3::splat(0.012));
-            others.push(Footprint::new(
-                "screw aside",
-                at.with_rotation(rest.rotation),
-                area,
-            ));
-        }
-    }
-    for other in &others {
-        assert!(
-            !open.overlaps(other),
-            "the open file overlaps {}",
-            other.name
-        );
     }
 }

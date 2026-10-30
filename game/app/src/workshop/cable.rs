@@ -28,6 +28,7 @@ use ld60_geometry::surface::Finish;
 use self::rope::{Rope, RopeMaterial, RopePlugin};
 use self::solver::Ends;
 use super::COMPUTER_YAW;
+use super::footprint::{Footprint, counter_props};
 use ld60_game_device::{Aim, Casing, Connected, Header, Holdable};
 
 /// Where the plug of the debug cable lies while it is out, see
@@ -58,6 +59,9 @@ const PLUG_REACH: f32 = 0.005;
 /// How high the port for the cable sits on the side of the monitor.
 const PORT_HEIGHT: f32 = 0.025;
 const RADIUS: f32 = 0.0016;
+/// Long enough to reach a device in the player's hands with some slack.
+/// Unplugged, the rest lies in loops by the plug.
+const LENGTH: f32 = 0.7;
 /// The cable is a chain of this many points.
 const POINTS: usize = 48;
 const PLUG_BLACK: Color = Color::srgb_u8(0x22, 0x22, 0x24);
@@ -91,15 +95,14 @@ struct Cable {
     floor: f32,
     /// The mat on the counter, which the cable lies on where it crosses it.
     mat: Block,
-    /// Boxes the cable stays out of, with where they are.
+    /// Boxes of the props on the counter the cable stays out of, with
+    /// where they are.
     solids: Vec<(Affine3A, Block)>,
     points: Vec<Vec3>,
     /// Where the points were a step ago, which gives their speed.
     previous: Vec<Vec3>,
     /// Where the points were a tick ago, to show the cable between ticks.
     ticked: Vec<Vec3>,
-    /// How long the cable is now, see [`SLACK`].
-    length: f32,
     /// Where the plug end was when the cable went to sleep.
     asleep: Option<Vec3>,
     /// Time the simulation still has to catch up on, less than a [`TICK`].
@@ -255,12 +258,7 @@ impl Cable {
                 Self::relief(plug, (start, PLUG.z / 2.0), PLUG_RELIEF, Vec3::Z);
             });
         let cable = Self::new(&counter, rest);
-        let material = ropes.add(Rope::material(
-            CABLE_GRAY,
-            RADIUS,
-            &cable.points,
-            cable.length,
-        ));
+        let material = ropes.add(Rope::material(CABLE_GRAY, RADIUS, &cable.points, LENGTH));
         // The shader moves the tube far from the bounds of its mesh.
         commands.spawn((
             Name::new("debug cable"),
@@ -291,22 +289,22 @@ impl Cable {
     /// laid out to fall into place.
     fn new(counter: &CounterLayout, plug: Transform) -> Self {
         let (port, out) = Self::port(counter);
-        let at_computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW).compute_affine();
-        let layout = ComputerLayout::new();
+        // The device moves, and plugged in it comes with the ends.
+        let props = counter_props(counter)
+            .iter()
+            .filter(|prop| !matches!(prop.name(), "device" | "debug cable plug"))
+            .map(Footprint::solid)
+            .chain([(Affine3A::IDENTITY, counter.top)])
+            .collect();
         let mut cable = Self {
             socket: port + out * (BOOT.z - BOOT_INSIDE),
             out,
             floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
             mat: counter.mat,
-            solids: vec![
-                (at_computer, layout.monitor_body()),
-                (at_computer, layout.keyboard_placement),
-                (Affine3A::IDENTITY, counter.top),
-            ],
+            solids: props,
             points: Vec::new(),
             previous: Vec::new(),
             ticked: Vec::new(),
-            length: 0.0,
             asleep: None,
             behind: 0.0,
             last: None,
@@ -398,7 +396,7 @@ impl Cable {
             return;
         }
         if let Some(mut rope) = ropes.get_mut(material) {
-            rope.extension.follow(&cable.shown(&ends), cable.length);
+            rope.extension.follow(&cable.shown(&ends), LENGTH);
         }
     }
 }
