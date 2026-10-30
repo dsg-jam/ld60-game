@@ -5,6 +5,7 @@ mod leaf;
 mod press;
 mod sheet;
 mod stock;
+mod swing;
 
 use std::f32::consts::FRAC_PI_2;
 use std::hash::Hash;
@@ -36,6 +37,7 @@ pub use self::press::{Press, Print};
 pub use self::sheet::{PaperMaterial, Pressed, Wrinkles};
 use self::sheet::{SheetGlow, SheetPlugin, SheetPrint};
 pub use self::stock::Stock;
+pub use self::swing::Swing;
 use super::screen::UiCanvas;
 
 pub const PAPER: Color = Color::srgb_u8(0xf2, 0xec, 0xdc);

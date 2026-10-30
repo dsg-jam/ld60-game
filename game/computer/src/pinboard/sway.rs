@@ -2,6 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 use ld60_game_city::Draft;
+use ld60_game_parts::paper::Swing;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::Hanging;
@@ -19,14 +20,9 @@ const SWING_RATE: f32 = 0.8;
 const DAMPING: f32 = 0.35;
 /// Angular acceleration per meter per second of draft against the sheet.
 const PUSH: f32 = 9.0;
-/// Seconds for the draft on a sheet to build up and die down.
-const GUST_TIME: f32 = 0.35;
 /// Radians of flutter per meter per second of draft.
 const FLUTTER: f32 = 0.015;
 const FLUTTER_RATE: f32 = 2.5;
-/// Longer steps than this, in seconds, are split up, so the swing stays
-/// stable after a hitch.
-const MAX_STEP: f32 = 1.0 / 60.0;
 
 /// How a pinned sheet hangs from its clip: tilted a little and swinging in
 /// the draft of passing vehicles. The edge in the clip stays put.
@@ -38,11 +34,8 @@ pub(crate) struct Sway {
     center: Vec3,
     /// About the sheet's normal, in radians.
     tilt: f32,
-    /// About the top edge, in radians. Positive swings the bottom back.
-    angle: f32,
-    speed: f32,
-    /// The draft against the sheet, smoothed, in meters per second.
-    gust: f32,
+    /// About the top edge. Positive swings the bottom back.
+    swing: Swing,
     /// Seconds of flutter so far, offset for each sheet.
     flutter: f32,
     slot: usize,
@@ -54,18 +47,16 @@ impl Sway {
             clip,
             center,
             tilt: 0.0,
-            angle: 0.0,
-            speed: 0.0,
-            gust: 0.0,
+            swing: Swing::new(SWING_RATE, DAMPING, PUSH),
             flutter: slot as f32 * 0.37,
             slot,
         }
     }
 
-    /// The pose of the sheet in the rail's space.
-    fn pose(&self, flutter: f32) -> Transform {
-        let rotation =
-            Quat::from_rotation_z(self.tilt) * Quat::from_rotation_x(self.angle + flutter);
+    /// The pose of the sheet in the rail's space, swung by `angle` about
+    /// the top edge.
+    fn pose(&self, angle: f32) -> Transform {
+        let rotation = Quat::from_rotation_z(self.tilt) * Quat::from_rotation_x(angle);
         Transform::from_translation(self.clip + rotation * (self.center - self.clip))
             .with_rotation(rotation)
     }
@@ -88,29 +79,16 @@ impl Sway {
         let draft = draft.map_or(Vec3::ZERO, |draft| draft.0);
         for (mut sway, mut transform, global) in &mut sheets {
             let against = draft.dot(global.forward().as_vec3());
-            sway.step(against, time.delta_secs());
-            let flutter = (TAU * FLUTTER_RATE * sway.flutter).sin() * sway.gust.abs() * FLUTTER;
-            let pose = sway.pose(flutter);
+            let dt = time.delta_secs();
+            sway.swing.step(against, dt);
+            sway.flutter += dt;
+            let gust = sway.swing.gust().abs();
+            let flutter = (TAU * FLUTTER_RATE * sway.flutter).sin() * gust * FLUTTER;
+            let pose = sway.pose(sway.swing.angle() + flutter);
             if *transform != pose {
                 *transform = pose;
             }
         }
-    }
-
-    /// Swings on by `dt` with `against` meters per second of draft blowing
-    /// into the front of the sheet.
-    fn step(&mut self, against: f32, dt: f32) {
-        let omega = TAU * SWING_RATE;
-        let mut left = dt;
-        while left > 0.0 {
-            let step = left.min(MAX_STEP);
-            self.gust += (against - self.gust) * (step / GUST_TIME).min(1.0);
-            let pull = -omega * omega * self.angle - 2.0 * DAMPING * omega * self.speed;
-            self.speed += (pull + PUSH * self.gust) * step;
-            self.angle += self.speed * step;
-            left -= step;
-        }
-        self.flutter += dt;
     }
 }
 
@@ -123,37 +101,23 @@ mod tests {
     }
 
     #[test]
-    fn a_gust_swings_the_sheet_back_and_it_settles() {
+    fn a_gust_swings_the_bottom_back() {
         let mut sway = sway();
         for _ in 0..30 {
-            sway.step(0.2, 1.0 / 60.0);
+            sway.swing.step(0.2, 1.0 / 60.0);
         }
-        let bottom = sway.pose(0.0).transform_point(Vec3::NEG_Y * 0.07);
+        let bottom = sway
+            .pose(sway.swing.angle())
+            .transform_point(Vec3::NEG_Y * 0.07);
         assert!(bottom.z < -0.001, "{bottom}");
-        assert!(sway.angle.abs() < 0.1);
-        for _ in 0..600 {
-            sway.step(0.0, 1.0 / 60.0);
-        }
-        assert!(sway.angle.abs() < 1e-3);
     }
 
     #[test]
     fn the_clip_stays_put() {
         let mut sway = sway();
         sway.tilt = TILT;
-        sway.angle = 0.2;
-        let pose = sway.pose(0.05);
+        let pose = sway.pose(0.25);
         let clip = pose.transform_point(Vec3::NEG_Y * 0.07 * -1.0);
         assert!(clip.length() < 1e-5, "{clip}");
-    }
-
-    #[test]
-    fn long_frames_stay_stable() {
-        let mut sway = sway();
-        sway.step(1.0, 0.5);
-        for _ in 0..20 {
-            sway.step(0.0, 0.25);
-        }
-        assert!(sway.angle.abs() < 0.05);
     }
 }

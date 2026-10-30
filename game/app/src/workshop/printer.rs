@@ -5,7 +5,9 @@ use bevy::{
     prelude::*,
 };
 use ld60_game_audio::{Play, Sound};
-use ld60_game_parts::paper::Sheltered;
+use ld60_game_city::Draft;
+use ld60_game_parts::downwash::Downwash;
+use ld60_game_parts::paper::{Sheltered, Swing};
 use ld60_game_player::focus::{Clickable, Focus, FocusTarget};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -47,6 +49,10 @@ const LED_AMBER: Color = Color::srgb_u8(0xe0, 0x9a, 0x30);
 /// How far the paper leans back from upright as it comes out, in radians.
 /// It faces up into the light of the lamp.
 const LEAN: f32 = 0.7;
+/// How the paper out of the slot swings back in the air of passing
+/// vehicles and the drone: how often, in hertz, how damped, and how hard
+/// the air pushes it, see [`Swing`]. It stands stiffer than a hanging sheet.
+const SWING: Swing = Swing::new(1.4, 0.3, 12.0);
 
 const PRINT_TIME: f32 = 2.0;
 /// Seconds between two steps of the print head, each one a tick.
@@ -163,6 +169,8 @@ pub(crate) struct Printing {
     torn: Option<f32>,
     /// Taken off while it prints, so a click tears it off instead.
     target: Option<FocusTarget>,
+    /// Further back than [`LEAN`], while it is in the slot.
+    swing: Swing,
 }
 
 impl Printing {
@@ -200,6 +208,7 @@ impl Printing {
             sounds: (None, None),
             torn: None,
             target: None,
+            swing: SWING,
         }
     }
 
@@ -212,9 +221,14 @@ impl Printing {
         self.printed() && self.torn.is_none() && !self.tears_off
     }
 
+    /// How the sheet leans back out of `slot`.
+    fn lean(&self, slot: Transform) -> Quat {
+        slot.rotation * Quat::from_rotation_x(-LEAN - self.swing.angle())
+    }
+
     /// The pose with `out` meters of the sheet out of `slot`, leaning back.
     fn out_of(&self, slot: Transform, out: f32) -> Transform {
-        let lean = slot.rotation * Quat::from_rotation_x(-LEAN);
+        let lean = self.lean(slot);
         let at = slot.translation + lean * Vec3::Y * (out - self.length / 2.0);
         // The sheet of a paper lies flat in its own space, so it stands up
         // turned by a quarter.
@@ -238,6 +252,8 @@ impl Printing {
 
     fn animate(
         time: Res<Time>,
+        draft: Option<Res<Draft>>,
+        downwash: Res<Downwash>,
         printers: Query<&Transform, (With<Printer>, Without<Printing>)>,
         mut sheets: Query<(
             Entity,
@@ -278,7 +294,14 @@ impl Printing {
                 Visibility::Inherited
             });
             let t = ((printing.elapsed - delay) / PRINT_TIME).clamp(0.0, 1.0);
-            let printed = printing.out_of(slot, PRINTED * printing.length * t);
+            let out = PRINTED * printing.length * t;
+            if printing.torn.is_none() {
+                let lean = printing.lean(slot);
+                let middle = slot.translation + lean * Vec3::Y * out / 2.0;
+                let air = draft.as_ref().map_or(Vec3::ZERO, |draft| draft.0) + downwash.at(middle);
+                printing.swing.step(air.dot(lean * Vec3::NEG_Z), dt);
+            }
+            let printed = printing.out_of(slot, out);
             let steps = |elapsed: f32| ((elapsed - delay) / STEP_TIME).floor();
             if t > 0.0 && t < 1.0 && steps(printing.elapsed) > steps(before) {
                 commands.trigger(Play(Sound::Ratchet));
