@@ -6,14 +6,21 @@ mod stress;
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    camera::visibility::NoFrustumCulling, math::Affine3A, prelude::*,
+    camera::visibility::NoFrustumCulling,
+    math::Affine3A,
+    picking::{
+        PickingSystems,
+        backend::{HitData, PointerHits, ray::RayMap},
+        mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings},
+    },
+    prelude::*,
     transform::helper::TransformHelper,
 };
 use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::COMPUTER_SPOT;
 use ld60_game_manuals::{Pose, ShopManuals};
-use ld60_game_player::focus::ClickTool;
+use ld60_game_player::focus::{ClickTool, Focus, Focused};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
@@ -46,6 +53,8 @@ const PLUG_RATE: f32 = 12.0;
 /// The strain relief at the +Z end of the plug, around the cable.
 const PLUG_RELIEF: f32 = 0.0024;
 const PLUG_RELIEF_LENGTH: f32 = 0.005;
+/// How far around the plugged in plug the pointer still catches it.
+const PLUG_REACH: f32 = 0.005;
 /// How high the port for the cable sits on the side of the monitor.
 const PORT_HEIGHT: f32 = 0.025;
 const RADIUS: f32 = 0.0016;
@@ -60,6 +69,7 @@ impl Plugin for CablePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(RopePlugin)
             .add_systems(Startup, Cable::spawn)
+            .add_systems(PreUpdate, Plug::hits.in_set(PickingSystems::Backend))
             .add_systems(Update, Cable::follow.after(Holdable::follow));
     }
 }
@@ -113,6 +123,77 @@ impl Plug {
     fn rest_at(counter: &CounterLayout) -> Transform {
         let rest = counter.place(PLUG_SPOT, PLUG_YAW);
         rest.with_translation(rest.translation + Vec3::Y * PLUG.y / 2.0)
+    }
+
+    /// Puts the header of the focused device under each pointer on a plug
+    /// plugged into it, or a little way off it. The plug itself lets
+    /// clicks through, and on its own the header under it is hard to hit.
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
+    fn hits(
+        state: Res<State<Focus>>,
+        focused: Res<Focused>,
+        rays: Res<RayMap>,
+        cameras: Query<&Camera>,
+        plug: Single<&GlobalTransform, With<Plug>>,
+        headers: Query<(Entity, &ChildOf), With<Header>>,
+        plugged: Query<(), With<Connected>>,
+        parents: Query<&ChildOf>,
+        pickables: Query<&Pickable>,
+        mut ray_cast: MeshRayCast,
+        mut hits: MessageWriter<PointerHits>,
+    ) {
+        let Some(device) = focused.get().filter(|_| *state.get() == Focus::Device) else {
+            return;
+        };
+        let Some(header) = headers
+            .iter()
+            .find(|(_, parent)| parent.parent() == device && plugged.contains(device))
+            .map(|(header, _)| header)
+        else {
+            return;
+        };
+        let to_plug = plug.affine().inverse();
+        let size = PLUG + 2.0 * PLUG_REACH;
+        let around = Block::new(size).translated(Vec3::NEG_Y * size.y / 2.0);
+        for (ray_id, ray) in rays.iter() {
+            let Ok(camera) = cameras.get(ray_id.camera) else {
+                continue;
+            };
+            let from = to_plug.transform_point3(ray.origin);
+            let along = to_plug.transform_vector3(*ray.direction);
+            let Some(depth) = Self::enters(&around, from, along) else {
+                continue;
+            };
+            let hoverable = |entity| pickables.get(entity).ok().is_none_or(|p| p.is_hoverable);
+            let settings = MeshRayCastSettings::default().with_filter(&hoverable);
+            // Something in front of the plug, other than the device's own
+            // header, hides it.
+            let hidden = ray_cast
+                .cast_ray(*ray, &settings)
+                .first()
+                .is_some_and(|(hit, data)| {
+                    data.distance < depth
+                        && *hit != header
+                        && !parents.iter_ancestors(*hit).any(|parent| parent == header)
+                });
+            if !hidden {
+                let at = ray.get_point(depth);
+                hits.write(PointerHits::new(
+                    ray_id.pointer,
+                    vec![(header, HitData::new(ray_id.camera, depth, Some(at), None))],
+                    camera.order as f32 + 0.25,
+                ));
+            }
+        }
+    }
+
+    /// How far along a ray from `from` going `along` it enters `block`, if
+    /// it does. Zero from inside it.
+    fn enters(block: &Block, from: Vec3, along: Vec3) -> Option<f32> {
+        let [near, far] = [block.min(), block.max()].map(|side| (side - from) / along);
+        let enter = near.min(far).max_element().max(0.0);
+        let leave = near.max(far).min_element();
+        (enter <= leave).then_some(enter)
     }
 }
 
@@ -319,5 +400,20 @@ impl Cable {
         if let Some(mut rope) = ropes.get_mut(material) {
             rope.extension.follow(&cable.shown(&ends), cable.length);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_ray_enters_the_box_around_the_plug_only_when_it_hits_it() {
+        let block = Block::new(Vec3::splat(2.0)).translated(Vec3::NEG_Y);
+        let from = Vec3::new(0.5, 0.5, 5.0);
+        assert_eq!(Plug::enters(&block, from, Vec3::NEG_Z), Some(4.0));
+        assert_eq!(Plug::enters(&block, from, Vec3::Z), None);
+        assert_eq!(Plug::enters(&block, from.with_x(1.5), Vec3::NEG_Z), None);
+        assert_eq!(Plug::enters(&block, Vec3::ZERO, Vec3::X), Some(0.0));
     }
 }
