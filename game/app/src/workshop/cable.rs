@@ -1,5 +1,7 @@
 mod rope;
 mod solver;
+#[cfg(test)]
+mod stress;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -96,12 +98,22 @@ struct Cable {
     /// where they are now, so a fast turn of the device does not yank the
     /// cable or sweep through it.
     last: Option<Ends>,
+    /// The ends a tick before `last`, where the shown points start from.
+    before_last: Option<Ends>,
 }
 
 /// The end of the cable that goes onto the [`Header`] of a device.
 #[derive(Component, Debug)]
 struct Plug {
     rest: Transform,
+}
+
+impl Plug {
+    /// Where the plug lies on `counter` while it is out.
+    fn rest_at(counter: &CounterLayout) -> Transform {
+        let rest = counter.place(PLUG_SPOT, PLUG_YAW);
+        rest.with_translation(rest.translation + Vec3::Y * PLUG.y / 2.0)
+    }
 }
 
 impl Cable {
@@ -111,18 +123,8 @@ impl Cable {
         mut ropes: ResMut<Assets<RopeMaterial>>,
     ) {
         let counter = CounterLayout::new();
-        let rest = counter.place(PLUG_SPOT, PLUG_YAW);
-        let rest = rest.with_translation(rest.translation + Vec3::Y * PLUG.y / 2.0);
-        // A port low on the side of the monitor that faces the mat.
-        let computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW);
-        let layout = ComputerLayout::new();
-        let monitor = layout.monitor_body();
-        let port = computer.transform_point(Vec3::new(
-            monitor.min().x,
-            monitor.min().y + PORT_HEIGHT,
-            monitor.center.z,
-        ));
-        let out = computer.rotation * Vec3::NEG_X;
+        let rest = Plug::rest_at(&counter);
+        let (port, out) = Self::port(&counter);
         // The boot looks along -Z, out of the monitor.
         let along = |from: f32, to: f32| (from - BOOT_INSIDE, to - BOOT_INSIDE);
         commands
@@ -171,26 +173,7 @@ impl Cable {
                 let start = -PLUG.z / 2.0 + housing;
                 Self::relief(plug, (start, PLUG.z / 2.0), PLUG_RELIEF, Vec3::Z);
             });
-        let at_computer = computer.compute_affine();
-        let mut cable = Self {
-            socket: port + out * (BOOT.z - BOOT_INSIDE),
-            out,
-            floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
-            mat: counter.mat,
-            solids: vec![
-                (at_computer, monitor),
-                (at_computer, layout.keyboard_placement),
-            ],
-            points: Vec::new(),
-            previous: Vec::new(),
-            ticked: Vec::new(),
-            length: 0.0,
-            asleep: None,
-            behind: 0.0,
-            last: None,
-        };
-        let exit = rest.rotation * Vec3::Z;
-        cable.lay(rest.translation + exit * (PLUG.z / 2.0));
+        let cable = Self::new(&counter, rest);
         let material = ropes.add(Rope::material(
             CABLE_GRAY,
             RADIUS,
@@ -208,6 +191,48 @@ impl Cable {
             NoFrustumCulling,
             Pickable::IGNORE,
         ));
+    }
+
+    /// Where the cable leaves the computer on `counter`: a port low on the
+    /// side of the monitor that faces the mat, and the way out of it.
+    fn port(counter: &CounterLayout) -> (Vec3, Vec3) {
+        let computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW);
+        let monitor = ComputerLayout::new().monitor_body();
+        let port = computer.transform_point(Vec3::new(
+            monitor.min().x,
+            monitor.min().y + PORT_HEIGHT,
+            monitor.center.z,
+        ));
+        (port, computer.rotation * Vec3::NEG_X)
+    }
+
+    /// The cable from the computer on `counter` to the plug at `plug`,
+    /// laid out to fall into place.
+    fn new(counter: &CounterLayout, plug: Transform) -> Self {
+        let (port, out) = Self::port(counter);
+        let at_computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW).compute_affine();
+        let layout = ComputerLayout::new();
+        let mut cable = Self {
+            socket: port + out * (BOOT.z - BOOT_INSIDE),
+            out,
+            floor: counter.place(PLUG_SPOT, 0.0).translation.y + RADIUS,
+            mat: counter.mat,
+            solids: vec![
+                (at_computer, layout.monitor_body()),
+                (at_computer, layout.keyboard_placement),
+            ],
+            points: Vec::new(),
+            previous: Vec::new(),
+            ticked: Vec::new(),
+            length: 0.0,
+            asleep: None,
+            behind: 0.0,
+            last: None,
+            before_last: None,
+        };
+        let exit = plug.rotation * Vec3::Z;
+        cable.lay(plug.translation + exit * (PLUG.z / 2.0));
+        cable
     }
 
     /// A round strain relief around the cable, from `from` to `to` along

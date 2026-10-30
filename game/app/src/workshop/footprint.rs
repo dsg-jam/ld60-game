@@ -30,6 +30,15 @@ impl Footprint {
         Self { name, at, area }
     }
 
+    pub(super) fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// The box of the prop, where it stands.
+    pub(super) fn solid(&self) -> (bevy::math::Affine3A, Block) {
+        (self.at.compute_affine(), self.area)
+    }
+
     fn corners(&self) -> [Vec2; 4] {
         let (min, max) = (self.area.min(), self.area.max());
         [
@@ -68,7 +77,7 @@ fn sheet(size: Vec2) -> Block {
     Block::new(size.extend(0.0).xzy())
 }
 
-fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
+pub(super) fn counter_props(counter: &CounterLayout) -> Vec<Footprint> {
     let computer = ComputerLayout::new();
     let at_computer = counter.place(COMPUTER_SPOT, COMPUTER_YAW);
     let device = DeviceKind::ALL
