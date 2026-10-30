@@ -34,15 +34,27 @@ struct Droplet {
     @location(1) local: vec3<f32>,
     @location(2) age: f32,
     @location(3) water: f32,
+    /// From 0 for a puff of mist to 1 for a drop of a puddle.
+    @location(4) drop: f32,
 }
 
 /// The water of a soaked road gives the mist of a wet road. Deeper water,
 /// like a puddle, throws drops further, higher and thicker.
 const FILM: f32 = 1.0;
-const DEEP: vec2<f32> = vec2<f32>(3.0, 25.0);
-const DEEP_THROW: f32 = 0.8;
-const DEEP_SIZE: f32 = 0.6;
-const DEEP_GLOW: f32 = 1.5;
+const DEEP: vec2<f32> = vec2<f32>(1.5, 8.0);
+const DEEP_THROW: f32 = 1.6;
+const DEEP_SIZE: f32 = 0.5;
+const DEEP_GLOW: f32 = 3.0;
+/// The share of droplets that are drops in a puddle, the rest stay mist.
+const DROPS: f32 = 0.8;
+/// Size of a drop, and how long it is drawn per meter per second it flies,
+/// as a streak.
+const DROP_SIZE: f32 = 0.04;
+const STREAK: f32 = 0.035;
+/// The faint mist of a wet road, and the water of a puddle catching the
+/// street lights.
+const MIST: vec3<f32> = vec3<f32>(0.04, 0.045, 0.05);
+const SPLASH: vec3<f32> = vec3<f32>(0.16, 0.18, 0.2);
 
 /// The water under the wheel a droplet leaves.
 fn water_under(anchor: vec3<f32>, side: f32) -> f32 {
@@ -74,26 +86,37 @@ fn vertex(vertex: Vertex) -> Droplet {
     let world = (get_world_from_local(vertex.instance_index) * vec4<f32>(local, 1.0)).xyz;
 
     let to_camera = normalize(view.world_position - world);
-    let right = normalize(cross(vec3<f32>(0.0, 1.0, 0.0), to_camera));
-    let up = cross(to_camera, right);
-    let corner = (vertex.uv - 0.5) * spray.size * mix(0.3, 1.0, age) * (1.0 + DEEP_SIZE * deep);
+    let drop = deep * step(1.0 - DROPS, r.z);
+    let now = velocity - vec3<f32>(0.0, spray.gravity * t, 0.0);
+    let flight = (get_world_from_local(vertex.instance_index) * vec4<f32>(now, 0.0)).xyz;
+    let across = flight - to_camera * dot(flight, to_camera);
+    let free_up = normalize(cross(to_camera, normalize(cross(vec3<f32>(0.0, 1.0, 0.0), to_camera))));
+    // Mist faces the camera upright, drops stretch along their flight.
+    let up = normalize(mix(free_up, normalize(across + free_up * 1e-4), drop));
+    let right = normalize(cross(up, to_camera));
+    let mist = spray.size * mix(0.3, 1.0, age) * (1.0 + DEEP_SIZE * deep);
+    let size = vec2<f32>(mix(mist, DROP_SIZE, drop), mix(mist, DROP_SIZE + length(across) * STREAK, drop));
+    let corner = (vertex.uv - 0.5) * size;
     var out: Droplet;
     out.clip = position_world_to_clip(world + right * corner.x + up * corner.y);
     out.uv = vertex.uv;
     out.local = local;
     out.age = age;
     out.water = water;
+    out.drop = drop;
     return out;
 }
 
 @fragment
 fn fragment(in: Droplet) -> @location(0) vec4<f32> {
-    let soft = 1.0 - smoothstep(0.0, 1.0, length(in.uv - 0.5) * 2.0);
+    let edge = mix(0.0, 0.5, in.drop);
+    let soft = 1.0 - smoothstep(edge, 1.0, length(in.uv - 0.5) * 2.0);
     let amount = clamp(in.water / FILM, 0.0, 1.0) + DEEP_GLOW * smoothstep(DEEP.x, DEEP.y, in.water);
-    let fade = (1.0 - in.age) * (1.0 - in.age) * amount * 0.4;
+    let fade = (1.0 - in.age) * (1.0 - in.age) * amount * 0.4 * (1.0 + 5.0 * in.drop);
     let tail = spray.tail * vec3<f32>(1.0, 1.0, sign(in.local.z));
     let d = in.local - tail;
     let red = 1.0 / (1.0 + dot(d, d) * 4.0);
-    let light = vec3<f32>(0.04, 0.045, 0.05) + vec3<f32>(1.0, 0.08, 0.05) * red * 1.5;
+    let deep = smoothstep(DEEP.x, DEEP.y, in.water);
+    let light = mix(MIST, SPLASH, deep) + vec3<f32>(1.0, 0.08, 0.05) * red * 1.5;
     return vec4<f32>(light * soft * fade, 0.0);
 }
