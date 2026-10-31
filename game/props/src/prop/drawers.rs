@@ -3,7 +3,8 @@ use ld60_geometry::block::Block;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
-use super::{LABEL, LABEL_DEPTH, Prop, part, shade};
+use super::super::writing::{Card, Layout};
+use super::{INK_DEPTH, LABEL, LABEL_DEPTH, Prop, part, shade};
 
 const FRAMES: [Color; 3] = [
     Color::srgb_u8(0xc4, 0xbc, 0xa8),
@@ -33,6 +34,7 @@ pub(crate) struct Drawers {
     front: Color,
     /// How far each drawer stands out, row by row.
     open: Vec<f32>,
+    writing: u32,
 }
 
 impl Drawers {
@@ -66,6 +68,7 @@ impl Drawers {
             frame: shade(rng, &FRAMES),
             front: shade(rng, &FRONTS),
             open,
+            writing: rng.random(),
         })
     }
 }
@@ -94,6 +97,11 @@ impl Prop for Drawers {
                     front.max().z + LABEL_DEPTH / 2.0,
                 ));
             part(parent, label, LABEL, Finish::Paper);
+            Card::nth(Layout::Tag, self.writing.wrapping_add(index as u32)).spawn(
+                parent,
+                label.center.with_z(label.max().z + INK_DEPTH),
+                label.size.xy() * 0.85,
+            );
         }
     }
 }

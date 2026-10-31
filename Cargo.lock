@@ -3771,6 +3771,7 @@ name = "ld60-game-props"
 version = "0.3.0"
 dependencies = [
  "bevy",
+ "ld60-game-parts",
  "ld60-geometry",
  "rand",
 ]

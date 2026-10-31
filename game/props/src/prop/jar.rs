@@ -33,6 +33,7 @@ pub(crate) struct Jar {
     size: Vec3,
     lid: Color,
     contents: Color,
+    writing: u32,
 }
 
 /// A tin can with a printed band around it.
@@ -50,6 +51,7 @@ impl Jar {
             size: Vec3::new(width, height, width),
             lid: shade(rng, &LIDS),
             contents: shade(rng, &HARDWARE),
+            writing: rng.random(),
         })
     }
 }
@@ -81,7 +83,7 @@ impl Prop for Jar {
             parent,
             Vec3::new(0.0, glass.size.y * 0.5, glass.size.z / 2.0),
             Vec2::new(width, glass.size.y * 0.4),
-            2,
+            self.writing,
         );
     }
 }
