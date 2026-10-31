@@ -35,10 +35,12 @@ const DROP_TILT: f32 = 0.5;
 /// radians per second.
 const DROP_SPEED: f32 = 0.12;
 const DROP_SPIN: f32 = 6.0;
-/// How high a flicked screw rises over where it came out, in meters, and
-/// how fast it tumbles, in radians per second.
-const FLICK_RISE: std::ops::Range<f32> = 0.012..0.022;
-const FLICK_SPIN: f32 = 9.0;
+/// How a screw is tipped off the device: how far off straight out to the
+/// nearest edge in radians, how fast in meters per second, and how fast it
+/// topples in radians per second.
+const TIP_TURN: f32 = 0.5;
+const TIP_SPEED: std::ops::Range<f32> = 0.03..0.07;
+const TIP_TOPPLE: std::ops::Range<f32> = 4.0..8.0;
 /// A screw landing this fast, in meters per second, sounds at full volume.
 /// Softer hits are quieter, as the force of a contact grows with the speed
 /// to the power of 6/5.
@@ -91,7 +93,8 @@ impl Casing {
                 }
             }
             let rest = *holdable.rest();
-            let ground = Ground::of(&casing.bounds, &rest).with_device(*device, casing.bounds);
+            let ground =
+                Ground::of(&casing.bounds, &rest).with_device(*device, rest, casing.bounds);
             for (index, &screw) in casing.aside.iter().enumerate() {
                 let Ok((entity, mut aside, ..)) = asides.get_mut(screw) else {
                     continue;
@@ -128,7 +131,7 @@ impl Casing {
                     aside.drops += 1;
                 } else if before < TURN_TO && aside.progress >= TURN_TO && aside.fall.is_none() {
                     let (out, _) = screw_pose(TURN_TO, hole, &around, Transform::IDENTITY);
-                    let fall = Self::flick(out, &casing.bounds, index, &rest, entity, aside.drops);
+                    let fall = Self::tip(out, &ground, entity, aside.drops);
                     aside.fall = Some(fall);
                     aside.drops += 1;
                 } else if aside.progress == 1.0 {
@@ -187,33 +190,16 @@ impl Casing {
         }
     }
 
-    /// How the screwdriver flicks the screw `index` of a device with
-    /// `bounds` resting at `rest` off the device, from `out` where it came
-    /// out of its hole, so that it lands a little off its place in the row
-    /// on the mat. `entity` and `drops` pick how.
-    fn flick(
-        out: Transform,
-        bounds: &Block,
-        index: usize,
-        rest: &Transform,
-        entity: Entity,
-        drops: u32,
-    ) -> Fall {
-        let mut rng = SmallRng::seed_from_u64(fixed_hash_one(("screw flick", entity, drops)));
-        let place = Self::aside_at(bounds, index, rest);
-        let target = place.translation
-            + place.rotation * Vec3::new(0.0, 0.0, rng.random_range(-DROP_SPREAD..DROP_SPREAD))
-            + Vec3::new(
-                rng.random_range(-DROP_SPREAD..DROP_SPREAD),
-                0.0,
-                rng.random_range(-DROP_SPREAD..DROP_SPREAD),
-            ) / 2.0;
-        let spin = Vec3::new(
-            rng.random_range(-1.0..1.0),
-            rng.random_range(-1.0..1.0),
-            rng.random_range(-1.0..1.0),
-        ) * FLICK_SPIN;
-        Fall::tossed(out, target, rng.random_range(FLICK_RISE), spin)
+    /// How the screwdriver tips a screw off the device once it is out at
+    /// `out`, towards the nearest edge. `entity` and `drops` pick how.
+    fn tip(out: Transform, ground: &Ground, entity: Entity, drops: u32) -> Fall {
+        let mut rng = SmallRng::seed_from_u64(fixed_hash_one(("screw tip", entity, drops)));
+        Fall::tipped(
+            out,
+            ground,
+            rng.random_range(-TIP_TURN..TIP_TURN),
+            (rng.random_range(TIP_SPEED), rng.random_range(TIP_TOPPLE)),
+        )
     }
 
     /// How the screw `index` of a device with `bounds` resting at `rest` is
@@ -254,6 +240,7 @@ impl Casing {
             velocity,
             spin,
         )
+        .walled()
     }
 }
 
