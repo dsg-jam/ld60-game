@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods};
 use ld60_game_player::focus::{Aside, Focus};
 use ld60_locale::{Localized, Message};
 
@@ -25,7 +25,10 @@ impl Plugin for PagePlugin {
             )
             .add_observer(Page::switch_on_run);
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.page", Page::debug_state);
+        app.add_debug_method(
+            DebugMethod::new("ld60.page", "Returns the active page of the computer."),
+            Page::debug_state,
+        );
     }
 }
 

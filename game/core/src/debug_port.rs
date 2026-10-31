@@ -1,35 +1,91 @@
 mod input;
+mod method;
 mod profile;
 
 #[cfg(not(target_arch = "wasm32"))]
 use bevy::remote::http::{DEFAULT_ADDR, RemoteHttpPlugin};
+#[cfg(not(target_arch = "wasm32"))]
+use bevy::window::PrimaryWindow;
 use bevy::{
     ecs::system::IntoSystem,
     prelude::*,
     remote::{BrpError, BrpResult, RemoteMethodSystemId, RemoteMethods, RemotePlugin, error_codes},
     render::view::screenshot::{Screenshot, save_to_disk},
-    window::PrimaryWindow,
 };
 use serde_json::{Value, json};
 
+pub use self::method::{DebugMethod, DebugMethodList, Param, ParamKind};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::state::KeepMouse;
 
+#[cfg(not(target_arch = "wasm32"))]
 const PORT_VARIABLE: &str = "LD60_DEBUG_PORT";
+#[cfg(not(target_arch = "wasm32"))]
 const KEEP_MOUSE_VARIABLE: &str = "LD60_KEEP_MOUSE";
 
-/// Serves the Bevy Remote Protocol when `LD60_DEBUG_PORT` is set.
+/// Registers the `ld60.*` methods, for the in-game console and the Bevy
+/// Remote Protocol. The protocol is served when `LD60_DEBUG_PORT` is set,
+/// only on native builds.
 ///
 /// With `LD60_KEEP_MOUSE` also set, the game leaves the system mouse to the
 /// user, see [`KeepMouse`]. Its window opens in the background, and
 /// `ld60.input` only moves the pointer of the game.
+///
+/// Add it before the plugins that register methods.
 pub struct DebugPortPlugin;
 
 impl Plugin for DebugPortPlugin {
-    #[cfg(target_arch = "wasm32")]
-    fn build(&self, _app: &mut App) {}
-
-    #[cfg(not(target_arch = "wasm32"))]
     fn build(&self, app: &mut App) {
+        app.add_plugins(RemotePlugin::default())
+            .init_resource::<DebugMethodList>()
+            .add_debug_method(
+                DebugMethod::new("ld60.screenshot", "Saves the next frame to a file.").param(
+                    "path",
+                    ParamKind::Text,
+                    "where the PNG goes",
+                ),
+                screenshot,
+            )
+            .add_debug_method(
+                DebugMethod::new("ld60.where", "Lists named entities and where they are.").param(
+                    "name",
+                    ParamKind::Text,
+                    "only names that contain this",
+                ),
+                place,
+            )
+            .add_debug_method(
+                DebugMethod::new("ld60.time", "Sets how fast game time runs.").param(
+                    "speed",
+                    ParamKind::Numbers,
+                    "times real time, 0 freezes it",
+                ),
+                speed,
+            )
+            .add_debug_method(input::method(), input::input)
+            .add_debug_method(
+                DebugMethod::new(
+                    "ld60.diagnostics",
+                    "Returns frame and render times. Only with the port open.",
+                ),
+                profile::diagnostics,
+            )
+            .add_debug_method(
+                DebugMethod::new("ld60.vsync", "Turns vsync on or off.").param(
+                    "on",
+                    ParamKind::Flag,
+                    "false lets the frame rate run free",
+                ),
+                profile::vsync,
+            );
+        #[cfg(not(target_arch = "wasm32"))]
+        Self::serve(app);
+    }
+}
+
+impl DebugPortPlugin {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn serve(app: &mut App) {
         let Ok(port) = std::env::var(PORT_VARIABLE) else {
             return;
         };
@@ -38,16 +94,9 @@ impl Plugin for DebugPortPlugin {
             return;
         };
         app.add_plugins((
-            RemotePlugin::default(),
             RemoteHttpPlugin::default().with_port(port),
             profile::ProfilePlugin,
-        ))
-        .add_debug_method("ld60.screenshot", screenshot)
-        .add_debug_method("ld60.where", place)
-        .add_debug_method("ld60.time", speed)
-        .add_debug_method("ld60.input", input::input)
-        .add_debug_method("ld60.diagnostics", profile::diagnostics)
-        .add_debug_method("ld60.vsync", profile::vsync);
+        ));
         info!("Debug port listening on {DEFAULT_ADDR}:{port}");
         if std::env::var_os(KEEP_MOUSE_VARIABLE).is_some() {
             let world = app.world_mut();
@@ -60,11 +109,11 @@ impl Plugin for DebugPortPlugin {
     }
 }
 
-/// Registers `ld60.*` methods on the debug port, if it is running.
+/// Registers `ld60.*` methods, if [`DebugPortPlugin`] is added.
 pub trait DebugMethods {
     fn add_debug_method<M>(
         &mut self,
-        name: &str,
+        method: DebugMethod,
         handler: impl IntoSystem<In<Option<Value>>, BrpResult, M> + 'static,
     ) -> &mut Self;
 }
@@ -72,14 +121,18 @@ pub trait DebugMethods {
 impl DebugMethods for App {
     fn add_debug_method<M>(
         &mut self,
-        name: &str,
+        method: DebugMethod,
         handler: impl IntoSystem<In<Option<Value>>, BrpResult, M> + 'static,
     ) -> &mut Self {
-        if self.world().contains_resource::<RemoteMethods>() {
-            let id = self.world_mut().register_system(handler);
-            self.world_mut()
-                .resource_mut::<RemoteMethods>()
-                .insert(name, RemoteMethodSystemId::Instant(id));
+        if !self.world().contains_resource::<RemoteMethods>() {
+            return self;
+        }
+        let id = self.world_mut().register_system(handler);
+        self.world_mut()
+            .resource_mut::<RemoteMethods>()
+            .insert(method.name(), RemoteMethodSystemId::Instant(id));
+        if let Some(mut list) = self.world_mut().get_resource_mut::<DebugMethodList>() {
+            list.insert(method);
         }
         self
     }

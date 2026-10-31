@@ -18,8 +18,17 @@ impl Plugin for DownwashPlugin {
         app.init_resource::<Downwash>();
         #[cfg(feature = "debug_port")]
         {
-            use ld60_game_core::debug_port::DebugMethods;
-            app.add_debug_method("ld60.wind", Downwash::debug_wind);
+            use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
+            app.add_debug_method(
+                DebugMethod::new(
+                    "ld60.wind",
+                    "Holds a jet of air blowing down. Without parameters the jets go.",
+                )
+                .param("at", ParamKind::Numbers, "x,y,z where it blows from")
+                .param("speed", ParamKind::Numbers, "meters per second")
+                .param("radius", ParamKind::Numbers, "meters"),
+                Downwash::debug_wind,
+            );
         }
     }
 }

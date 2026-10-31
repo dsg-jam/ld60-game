@@ -11,7 +11,7 @@ use bevy::{
     prelude::*,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::state::AppState;
 
@@ -35,8 +35,18 @@ impl Plugin for FocusPlugin {
             .add_observer(FocusTarget::make_clickable)
             .add_observer(FocusTarget::focus_on_press);
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.focus", Focused::debug_focus)
-            .add_debug_method("ld60.state", Focus::debug_state);
+        app.add_debug_method(
+            DebugMethod::new("ld60.focus", "Focuses a named thing, or desk to sit back.").param(
+                "target",
+                ParamKind::Text,
+                "a name, see ld60.state",
+            ),
+            Focused::debug_focus,
+        )
+        .add_debug_method(
+            DebugMethod::new("ld60.state", "Returns the game state, focus and cursor."),
+            Focus::debug_state,
+        );
     }
 }
 

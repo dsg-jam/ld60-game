@@ -9,7 +9,7 @@ use bevy::{
     prelude::*,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_player::focus::{ClickTool, Clickable, Focused, Prompting};
 use ld60_geometry::block::Block;
@@ -93,7 +93,18 @@ impl Plugin for CasingPlugin {
         .add_observer(Board::press)
         .add_observer(Header::press);
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.device", Casing::debug_device);
+        app.add_debug_method(
+            DebugMethod::new("ld60.device", "Works the devices as the player would.")
+                .param("open", ParamKind::Flag, "opens or closes the cover")
+                .param("plugged", ParamKind::Flag, "plugs the cable in or pulls it")
+                .param(
+                    "turn",
+                    ParamKind::Numbers,
+                    "x,y,z degrees for a held device",
+                )
+                .param("screw", ParamKind::Numbers, "turns this screw in or out"),
+            Casing::debug_device,
+        );
     }
 }
 
