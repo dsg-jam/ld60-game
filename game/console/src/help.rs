@@ -39,6 +39,7 @@ impl fmt::Display for Help<'_> {
                         ParamKind::Flag => format!("{} | {}=false", param.name, param.name),
                         ParamKind::Numbers => format!("{}=1,2,3", param.name),
                         ParamKind::Text => format!("{}=\"...\"", param.name),
+                        ParamKind::Listed(_) => format!("{}=NAME", param.name),
                         ParamKind::Choice(choices) => {
                             format!("{}={}", param.name, choices.join("|"))
                         }

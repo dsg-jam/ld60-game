@@ -20,7 +20,7 @@ pub struct Param {
 }
 
 /// The JSON value a [`Param`] takes.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub enum ParamKind {
     /// `true` or `false`.
     Flag,
@@ -30,11 +30,14 @@ pub enum ParamKind {
     Text,
     /// One of these strings.
     Choice(&'static [&'static str]),
+    /// A string, one of the names this finds in the world, like the
+    /// things that can be focused. The console offers them on Tab.
+    Listed(fn(&mut World) -> Vec<String>),
 }
 
 /// Every [`DebugMethod`] registered with
 /// [`DebugMethods::add_debug_method`](super::DebugMethods::add_debug_method).
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Clone, Debug, Default)]
 pub struct DebugMethodList(Vec<DebugMethod>);
 
 impl DebugMethod {

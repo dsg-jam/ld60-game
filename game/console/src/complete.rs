@@ -1,4 +1,5 @@
-use ld60_game_core::debug_port::{DebugMethodList, ParamKind};
+use bevy::prelude::*;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethodList, ParamKind};
 
 use super::line::{Call, words};
 
@@ -15,12 +16,13 @@ pub(crate) struct Completion {
 }
 
 impl Completion {
-    pub(crate) fn of(line: &str, methods: &DebugMethodList) -> Self {
-        let partial = line.rsplit(char::is_whitespace).next().unwrap_or_default();
-        let head = &line[..line.len() - partial.len()];
-        let options: Vec<String> = Self::candidates(head, partial, methods)
+    /// Completes the end of `line`. `list` finds the names of a
+    /// [`ParamKind::Listed`] parameter.
+    pub(crate) fn of(line: &str, methods: &DebugMethodList, list: &mut Lister) -> Self {
+        let (head, partial) = line.split_at(last_word(line));
+        let options: Vec<String> = Self::candidates(head, partial, methods, list)
             .into_iter()
-            .filter(|option| option.starts_with(partial))
+            .filter(|option| unquoted(option).starts_with(&unquoted(partial)))
             .collect();
         let line = match options.as_slice() {
             [] => line.to_owned(),
@@ -50,7 +52,12 @@ impl Completion {
 
     /// Every word that could stand after `head`, which ends in a space or
     /// is empty.
-    fn candidates(head: &str, partial: &str, methods: &DebugMethodList) -> Vec<String> {
+    fn candidates(
+        head: &str,
+        partial: &str,
+        methods: &DebugMethodList,
+        list: &mut Lister,
+    ) -> Vec<String> {
         let Ok(before) = words(head) else {
             return Vec::new();
         };
@@ -77,24 +84,22 @@ impl Completion {
             return Vec::new();
         };
         if let Some((name, _)) = partial.split_once('=') {
-            let values: &[&str] = match method.params().iter().find(|param| param.name == name) {
-                Some(param) => match param.kind {
-                    ParamKind::Choice(choices) => choices,
-                    ParamKind::Flag => &["true", "false"],
-                    ParamKind::Numbers | ParamKind::Text => &[],
-                },
-                None => &[],
-            };
-            return values
+            return method
+                .params()
                 .iter()
+                .find(|param| param.name == name)
+                .map(|param| Self::values(param.kind, list))
+                .unwrap_or_default()
+                .into_iter()
                 .map(|value| format!("{name}={value}"))
                 .collect();
         }
-        let set: Vec<&str> = before[1..]
+        let set = Self::set(method, &before[1..]);
+        let next = method
+            .params()
             .iter()
-            .map(|word| word.split_once('=').map_or(word.as_str(), |(name, _)| name))
-            .collect();
-        method
+            .find(|param| !matches!(param.kind, ParamKind::Flag) && !set.contains(&param.name));
+        let mut options: Vec<String> = method
             .params()
             .iter()
             .filter(|param| !set.contains(&param.name))
@@ -102,8 +107,85 @@ impl Completion {
                 ParamKind::Flag => param.name.to_owned(),
                 _ => format!("{}=", param.name),
             })
+            .collect();
+        if let Some(next) = next {
+            options.extend(Self::values(next.kind, list));
+        }
+        options
+    }
+
+    /// The parameters of `method` that `words` set, as [`Call::parse`]
+    /// reads them.
+    fn set(method: &DebugMethod, words: &[String]) -> Vec<&'static str> {
+        let mut set = Vec::new();
+        for word in words {
+            let name = match word.split_once('=') {
+                Some((name, _)) => method
+                    .params()
+                    .iter()
+                    .find(|param| param.name == name)
+                    .map(|param| param.name),
+                None => method
+                    .params()
+                    .iter()
+                    .find(|param| matches!(param.kind, ParamKind::Flag) && param.name == word)
+                    .or_else(|| {
+                        method.params().iter().find(|param| {
+                            !matches!(param.kind, ParamKind::Flag) && !set.contains(&param.name)
+                        })
+                    })
+                    .map(|param| param.name),
+            };
+            set.extend(name);
+        }
+        set
+    }
+
+    /// The values a parameter of `kind` can have, quoted where they have
+    /// spaces.
+    fn values(kind: ParamKind, list: &mut Lister) -> Vec<String> {
+        let values = match kind {
+            ParamKind::Choice(choices) => choices.iter().map(|&choice| choice.to_owned()).collect(),
+            ParamKind::Flag => vec!["true".to_owned(), "false".to_owned()],
+            ParamKind::Listed(names) => list(names),
+            ParamKind::Numbers | ParamKind::Text => Vec::new(),
+        };
+        values
+            .into_iter()
+            .map(|value| {
+                if value.contains(char::is_whitespace) {
+                    format!("\"{value}\"")
+                } else {
+                    value
+                }
+            })
             .collect()
     }
+}
+
+/// Finds the names of a [`ParamKind::Listed`] parameter with its function.
+pub(crate) type Lister<'a> = dyn FnMut(fn(&mut World) -> Vec<String>) -> Vec<String> + 'a;
+
+/// Where the last word of `line` starts: after the last space outside of
+/// quotes.
+fn last_word(line: &str) -> usize {
+    let mut quote = None;
+    let mut start = 0;
+    for (index, c) in line.char_indices() {
+        match (quote, c) {
+            (Some(open), c) if c == open => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'') => quote = Some(c),
+            (None, c) if c.is_whitespace() => start = index + c.len_utf8(),
+            (None, _) => {}
+        }
+    }
+    start
+}
+
+/// `word` without its quotes.
+fn unquoted(word: &str) -> String {
+    word.replace('"', "")
 }
 
 #[cfg(test)]
@@ -112,7 +194,13 @@ mod tests {
     use super::*;
 
     fn complete(line: &str) -> Completion {
-        Completion::of(line, &methods())
+        Completion::of(line, &methods(), &mut |_| {
+            vec![
+                "shop manuals".to_owned(),
+                "shop sign".to_owned(),
+                "device".to_owned(),
+            ]
+        })
     }
 
     #[test]
@@ -129,7 +217,21 @@ mod tests {
         let completion = complete("device ");
         assert_eq!(completion.line, "device ");
         assert_eq!(completion.options, ["open", "turn=", "screw="]);
-        assert_eq!(complete("").options, ["help", "clear", "device", "editor"]);
+        assert_eq!(
+            complete("").options,
+            ["help", "clear", "device", "editor", "focus"]
+        );
+    }
+
+    #[test]
+    fn names_from_the_world_are_offered_and_quoted() {
+        assert_eq!(complete("focus d").line, "focus device ");
+        assert_eq!(complete("focus target=sh").line, "focus target=\"shop ");
+        assert_eq!(
+            complete("focus target=\"shop m").line,
+            "focus target=\"shop manuals\" "
+        );
+        assert_eq!(complete("focus shop m").line, "focus shop m");
     }
 
     #[test]

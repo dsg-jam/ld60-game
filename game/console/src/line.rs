@@ -105,13 +105,13 @@ impl Call {
         let params = spec.params();
         if let Some(flag) = params
             .iter()
-            .find(|param| param.kind == ParamKind::Flag && param.name == word)
+            .find(|param| matches!(param.kind, ParamKind::Flag) && param.name == word)
         {
             return Some((flag.name, true));
         }
         params
             .iter()
-            .find(|param| param.kind != ParamKind::Flag && !set.contains_key(param.name))
+            .find(|param| !matches!(param.kind, ParamKind::Flag) && !set.contains_key(param.name))
             .map(|param| (param.name, false))
     }
 
@@ -139,7 +139,7 @@ impl Call {
             }
             Some(ParamKind::Numbers) => numbers()
                 .ok_or_else(|| error(|param, value| LineError::NotNumbers { param, value })),
-            Some(ParamKind::Text) => Ok(Value::String(value.into())),
+            Some(ParamKind::Text | ParamKind::Listed(_)) => Ok(Value::String(value.into())),
             Some(ParamKind::Choice(choices)) => choices
                 .contains(&value)
                 .then(|| Value::String(value.into()))
@@ -220,6 +220,11 @@ pub(crate) mod tests {
             DebugMethod::new("ld60.editor", "").param(
                 "history",
                 ParamKind::Choice(&["undo", "redo"]),
+                "",
+            ),
+            DebugMethod::new("ld60.focus", "").param(
+                "target",
+                ParamKind::Listed(|_| Vec::new()),
                 "",
             ),
         ]

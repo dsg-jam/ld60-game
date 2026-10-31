@@ -21,7 +21,7 @@ pub(super) fn register(app: &mut App) {
         .param("skip", ParamKind::Numbers, "settles this many jobs as paid")
         .param(
             "level",
-            ParamKind::Text,
+            ParamKind::Listed(level_folders),
             "puts this level folder on the bench",
         )
         .param("levels", ParamKind::Flag, "lists the level folders")
@@ -38,6 +38,19 @@ pub(super) fn register(app: &mut App) {
         .param("ticks", ParamKind::Numbers, "how far, 40 is a whole cycle"),
         clock,
     );
+}
+
+/// The level folders `level` takes.
+fn level_folders(world: &mut World) -> Vec<String> {
+    world
+        .get_resource::<Levels>()
+        .map_or_else(Vec::new, |levels| {
+            levels
+                .levels()
+                .iter()
+                .map(|source| source.path.clone())
+                .collect()
+        })
 }
 
 fn invalid(message: impl Into<String>) -> BrpError {

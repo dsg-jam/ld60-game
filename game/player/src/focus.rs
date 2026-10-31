@@ -38,8 +38,8 @@ impl Plugin for FocusPlugin {
         app.add_debug_method(
             DebugMethod::new("ld60.focus", "Focuses a named thing, or desk to sit back.").param(
                 "target",
-                ParamKind::Text,
-                "a name, see ld60.state",
+                ParamKind::Listed(Focused::debug_targets),
+                "a name, Tab lists them",
             ),
             Focused::debug_focus,
         )
@@ -296,6 +296,17 @@ impl Focused {
         } else {
             focused.leave(&mut next);
         }
+    }
+
+    /// The names `ld60.focus` takes.
+    #[cfg(feature = "debug_port")]
+    fn debug_targets(world: &mut World) -> Vec<String> {
+        let mut targets = world.query_filtered::<&Name, With<FocusTarget>>();
+        targets
+            .iter(world)
+            .map(|name| name.as_str().to_owned())
+            .chain(["desk".to_owned()])
+            .collect()
     }
 
     /// `ld60.focus { "target": "<name>" }` focuses the named entity.

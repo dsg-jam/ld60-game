@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::mem;
 
 use bevy::ecs::message::MessageCursor;
 use bevy::input::ButtonState;
@@ -36,6 +37,8 @@ pub(crate) struct Console {
     /// The history entry shown with Up and Down.
     browsing: Option<usize>,
     pending: Vec<String>,
+    /// Tab was pressed. Completing may look up names in the world.
+    complete: bool,
 }
 
 impl Console {
@@ -47,7 +50,6 @@ impl Console {
         mut cursor: Local<MessageCursor<KeyboardInput>>,
         mut codes: ResMut<ButtonInput<KeyCode>>,
         mut keys: ResMut<ButtonInput<Key>>,
-        methods: Res<DebugMethodList>,
         mut console: ResMut<Console>,
     ) {
         let inputs: Vec<KeyboardInput> = cursor.read(&messages).cloned().collect();
@@ -63,7 +65,7 @@ impl Console {
                 continue;
             }
             if console.open {
-                console.press(&input, &methods);
+                console.press(&input);
             }
         }
         if was_open || console.open {
@@ -73,9 +75,20 @@ impl Console {
         }
     }
 
-    /// Runs the lines entered since the last frame.
+    /// Completes the line and runs the lines entered since the last frame.
     pub(crate) fn run(world: &mut World) {
-        let pending = std::mem::take(&mut world.resource_mut::<Console>().pending);
+        if mem::take(&mut world.resource_mut::<Console>().complete) {
+            let methods = world.resource::<DebugMethodList>().clone();
+            let line = world.resource::<Console>().line.clone();
+            let completion = Completion::of(&line, &methods, &mut |names| names(world));
+            let mut console = world.resource_mut::<Console>();
+            if !completion.options.is_empty() {
+                console.print(&completion.options.join("  "));
+            }
+            console.caret = completion.line.len();
+            console.line = completion.line;
+        }
+        let pending = mem::take(&mut world.resource_mut::<Console>().pending);
         for line in pending {
             let output = Self::execute(world, &line);
             let mut console = world.resource_mut::<Console>();
@@ -92,19 +105,11 @@ impl Console {
         self.output.iter().take(shown).map(String::as_str)
     }
 
-    fn press(&mut self, input: &KeyboardInput, methods: &DebugMethodList) {
+    fn press(&mut self, input: &KeyboardInput) {
         match &input.logical_key {
             Key::Enter => self.submit(),
             Key::Escape => self.open = false,
-            Key::Tab => {
-                self.caret = self.line.len();
-                let completion = Completion::of(&self.line, methods);
-                if !completion.options.is_empty() {
-                    self.print(&completion.options.join("  "));
-                }
-                self.line = completion.line;
-                self.caret = self.line.len();
-            }
+            Key::Tab => self.complete = true,
             Key::Backspace => {
                 if let Some(c) = self.line[..self.caret].chars().next_back() {
                     self.caret -= c.len_utf8();
@@ -147,7 +152,7 @@ impl Console {
     }
 
     fn submit(&mut self) {
-        let line = std::mem::take(&mut self.line);
+        let line = mem::take(&mut self.line);
         self.caret = 0;
         self.browsing = None;
         self.scroll = 0;
