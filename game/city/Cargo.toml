@@ -23,6 +23,7 @@ ld60-game-audio = { workspace = true }
 ld60-game-core = { workspace = true }
 ld60-game-parts = { workspace = true }
 ld60-game-player = { workspace = true }
+ld60-game-props = { workspace = true }
 ld60-geometry = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true, features = ["std"], optional = true }

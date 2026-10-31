@@ -3,6 +3,7 @@ use std::ops::Range;
 use bevy::prelude::*;
 use ld60_game_core::layout::shop;
 use ld60_game_parts::script::Word;
+use ld60_game_props::Theme;
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -32,6 +33,18 @@ const COUNTER_SETBACK: f32 = 0.4;
 const SHELF_DEPTH: f32 = 0.45;
 const SHELF_BOARDS: [f32; 4] = [0.9, 1.5, 2.1, 2.7];
 const BOARD: f32 = 0.03;
+/// How high things are piled on the top board.
+const ON_TOP: f32 = 0.5;
+/// What the stalls near the shop keep on their shelves, from the bottom
+/// board up: repairs like ours, parts, paper and records, and junk.
+const TRADES: [[Theme; 4]; 4] = [
+    [Theme::Stock, Theme::Salvage, Theme::Parts, Theme::Stock],
+    [Theme::Stock, Theme::Parts, Theme::Parts, Theme::Stock],
+    [Theme::Stock, Theme::Papers, Theme::Papers, Theme::Stock],
+    [Theme::Stock, Theme::Salvage, Theme::Salvage, Theme::Stock],
+];
+/// Of the stalls near the shop, how many sell other goods.
+const OTHER_GOODS_CHANCE: f64 = 0.4;
 
 const AWNING_CHANCE: f64 = 0.65;
 const STOOL_CHANCE: f64 = 0.25;
@@ -298,13 +311,30 @@ impl Bay {
         stall.spawn(kit.cuboid(&top, stock.metal.clone()));
         Self::spawn_goods(stall, kit, stock, &top, rng);
 
-        for &height in &SHELF_BOARDS {
+        // Stalls near the shop keep the same things as the shop, seen from
+        // afar.
+        let trade = (lit && !rng.random_bool(OTHER_GOODS_CHANCE)).then(|| *TRADES.pick(rng));
+        for (index, &height) in SHELF_BOARDS.iter().enumerate() {
             let board = Block::between(
                 Vec3::new(-inner, height - BOARD, -STALL_DEPTH),
                 Vec3::new(inner, height, -STALL_DEPTH + SHELF_DEPTH),
             );
             stall.spawn(kit.cuboid(&board, stock.metal.clone()));
-            Self::spawn_goods(stall, kit, stock, &board, rng);
+            let Some(trade) = trade else {
+                Self::spawn_goods(stall, kit, stock, &board, rng);
+                continue;
+            };
+            let above = SHELF_BOARDS
+                .get(index + 1)
+                .map_or(ON_TOP, |next| next - BOARD - height);
+            let room = board.size.with_y(above);
+            let seed = rng.random();
+            stall
+                .spawn((
+                    Transform::from_translation(board.center.with_y(board.max().y)),
+                    Visibility::default(),
+                ))
+                .with_children(|on_board| trade[index].fill_rough(seed, room, on_board));
         }
 
         // A lamp hanging from the ceiling on its cord.

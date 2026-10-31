@@ -3650,6 +3650,7 @@ dependencies = [
  "ld60-game-core",
  "ld60-game-parts",
  "ld60-game-player",
+ "ld60-game-props",
  "ld60-geometry",
  "rand",
  "serde_json",
