@@ -1,3 +1,5 @@
+mod art;
+
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::platform::collections::HashMap;
@@ -6,6 +8,8 @@ use ld60_game_parts::pcb::{Pad, Pcb, PcbArt, PcbMaterial, Router};
 use ld60_geometry::block::Block;
 use ld60_locale::{Locale, Message};
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
+
+use self::art::{ArtJob, ArtJobs};
 
 /// Thickness of the board.
 pub(super) const THICKNESS: f32 = 0.0012;
@@ -123,9 +127,26 @@ pub(super) struct SilkWords {
 }
 
 /// The faces of the boards made so far, since routing one takes a while.
-/// Boards of one revision come off the same artwork.
+/// Boards of one revision come off the same artwork. A new one is drawn
+/// over a few frames and shows a bare board until then.
 #[derive(Resource, Default)]
-pub(super) struct BoardArts(HashMap<(u64, String, SilkWords), Handle<PcbMaterial>>);
+pub(super) struct BoardArts {
+    materials: HashMap<(u64, String, SilkWords), Handle<PcbMaterial>>,
+    jobs: ArtJobs,
+}
+
+impl BoardArts {
+    /// Draws on the faces that are not done yet, for a little while.
+    pub(super) fn work(
+        mut arts: ResMut<BoardArts>,
+        mut images: ResMut<Assets<Image>>,
+        mut pcbs: ResMut<Assets<PcbMaterial>>,
+    ) {
+        if !arts.jobs.is_empty() {
+            arts.jobs.work(&mut images, &mut pcbs);
+        }
+    }
+}
 
 impl SilkWords {
     pub(super) fn new(locale: &Locale) -> Self {
@@ -283,10 +304,14 @@ impl BoardLayout {
         pcbs: &mut Assets<PcbMaterial>,
     ) -> [(Mesh3d, MeshMaterial3d<PcbMaterial>, Transform); 2] {
         let mesh = Mesh3d(meshes.add(Rectangle::from_size(self.board.size.xz())));
-        let material = arts
-            .0
+        let BoardArts { materials, jobs } = arts;
+        let material = materials
             .entry((self.seed, name.to_owned(), words.clone()))
-            .or_insert_with(|| pcbs.add(Pcb::material(images.add(self.art(name, words).image()))))
+            .or_insert_with(|| {
+                let bare = pcbs.add(Pcb::material(images.add(PcbArt::new(Vec2::ZERO).image())));
+                jobs.push(self.art(name, words), bare.clone());
+                bare
+            })
             .clone();
         let material = MeshMaterial3d(material);
         // Faces up, with the art at the same place as on the face.
@@ -528,8 +553,10 @@ impl BoardLayout {
         pads
     }
 
-    /// Draws the board: every trace runs between two pads of its net.
-    fn art(&self, name: &str, words: &SilkWords) -> PcbArt {
+    /// The drawing of the board: every trace runs between two pads of its
+    /// net. The pads, the holes and the print go on at once, the traces
+    /// later.
+    fn art(&self, name: &str, words: &SilkWords) -> ArtJob {
         let size = self.board.size.xz();
         let mut art = PcbArt::new(size);
         let mut router = Router::new(size, PITCH, 0.0015);
@@ -538,13 +565,13 @@ impl BoardLayout {
             art.via(self.to_art(screw), SCREW_RING, SCREW_HOLE);
         }
         let pads = self.pads();
-        let routed: Vec<(Pad, Vec2, Vec2, Option<Net>)> = pads
+        let routed: Vec<(Pad, Vec2, Option<Net>)> = pads
             .iter()
             .enumerate()
             .map(|(index, &(center, size, net))| {
                 let pad = router.pad(center, size, index as u32);
                 art.pad(center, size);
-                (pad, center, size, net)
+                (pad, center, net)
             })
             .collect();
 
@@ -556,31 +583,16 @@ impl BoardLayout {
         }
         // Signals first, so power, which can go round, does not wall them in.
         nets.sort_by_key(|net| matches!(net, Net::Power | Net::Ground));
-        let mut rng = SmallRng::seed_from_u64(self.seed ^ 0x5a5a);
-        for net in nets {
-            let members: Vec<_> = routed.iter().filter(|pad| pad.3 == Some(net)).collect();
-            let Some((&first, rest)) = members.split_first() else {
-                continue;
-            };
-            router.seed(first.0, net.id());
-            let mut joined = vec![first.1];
-            for &&(pad, center, ..) in rest {
-                if let Some(path) = router.route(pad, center, net.id(), &joined) {
-                    art.trace(&path, net.width());
-                    // Power and ground go down to the planes inside here
-                    // and there.
-                    if matches!(net, Net::Power | Net::Ground)
-                        && path.len() > 2
-                        && rng.random_bool(0.5)
-                    {
-                        art.via(path[path.len() / 2], 0.0005, 0.00025);
-                    }
-                    joined.push(center);
-                }
-            }
-        }
+        let nets = nets.into_iter().map(|net| {
+            let members = routed
+                .iter()
+                .filter(|pad| pad.2 == Some(net))
+                .map(|&(pad, center, _)| (pad, center))
+                .collect();
+            (net, members)
+        });
         self.print(&mut art, name, words);
-        art
+        ArtJob::new(art, router, nets, self.seed ^ 0x5a5a)
     }
 
     /// The silkscreen: outlines, names of the parts and of the board. Each
@@ -736,6 +748,8 @@ impl BoardLayout {
 
 #[cfg(test)]
 mod tests {
+    use bevy::platform::time::Instant;
+
     use super::*;
 
     #[test]
@@ -783,6 +797,26 @@ mod tests {
         };
         assert_ne!(material(&other), first);
         assert_eq!(images.len(), 2);
+    }
+
+    #[test]
+    fn a_board_drawn_over_many_frames_comes_out_the_same() {
+        let words = SilkWords::new(&Locale::on_disk());
+        let at_once = layout()
+            .art("PCB 1A", &words)
+            .work(Instant::now() + std::time::Duration::from_secs(60))
+            .unwrap();
+        let mut job = layout().art("PCB 1A", &words);
+        let mut frames = 0;
+        let in_steps = loop {
+            frames += 1;
+            if let Some(image) = job.work(Instant::now()) {
+                break image;
+            }
+        };
+        assert!(frames > 10, "{frames}");
+        assert_eq!(in_steps.data, at_once.data);
+        assert!(at_once.data.unwrap().chunks(4).any(|texel| texel[0] > 0));
     }
 
     #[test]

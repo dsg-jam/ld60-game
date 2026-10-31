@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::mem;
+use std::task::Poll;
 
 use bevy::prelude::*;
 
@@ -50,6 +51,18 @@ struct Search {
     /// The round that reached each cell in [`Router::reaches`].
     flooded: Vec<u32>,
     round: u32,
+}
+
+/// A trace that is being searched for, a few steps at a time, see
+/// [`Router::start`].
+#[derive(Debug)]
+pub struct Routing {
+    from: Pad,
+    start: Vec2,
+    net: u32,
+    goals: Vec<IVec2>,
+    /// States to look at next, cheapest guess first.
+    open: BinaryHeap<Reverse<(u32, usize)>>,
 }
 
 /// A pad that a trace can start from, see [`Router::pad`].
@@ -114,22 +127,49 @@ impl Router {
         net: u32,
         targets: &[Vec2],
     ) -> Option<Vec<Vec2>> {
+        let mut routing = self.start(from, start, net, targets)?;
+        loop {
+            if let Poll::Ready(path) = self.search(&mut routing, usize::MAX) {
+                return path;
+            }
+        }
+    }
+
+    /// Starts to look for the trace of [`Self::route`], which
+    /// [`Self::search`] goes on with. Returns nothing if the way is blocked.
+    /// Only one routing of a router may go on at a time.
+    pub fn start(&mut self, from: Pad, start: Vec2, net: u32, targets: &[Vec2]) -> Option<Routing> {
         let start_cell = self.cell(start)?;
         let goals: Vec<IVec2> = targets.iter().filter_map(|&t| self.cell(t)).collect();
         let mut search = mem::take(&mut self.search);
         search.begin(self.owners.len());
         // A way that is blocked costs the search the whole board, so a
         // cheaper flood over the cells looks first.
-        if !self.reaches(&mut search, start_cell, from, net) {
-            self.search = search;
-            return None;
-        }
-        let mut open = BinaryHeap::new();
+        let reaches = self.reaches(&mut search, start_cell, from, net);
         let first = self.index(start_cell) * (START + 1) + START;
         search.reach(first, 0, u32::MAX);
-        open.push(Reverse((Self::guess(start_cell, &goals), first)));
+        self.search = search;
+        reaches.then(|| Routing {
+            from,
+            start,
+            net,
+            open: BinaryHeap::from([Reverse((Self::guess(start_cell, &goals), first))]),
+            goals,
+        })
+    }
+
+    /// Looks at up to `steps` more states of `routing`. Once it is done,
+    /// returns the corners of the trace, or nothing if the way is blocked.
+    pub fn search(&mut self, routing: &mut Routing, steps: usize) -> Poll<Option<Vec<Vec2>>> {
+        let mut search = mem::take(&mut self.search);
+        let (from, net) = (routing.from, routing.net);
         let mut goal = None;
-        while let Some(Reverse((_, state))) = open.pop() {
+        let mut done = false;
+        for _ in 0..steps {
+            let Some(Reverse((_, state))) = routing.open.pop() else {
+                done = true;
+                break;
+            };
             let (cell_index, heading) = (state / (START + 1), state % (START + 1));
             let cell = IVec2::new(
                 cell_index as i32 % self.cells.x,
@@ -165,9 +205,16 @@ impl Router {
                 let total = here + price;
                 if total < search.cost(next_state) {
                     search.reach(next_state, total, state as u32);
-                    open.push(Reverse((total + Self::guess(next, &goals), next_state)));
+                    routing.open.push(Reverse((
+                        total + Self::guess(next, &routing.goals),
+                        next_state,
+                    )));
                 }
             }
+        }
+        if goal.is_none() && !done {
+            self.search = search;
+            return Poll::Pending;
         }
         let path = goal.map(|mut state| {
             let mut cells = Vec::new();
@@ -181,13 +228,15 @@ impl Router {
             cells
         });
         self.search = search;
-        let mut cells = path?;
+        let Some(mut cells) = path else {
+            return Poll::Ready(None);
+        };
         cells.reverse();
         for &cell in &cells {
             self.owners[cell] = net;
         }
         self.join(from, net);
-        Some(self.corners(start, &cells))
+        Poll::Ready(Some(self.corners(routing.start, &cells)))
     }
 
     /// Whether a trace from `start` can get to `net` at all.
@@ -273,8 +322,18 @@ impl Router {
     }
 
     fn mark(&mut self, center: Vec2, size: Vec2, owner: impl Fn(u32) -> u32) {
-        for y in 0..self.cells.y {
-            for x in 0..self.cells.x {
+        // Only cells within half a pitch of the rectangle are marked.
+        let reach = size / 2.0 + self.pitch;
+        let low = ((center - reach + self.size / 2.0) / self.pitch)
+            .floor()
+            .as_ivec2()
+            .max(IVec2::ZERO);
+        let high = ((center + reach + self.size / 2.0) / self.pitch)
+            .ceil()
+            .as_ivec2()
+            .min(self.cells);
+        for y in low.y..high.y {
+            for x in low.x..high.x {
                 let cell = IVec2::new(x, y);
                 let off = (self.point(cell) - center).abs() - size / 2.0;
                 if off.max_element() <= self.pitch / 2.0 {

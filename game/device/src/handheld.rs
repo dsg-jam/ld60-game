@@ -305,6 +305,7 @@ pub(super) struct HandheldPlugin;
 impl Plugin for HandheldPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BoardArts>()
+            .add_systems(Update, BoardArts::work)
             .add_observer(Handheld::on_add);
     }
 }

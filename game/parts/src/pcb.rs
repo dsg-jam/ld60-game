@@ -9,7 +9,7 @@ use bevy::{
     shader::ShaderRef,
 };
 
-pub use self::router::{Pad, Router};
+pub use self::router::{Pad, Router, Routing};
 use super::dot_matrix::GLYPHS;
 
 /// Mask texels per meter of board.
@@ -46,6 +46,16 @@ pub struct PcbArt {
     texels: UVec2,
     /// Copper, opening and silk per texel, from 0 to 1.
     layers: Vec<[f32; 3]>,
+}
+
+/// The mask texture of a [`PcbArt`] while it is made, see
+/// [`PcbArt::develop`].
+#[derive(Debug)]
+pub struct Developing {
+    art: PcbArt,
+    /// The copper summed along each row, for the blur.
+    rows: Vec<f32>,
+    data: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -165,48 +175,18 @@ impl PcbArt {
     /// The mask texture, with the copper's height smoothed by the mask on
     /// top.
     pub fn image(self) -> Image {
-        let (width, height) = (self.texels.x as i32, self.texels.y as i32);
-        let at = |x: i32, y: i32| (y.clamp(0, height - 1) * width + x.clamp(0, width - 1)) as usize;
-        // The box blur, along the rows first and then down the columns.
-        let rows: Vec<f32> = (0..height)
-            .flat_map(|y| (0..width).map(move |x| (x, y)))
-            .map(|(x, y)| {
-                (-HEIGHT_BLUR..=HEIGHT_BLUR)
-                    .map(|dx| self.layers[at(x + dx, y)][Layer::Copper as usize])
-                    .sum()
-            })
-            .collect();
-        let area = ((2 * HEIGHT_BLUR + 1) * (2 * HEIGHT_BLUR + 1)) as f32;
-        let mut data = Vec::with_capacity(self.layers.len() * 4);
-        for y in 0..height {
-            for x in 0..width {
-                let texel = self.layers[(y * width + x) as usize];
-                let sum: f32 = (-HEIGHT_BLUR..=HEIGHT_BLUR)
-                    .map(|dy| rows[at(x, y + dy)])
-                    .sum();
-                let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
-                // Print never goes onto bare copper or into holes.
-                let silk = texel[2] * (1.0 - texel[1]);
-                data.extend([byte(texel[0]), byte(texel[1]), byte(silk), byte(sum / area)]);
-            }
+        let mut developing = self.develop();
+        while !developing.step(usize::MAX) {}
+        developing.image()
+    }
+
+    /// Starts to make [`Self::image`] a few rows at a time.
+    pub fn develop(self) -> Developing {
+        Developing {
+            rows: Vec::with_capacity(self.layers.len()),
+            data: Vec::with_capacity(self.layers.len() * 4),
+            art: self,
         }
-        let mut image = Image::new(
-            Extent3d {
-                width: self.texels.x,
-                height: self.texels.y,
-                depth_or_array_layers: 1,
-            },
-            TextureDimension::D2,
-            data,
-            TextureFormat::Rgba8Unorm,
-            RenderAssetUsages::RENDER_WORLD,
-        );
-        image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
-            address_mode_u: ImageAddressMode::ClampToEdge,
-            address_mode_v: ImageAddressMode::ClampToEdge,
-            ..ImageSamplerDescriptor::linear()
-        });
-        image
     }
 
     /// Covers `layers` along `path`, `width` wide with round ends.
@@ -281,6 +261,69 @@ impl PcbArt {
                 visit(&mut self.layers[index], point);
             }
         }
+    }
+}
+
+impl Developing {
+    /// Works through up to `rows` more rows, first blurring along them and
+    /// then down the columns. Returns whether the image is done.
+    pub fn step(&mut self, rows: usize) -> bool {
+        let (width, height) = (self.art.texels.x as i32, self.art.texels.y as i32);
+        let at = |x: i32, y: i32| (y.clamp(0, height - 1) * width + x.clamp(0, width - 1)) as usize;
+        let layers = &self.art.layers;
+        let area = ((2 * HEIGHT_BLUR + 1) * (2 * HEIGHT_BLUR + 1)) as f32;
+        for _ in 0..rows {
+            let blurred = self.rows.len() as i32 / width;
+            let written = self.data.len() as i32 / (4 * width);
+            if blurred < height {
+                self.rows.extend((0..width).map(|x| {
+                    (-HEIGHT_BLUR..=HEIGHT_BLUR)
+                        .map(|dx| layers[at(x + dx, blurred)][Layer::Copper as usize])
+                        .sum::<f32>()
+                }));
+            } else if written < height {
+                let y = written;
+                for x in 0..width {
+                    let texel = layers[(y * width + x) as usize];
+                    let sum: f32 = (-HEIGHT_BLUR..=HEIGHT_BLUR)
+                        .map(|dy| self.rows[at(x, y + dy)])
+                        .sum();
+                    let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
+                    // Print never goes onto bare copper or into holes.
+                    let silk = texel[2] * (1.0 - texel[1]);
+                    self.data.extend([
+                        byte(texel[0]),
+                        byte(texel[1]),
+                        byte(silk),
+                        byte(sum / area),
+                    ]);
+                }
+            } else {
+                break;
+            }
+        }
+        self.data.len() == layers.len() * 4
+    }
+
+    /// The finished image, once [`Self::step`] says it is done.
+    pub fn image(self) -> Image {
+        let mut image = Image::new(
+            Extent3d {
+                width: self.art.texels.x,
+                height: self.art.texels.y,
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            self.data,
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
+            address_mode_u: ImageAddressMode::ClampToEdge,
+            address_mode_v: ImageAddressMode::ClampToEdge,
+            ..ImageSamplerDescriptor::linear()
+        });
+        image
     }
 }
 

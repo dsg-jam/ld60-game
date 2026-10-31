@@ -674,7 +674,10 @@ mod tests {
         assert!(screws[0].asleep());
         assert!((2..12).contains(&speeds.len()), "{speeds:?}");
         assert!(speeds[0] > 0.5, "{speeds:?}");
-        assert!(speeds[1..].iter().all(|&speed| speed < speeds[0]), "{speeds:?}");
+        assert!(
+            speeds[1..].iter().all(|&speed| speed < speeds[0]),
+            "{speeds:?}"
+        );
     }
 
     #[test]
