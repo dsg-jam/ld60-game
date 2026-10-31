@@ -64,7 +64,7 @@ impl Screw {
         let Some((_, mut casing, ..)) = click.device(&mut press) else {
             return;
         };
-        let out = casing.loose.get(screw.0) == Some(&false) && casing.turn_screw(screw.0);
+        let out = casing.loose.get(screw.index) == Some(&false) && casing.turn_screw(screw.index);
         // The screwdriver plays the turning, see `Casing::travel`.
         if !out {
             commands.trigger(Play(Sound::Refuse));

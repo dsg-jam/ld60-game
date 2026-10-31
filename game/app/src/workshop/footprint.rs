@@ -209,9 +209,9 @@ mod tests {
             .collect();
         for kind in DeviceKind::ALL {
             let bounds = Block::new(Handheld::body_size(kind));
-            let device = Footprint::new("device", rest, bounds);
+            // The room is around the device, which the screws keep off.
             let screws = room(&bounds, &rest);
-            for other in others.iter().chain([&device]) {
+            for other in &others {
                 assert!(
                     !screws.overlaps(other),
                     "{kind:?} screws roll into {}",

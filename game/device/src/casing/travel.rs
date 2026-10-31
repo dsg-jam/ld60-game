@@ -1,4 +1,4 @@
-use std::f32::consts::{FRAC_PI_2, PI, TAU};
+use std::f32::consts::{PI, TAU};
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
 use ld60_game_audio::{Knock, Play, Sound};
@@ -6,7 +6,7 @@ use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::fall::{Fall, Ground};
-use super::{Aside, Casing, Cover, POCKET, SCREW};
+use super::{Casing, Cover, POCKET, SCREW, Screw};
 use crate::Holdable;
 use crate::thread::Thread;
 
@@ -14,8 +14,8 @@ use crate::thread::Thread;
 const SCREW_TIME: f32 = 1.4;
 /// Shares of [`SCREW_TIME`]. The screwdriver sits on the screw in its hole
 /// until the first and turns it out until the second. The turning takes as
-/// long as the sound of it. Then the screwdriver flicks it off towards the
-/// mat, or carries it back from there on the way in.
+/// long as the sound of it. Then the screwdriver tips it off the device, or
+/// carries it back from the mat on the way in.
 const TURN_FROM: f32 = 0.18;
 const TURN_TO: f32 = 0.48;
 const TURNS: f32 = 3.0;
@@ -25,20 +25,10 @@ const LIFT_TO: f32 = 0.3;
 const LIFT: f32 = 0.015;
 /// How far a screw stays clear of the device on its way to the mat.
 const SCREW_CLEAR: f32 = 0.01;
-/// How high over the mat a screw that was out already is let go, how far
-/// off its place in the row, and how far from lying flat, in meters and
-/// radians.
-const DROP_HEIGHT: f32 = 0.025;
-const DROP_SPREAD: f32 = 0.006;
-const DROP_TILT: f32 = 0.5;
-/// The fastest a screw moves and turns as it is let go, in meters and
-/// radians per second.
-const DROP_SPEED: f32 = 0.12;
-const DROP_SPIN: f32 = 6.0;
-/// How a screw is tipped off the device: how far off straight out to the
-/// nearest edge in radians, how fast in meters per second, and how fast it
-/// topples in radians per second.
-const TIP_TURN: f32 = 0.5;
+/// How a screw is tipped off the device: how much it leans towards the
+/// front, see [`Fall::tipped`], how fast in meters per second, and how fast
+/// it topples in radians per second.
+const TIP_FORWARD: std::ops::Range<f32> = 0.2..0.6;
 const TIP_SPEED: std::ops::Range<f32> = 0.03..0.07;
 const TIP_TOPPLE: std::ops::Range<f32> = 4.0..8.0;
 /// A screw landing this fast, in meters per second, sounds at full volume.
@@ -47,8 +37,8 @@ const TIP_TOPPLE: std::ops::Range<f32> = 4.0..8.0;
 const LOUD_LANDING: f32 = 0.8;
 
 /// The cover of a device, apart from the other parts that move.
-type CoverOnly = (With<Cover>, Without<Casing>, Without<Aside>);
-type AsideOnly = (Without<Casing>, Without<Cover>);
+type CoverOnly = (With<Cover>, Without<Casing>, Without<Screw>);
+type ScrewOnly = (Without<Casing>, Without<Cover>);
 
 /// A screw that the screwdriver turns.
 #[derive(Component, Debug)]
@@ -66,7 +56,7 @@ impl Casing {
         time: Res<Time>,
         mut casings: Query<(&mut Casing, &Transform, &Holdable, &Children)>,
         mut covers: Query<&mut Transform, CoverOnly>,
-        mut asides: Query<(Entity, &mut Aside, &mut Transform, Has<Turning>), AsideOnly>,
+        mut screws: Query<(Entity, &mut Screw, &mut Transform, Has<Turning>), ScrewOnly>,
         mut commands: Commands,
     ) {
         let dt = time.delta_secs();
@@ -95,55 +85,55 @@ impl Casing {
             let rest = *holdable.rest();
             let ground =
                 Ground::of(&casing.bounds, &rest).with_device(*device, rest, casing.bounds);
-            for (index, &screw) in casing.aside.iter().enumerate() {
-                let Ok((entity, mut aside, ..)) = asides.get_mut(screw) else {
+            for &entity in &casing.screws {
+                let Ok((_, mut screw, ..)) = screws.get_mut(entity) else {
                     continue;
                 };
+                let index = screw.index;
                 let goal = if casing.loose[index] { 1.0 } else { 0.0 };
-                let before = aside.progress;
+                let before = screw.progress;
                 let progress = towards(before, goal, dt / SCREW_TIME);
                 if progress != before {
-                    aside.progress = progress;
+                    screw.progress = progress;
                 }
                 // The screw starts to turn, out of its hole or into it.
-                if before <= TURN_FROM && aside.progress > TURN_FROM {
+                if before <= TURN_FROM && progress > TURN_FROM {
                     commands.trigger(Play(Sound::ScrewOut));
-                } else if before >= TURN_TO && aside.progress < TURN_TO {
+                } else if before >= TURN_TO && progress < TURN_TO {
                     commands.trigger(Play(Sound::ScrewIn));
                 }
-                let hole = cover * Transform::from_translation(casing.holes[index]);
                 if goal == 0.0 {
-                    if let Some(fall) = aside.fall.as_mut() {
+                    if let Some(fall) = screw.fall.as_mut() {
                         fall.hold();
                     }
-                    aside.carried |= aside.progress > TURN_TO;
-                    if aside.progress == 0.0 {
-                        aside.fall = None;
-                        aside.carried = false;
+                    screw.carried |= progress > TURN_TO;
+                    if progress == 0.0 {
+                        screw.fall = None;
+                        screw.carried = false;
                     }
-                } else if before == 1.0 && aside.fall.is_none() {
-                    // A screw that was out already, as the device came in,
-                    // lies where it would have landed.
-                    let mut fall =
-                        Self::drop(&casing.bounds, index, &rest, &ground, entity, aside.drops);
-                    fall.settle(&ground);
-                    aside.fall = Some(fall);
-                    aside.drops += 1;
-                } else if before < TURN_TO && aside.progress >= TURN_TO && aside.fall.is_none() {
-                    let (out, _) = screw_pose(TURN_TO, hole, &around, Transform::IDENTITY);
-                    let fall = Self::tip(out, &ground, entity, aside.drops);
-                    aside.fall = Some(fall);
-                    aside.drops += 1;
-                } else if aside.progress == 1.0 {
-                    aside.carried = false;
+                } else if before < TURN_TO && progress >= TURN_TO && screw.fall.is_none() {
+                    let hole = cover * Transform::from_translation(casing.holes[index]);
+                    let (out, _) = screw_pose(TURN_TO, hole, &around, hole);
+                    screw.fall = Some(Self::tip(out, &ground, entity, screw.drops));
+                    screw.drops += 1;
+                } else if progress == 1.0 {
+                    screw.carried = false;
                 }
             }
-            let mut falls: Vec<(Entity, Fall)> = casing
-                .aside
+            let falling: Vec<Entity> = casing
+                .screws
                 .iter()
-                .filter_map(|&screw| Some((screw, asides.get(screw).ok()?.1.fall?)))
+                .copied()
+                .filter(|&entity| {
+                    screws
+                        .get(entity)
+                        .is_ok_and(|(_, screw, ..)| screw.fall.is_some())
+                })
                 .collect();
-            let mut bodies: Vec<Fall> = falls.iter().map(|(_, fall)| *fall).collect();
+            let mut bodies: Vec<Fall> = falling
+                .iter()
+                .filter_map(|&entity| screws.get(entity).ok()?.1.fall)
+                .collect();
             let mut landings = Vec::new();
             Fall::step_all(&mut bodies, &ground, dt, &mut landings);
             for landing in landings {
@@ -153,30 +143,31 @@ impl Casing {
                     level: (landing.speed / LOUD_LANDING).powf(1.2).min(1.0),
                 });
             }
-            for ((screw, fall), body) in falls.iter_mut().zip(bodies) {
-                *fall = body;
-                if let Ok((_, mut aside, ..)) = asides.get_mut(*screw) {
-                    aside.fall = Some(body);
+            for (&entity, body) in falling.iter().zip(bodies) {
+                if let Ok((_, mut screw, ..)) = screws.get_mut(entity) {
+                    screw.fall = Some(body);
                 }
             }
-            for (index, &screw) in casing.aside.iter().enumerate() {
-                let Ok((entity, aside, mut transform, turned)) = asides.get_mut(screw) else {
+            let to_device = device.compute_affine().inverse();
+            for &entity in &casing.screws {
+                let Ok((_, screw, mut transform, turned)) = screws.get_mut(entity) else {
                     continue;
                 };
-                let hole = cover * Transform::from_translation(casing.holes[index]);
-                let (pose, turning) = match aside.fall {
-                    Some(fall) if !aside.carried && aside.progress >= TURN_TO => {
+                let hole = cover * Transform::from_translation(casing.holes[screw.index]);
+                let (pose, turning) = match screw.fall {
+                    Some(fall) if !screw.carried && screw.progress >= TURN_TO => {
                         (fall.pose(), None)
                     }
                     fall => {
-                        let mat = fall.map_or_else(
-                            || Self::aside_at(&casing.bounds, index, &rest),
-                            |fall| fall.pose(),
-                        );
-                        screw_pose(aside.progress, hole, &around, mat)
+                        let mat = fall.map_or(hole, |fall| fall.pose());
+                        screw_pose(screw.progress, hole, &around, mat)
                     }
                 };
-                transform.set_if_neq(pose);
+                // A child of the device, which may move, but placed in the
+                // world.
+                transform.set_if_neq(Transform::from_matrix(Mat4::from(
+                    to_device * pose.compute_affine(),
+                )));
                 match turning {
                     Some(turning) => {
                         commands.entity(entity).insert(turning);
@@ -197,50 +188,9 @@ impl Casing {
         Fall::tipped(
             out,
             ground,
-            rng.random_range(-TIP_TURN..TIP_TURN),
+            rng.random_range(TIP_FORWARD),
             (rng.random_range(TIP_SPEED), rng.random_range(TIP_TOPPLE)),
         )
-    }
-
-    /// How the screw `index` of a device with `bounds` resting at `rest` is
-    /// let go over the mat: a little off its place in the row, turned any
-    /// way, lying on its side, and moving a little. `entity` and `drops`
-    /// pick how.
-    fn drop(
-        bounds: &Block,
-        index: usize,
-        rest: &Transform,
-        ground: &Ground,
-        entity: Entity,
-        drops: u32,
-    ) -> Fall {
-        let mut rng = SmallRng::seed_from_u64(fixed_hash_one(("screw drop", entity, drops)));
-        let place = Self::aside_at(bounds, index, rest);
-        let mut at = place.translation
-            + ground.room.rotation
-                * Vec3::new(
-                    rng.random_range(-DROP_SPREAD..DROP_SPREAD),
-                    0.0,
-                    rng.random_range(-DROP_SPREAD..DROP_SPREAD) / 2.0,
-                );
-        at.y += DROP_HEIGHT;
-        let rotation = Quat::from_rotation_y(rng.random_range(0.0..TAU))
-            * Quat::from_rotation_z(-FRAC_PI_2 + rng.random_range(-DROP_TILT..DROP_TILT))
-            * Quat::from_rotation_y(rng.random_range(0.0..TAU));
-        let heading = rng.random_range(0.0..TAU);
-        let velocity = Vec3::new(heading.cos(), 0.0, heading.sin())
-            * rng.random_range(DROP_SPEED / 3.0..DROP_SPEED);
-        let spin = Vec3::new(
-            rng.random_range(-1.0..1.0),
-            rng.random_range(-1.0..1.0),
-            rng.random_range(-1.0..1.0),
-        ) * DROP_SPIN;
-        Fall::new(
-            Transform::from_translation(at).with_rotation(rotation),
-            velocity,
-            spin,
-        )
-        .walled()
     }
 }
 
