@@ -39,6 +39,8 @@ pub struct Job {
     pub level: Level,
     /// The firmware the device comes in with.
     pub buggy: String,
+    /// The factory fix.
+    fixed: String,
     /// The factory fix, as the bench measures it.
     par: Option<Measure>,
     /// The regular who brought the device, if a regular did.
@@ -117,6 +119,7 @@ impl Job {
             origin,
             level,
             buggy,
+            fixed,
             par,
             visit,
             flashed: false,
@@ -129,6 +132,17 @@ impl Job {
     /// The current job of `run`.
     pub fn for_run(run: &Run, levels: &Levels) -> Result<Self, JobError> {
         Self::new(run.pick(levels), run, levels)
+    }
+
+    /// The hand-written level `source` as the current job of `run`, out of
+    /// turn.
+    pub fn from_level(source: LevelSource, run: &Run, levels: &Levels) -> Result<Self, JobError> {
+        Self::new(Origin::Special(source), run, levels)
+    }
+
+    /// The source of the factory fix.
+    pub fn fixed(&self) -> &str {
+        &self.fixed
     }
 
     /// The instruction set the firmware of this job is written in.
