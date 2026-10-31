@@ -1,5 +1,5 @@
-//! The cloth covered boards of the file and the strips where they bend
-//! into each other.
+//! Cloth covered boards, like the covers of a file, and the strips where
+//! they bend into each other.
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -38,7 +38,7 @@ impl Builder {
 /// A board `size.x` wide from its bound edge at x = 0, `size.y` thick
 /// from y = 0 and `size.z` long around z = 0. The corners of its free edge
 /// are rounded by `corner`.
-pub(super) fn board(size: Vec3, corner: f32) -> Mesh {
+pub fn board(size: Vec3, corner: f32) -> Mesh {
     let half = size.z / 2.0;
     // Around the outline counterclockwise in x and z, each point with the
     // normal of the edge there. The bound corners are sharp, so their
@@ -92,7 +92,7 @@ pub(super) fn board(size: Vec3, corner: f32) -> Mesh {
 /// two boards that meet there at an angle. It reaches `radius` out from
 /// the axis between the angles `from` and `to`, counterclockwise in x and
 /// y, and runs `length` along z. `to` is past `from`.
-pub(super) fn hinge(from: f32, to: f32, radius: f32, length: f32) -> Mesh {
+pub fn hinge(from: f32, to: f32, radius: f32, length: f32) -> Mesh {
     let mut builder = Builder::default();
     let half = length / 2.0;
     let around: Vec<Vec2> = (0..=SEGMENTS)

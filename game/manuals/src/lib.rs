@@ -1,4 +1,3 @@
-mod cloth;
 mod contents;
 mod datasheet;
 mod dividers;
