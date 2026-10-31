@@ -6,6 +6,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::{Prop, label, part, placed, shade};
 
 /// Cloth like the file of manuals on the counter, and others.
@@ -114,6 +115,18 @@ impl Binder {
 impl Prop for Binder {
     fn size(&self) -> Vec3 {
         self.size
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let size = self.size;
+        Rough::cuboid(parent, Block::new(size), self.cloth, Finish::Fabric);
+        let label = Vec2::new((size.x * 0.7).min(0.04), size.y * 0.32);
+        let paper = Block::new(label.extend(0.001)).translated(Vec3::new(
+            0.0,
+            size.y * 0.66 - label.y / 2.0,
+            size.z / 2.0,
+        ));
+        Rough::cuboid(parent, paper, PAGES, Finish::Paper);
     }
 
     fn spawn(&self, parent: &mut ChildSpawnerCommands) {

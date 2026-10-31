@@ -39,6 +39,24 @@ impl Theme {
     /// the middle of the top of the board. The same `seed` fills it the
     /// same way.
     pub fn fill(self, seed: u64, room: Vec3, parent: &mut ChildSpawnerCommands) {
+        self.arrange(seed, room, parent, |group, spot| group.spawn(spot));
+    }
+
+    /// Like [`Self::fill`], with the props as a few plain parts each, for
+    /// shelves seen from afar.
+    pub fn fill_rough(self, seed: u64, room: Vec3, parent: &mut ChildSpawnerCommands) {
+        self.arrange(seed, room, parent, |group, spot| group.spawn_rough(spot));
+    }
+
+    /// Picks groups of props that fit along the board and spawns each with
+    /// `spawn` where it goes.
+    fn arrange(
+        self,
+        seed: u64,
+        room: Vec3,
+        parent: &mut ChildSpawnerCommands,
+        spawn: impl Fn(&Group, &mut ChildSpawnerCommands),
+    ) {
         let mut rng = SmallRng::seed_from_u64(seed);
         let most = Vec3::new(room.x, room.y - CLEAR.x, room.z - CLEAR.y);
         let mut x = -room.x / 2.0 + rng.random_range(GAP);
@@ -58,7 +76,7 @@ impl Theme {
             let back = rng.random_range(0.0..=(most.z - size.z).min(0.03));
             let at = Vec3::new(x + size.x / 2.0, 0.0, -room.z / 2.0 + back + size.z / 2.0);
             placed(parent, Transform::from_translation(at), |spot| {
-                group.spawn(spot);
+                spawn(&group, spot);
             });
             let gap = if rng.random_bool(0.15) { WIDE_GAP } else { GAP };
             x += size.x + rng.random_range(gap);

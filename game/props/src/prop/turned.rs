@@ -22,6 +22,13 @@ impl<P: Prop> Prop for Lying<P> {
             .with_rotation(Quat::from_rotation_z(FRAC_PI_2));
         placed(parent, at, |turned| self.0.spawn(turned));
     }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let size = self.0.size();
+        let at = Transform::from_xyz(size.y / 2.0, size.x / 2.0, 0.0)
+            .with_rotation(Quat::from_rotation_z(FRAC_PI_2));
+        placed(parent, at, |turned| self.0.spawn_rough(turned));
+    }
 }
 
 impl<P: Prop> Prop for Standing<P> {
@@ -35,5 +42,12 @@ impl<P: Prop> Prop for Standing<P> {
         let at = Transform::from_xyz(0.0, size.z / 2.0, -size.y / 2.0)
             .with_rotation(Quat::from_rotation_x(FRAC_PI_2));
         placed(parent, at, |turned| self.0.spawn(turned));
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let size = self.0.size();
+        let at = Transform::from_xyz(0.0, size.z / 2.0, -size.y / 2.0)
+            .with_rotation(Quat::from_rotation_x(FRAC_PI_2));
+        placed(parent, at, |turned| self.0.spawn_rough(turned));
     }
 }

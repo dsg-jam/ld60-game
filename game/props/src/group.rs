@@ -72,6 +72,24 @@ impl Group {
         self.props.is_empty()
     }
 
+    /// Spawns each prop with `spawn` where it goes, with the middle of the
+    /// bottom of the group at the origin.
+    fn place(
+        &self,
+        parent: &mut ChildSpawnerCommands,
+        spawn: impl Fn(&dyn Prop, &mut ChildSpawnerCommands),
+    ) {
+        let middle = (self.min + self.max) / 2.0;
+        let offset = -middle.with_y(self.min.y);
+        for (prop, at) in &self.props {
+            let at = Transform {
+                translation: at.translation + offset,
+                ..*at
+            };
+            placed(parent, at, |spot| spawn(prop.as_ref(), spot));
+        }
+    }
+
     fn add(&mut self, prop: Box<dyn Prop>, at: Transform) {
         let half = prop.size() / 2.0;
         let corners = (0..8).map(|corner| {
@@ -105,14 +123,10 @@ impl Prop for Group {
     }
 
     fn spawn(&self, parent: &mut ChildSpawnerCommands) {
-        let middle = (self.min + self.max) / 2.0;
-        let offset = -middle.with_y(self.min.y);
-        for (prop, at) in &self.props {
-            let at = Transform {
-                translation: at.translation + offset,
-                ..*at
-            };
-            placed(parent, at, |spot| prop.spawn(spot));
-        }
+        self.place(parent, |prop, spot| prop.spawn(spot));
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        self.place(parent, |prop, spot| prop.spawn_rough(spot));
     }
 }

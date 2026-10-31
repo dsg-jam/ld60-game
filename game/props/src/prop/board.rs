@@ -4,6 +4,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::{Prop, part, shade};
 
 const MASKS: [Color; 3] = [
@@ -92,5 +93,10 @@ impl Prop for Board {
                 part(parent, *block, CHIP, Finish::Plastic);
             }
         }
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let board = Block::new(Vec3::new(self.size.x, THICKNESS, self.size.y));
+        Rough::cuboid(parent, board, self.mask, Finish::Plastic);
     }
 }

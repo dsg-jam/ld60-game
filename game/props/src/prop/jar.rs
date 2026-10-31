@@ -4,6 +4,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::{LABEL, Prop, label, shade};
 
 const LIDS: [Color; 4] = [
@@ -86,6 +87,13 @@ impl Prop for Jar {
             self.writing,
         );
     }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let glass = Block::new(self.size - Vec3::new(2.0 * LID_OUT, LID, 2.0 * LID_OUT));
+        Rough::cylinder(parent, glass, self.contents, Finish::Metal);
+        let lid = Block::new(self.size.with_y(LID)).on_top_of(&glass);
+        Rough::cylinder(parent, lid, self.lid, Finish::Plastic);
+    }
 }
 
 impl Prop for Tin {
@@ -99,5 +107,13 @@ impl Prop for Tin {
         let band =
             Block::new(self.size.with_y(self.size.y * 0.6)).translated(Vec3::Y * self.size.y * 0.2);
         parent.spawn((Shape::cylinder(&band, self.print), Finish::Paper));
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let can = Block::new(self.size - Vec3::new(0.002, 0.0, 0.002));
+        Rough::cylinder(parent, can, TIN, Finish::Metal);
+        let band =
+            Block::new(self.size.with_y(self.size.y * 0.6)).translated(Vec3::Y * self.size.y * 0.2);
+        Rough::cylinder(parent, band, self.print, Finish::Paper);
     }
 }

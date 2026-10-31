@@ -39,6 +39,10 @@ pub(crate) trait Prop {
     fn size(&self) -> Vec3;
 
     fn spawn(&self, parent: &mut ChildSpawnerCommands);
+
+    /// Spawns it as a few plain parts, for shelves seen from afar, see
+    /// [`Rough`](super::rough::Rough).
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands);
 }
 
 /// Spawns a box of `color` with `finish` filling `block`.

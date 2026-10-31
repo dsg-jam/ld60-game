@@ -5,6 +5,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::super::writing::{Card, Layout};
 use super::{INK_DEPTH, Prop, label, part, placed, shade};
 
@@ -208,6 +209,37 @@ impl Prop for Carton {
                 )
             }
             _ => self.body,
+        }
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let body = Block::new(self.body);
+        Rough::cuboid(parent, body, self.color, Finish::Paper);
+        match &self.look {
+            Look::Taped { tape, .. } => {
+                let top =
+                    Block::new(Vec3::new(TAPE_WIDTH, TAPE_DEPTH, self.body.z)).on_top_of(&body);
+                Rough::cuboid(parent, top, *tape, Finish::Plastic);
+            }
+            Look::Marked => {}
+            Look::Open { lean, contents } => {
+                let flap = self.flap();
+                for side in [-1.0, 1.0] {
+                    let hinge = Vec3::new(0.0, self.body.y, side * (self.body.z - WALL) / 2.0);
+                    let at = Transform::from_translation(hinge)
+                        .with_rotation(Quat::from_rotation_x(side * lean));
+                    placed(parent, at, |hinged| {
+                        let sheet = Block::new(Vec3::new(self.body.x, flap, WALL));
+                        Rough::cuboid(hinged, sheet, self.color, Finish::Paper);
+                    });
+                }
+                if let Some(contents) = contents {
+                    let lift = (self.body.y * FILLED - contents.size().y).max(WALL);
+                    placed(parent, Transform::from_xyz(0.0, lift, 0.0), |inside| {
+                        contents.spawn_rough(inside);
+                    });
+                }
+            }
         }
     }
 

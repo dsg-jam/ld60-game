@@ -3,6 +3,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::{Board, Prop, part, placed, shade};
 
 const CASES: [Color; 5] = [
@@ -66,6 +67,18 @@ impl Handheld {
 impl Prop for Handheld {
     fn size(&self) -> Vec3 {
         self.size
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let size = self.size;
+        let case = Block::new(size - Vec3::Y * SCREEN_HEIGHT);
+        Rough::cuboid(parent, case, self.case, Finish::Plastic);
+        if !matches!(self.face, Face::Open(_)) {
+            let screen = Block::new(Vec3::new(size.x * 0.75, SCREEN_HEIGHT, size.z * 0.3))
+                .on_top_of(&case)
+                .translated(Vec3::Z * -size.z * 0.22);
+            Rough::cuboid(parent, screen, SCREEN, Finish::Plastic);
+        }
     }
 
     fn spawn(&self, parent: &mut ChildSpawnerCommands) {

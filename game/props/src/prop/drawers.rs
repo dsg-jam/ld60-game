@@ -3,6 +3,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::super::writing::{Card, Layout};
 use super::{INK_DEPTH, LABEL, LABEL_DEPTH, Prop, part, shade};
 
@@ -76,6 +77,18 @@ impl Drawers {
 impl Prop for Drawers {
     fn size(&self) -> Vec3 {
         self.size + Vec3::Z * MOST_OPEN
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        let back = Vec3::Z * -MOST_OPEN / 2.0;
+        let frame = Block::new(self.size).translated(back);
+        Rough::cuboid(parent, frame, self.frame, Finish::Plastic);
+        let fronts = Block::new((self.size.xy() - 2.0 * GAP).extend(FRONT)).translated(Vec3::new(
+            0.0,
+            GAP,
+            frame.max().z + FRONT / 2.0,
+        ));
+        Rough::cuboid(parent, fronts, self.front, Finish::Plastic);
     }
 
     fn spawn(&self, parent: &mut ChildSpawnerCommands) {

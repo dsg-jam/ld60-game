@@ -4,6 +4,7 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::super::rough::Rough;
 use super::{Prop, shade};
 
 const SHEATHS: [Color; 5] = [
@@ -44,5 +45,9 @@ impl Prop for Coil {
             Shape::ring(&Block::new(self.size), self.color),
             Finish::Grip,
         ));
+    }
+
+    fn spawn_rough(&self, parent: &mut ChildSpawnerCommands) {
+        Rough::cylinder(parent, Block::new(self.size), self.color, Finish::Grip);
     }
 }
