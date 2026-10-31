@@ -155,13 +155,14 @@ struct Hole(usize);
 /// between there and its hole.
 #[derive(Component, Debug)]
 struct Aside {
-    /// How far it is on its way from its hole to the mat, from 0 to 1. At 1
-    /// it falls and lies where it lands.
+    /// How far it is on its way between its hole and the mat, from 0 to 1.
+    /// Once it is out of its hole it falls and lies where it lands.
     progress: f32,
-    /// Where it is let go over the mat, and how it moves then.
-    drop: Option<Fall>,
-    /// Where it falls and lies.
+    /// How it falls and where it lies.
     fall: Option<Fall>,
+    /// Whether it is carried between where it lies and its hole, on its
+    /// way back in.
+    carried: bool,
     /// How often it was taken out, which picks how it falls.
     drops: u32,
 }
@@ -410,8 +411,8 @@ impl Casing {
                             Name::new("screw aside"),
                             Aside {
                                 progress: if casing.loose[index] { 1.0 } else { 0.0 },
-                                drop: None,
                                 fall: None,
+                                carried: false,
                                 drops: 0,
                             },
                             Transform::default(),

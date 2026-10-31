@@ -29,11 +29,15 @@ const STILL_TIME: f32 = 0.25;
 const SETTLE_TIME: f32 = 5.0;
 /// Points around each ring of the shape.
 const RING_POINTS: usize = 8;
+/// A screw counts as over the room once its middle is this far inside the
+/// walls.
+const ROOM_INSET: f32 = 0.002;
 
 /// A screw falling onto the counter and rolling to a stop.
 ///
-/// It is one rigid body against the floor, the walls of the room it may
-/// roll in and the other screws, solved as in Müller et al., "Detailed Rigid
+/// It is one rigid body against the floor, the device, the walls of the
+/// room it may roll in once it is over it and the other screws, solved as
+/// in Müller et al., "Detailed Rigid
 /// Body Simulation with Extended Position Based Dynamics" (2020).
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Fall {
@@ -45,6 +49,8 @@ pub(super) struct Fall {
     /// Seconds it has been slow.
     still: f32,
     asleep: bool,
+    /// Whether it has come over the room. Only then do its walls hold it.
+    in_room: bool,
 }
 
 /// What a falling screw lands on and rolls in.
@@ -57,6 +63,8 @@ pub(super) struct Ground {
     /// and its size across the counter.
     pub(super) room: Transform,
     room_size: Vec2,
+    /// The box of the device, where it is, and its size.
+    device: Option<(Transform, Block)>,
 }
 
 /// A contact of a screw against something, for its velocity pass.
@@ -85,7 +93,19 @@ impl Fall {
             spin,
             still: 0.0,
             asleep: false,
+            in_room: false,
         }
+    }
+
+    /// A screw at `pose` tossed so that its middle rises by `rise` and
+    /// comes down on `target`, turning at `spin`.
+    pub(super) fn tossed(pose: Transform, target: Vec3, rise: f32, spin: Vec3) -> Self {
+        let start = pose.transform_point(Self::middle());
+        let up = (2.0 * GRAVITY * rise).sqrt();
+        let fall = (start.y + rise - target.y).max(0.0);
+        let time = up / GRAVITY + (2.0 * fall / GRAVITY).sqrt();
+        let velocity = ((target - start) / time).with_y(up);
+        Self::new(pose, velocity, spin)
     }
 
     /// Where the entity of the screw is.
@@ -240,6 +260,7 @@ impl Fall {
                 screw.rotation = (screw.rotation
                     + Quat::from_xyzw(spin.x, spin.y, spin.z, 0.0) * screw.rotation)
                     .normalize();
+                screw.in_room |= ground.over_room(screw.at);
             }
             let mut contacts = Vec::new();
             for (index, screw) in screws.iter_mut().enumerate() {
@@ -308,11 +329,22 @@ impl Fall {
         if point.y < floor {
             planes.push((Vec3::Y, floor - point.y, true));
         }
+        if let Some((device, bounds)) = &ground.device {
+            let inside = device.rotation.inverse() * (point - device.translation) - bounds.center;
+            let depth = bounds.size / 2.0 - inside.abs();
+            if depth.min_element() > 0.0 {
+                let axis = depth.min_position();
+                let mut out = Vec3::ZERO;
+                out[axis] = inside[axis].signum();
+                let normal = device.rotation * out;
+                planes.push((normal, depth[axis], normal.y > 0.7));
+            }
+        }
         let inside = ground.room.rotation.inverse() * (point - ground.room.translation);
         let half = ground.room_size / 2.0;
         for (axis, size) in [(Vec3::X, half.x), (Vec3::Z, half.y)] {
             let along = inside.dot(axis);
-            if along.abs() > size {
+            if self.in_room && along.abs() > size {
                 let inward = ground.room.rotation * axis * -along.signum();
                 planes.push((inward, along.abs() - size, false));
             }
@@ -455,7 +487,26 @@ impl Ground {
             counter: mat.min().y,
             room,
             room_size,
+            device: None,
         }
+    }
+
+    /// With the box of the device at `device`, `bounds` in its own space.
+    pub(super) fn with_device(self, device: Transform, bounds: Block) -> Self {
+        Self {
+            device: Some((device, bounds)),
+            ..self
+        }
+    }
+
+    /// Whether `point` is over the room, a little inside its walls.
+    fn over_room(&self, point: Vec3) -> bool {
+        let inside = self.room.rotation.inverse() * (point - self.room.translation);
+        inside
+            .xz()
+            .abs()
+            .cmplt(self.room_size / 2.0 - ROOM_INSET)
+            .all()
     }
 
     /// The height of the mat at `point` or, off the mat, of the counter.
@@ -476,6 +527,7 @@ mod tests {
             counter: 1.0,
             room: Transform::from_xyz(0.0, 1.0, 0.0),
             room_size: Vec2::new(0.034, 0.06),
+            device: None,
         }
     }
 
@@ -524,6 +576,33 @@ mod tests {
         assert!(out < 2e-4, "{out} out of the room");
         let axis = screw.rotation * Vec3::Y;
         assert!(axis.y.abs() < 0.4, "standing at {axis}");
+    }
+
+    #[test]
+    fn screws_flicked_off_a_device_land_in_the_room() {
+        let device = Transform::from_xyz(0.05, 1.003, 0.0);
+        let bounds = Block::new(Vec3::new(0.06, 0.02, 0.1));
+        let ground = ground().with_device(device, bounds);
+        let top = device.translation.y + bounds.size.y;
+        // Upright on the device with the head up, as it comes out.
+        let upright = Quat::from_rotation_x(std::f32::consts::PI);
+        for (n, (x, z)) in [0.025, 0.05, 0.075]
+            .into_iter()
+            .flat_map(|x| [-0.04, 0.0, 0.04].map(|z| (x, z)))
+            .enumerate()
+        {
+            let out = Transform::from_xyz(x, top + Thread::SIZE.y, z).with_rotation(upright);
+            let target = Vec3::new(0.0, ground.mat.max().y + 0.002, z * 0.6);
+            let turn = n as f32 * 1.3;
+            let spin = Vec3::new(turn.sin(), turn.cos(), (2.0 * turn).sin()) * 9.0;
+            let mut screws = [Fall::tossed(out, target, 0.012 + 0.001 * n as f32, spin)];
+            run(&mut screws, &ground, 5.0);
+            let screw = &screws[0];
+            assert!(screw.asleep(), "{n}: {screw:?}");
+            let (low, out) = reach(screw, &ground);
+            assert!((low - ground.mat.max().y).abs() < 3e-4, "{n}: lowest point {low}");
+            assert!(out < 3e-4, "{n}: {out} out of the room");
+        }
     }
 
     #[test]

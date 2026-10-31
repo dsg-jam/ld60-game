@@ -10,15 +10,14 @@ use super::{Aside, Casing, Cover, SCREW};
 use crate::Holdable;
 use crate::thread::Thread;
 
-/// Seconds a screw takes from its hole to the mat.
+/// Seconds a screw takes between its hole and the mat.
 const SCREW_TIME: f32 = 1.4;
 /// Shares of [`SCREW_TIME`]. The screwdriver sits on the screw in its hole
-/// until the first, turns it out until the second and holds it until the
-/// third. Then the screw is carried to the mat. The turning takes as long
-/// as the sound of it.
+/// until the first and turns it out until the second. The turning takes as
+/// long as the sound of it. Then the screwdriver flicks it off towards the
+/// mat, or carries it back from there on the way in.
 const TURN_FROM: f32 = 0.18;
 const TURN_TO: f32 = 0.48;
-const LET_GO: f32 = 0.6;
 const TURNS: f32 = 3.0;
 const COVER_TIME: f32 = 0.8;
 /// Share of [`COVER_TIME`] that lifts the cover straight off.
@@ -26,8 +25,9 @@ const LIFT_TO: f32 = 0.3;
 const LIFT: f32 = 0.015;
 /// How far a screw stays clear of the device on its way to the mat.
 const SCREW_CLEAR: f32 = 0.01;
-/// How high over the mat a screw is let go, how far off its place in the
-/// row, and how far from lying flat, in meters and radians.
+/// How high over the mat a screw that was out already is let go, how far
+/// off its place in the row, and how far from lying flat, in meters and
+/// radians.
 const DROP_HEIGHT: f32 = 0.025;
 const DROP_SPREAD: f32 = 0.006;
 const DROP_TILT: f32 = 0.5;
@@ -35,6 +35,10 @@ const DROP_TILT: f32 = 0.5;
 /// radians per second.
 const DROP_SPEED: f32 = 0.12;
 const DROP_SPIN: f32 = 6.0;
+/// How high a flicked screw rises over where it came out, in meters, and
+/// how fast it tumbles, in radians per second.
+const FLICK_RISE: std::ops::Range<f32> = 0.012..0.022;
+const FLICK_SPIN: f32 = 9.0;
 
 /// The cover of a device, apart from the other parts that move.
 type CoverOnly = (With<Cover>, Without<Casing>, Without<Aside>);
@@ -83,7 +87,7 @@ impl Casing {
                 }
             }
             let rest = *holdable.rest();
-            let ground = Ground::of(&casing.bounds, &rest);
+            let ground = Ground::of(&casing.bounds, &rest).with_device(*device, casing.bounds);
             for (index, &screw) in casing.aside.iter().enumerate() {
                 let Ok((entity, mut aside, ..)) = asides.get_mut(screw) else {
                     continue;
@@ -100,30 +104,31 @@ impl Casing {
                 } else if before >= TURN_TO && aside.progress < TURN_TO {
                     commands.trigger(Play(Sound::ScrewIn));
                 }
-                if goal == 1.0 && aside.drop.is_none() {
-                    let drop =
-                        Self::drop(&casing.bounds, index, &rest, &ground, entity, aside.drops);
-                    aside.drop = Some(drop);
-                    aside.drops += 1;
-                }
+                let hole = cover * Transform::from_translation(casing.holes[index]);
                 if goal == 0.0 {
                     if let Some(fall) = aside.fall.as_mut() {
                         fall.hold();
                     }
+                    aside.carried |= aside.progress > TURN_TO;
                     if aside.progress == 0.0 {
-                        aside.drop = None;
                         aside.fall = None;
+                        aside.carried = false;
                     }
-                } else if aside.progress == 1.0 && aside.fall.is_none() {
-                    let mut fall = aside.drop;
+                } else if before == 1.0 && aside.fall.is_none() {
                     // A screw that was out already, as the device came in,
                     // lies where it would have landed.
-                    if before == 1.0
-                        && let Some(fall) = fall.as_mut()
-                    {
-                        fall.settle(&ground);
-                    }
-                    aside.fall = fall;
+                    let mut fall =
+                        Self::drop(&casing.bounds, index, &rest, &ground, entity, aside.drops);
+                    fall.settle(&ground);
+                    aside.fall = Some(fall);
+                    aside.drops += 1;
+                } else if before < TURN_TO && aside.progress >= TURN_TO && aside.fall.is_none() {
+                    let (out, _) = screw_pose(TURN_TO, hole, &around, Transform::IDENTITY);
+                    let fall = Self::flick(out, &casing.bounds, index, &rest, entity, aside.drops);
+                    aside.fall = Some(fall);
+                    aside.drops += 1;
+                } else if aside.progress == 1.0 {
+                    aside.carried = false;
                 }
             }
             let mut falls: Vec<(Entity, Fall)> = casing
@@ -144,11 +149,18 @@ impl Casing {
                     continue;
                 };
                 let hole = cover * Transform::from_translation(casing.holes[index]);
-                let mat = aside.fall.or(aside.drop).map_or_else(
-                    || Self::aside_at(&casing.bounds, index, &rest),
-                    |fall| fall.pose(),
-                );
-                let (pose, turning) = screw_pose(aside.progress, hole, &around, mat);
+                let (pose, turning) = match aside.fall {
+                    Some(fall) if !aside.carried && aside.progress >= TURN_TO => {
+                        (fall.pose(), None)
+                    }
+                    fall => {
+                        let mat = fall.map_or_else(
+                            || Self::aside_at(&casing.bounds, index, &rest),
+                            |fall| fall.pose(),
+                        );
+                        screw_pose(aside.progress, hole, &around, mat)
+                    }
+                };
                 transform.set_if_neq(pose);
                 match turning {
                     Some(turning) => {
@@ -161,6 +173,35 @@ impl Casing {
                 }
             }
         }
+    }
+
+    /// How the screwdriver flicks the screw `index` of a device with
+    /// `bounds` resting at `rest` off the device, from `out` where it came
+    /// out of its hole, so that it lands a little off its place in the row
+    /// on the mat. `entity` and `drops` pick how.
+    fn flick(
+        out: Transform,
+        bounds: &Block,
+        index: usize,
+        rest: &Transform,
+        entity: Entity,
+        drops: u32,
+    ) -> Fall {
+        let mut rng = SmallRng::seed_from_u64(fixed_hash_one(("screw flick", entity, drops)));
+        let place = Self::aside_at(bounds, index, rest);
+        let target = place.translation
+            + place.rotation * Vec3::new(0.0, 0.0, rng.random_range(-DROP_SPREAD..DROP_SPREAD))
+            + Vec3::new(
+                rng.random_range(-DROP_SPREAD..DROP_SPREAD),
+                0.0,
+                rng.random_range(-DROP_SPREAD..DROP_SPREAD),
+            ) / 2.0;
+        let spin = Vec3::new(
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+        ) * FLICK_SPIN;
+        Fall::tossed(out, target, rng.random_range(FLICK_RISE), spin)
     }
 
     /// How the screw `index` of a device with `bounds` resting at `rest` is
@@ -253,10 +294,10 @@ fn screw_pose(
     let pose = around.carry(
         spun,
         mat,
-        ((progress - LET_GO) / (1.0 - LET_GO)).clamp(0.0, 1.0),
+        ((progress - TURN_TO) / (1.0 - TURN_TO)).clamp(0.0, 1.0),
         SCREW_CLEAR,
     );
-    let turning = (progress > 0.0 && progress < LET_GO).then(|| Turning {
+    let turning = (progress > 0.0 && progress <= TURN_TO).then(|| Turning {
         at: out * Transform::from_translation(Vec3::NEG_Y * SCREW.y),
         angle,
     });
@@ -314,7 +355,7 @@ mod tests {
         assert!(turning.is_none());
         let (_, turning) = screw_pose(0.4, hole, &around, mat);
         assert!(turning.is_some());
-        let (out, _) = screw_pose(LET_GO, hole, &around, mat);
+        let (out, _) = screw_pose(TURN_TO, hole, &around, mat);
         assert!((out.translation - hole.translation + Vec3::Y * Thread::SIZE.y).length() < 1e-5);
         let (end, turning) = screw_pose(1.0, hole, &around, mat);
         assert!(end.translation.distance(mat.translation) < 1e-5);
