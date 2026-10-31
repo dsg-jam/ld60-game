@@ -11,7 +11,7 @@ use bevy::{
     text::EditableText,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods};
 use ld60_game_run::job::{Job, JobId};
 use ld60_locale::{Locale, Localized, Message};
 
@@ -45,7 +45,10 @@ impl Plugin for VersionsPlugin {
             .add_observer(Action::run_on_click)
             .add_observer(Perform::apply);
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.versions", Versions::debug_state);
+        app.add_debug_method(
+            DebugMethod::new("ld60.versions", "Returns the versions of the current job."),
+            Versions::debug_state,
+        );
     }
 }
 

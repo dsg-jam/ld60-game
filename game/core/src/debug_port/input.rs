@@ -11,7 +11,33 @@ use bevy::{
 };
 use serde_json::Value;
 
+use super::{DebugMethod, ParamKind};
 use crate::state::KeepMouse;
+
+pub(super) fn method() -> DebugMethod {
+    DebugMethod::new(
+        "ld60.input",
+        "Feeds input into the game as if it came from the window.",
+    )
+    .param("pointer", ParamKind::Numbers, "x,y in logical pixels")
+    .param(
+        "click",
+        ParamKind::Choice(&["left", "right"]),
+        "a mouse button",
+    )
+    .param(
+        "scroll",
+        ParamKind::Numbers,
+        "lines, negative is down, or pixels each",
+    )
+    .param("key", ParamKind::Text, "a KeyCode name, like ArrowRight")
+    .param("text", ParamKind::Text, "types each character")
+    .param(
+        "hold",
+        ParamKind::Choice(&["down", "up"]),
+        "only press or only release",
+    )
+}
 
 /// `ld60.input { "pointer": [x, y], "click": "left", "scroll": -1,
 /// "key": "ArrowRight", "text": "LD M1" }` feeds input into the game as if it

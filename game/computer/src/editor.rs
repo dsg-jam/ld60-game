@@ -32,7 +32,7 @@ use bevy::{
     ui_widgets::TextInput,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_game_player::free_look::MODIFIERS;
 use ld60_game_run::job::{Job, JobId};
@@ -130,9 +130,18 @@ impl Plugin for EditorPlugin {
         .add_observer(Editor::scroll_on_wheel);
         app.add_plugins((page::PagePlugin, versions::VersionsPlugin));
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.editor", Editor::debug_state);
-        #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.notes", Notes::debug_state);
+        app.add_debug_method(
+            DebugMethod::new("ld60.editor", "Returns the source, caret and errors.").param(
+                "history",
+                ParamKind::Choice(&["undo", "redo"]),
+                "steps through the edits",
+            ),
+            Editor::debug_state,
+        )
+        .add_debug_method(
+            DebugMethod::new("ld60.notes", "Returns the text of the notes."),
+            Notes::debug_state,
+        );
     }
 }
 

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 
 /// Wind at street level along X and Z, in meters per second. The rain
 /// drifts with it, and the clouds with the stronger wind up high.
@@ -27,7 +27,12 @@ impl Plugin for WeatherPlugin {
         })
         .add_systems(Update, (Weather::toggle_rain, Weather::settle).chain());
         #[cfg(feature = "debug_port")]
-        app.add_debug_method("ld60.weather", Weather::debug_set);
+        app.add_debug_method(
+            DebugMethod::new("ld60.weather", "Sets the rain and how wet the ground is.")
+                .param("rain", ParamKind::Numbers, "0 to 1")
+                .param("wetness", ParamKind::Numbers, "0 to 1"),
+            Weather::debug_set,
+        );
     }
 }
 

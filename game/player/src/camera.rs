@@ -11,7 +11,7 @@ use bevy::{
     prelude::*,
 };
 #[cfg(feature = "debug_port")]
-use ld60_game_core::debug_port::DebugMethods;
+use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 use ld60_game_core::settings::Settings;
 use ld60_game_core::state::AppState;
 
@@ -85,7 +85,16 @@ impl Plugin for CameraPlugin {
                     .before(bevy::transform::TransformSystems::Propagate)
                     .before(bevy::camera::CameraUpdateSystems),
             )
-            .add_debug_method("ld60.camera", CameraOverride::debug_camera);
+            .add_debug_method(
+                DebugMethod::new(
+                    "ld60.camera",
+                    "Holds the camera. Without parameters it is released.",
+                )
+                .param("eye", ParamKind::Numbers, "x,y,z of the camera")
+                .param("at", ParamKind::Numbers, "x,y,z it looks at")
+                .param("fov", ParamKind::Numbers, "degrees"),
+                CameraOverride::debug_camera,
+            );
     }
 }
 

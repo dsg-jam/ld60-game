@@ -8,6 +8,10 @@ use bevy::{
 use serde_json::{Map, Value, json};
 
 /// Measures frame and render pass times for the debug port.
+#[cfg_attr(
+    target_arch = "wasm32",
+    expect(dead_code, reason = "the port is not served on the web")
+)]
 pub(super) struct ProfilePlugin;
 
 impl Plugin for ProfilePlugin {
