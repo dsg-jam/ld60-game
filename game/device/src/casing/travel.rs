@@ -291,12 +291,14 @@ fn screw_pose(
     let out = hole * Transform::from_translation(Vec3::NEG_Y * (Thread::SIZE.y + POCKET) * turned);
     let angle = -turned * TURNS * TAU;
     let spun = out * Transform::from_rotation(Quat::from_rotation_y(angle));
-    let pose = around.carry(
-        spun,
-        mat,
-        ((progress - TURN_TO) / (1.0 - TURN_TO)).clamp(0.0, 1.0),
-        SCREW_CLEAR,
-    );
+    // Carrying keeps clear of the box of the device, which the head in its
+    // pocket is inside of, so it only starts once the screw is out.
+    let carried = ((progress - TURN_TO) / (1.0 - TURN_TO)).clamp(0.0, 1.0);
+    let pose = if carried > 0.0 {
+        around.carry(spun, mat, carried, SCREW_CLEAR)
+    } else {
+        spun
+    };
     let turning = (progress > 0.0 && progress <= TURN_TO).then(|| Turning {
         at: out * Transform::from_translation(Vec3::NEG_Y * SCREW.y),
         angle,
@@ -355,6 +357,11 @@ mod tests {
         assert!(turning.is_none());
         let (_, turning) = screw_pose(0.4, hole, &around, mat);
         assert!(turning.is_some());
+        // Sunk in its pocket, inside the box of the device, it turns where
+        // it is.
+        let sunk = hole * Transform::from_translation(Vec3::Y * POCKET);
+        let (early, _) = screw_pose(0.1, sunk, &around, mat);
+        assert!(early.translation.distance(sunk.translation) < 1e-5);
         let (out, _) = screw_pose(TURN_TO, hole, &around, mat);
         let rise = Thread::SIZE.y + POCKET;
         assert!((out.translation - hole.translation + Vec3::Y * rise).length() < 1e-5);
