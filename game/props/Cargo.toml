@@ -10,6 +10,7 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
+ld60-game-parts = { workspace = true }
 ld60-geometry = { workspace = true }
 rand = { workspace = true }
 

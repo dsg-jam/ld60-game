@@ -5,7 +5,8 @@ use ld60_geometry::block::Block;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
-use super::{INK, INK_DEPTH, Prop, label, part, placed, shade};
+use super::super::writing::{Card, Layout};
+use super::{INK_DEPTH, Prop, label, part, placed, shade};
 
 const CARDBOARD: [Color; 3] = [
     Color::srgb_u8(0xa8, 0x86, 0x5c),
@@ -36,6 +37,7 @@ pub(crate) struct Carton {
     body: Vec3,
     color: Color,
     look: Look,
+    writing: u32,
 }
 
 enum Look {
@@ -69,6 +71,7 @@ impl Carton {
             body,
             color: shade(rng, &CARDBOARD),
             look,
+            writing: rng.random(),
         })
     }
 
@@ -89,6 +92,7 @@ impl Carton {
             body,
             color: shade(rng, &CARDBOARD),
             look: Look::Open { lean, contents },
+            writing: rng.random(),
         })
     }
 
@@ -124,21 +128,22 @@ impl Carton {
         if let Some(x) = spot {
             let size = Vec2::new(0.09, 0.06).min(self.body.xy() * 0.4);
             let at = Vec3::new(x, self.body.y * 0.5, self.body.z / 2.0);
-            label(parent, at, size, 3);
+            label(parent, at, size, self.writing);
         }
     }
 
     fn spawn_marked(&self, parent: &mut ChildSpawnerCommands) {
         part(parent, Block::new(self.body), self.color, Finish::Paper);
-        for (line, width) in [0.5, 0.3].into_iter().enumerate() {
-            let stroke =
-                Block::new(Vec3::new(self.body.x * width, 0.008, INK_DEPTH)).translated(Vec3::new(
-                    -self.body.x * 0.1,
-                    self.body.y * (0.7 - 0.12 * line as f32),
-                    (self.body.z + INK_DEPTH) / 2.0,
-                ));
-            part(parent, stroke, INK, Finish::Paint);
-        }
+        let size = self.body.xy() * Vec2::new(0.7, 0.4);
+        Card::nth(Layout::Marked, self.writing).spawn(
+            parent,
+            Vec3::new(
+                -self.body.x * 0.05,
+                self.body.y * 0.65,
+                self.body.z / 2.0 + INK_DEPTH,
+            ),
+            size,
+        );
     }
 
     fn spawn_open(

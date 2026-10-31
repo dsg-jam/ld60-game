@@ -13,6 +13,8 @@ use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use rand::{Rng, RngExt};
 
+use super::writing::Card;
+
 pub(crate) use self::binder::Binder;
 pub(crate) use self::board::Board;
 pub(crate) use self::carton::Carton;
@@ -23,9 +25,8 @@ pub(crate) use self::jar::{Jar, Tin};
 pub(crate) use self::turned::{Lying, Standing};
 
 const LABEL: Color = Color::srgb_u8(0xe0, 0xd8, 0xc4);
-const INK: Color = Color::srgb_u8(0x2a, 0x26, 0x22);
-/// Writing stands this far out of a label.
-const INK_DEPTH: f32 = 0.0004;
+/// Writing stands this far out of the face it is on.
+const INK_DEPTH: f32 = 0.0003;
 /// A label stands this far out of the face it is stuck on.
 const LABEL_DEPTH: f32 = 0.0006;
 
@@ -45,23 +46,19 @@ pub(crate) fn part(parent: &mut ChildSpawnerCommands, block: Block, color: Color
     parent.spawn((Shape::cuboid(&block, color), finish));
 }
 
-/// A paper label of `size` with `lines` of writing, stuck on a face that
-/// looks towards +Z. `at` is the middle of the label on that face.
-pub(crate) fn label(parent: &mut ChildSpawnerCommands, at: Vec3, size: Vec2, lines: usize) {
+/// A paper label of `size` with writing on it, stuck on a face that looks
+/// towards +Z. `at` is the middle of the label on that face. The same
+/// `writing` writes the same.
+pub(crate) fn label(parent: &mut ChildSpawnerCommands, at: Vec3, size: Vec2, writing: u32) {
     let paper = Block::new(size.extend(LABEL_DEPTH))
         .translated(at - Vec3::Y * size.y / 2.0 + Vec3::Z * LABEL_DEPTH / 2.0);
     part(parent, paper, LABEL, Finish::Paper);
-    let pitch = size.y / (lines + 1) as f32;
-    for line in 1..=lines {
-        // Shorter lines below the first, like a title and notes.
-        let width = size.x * if line == 1 { 0.75 } else { 0.5 };
-        let ink = Block::new(Vec3::new(width, pitch * 0.35, INK_DEPTH)).translated(Vec3::new(
-            paper.min().x + size.x * 0.12 + width / 2.0,
-            paper.max().y - pitch * line as f32 - pitch * 0.175,
-            paper.max().z + INK_DEPTH / 2.0,
-        ));
-        part(parent, ink, INK, Finish::Paint);
-    }
+    let margin = size.min_element() * 0.12;
+    Card::fitting(size, writing).spawn(
+        parent,
+        at + Vec3::Z * (LABEL_DEPTH + INK_DEPTH),
+        size - margin,
+    );
 }
 
 /// One of `colors`, a little lighter or darker.
