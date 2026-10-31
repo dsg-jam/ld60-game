@@ -5,6 +5,7 @@ members = [
   "game/audio",
   "game/city",
   "game/computer",
+  "game/console",
   "game/cli",
   "game/core",
   "game/device",
@@ -42,6 +43,7 @@ ld60-dsl = { path = "silicon/dsl" }
 ld60-game-audio = { path = "game/audio" }
 ld60-game-city = { path = "game/city" }
 ld60-game-computer = { path = "game/computer" }
+ld60-game-console = { path = "game/console" }
 ld60-game-core = { path = "game/core" }
 ld60-game-device = { path = "game/device" }
 ld60-game-manuals = { path = "game/manuals" }

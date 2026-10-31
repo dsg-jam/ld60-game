@@ -10,6 +10,7 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [features]
+console = ["debug_port", "dep:ld60-game-console"]
 debug_port = [
   "bevy/bevy_remote",
   "dep:serde_json",
@@ -27,6 +28,7 @@ ld60-devices = { workspace = true, features = ["serde"] }
 ld60-game-audio = { workspace = true }
 ld60-game-city = { workspace = true }
 ld60-game-computer = { workspace = true }
+ld60-game-console = { workspace = true, optional = true }
 ld60-game-core = { workspace = true }
 ld60-game-device = { workspace = true }
 ld60-game-manuals = { workspace = true }
