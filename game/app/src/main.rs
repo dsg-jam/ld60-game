@@ -5,6 +5,8 @@
 //! - `debug_port`: makes a Bevy Remote Protocol server available for
 //!   inspecting and driving the running game. It only starts when
 //!   `LD60_DEBUG_PORT` is set to a port number, and only on native builds.
+//! - `console`: an in-game console for the same methods, on the key left
+//!   of 1. Works on the web too.
 
 mod menu;
 mod workshop;
@@ -34,6 +36,8 @@ fn main() -> AppExit {
     );
     #[cfg(feature = "debug_port")]
     app.add_plugins(ld60_game_core::debug_port::DebugPortPlugin);
+    #[cfg(feature = "console")]
+    app.add_plugins(ld60_game_console::ConsolePlugin);
     app.add_plugins((
         MeshPickingPlugin,
         ld60_game_audio::AudioPlugin,

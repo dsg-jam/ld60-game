@@ -1,0 +1,21 @@
+[package]
+name = "ld60-game-console"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+readme = { workspace = true }
+publish = { workspace = true }
+
+[dependencies]
+ld60-game-core = { workspace = true, features = ["debug_port"] }
+serde_json = { workspace = true, features = ["std"] }
+
+[dependencies.bevy]
+workspace = true
+features = ["bevy_remote", "default_app", "std", "ui_api", "ui_bevy_render"]
+
+[lints]
+workspace = true

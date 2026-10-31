@@ -3613,6 +3613,7 @@ dependencies = [
  "ld60-game-audio",
  "ld60-game-city",
  "ld60-game-computer",
+ "ld60-game-console",
  "ld60-game-core",
  "ld60-game-device",
  "ld60-game-manuals",
@@ -3675,6 +3676,15 @@ dependencies = [
  "ld60-machine",
  "rand",
  "ron",
+ "serde_json",
+]
+
+[[package]]
+name = "ld60-game-console"
+version = "0.3.0"
+dependencies = [
+ "bevy",
+ "ld60-game-core",
  "serde_json",
 ]
 
