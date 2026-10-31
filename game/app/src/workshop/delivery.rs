@@ -1,3 +1,5 @@
+#[cfg(feature = "debug_port")]
+mod command;
 mod drone;
 
 use bevy::prelude::*;
@@ -43,6 +45,8 @@ impl Plugin for DeliveryPlugin {
         .add_observer(HandIn::pick_up)
         .add_observer(Drone::on_add)
         .add_observer(Flight::clear_cargo);
+        #[cfg(feature = "debug_port")]
+        command::register(app);
     }
 }
 
