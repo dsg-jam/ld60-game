@@ -150,8 +150,9 @@ impl Printer {
     }
 }
 
-/// A sheet coming out of the [`Printer`], then going to its place. A receipt
-/// goes there by itself. A job ticket waits for a click that tears it off.
+/// A sheet coming out of the [`Printer`], then going to its place. It waits
+/// in the slot for a click that tears it off, and the next sheet waits for
+/// the slot.
 #[derive(Component, Debug)]
 pub(crate) struct Printing {
     elapsed: f32,
@@ -161,8 +162,8 @@ pub(crate) struct Printing {
     /// The middle of its sheet, in its own space.
     sheet: Vec3,
     length: f32,
-    /// Whether it tears off by itself once it is out.
-    tears_off: bool,
+    /// What a click on it does while it waits in the slot.
+    prompt: &'static str,
     /// What it sounds like as it starts to print, and as it lands.
     sounds: (Option<Sound>, Option<Sound>),
     /// How long ago it was torn off, once it is.
@@ -176,22 +177,19 @@ pub(crate) struct Printing {
 impl Printing {
     /// The ticket of a new job, after `delay` seconds.
     pub(crate) fn ticket(rest: Transform, delay: f32) -> Self {
-        Self {
-            sounds: (None, None),
-            ..Self::new(
-                rest,
-                JobTicket::sheet_center(),
-                JobTicket::SHEET_SIZE.y,
-                delay,
-            )
-        }
+        Self::new(
+            rest,
+            JobTicket::sheet_center(),
+            JobTicket::SHEET_SIZE.y,
+            delay,
+        )
     }
 
     /// A receipt after `delay` seconds. The printer chirps as it has it, and
     /// it lands with `landed`.
     pub(crate) fn receipt(rest: Transform, delay: f32, landed: Sound) -> Self {
         Self {
-            tears_off: true,
+            prompt: "click-tear-receipt",
             sounds: (Some(Sound::Chirp), Some(landed)),
             ..Self::new(rest, Receipt::sheet_center(), receipt::SHEET_SIZE.y, delay)
         }
@@ -204,12 +202,17 @@ impl Printing {
             rest,
             sheet,
             length,
-            tears_off: false,
+            prompt: "click-tear-ticket",
             sounds: (None, None),
             torn: None,
             target: None,
             swing: SWING,
         }
+    }
+
+    /// Whether it has started to come out of the slot and is not torn off.
+    fn in_slot(&self) -> bool {
+        self.elapsed >= self.delay && self.torn.is_none()
     }
 
     fn printed(&self) -> bool {
@@ -218,7 +221,7 @@ impl Printing {
 
     /// Whether it is out and waits to be torn off.
     pub(crate) fn waiting(&self) -> bool {
-        self.printed() && self.torn.is_none() && !self.tears_off
+        self.printed() && self.torn.is_none()
     }
 
     /// How the sheet leans back out of `slot`.
@@ -268,20 +271,27 @@ impl Printing {
             return;
         };
         let dt = time.delta_secs();
+        let mut slot_taken = sheets.iter().any(|(_, printing, ..)| printing.in_slot());
         for (entity, mut printing, mut transform, mut visibility, target) in &mut sheets {
             if let Some(&target) = target {
                 printing.target = Some(target);
                 let mut entity = commands.entity(entity);
                 entity.remove::<(FocusTarget, Clickable)>();
-                if !printing.tears_off {
-                    entity.insert(Clickable {
-                        prompt: "click-tear-ticket",
-                    });
-                }
+                entity.insert(Clickable {
+                    prompt: printing.prompt,
+                });
             }
             let before = printing.elapsed;
-            printing.elapsed += dt;
             let delay = printing.delay;
+            printing.elapsed += dt;
+            if before < delay && printing.elapsed >= delay {
+                if slot_taken {
+                    // Held back until the sheet in the slot is torn off.
+                    printing.elapsed = before;
+                } else {
+                    slot_taken = true;
+                }
+            }
             if let (true, Some(sound)) = (
                 before < delay && printing.elapsed >= delay,
                 printing.sounds.0,
@@ -305,10 +315,6 @@ impl Printing {
             let steps = |elapsed: f32| ((elapsed - delay) / STEP_TIME).floor();
             if t > 0.0 && t < 1.0 && steps(printing.elapsed) > steps(before) {
                 commands.trigger(Play(Sound::Ratchet));
-            }
-            if printing.tears_off && printing.printed() && printing.torn.is_none() {
-                printing.torn = Some(0.0);
-                commands.trigger(Play(Sound::PageTurn));
             }
             let Some(torn) = printing.torn.as_mut() else {
                 *transform = printed;

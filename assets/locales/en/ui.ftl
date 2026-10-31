@@ -44,3 +44,4 @@ click-receipt = Inspect receipt
 click-rent = Read rent note
 click-ticket = Inspect ticket
 click-tear-ticket = Tear off ticket
+click-tear-receipt = Tear off receipt

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use ld60_game_audio::Sound;
 use ld60_game_core::layout::counter::CounterLayout;
-use ld60_game_parts::paper::{Flutter, Paper};
+use ld60_game_parts::paper::{Flutter, Paper, Sheltered};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_game_player::focus::{Focus, FocusTarget, View};
 use ld60_game_run::Leftover;
@@ -68,7 +68,9 @@ impl Receipt {
     ) {
         // The old slip goes into the bin.
         for entity in old {
-            commands.entity(entity).remove::<Receipt>();
+            commands
+                .entity(entity)
+                .remove::<(Receipt, Printing, Sheltered)>();
             Binned::send(entity, commands);
         }
         let landed = match self.pickup {
