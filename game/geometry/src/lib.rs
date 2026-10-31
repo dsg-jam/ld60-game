@@ -2,6 +2,7 @@
 
 pub mod bar;
 pub mod block;
+pub mod cloth;
 pub mod frame;
 pub mod noise;
 pub mod quads;

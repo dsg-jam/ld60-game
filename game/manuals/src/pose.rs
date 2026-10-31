@@ -5,8 +5,8 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::prelude::*;
 
-use super::cloth;
 use super::model::{BOARD, CLOSED, COVER, Parts, SPINE};
+use ld60_geometry::cloth;
 
 /// Seconds to lie down or to stand up.
 const LIE_TIME: f32 = 0.5;

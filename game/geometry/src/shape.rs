@@ -5,6 +5,7 @@ use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 use super::bar::Bar;
 use super::block::Block;
+use super::cloth;
 use super::surface::{Finish, Form, SurfaceMaterial, SurfacePlugin};
 
 /// Shapes get one of this many seeds, which vary their surfaces.
@@ -56,6 +57,12 @@ enum Kind {
     /// A keycap, with sides that lean in by a taper and a top dished by a
     /// depth.
     Keycap(f32, f32),
+    /// A cloth board, see [`cloth::board`], with corners rounded by a
+    /// radius.
+    Board(f32),
+    /// Cloth bent about the z axis between two angles, see
+    /// [`cloth::hinge`]. The size holds the radius in x and the length in z.
+    Bend(f32, f32),
 }
 
 impl Shape {
@@ -138,6 +145,28 @@ impl Shape {
         )
     }
 
+    /// A cloth covered board of `size`, its bound edge on x = 0, see
+    /// [`cloth::board`].
+    pub fn board(size: Vec3, corner: f32, color: Color) -> Self {
+        Self {
+            kind: Kind::Board(corner),
+            size,
+            color,
+            texture: None,
+        }
+    }
+
+    /// Cloth bent about the z axis from the angle `from` to `to`, see
+    /// [`cloth::hinge`].
+    pub fn bend((from, to): (f32, f32), radius: f32, length: f32, color: Color) -> Self {
+        Self {
+            kind: Kind::Bend(from, to),
+            size: Vec3::new(radius, radius, length),
+            color,
+            texture: None,
+        }
+    }
+
     fn bundle(kind: Kind, block: &Block, color: Color) -> impl Bundle {
         (
             Self {
@@ -166,6 +195,8 @@ impl Shape {
             Kind::Turned(mesh) => return mesh.clone(),
             Kind::Drilled(holes, radius) => drilled::drilled(self.size, holes, *radius),
             Kind::Keycap(taper, dish) => keycap::keycap(self.size, *taper, *dish),
+            Kind::Board(corner) => cloth::board(self.size, *corner),
+            Kind::Bend(from, to) => cloth::hinge(*from, *to, self.size.x, self.size.z),
         };
         if let Some(texture) = &self.texture {
             texture.map_uvs(&mut mesh);
@@ -188,6 +219,7 @@ impl Shape {
             Kind::Cylinder | Kind::Capsule | Kind::Ring | Kind::Turned(_) => {
                 Form::Cylinder(shape.size)
             }
+            Kind::Board(_) | Kind::Bend(..) => Form::Freeform,
         };
         let seed = (add.entity.index_u32() % SEEDS) as f32;
         commands.entity(add.entity).insert((
