@@ -6,7 +6,7 @@ use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
 use super::fall::{Fall, Ground};
-use super::{Aside, Casing, Cover, SCREW};
+use super::{Aside, Casing, Cover, POCKET, SCREW};
 use crate::Holdable;
 use crate::thread::Thread;
 
@@ -300,7 +300,8 @@ fn screw_pose(
     mat: Transform,
 ) -> (Transform, Option<Turning>) {
     let turned = ((progress - TURN_FROM) / (TURN_TO - TURN_FROM)).clamp(0.0, 1.0);
-    let out = hole * Transform::from_translation(Vec3::NEG_Y * Thread::SIZE.y * turned);
+    // Out of the thread, and out of the pocket around the head.
+    let out = hole * Transform::from_translation(Vec3::NEG_Y * (Thread::SIZE.y + POCKET) * turned);
     let angle = -turned * TURNS * TAU;
     let spun = out * Transform::from_rotation(Quat::from_rotation_y(angle));
     let pose = around.carry(
@@ -368,7 +369,8 @@ mod tests {
         let (_, turning) = screw_pose(0.4, hole, &around, mat);
         assert!(turning.is_some());
         let (out, _) = screw_pose(TURN_TO, hole, &around, mat);
-        assert!((out.translation - hole.translation + Vec3::Y * Thread::SIZE.y).length() < 1e-5);
+        let rise = Thread::SIZE.y + POCKET;
+        assert!((out.translation - hole.translation + Vec3::Y * rise).length() < 1e-5);
         let (end, turning) = screw_pose(1.0, hole, &around, mat);
         assert!(end.translation.distance(mat.translation) < 1e-5);
         assert!(end.rotation.angle_between(mat.rotation) < 1e-3);

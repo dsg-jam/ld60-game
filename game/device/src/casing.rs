@@ -37,6 +37,12 @@ const PILOT: Vec3 = Vec3::new(0.0018, 0.0002, 0.0018);
 const SCREW: Vec3 = Phillips::HEAD;
 /// The hole through the cover that a screw goes through.
 const COVER_HOLE: f32 = 0.0013;
+/// Each screw head sits in a round pocket in the cover this deep, a little
+/// wider than the head, so it is almost flush with the cover.
+pub(super) const POCKET: f32 = 0.0012;
+const POCKET_RADIUS: f32 = SCREW.x / 2.0 + 0.0003;
+/// The bottom of a pocket, which the screw goes through.
+const POCKET_FLOOR: f32 = COVER - POCKET;
 /// Screws that are out lie this far from the left side of the device, and
 /// this far apart.
 const ASIDE: f32 = 0.014;
@@ -280,7 +286,11 @@ impl Casing {
     ) -> Self {
         let plate = Block::new(shell.size.with_y(COVER));
         let underside = |spot: Vec2| plate.top_spot(spot).with_y(0.0);
-        let holes: Vec<_> = spots.screws.iter().map(|&spot| underside(spot)).collect();
+        let holes: Vec<_> = spots
+            .screws
+            .iter()
+            .map(|&spot| underside(spot) + Vec3::Y * POCKET)
+            .collect();
         device
             .spawn((
                 Name::new("back cover"),
@@ -292,11 +302,23 @@ impl Casing {
                 let drilled: Vec<Vec2> = holes.iter().map(|hole| hole.xz()).collect();
                 cover.spawn((
                     CoverPlate,
-                    Shape::drilled(&plate, &drilled, COVER_HOLE, color),
+                    Shape::drilled(&plate, &drilled, POCKET_RADIUS, color),
                     Finish::Plastic,
                 ));
-                for (index, &spot) in spots.screws.iter().enumerate() {
-                    let head = Block::new(SCREW).translated(underside(spot) - Vec3::Y * SCREW.y);
+                for (index, &hole) in holes.iter().enumerate() {
+                    // A hair short of the inside, so it does not fight with it.
+                    let floor = Block::new(Vec3::new(
+                        2.0 * POCKET_RADIUS,
+                        POCKET_FLOOR - 0.00005,
+                        2.0 * POCKET_RADIUS,
+                    ))
+                    .translated(hole);
+                    cover.spawn((
+                        CoverPlate,
+                        Shape::drilled(&floor, &[Vec2::ZERO], COVER_HOLE, color),
+                        Finish::Plastic,
+                    ));
+                    let head = Block::new(SCREW).translated(hole - Vec3::Y * SCREW.y);
                     cover.spawn((
                         Screw(index),
                         ClickTool::Screwdriver,
@@ -311,7 +333,7 @@ impl Casing {
                         ClickTool::Screwdriver,
                         ToolSpot(Vec3::ZERO),
                         Snap,
-                        Transform::from_translation(underside(spot) - Vec3::Y * COVER / 2.0),
+                        Transform::from_translation(hole),
                         Visibility::Hidden,
                     ));
                 }
