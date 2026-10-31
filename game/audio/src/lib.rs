@@ -85,6 +85,8 @@ pub enum Sound {
     ScrewOut,
     /// A screw turned into a device.
     ScrewIn,
+    /// A screw landing on the cutting mat.
+    ScrewLands,
     /// The debug plug pushed onto a device.
     PlugIn,
     /// The debug plug pulled off a device.
@@ -112,7 +114,7 @@ pub enum Sound {
 impl Sound {
     /// The sounds played with [`Play`]. The radio plays its static itself,
     /// from where it stands.
-    const ALL: [Self; 25] = [
+    const ALL: [Self; 26] = [
         Self::LampOn,
         Self::LampOff,
         Self::Chime,
@@ -134,6 +136,7 @@ impl Sound {
         Self::Refuse,
         Self::ScrewOut,
         Self::ScrewIn,
+        Self::ScrewLands,
         Self::PlugIn,
         Self::PlugOut,
         Self::CoverOff,
@@ -170,6 +173,7 @@ impl Sound {
             | Self::Plunk
             | Self::ScrewOut
             | Self::ScrewIn
+            | Self::ScrewLands
             | Self::PlugIn
             | Self::PlugOut
             | Self::CoverOff
@@ -208,6 +212,7 @@ impl Sound {
             Self::Refuse => Samples::refuse(),
             Self::ScrewOut => Samples::screw_out(take),
             Self::ScrewIn => Samples::screw_in(take),
+            Self::ScrewLands => Samples::screw_lands(take),
             Self::PlugIn => Samples::plug_in(take),
             Self::PlugOut => Samples::plug_out(take),
             Self::CoverOff => Samples::cover_off(take),
@@ -242,6 +247,7 @@ impl Sound {
             Self::Hinge => 0.12,
             Self::Refuse => 0.12,
             Self::ScrewOut | Self::ScrewIn => 0.7,
+            Self::ScrewLands => 0.5,
             Self::PlugIn | Self::PlugOut => 0.35,
             Self::CoverOff | Self::CoverOn => 0.55,
             Self::AsphaltRain | Self::ConcreteRain => 0.125,
@@ -275,6 +281,15 @@ pub struct Play(pub Sound);
 /// it comes from.
 #[derive(Event, Debug)]
 pub struct PlayAt(pub Sound, pub Vec3);
+
+/// Something hit something else at `at`. The [`Sound`] plays from there,
+/// as loud as `level` times its volume, so harder hits sound louder.
+#[derive(Event, Debug)]
+pub struct Knock {
+    pub sound: Sound,
+    pub at: Vec3,
+    pub level: f32,
+}
 
 /// A key `width` meters wide went down, or came back up, at `at`.
 #[derive(Event, Debug)]
@@ -359,6 +374,7 @@ impl Plugin for AudioPlugin {
             )
             .add_observer(Sounds::play)
             .add_observer(Sounds::play_at)
+            .add_observer(Sounds::knock)
             .add_observer(Sounds::click_key);
     }
 }
@@ -430,6 +446,29 @@ impl Sounds {
                 at,
                 PlaybackSettings::DESPAWN
                     .with_volume(Volume::Linear(sound.volume() * mixer.gain())),
+            );
+        }
+    }
+
+    fn knock(
+        knock: On<Knock>,
+        sounds: Option<ResMut<Sounds>>,
+        mixer: Res<Mixer>,
+        mut commands: Commands,
+    ) {
+        if let Some(mut sounds) = sounds
+            && let Some(source) = sounds
+                .0
+                .get_mut(&knock.sound)
+                .map(|takes| takes.next().clone())
+        {
+            let volume = knock.sound.volume() * knock.level * mixer.gain();
+            Self::play_from(
+                &mut commands,
+                &mixer,
+                source,
+                knock.at,
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume)),
             );
         }
     }

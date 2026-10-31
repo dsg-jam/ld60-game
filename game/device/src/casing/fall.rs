@@ -29,6 +29,9 @@ const STILL_TIME: f32 = 0.25;
 const SETTLE_TIME: f32 = 5.0;
 /// Points around each ring of the shape.
 const RING_POINTS: usize = 8;
+/// A screw that hits the mat or the device slower than this, in meters per
+/// second, makes no sound.
+const SILENT_SPEED: f32 = 0.04;
 /// A screw counts as over the room once its middle is this far inside the
 /// walls.
 const ROOM_INSET: f32 = 0.002;
@@ -65,6 +68,16 @@ pub(super) struct Ground {
     room_size: Vec2,
     /// The box of the device, where it is, and its size.
     device: Option<(Transform, Block)>,
+}
+
+/// A screw hitting the mat or the device.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Landing {
+    /// Which of the screws stepped together.
+    pub(super) screw: usize,
+    pub(super) at: Vec3,
+    /// How fast it came in, in meters per second.
+    pub(super) speed: f32,
 }
 
 /// A contact of a screw against something, for its velocity pass.
@@ -129,7 +142,12 @@ impl Fall {
             if self.asleep {
                 break;
             }
-            Self::step_all(std::slice::from_mut(self), ground, MAX_FRAME);
+            Self::step_all(
+                std::slice::from_mut(self),
+                ground,
+                MAX_FRAME,
+                &mut Vec::new(),
+            );
         }
         self.asleep = true;
     }
@@ -243,8 +261,16 @@ impl Fall {
     }
 
     /// Moves `screws` on by `dt` seconds. Sleeping ones stay put, but the
-    /// others still bump into them.
-    pub(super) fn step_all(screws: &mut [Fall], ground: &Ground, dt: f32) {
+    /// others still bump into them. The hardest hit of each screw on the
+    /// mat or the device, if it is loud enough to hear, goes into
+    /// `landings`.
+    pub(super) fn step_all(
+        screws: &mut [Fall],
+        ground: &Ground,
+        dt: f32,
+        landings: &mut Vec<Landing>,
+    ) {
+        let first = landings.len();
         if screws.iter().all(Fall::asleep) {
             return;
         }
@@ -283,6 +309,29 @@ impl Fall {
             }
             for contact in &contacts {
                 Self::bounce(screws, contact, h);
+                let speed = -contact.approach;
+                if contact.other.is_some() || contact.normal.y < 0.7 || speed < SILENT_SPEED {
+                    continue;
+                }
+                let at = screws[contact.body].at + contact.arm;
+                match landings[first..]
+                    .iter_mut()
+                    .find(|landing| landing.screw == contact.body)
+                {
+                    Some(landing) if landing.speed < speed => {
+                        *landing = Landing {
+                            screw: contact.body,
+                            at,
+                            speed,
+                        };
+                    }
+                    Some(_) => {}
+                    None => landings.push(Landing {
+                        screw: contact.body,
+                        at,
+                        speed,
+                    }),
+                }
             }
             for (index, screw) in screws.iter_mut().enumerate() {
                 if screw.asleep {
@@ -542,7 +591,7 @@ mod tests {
 
     fn run(screws: &mut [Fall], ground: &Ground, seconds: f32) {
         for _ in 0..(seconds * 60.0) as usize {
-            Fall::step_all(screws, ground, 1.0 / 60.0);
+            Fall::step_all(screws, ground, 1.0 / 60.0, &mut Vec::new());
         }
     }
 
@@ -600,9 +649,32 @@ mod tests {
             let screw = &screws[0];
             assert!(screw.asleep(), "{n}: {screw:?}");
             let (low, out) = reach(screw, &ground);
-            assert!((low - ground.mat.max().y).abs() < 3e-4, "{n}: lowest point {low}");
+            assert!(
+                (low - ground.mat.max().y).abs() < 3e-4,
+                "{n}: lowest point {low}"
+            );
             assert!(out < 3e-4, "{n}: {out} out of the room");
         }
+    }
+
+    #[test]
+    fn a_dropped_screw_lands_a_few_times_softer_each_time_then_goes_quiet() {
+        let ground = ground();
+        let mut screws = [dropped(
+            Vec3::new(0.0, 1.03, 0.0),
+            Vec3::new(0.05, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 3.0),
+        )];
+        let mut speeds = Vec::new();
+        for _ in 0..240 {
+            let mut landings = Vec::new();
+            Fall::step_all(&mut screws, &ground, 1.0 / 60.0, &mut landings);
+            speeds.extend(landings.iter().map(|landing| landing.speed));
+        }
+        assert!(screws[0].asleep());
+        assert!((2..12).contains(&speeds.len()), "{speeds:?}");
+        assert!(speeds[0] > 0.5, "{speeds:?}");
+        assert!(speeds[1..].iter().all(|&speed| speed < speeds[0]), "{speeds:?}");
     }
 
     #[test]

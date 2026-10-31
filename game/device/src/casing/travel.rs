@@ -1,7 +1,7 @@
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 use bevy::{platform::hash::fixed_hash_one, prelude::*};
-use ld60_game_audio::{Play, Sound};
+use ld60_game_audio::{Knock, Play, Sound};
 use ld60_geometry::block::Block;
 use rand::{RngExt, SeedableRng, rngs::SmallRng};
 
@@ -39,6 +39,10 @@ const DROP_SPIN: f32 = 6.0;
 /// how fast it tumbles, in radians per second.
 const FLICK_RISE: std::ops::Range<f32> = 0.012..0.022;
 const FLICK_SPIN: f32 = 9.0;
+/// A screw landing this fast, in meters per second, sounds at full volume.
+/// Softer hits are quieter, as the force of a contact grows with the speed
+/// to the power of 6/5.
+const LOUD_LANDING: f32 = 0.8;
 
 /// The cover of a device, apart from the other parts that move.
 type CoverOnly = (With<Cover>, Without<Casing>, Without<Aside>);
@@ -137,7 +141,15 @@ impl Casing {
                 .filter_map(|&screw| Some((screw, asides.get(screw).ok()?.1.fall?)))
                 .collect();
             let mut bodies: Vec<Fall> = falls.iter().map(|(_, fall)| *fall).collect();
-            Fall::step_all(&mut bodies, &ground, dt);
+            let mut landings = Vec::new();
+            Fall::step_all(&mut bodies, &ground, dt, &mut landings);
+            for landing in landings {
+                commands.trigger(Knock {
+                    sound: Sound::ScrewLands,
+                    at: landing.at,
+                    level: (landing.speed / LOUD_LANDING).powf(1.2).min(1.0),
+                });
+            }
             for ((screw, fall), body) in falls.iter_mut().zip(bodies) {
                 *fall = body;
                 if let Ok((_, mut aside, ..)) = asides.get_mut(*screw) {
