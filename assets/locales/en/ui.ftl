@@ -1,6 +1,6 @@
 hint-back = Back
 hint-pin = Pin to monitor
-hint-pin-full = The pin rail is full. Unpin a page at the monitor first.
+hint-pin-full = The pin rail is full.
 hint-pinned = This page hangs at the monitor.
 hint-open = Turn to { $target }
 hint-open-index = Turn to the index

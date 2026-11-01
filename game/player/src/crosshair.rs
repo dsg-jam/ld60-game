@@ -13,12 +13,9 @@ use ld60_locale::{Localized, Message};
 use super::{
     cursor,
     focus::{self, Clickable, Disabled, Focused},
-    hints::{self, Caption, ClickHint, Icon, IconFont},
+    hints::{self, Caption, ClickHint, Icon, IconFont, faded},
     look::Gaze,
 };
-
-/// How much a [`Disabled`] prompt shows.
-const DISABLED_ALPHA: f32 = 0.45;
 
 pub(super) struct CrosshairPlugin;
 
@@ -44,9 +41,13 @@ enum Shape {
     Prompt,
 }
 
-/// The [`Caption`] of [`Shape::Prompt`].
+/// The [`Caption`] of [`Shape::Prompt`], and under it why the action can't
+/// be done now.
 #[derive(Component, Debug)]
-struct PromptCaption;
+enum PromptCaption {
+    Action,
+    Reason,
+}
 
 /// The mouse button of [`Shape::Prompt`]. The one for a [`Disabled`]
 /// action, with `true`, is faded and has no accent.
@@ -111,18 +112,23 @@ impl Crosshair {
                         // Hangs below the icon, so the icon stays in the
                         // middle.
                         prompt.spawn((
-                            PromptCaption,
-                            Caption,
                             Node {
                                 position_type: PositionType::Absolute,
                                 top: percent(100),
                                 left: percent(50),
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
                                 ..default()
                             },
                             UiTransform::from_translation(Val2 {
                                 x: percent(-50),
                                 y: Val::ZERO,
                             }),
+                            Pickable::IGNORE,
+                            children![
+                                (PromptCaption::Action, Caption),
+                                (PromptCaption::Reason, Caption),
+                            ],
                         ));
                     });
             });
@@ -132,15 +138,25 @@ impl Crosshair {
     /// [`Prompt`] the dot turns into the mouse button, at the free cursor
     /// while focused.
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
+    #[expect(clippy::type_complexity, reason = "Bevy system")]
     fn update(
         gaze: Gaze,
         prompt: Res<Prompt>,
         window: Single<&Window, With<PrimaryWindow>>,
         ui_scale: Res<UiScale>,
         crosshair: Single<(&mut Visibility, &mut UiTransform), With<Crosshair>>,
-        mut shapes: Query<(&Shape, &mut Node), Without<PromptIcon>>,
-        caption: Single<(Entity, Option<&Localized>, &mut TextColor), With<PromptCaption>>,
-        mut icons: Query<(&PromptIcon, &mut Node)>,
+        mut shapes: Query<(&Shape, &mut Node), (Without<PromptIcon>, Without<PromptCaption>)>,
+        mut captions: Query<
+            (
+                Entity,
+                &PromptCaption,
+                Option<&Localized>,
+                &mut TextColor,
+                &mut Node,
+            ),
+            Without<PromptIcon>,
+        >,
+        mut icons: Query<(&PromptIcon, &mut Node), Without<PromptCaption>>,
         mut commands: Commands,
     ) {
         let (mut visibility, mut transform) = crosshair.into_inner();
@@ -166,11 +182,31 @@ impl Crosshair {
                 node.display = display;
             }
         }
-        let (entity, current, mut color) = caption.into_inner();
-        if let Some(message) = &prompt.message {
-            let text = Localized::from(message.clone());
-            if current != Some(&text) {
-                commands.entity(entity).insert(text);
+        for (entity, caption, current, mut color, mut node) in &mut captions {
+            let message = match caption {
+                PromptCaption::Action => prompt.message.as_ref(),
+                PromptCaption::Reason => prompt.reason.as_ref(),
+            };
+            let display = if message.is_some() {
+                Display::Flex
+            } else {
+                Display::None
+            };
+            if node.display != display {
+                node.display = display;
+            }
+            if let Some(message) = message {
+                let text = Localized::from(message.clone());
+                if current != Some(&text) {
+                    commands.entity(entity).insert(text);
+                }
+            }
+            if matches!(caption, PromptCaption::Action) {
+                color.set_if_neq(TextColor(if prompt.disabled {
+                    Self::disabled_ink()
+                } else {
+                    hints::INK
+                }));
             }
         }
         for (icon, mut node) in &mut icons {
@@ -183,16 +219,10 @@ impl Crosshair {
                 node.display = display;
             }
         }
-        let ink = if prompt.disabled {
-            Self::disabled_ink()
-        } else {
-            hints::INK
-        };
-        color.set_if_neq(TextColor(ink));
     }
 
     fn disabled_ink() -> Color {
-        hints::INK.with_alpha(DISABLED_ALPHA)
+        faded(hints::INK)
     }
 }
 
@@ -205,6 +235,8 @@ pub(crate) struct Prompt {
     message: Option<Message>,
     /// Whether the action can't be done right now.
     disabled: bool,
+    /// Why not, if the reason is out of view.
+    reason: Option<Message>,
     /// Where the free cursor is, in logical pixels, while the prompt shows
     /// there.
     at_cursor: Option<Vec2>,
@@ -236,13 +268,18 @@ impl Prompt {
         let from_hover = (settings.hints() && (gaze.steering() || gaze.focused()))
             .then(|| hovered.and_then(|entity| clickables.get(entity).ok()))
             .flatten();
-        let (message, disabled) = match (settings.hints(), click.0.clone()) {
-            (true, Some(click)) if gaze.focused() => (Some(click), false),
+        let (message, disabled, reason) = match (settings.hints(), &click.0) {
+            (true, Some(click)) if gaze.focused() => (
+                Some(click.message().clone()),
+                !click.is_ready(),
+                click.reason().cloned(),
+            ),
             _ => (
                 from_hover.map(|clickable| Message::new(clickable.prompt)),
                 hovered
                     .filter(|_| from_hover.is_some())
                     .is_some_and(|entity| disabled.contains(entity)),
+                None,
             ),
         };
         // A tool driving the game moves only its pointer, not the cursor.
@@ -264,6 +301,7 @@ impl Prompt {
             at_cursor: at_cursor.filter(|_| message.is_some()),
             message,
             disabled,
+            reason,
         });
     }
 }

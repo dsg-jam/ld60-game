@@ -9,6 +9,7 @@ use bevy::{
 };
 use ld60_game_parts::paper::{INK, Paper, PaperButton};
 use ld60_game_parts::screen::UiCanvas;
+use ld60_game_player::hints::Action;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
@@ -175,7 +176,7 @@ impl DividerTab {
                 divider
                     .spawn((
                         TabLink { file, start },
-                        PaperButton(Some(tab.hint())),
+                        PaperButton(Some(Action::Ready(tab.hint()))),
                         Transform::from_xyz((SHEET_SIZE.x + TAB_OUT) / 2.0, 0.0, along)
                             .with_rotation(Quat::from_rotation_y(-FRAC_PI_2)),
                         Visibility::Inherited,

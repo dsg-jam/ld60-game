@@ -24,7 +24,7 @@ use bevy::{
 };
 use ld60_game_player::focus::{self, Focus, Focused};
 use ld60_game_player::free_look::MODIFIERS;
-use ld60_game_player::hints::ClickHint;
+use ld60_game_player::hints::{Action, ClickHint};
 use ld60_locale::{Localized, Message};
 
 pub use self::back::BlankBack;
@@ -464,7 +464,7 @@ pub struct ShowsOwnPages;
 /// printed on a page or a divider tab. A click on it doesn't turn the page.
 /// Hovering it shows its hint, if it has one.
 #[derive(Component, Debug, Default)]
-pub struct PaperButton(pub Option<Message>);
+pub struct PaperButton(pub Option<Action>);
 
 /// The mouse over the focused [`Paper`].
 #[derive(SystemParam)]
@@ -524,7 +524,7 @@ impl MouseOnPaper<'_, '_> {
     }
 
     /// What a click does: the hint of a [`PaperButton`], or turning a page.
-    fn hint(&self) -> Option<Message> {
+    fn hint(&self) -> Option<Action> {
         if *self.state.get() != Focus::Paper {
             return None;
         }
@@ -535,11 +535,11 @@ impl MouseOnPaper<'_, '_> {
             return button.0.clone();
         }
         let forward = self.turn()?;
-        Some(Message::new(if forward {
+        Some(Action::Ready(Message::new(if forward {
             "hint-next-page"
         } else {
             "hint-previous-page"
-        }))
+        })))
     }
 }
 

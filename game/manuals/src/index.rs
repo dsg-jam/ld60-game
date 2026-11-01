@@ -6,6 +6,7 @@ use bevy::{
     prelude::*,
 };
 use ld60_game_parts::paper::{Paper, PaperButton};
+use ld60_game_player::hints::Action;
 use ld60_locale::{Localized, Message};
 
 use super::contents::{Contents, Entry, Page, Section};
@@ -71,7 +72,7 @@ impl Hover {
     }
 
     /// A line of the index or a link in it.
-    fn line(node: Node, hint: Message) -> impl Bundle {
+    fn line(node: Node, hint: Action) -> impl Bundle {
         (
             node,
             BackgroundColor(Color::NONE),
@@ -130,9 +131,12 @@ impl Contents {
 
     fn write_index(&self, links: &Links, page: &mut ChildSpawnerCommands) {
         let link = |target: Option<usize>, name: Localized| {
+            // Every page of a pinned entry hangs at the monitor, where the
+            // player can't see it from here.
+            let open = Message::new("hint-open").with("target", name);
             let hint = match target {
-                Some(_) => Message::new("hint-open").with("target", name),
-                None => Message::new("hint-pinned"),
+                Some(_) => Action::Ready(open),
+                None => Action::Blocked(open, Some(Message::new("hint-pinned"))),
             };
             (
                 PageLink {

@@ -22,6 +22,8 @@ const GAP: f32 = 6.0;
 const CORNER: f32 = 24.0;
 /// Between the hint for going back, the [`KeyHint`] and the [`Hints`].
 const KEY_HINT_GAP: f32 = 18.0;
+/// How much of an action that can't be done now shows.
+const FADED: f32 = 0.45;
 pub const INK: Color = cursor::DOT_FILL;
 /// The button or key to press.
 pub const ACCENT: Color = Color::srgb_u8(0xff, 0xb0, 0x50);
@@ -85,12 +87,20 @@ struct BackPart;
 /// A key that the focused thing reacts to and what it does, shown after
 /// the hint for going back.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
-pub struct KeyHint(pub Option<(&'static str, Message)>);
+pub struct KeyHint(pub Option<(&'static str, Action)>);
 
 /// What a left click does where the mouse is, shown at the cursor in
 /// focus views.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
-pub struct ClickHint(pub Option<Message>);
+pub struct ClickHint(pub Option<Action>);
+
+/// What an input does. One that can't be done now shows faded, with why in
+/// plain ink if the reason is out of view.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Action {
+    Ready(Message),
+    Blocked(Message, Option<Message>),
+}
 
 /// What the inputs of the focused thing do, after the [`KeyHint`].
 #[derive(Component, Clone, Debug, Default, PartialEq)]
@@ -123,8 +133,30 @@ struct HintList;
 #[derive(Component, Debug)]
 enum KeyHintPart {
     Row,
+    Cap,
     Key,
     Action,
+    Reason,
+}
+
+impl Action {
+    pub fn message(&self) -> &Message {
+        match self {
+            Self::Ready(message) | Self::Blocked(message, _) => message,
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready(_))
+    }
+
+    /// Why it can't be done now, if it can't and the reason is out of view.
+    pub fn reason(&self) -> Option<&Message> {
+        match self {
+            Self::Ready(_) | Self::Blocked(_, None) => None,
+            Self::Blocked(_, Some(reason)) => Some(reason),
+        }
+    }
 }
 
 impl FromWorld for IconFont {
@@ -267,8 +299,20 @@ impl BackHint {
                     },
                     Pickable::IGNORE,
                     children![
-                        key_cap((KeyHintPart::Key, Localized::verbatim(""))),
+                        (
+                            KeyHintPart::Cap,
+                            key_cap((KeyHintPart::Key, Localized::verbatim(""))),
+                        ),
                         (KeyHintPart::Action, Caption, Localized::verbatim("")),
+                        (
+                            KeyHintPart::Reason,
+                            Caption,
+                            Localized::verbatim(""),
+                            Node {
+                                margin: UiRect::left(px(GAP)),
+                                ..default()
+                            },
+                        ),
                     ],
                 ));
                 // Wraps onto more lines when the window is too narrow.
@@ -311,27 +355,53 @@ impl BackHint {
 }
 
 impl KeyHint {
+    #[expect(clippy::type_complexity, reason = "Bevy system")]
     fn update(
         hint: Res<KeyHint>,
-        mut parts: Query<(&KeyHintPart, &mut Node, Option<&mut Localized>)>,
+        mut parts: Query<(
+            &KeyHintPart,
+            &mut Node,
+            Option<&mut Localized>,
+            Option<&mut TextColor>,
+            Option<&mut BorderColor>,
+        )>,
     ) {
         if !hint.is_changed() {
             return;
         }
-        for (part, mut node, text) in &mut parts {
-            match (part, &hint.0, text) {
-                (KeyHintPart::Row, action, _) => {
-                    node.display = if action.is_some() {
-                        Display::Flex
-                    } else {
-                        Display::None
-                    };
+        let ready = hint.0.as_ref().is_none_or(|(_, action)| action.is_ready());
+        let shade = |color: Color| if ready { color } else { faded(color) };
+        let shown = |show: bool| if show { Display::Flex } else { Display::None };
+        for (part, mut node, text, color, border) in &mut parts {
+            match (part, &hint.0) {
+                (KeyHintPart::Row, action) => node.display = shown(action.is_some()),
+                (KeyHintPart::Cap, _) => {
+                    if let Some(mut border) = border {
+                        *border = BorderColor::all(shade(INK));
+                    }
                 }
-                (KeyHintPart::Key, Some((key, _)), Some(mut text)) => {
-                    *text = Localized::verbatim(*key);
+                (KeyHintPart::Key, Some((key, _))) => {
+                    if let Some(mut text) = text {
+                        *text = Localized::verbatim(*key);
+                    }
+                    if let Some(mut color) = color {
+                        *color = TextColor(shade(ACCENT));
+                    }
                 }
-                (KeyHintPart::Action, Some((_, action)), Some(mut text)) => {
-                    *text = action.clone().into();
+                (KeyHintPart::Action, Some((_, action))) => {
+                    if let Some(mut text) = text {
+                        *text = action.message().clone().into();
+                    }
+                    if let Some(mut color) = color {
+                        *color = TextColor(shade(INK));
+                    }
+                }
+                (KeyHintPart::Reason, action) => {
+                    let reason = action.as_ref().and_then(|(_, action)| action.reason());
+                    node.display = shown(reason.is_some());
+                    if let (Some(reason), Some(mut text)) = (reason, text) {
+                        *text = reason.clone().into();
+                    }
                 }
                 _ => {}
             }
@@ -434,6 +504,11 @@ impl Hint {
                 row.spawn((Caption, Localized::from(self.action.clone())));
             });
     }
+}
+
+/// `color` as it shows for an action that can't be done now.
+pub(crate) fn faded(color: Color) -> Color {
+    color.with_alpha(FADED)
 }
 
 /// A key to press, with its `label` in a box.

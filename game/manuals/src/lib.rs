@@ -23,7 +23,7 @@ use ld60_game_parts::paper::{
 };
 use ld60_game_parts::screen::{ScreenSurface, UiCanvas};
 use ld60_game_player::focus::{Focus, FocusOn, FocusTarget, Focused, View};
-use ld60_game_player::hints::{Hint, Hints, Icon, Input, KeyHint};
+use ld60_game_player::hints::{Action, Hint, Hints, Icon, Input, KeyHint};
 use ld60_game_run::Run;
 use ld60_game_run::job::{Job, JobId};
 use ld60_game_run::tutorial::{FirstNote, TutorialNote};
@@ -449,13 +449,15 @@ impl ShopManuals {
         pins: Res<Pins>,
         mut hint: ResMut<KeyHint>,
     ) {
+        // The rail hangs at the monitor, out of view while the file is open.
         let action = Self::open_sheet(&state, &focused, &files).map(|_| {
-            let id = if pins.is_full() {
-                "hint-pin-full"
+            let pin = Message::new("hint-pin");
+            let action = if pins.is_full() {
+                Action::Blocked(pin, Some(Message::new("hint-pin-full")))
             } else {
-                "hint-pin"
+                Action::Ready(pin)
             };
-            ("P", Message::new(id))
+            ("P", action)
         });
         hint.set_if_neq(KeyHint(action));
     }
