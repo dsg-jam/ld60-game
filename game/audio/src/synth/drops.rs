@@ -281,6 +281,12 @@ impl Bandpass {
         }
     }
 
+    /// Moves the band to `center`, keeping what rings in it.
+    pub(super) fn retune(&mut self, center: f32, q: f32) {
+        let Self { b0, a1, a2, .. } = Self::new(center, q);
+        (self.b0, self.a1, self.a2) = (b0, a1, a2);
+    }
+
     pub(super) fn next(&mut self, input: f32) -> f32 {
         let y = self.b0 * (input - self.x[1]) - self.a1 * self.y[0] - self.a2 * self.y[1];
         self.x = [input, self.x[0]];

@@ -109,6 +109,12 @@ pub enum Sound {
     Drip,
     /// A drip off an awning falling into a puddle.
     Plunk,
+    /// A local's foot landing on the sidewalk. Odd takes are wet.
+    Footstep,
+    /// A local stepping into a puddle.
+    Splash,
+    /// A local saying something in their language.
+    Murmur,
 }
 
 impl Sound {
@@ -171,6 +177,7 @@ impl Sound {
             | Self::Hinge
             | Self::Drip
             | Self::Plunk
+            | Self::Splash
             | Self::ScrewOut
             | Self::ScrewIn
             | Self::ScrewLands
@@ -178,7 +185,8 @@ impl Sound {
             | Self::PlugOut
             | Self::CoverOff
             | Self::CoverOn => TAKES,
-            Self::KeyDown | Self::KeyUp => 2 * TAKES,
+            Self::KeyDown | Self::KeyUp | Self::Footstep => 2 * TAKES,
+            Self::Murmur => 4 * TAKES,
             Self::AsphaltRain
             | Self::ConcreteRain
             | Self::PuddleRain
@@ -224,6 +232,9 @@ impl Sound {
             Self::RoofRain => Samples::roof_rain(take),
             Self::Drip => Samples::drip(take),
             Self::Plunk => Samples::plunk(take),
+            Self::Footstep => Samples::footstep(take),
+            Self::Splash => Samples::splash(take),
+            Self::Murmur => Samples::murmur(take),
         }
     }
 
@@ -255,6 +266,9 @@ impl Sound {
             Self::AwningRain => 0.2,
             Self::RoofRain => 0.125,
             Self::Drip | Self::Plunk => 0.25,
+            Self::Footstep => 0.3,
+            Self::Splash => 0.3,
+            Self::Murmur => 0.25,
         }
     }
 }

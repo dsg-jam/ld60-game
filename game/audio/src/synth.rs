@@ -12,6 +12,8 @@ mod paper;
 mod rain;
 mod rings;
 mod room;
+mod steps;
+mod voice;
 
 use std::f32::consts::{PI, TAU};
 
