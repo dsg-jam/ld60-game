@@ -13,8 +13,8 @@ use rand::{Rng, RngExt};
 pub(super) use self::facade::{Facade, FacadeMaterial, WindowGrid};
 use self::rows::{Plot, ROWS, Row, VIEW_CONE};
 use super::additions::Additions;
-use super::drips::{DripEdge, DripEdges};
-use super::market::{MARKET_HEIGHT, STALL_DEPTH, Stock};
+use super::drips::DripEdges;
+use super::market::{Finds, MARKET_HEIGHT, STALL_DEPTH, Stock};
 use super::{Kit, NEON, Pick, glow, rng};
 
 const SEED: u64 = 2;
@@ -110,7 +110,7 @@ impl Skyline {
         let market = Stock::new(&mut materials, &mut surfaces);
         let additions = Additions::new(&mut materials, &mut surfaces);
         let mut skyline = Skyline::default();
-        let mut drips = Vec::new();
+        let mut finds = Finds::default();
         let mut root = commands.spawn((
             Name::new("buildings"),
             Transform::default(),
@@ -127,7 +127,7 @@ impl Skyline {
                             &mut facades,
                             &market,
                             &additions,
-                            &mut drips,
+                            &mut finds,
                             &block,
                             floor,
                             row.facing,
@@ -185,7 +185,8 @@ impl Skyline {
         });
         skyline.spawn_shop_building(&mut commands, &kit, &mut facades, &mut rng);
         commands.insert_resource(skyline);
-        commands.insert_resource(DripEdges(drips));
+        commands.insert_resource(DripEdges(finds.drips));
+        commands.insert_resource(finds.places);
     }
 
     /// Up to two narrower tiers on top of `plot`, stepping in towards the
@@ -271,7 +272,7 @@ impl Skyline {
         facades: &mut Assets<FacadeMaterial>,
         market: &Stock,
         additions: &Additions,
-        drips: &mut Vec<DripEdge>,
+        finds: &mut Finds,
         block: &Block,
         floor: f32,
         facing: f32,
@@ -293,7 +294,7 @@ impl Skyline {
         let facade = facades.add(Facade::random(&upper, facing, floor, rng));
         parent.spawn(kit.cuboid(&upper, facade.clone()));
         parent.spawn(kit.cuboid(&base, market.wall()));
-        market.spawn_market(parent, kit, block, facing, drips, rng);
+        market.spawn_market(parent, kit, block, facing, finds, rng);
         if let Some(grid) = facades
             .get(&facade)
             .map(|material| material.extension.grid())

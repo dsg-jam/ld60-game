@@ -75,7 +75,7 @@ struct Lane {
 }
 
 #[derive(Component, Debug)]
-struct Vehicle {
+pub(super) struct Vehicle {
     velocity: f32,
     body: Body,
 }

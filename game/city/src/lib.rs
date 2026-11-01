@@ -9,6 +9,7 @@ mod atmosphere;
 mod buildings;
 mod cables;
 mod drips;
+mod locals;
 mod market;
 mod rain;
 mod signs;
@@ -67,6 +68,7 @@ impl Plugin for CityPlugin {
             buildings::BuildingsPlugin,
             cables::CablesPlugin,
             drips::DripsPlugin,
+            locals::LocalsPlugin,
             rain::RainPlugin,
             signs::SignsPlugin,
             sky::SkyPlugin,

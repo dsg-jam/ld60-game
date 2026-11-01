@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use std::ops::Range;
 
 use bevy::prelude::*;
@@ -10,6 +11,7 @@ use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 use super::drips::DripEdge;
+use super::locals::{Places, Stool};
 use super::signs::Tube;
 use super::{Kit, Pick, glow, turned_to};
 
@@ -46,6 +48,8 @@ const TRADES: [[Theme; 4]; 4] = [
 /// Of the stalls near the shop, how many sell other goods.
 const OTHER_GOODS_CHANCE: f64 = 0.4;
 
+/// Where a keeper stands behind the counter.
+const KEEPER_BACK: f32 = 0.35;
 const AWNING_CHANCE: f64 = 0.65;
 const STOOL_CHANCE: f64 = 0.25;
 const STOOL_HEIGHT: f32 = 0.75;
@@ -126,6 +130,23 @@ pub(super) struct Stock {
     lightboxes: Vec<Handle<StandardMaterial>>,
 }
 
+/// What building the market finds for the rest of the street.
+#[derive(Debug, Default)]
+pub(super) struct Finds {
+    pub(super) drips: Vec<DripEdge>,
+    pub(super) places: Places,
+}
+
+/// What an open stall has, in its own space.
+struct Opening {
+    /// The dripping edge of the awning.
+    edge: Option<DripEdge>,
+    /// The stools stand at both sides of the middle this far out.
+    stools: Option<f32>,
+    /// Half the width of the counter.
+    counter: f32,
+}
+
 /// What a market bay is used for.
 #[derive(Clone, Copy, Debug)]
 enum Bay {
@@ -178,7 +199,7 @@ impl Stock {
         kit: &Kit,
         building: &Block,
         facing: f32,
-        drips: &mut Vec<DripEdge>,
+        finds: &mut Finds,
         rng: &mut impl Rng,
     ) {
         let front = if facing > 0.0 {
@@ -209,16 +230,12 @@ impl Stock {
             let lit = center.x.abs() < LIT_RADIUS;
             let bay = Bay::random(rng);
             let place = Transform::from_translation(center).with_rotation(rotation);
-            let mut edge = None;
+            let mut opening = None;
             parent
                 .spawn((place, Visibility::default()))
-                .with_children(|stall| edge = bay.spawn(stall, kit, self, width, lit, rng));
-            if let Some(edge) = edge {
-                drips.push(DripEdge {
-                    from: place.transform_point(edge.from),
-                    to: place.transform_point(edge.to),
-                    ..edge
-                });
+                .with_children(|stall| opening = bay.spawn(stall, kit, self, width, lit, rng));
+            if let Some(opening) = opening {
+                Self::find(finds, &place, &opening, lit);
             }
             x += width;
             if x < last {
@@ -235,6 +252,36 @@ impl Stock {
                 parent.spawn(kit.cuboid(&partition, self.concrete.clone()));
             }
         }
+    }
+
+    /// Collects the dripping edge of a stall at `place`, and, near the
+    /// shop, its stools and the spot behind its counter.
+    fn find(finds: &mut Finds, place: &Transform, opening: &Opening, lit: bool) {
+        if let Some(edge) = opening.edge {
+            finds.drips.push(DripEdge {
+                from: place.transform_point(edge.from),
+                to: place.transform_point(edge.to),
+                ..edge
+            });
+        }
+        if !lit {
+            return;
+        }
+        let facing_in = Quat::from_rotation_y(PI);
+        if let Some(x) = opening.stools {
+            for side in [-1.0, 1.0] {
+                let at =
+                    *place * Transform::from_xyz(side * x, 0.0, STOOL_OUT).with_rotation(facing_in);
+                finds.places.stools.push(Stool {
+                    at,
+                    height: STOOL_HEIGHT,
+                    covered: opening.edge.is_some(),
+                });
+            }
+        }
+        let behind =
+            *place * Transform::from_xyz(0.0, STEP, -COUNTER_SETBACK - COUNTER_DEPTH - KEEPER_BACK);
+        finds.places.counters.push((behind, opening.counter));
     }
 
     /// The plain wall at the back of the stalls.
@@ -254,8 +301,8 @@ impl Bay {
     }
 
     /// The stall in local space: the street lies towards +Z, the bay spans
-    /// `width` along X and reaches back to -[`STALL_DEPTH`]. Returns the
-    /// dripping edge of its awning, if it has one.
+    /// `width` along X and reaches back to -[`STALL_DEPTH`]. Returns what
+    /// an open stall has.
     fn spawn(
         self,
         stall: &mut ChildSpawnerCommands,
@@ -264,7 +311,7 @@ impl Bay {
         width: f32,
         lit: bool,
         rng: &mut impl Rng,
-    ) -> Option<DripEdge> {
+    ) -> Option<Opening> {
         let half = width / 2.0;
         let floor = Block::between(
             Vec3::new(-half, -0.1, -STALL_DEPTH),
@@ -272,12 +319,12 @@ impl Bay {
         );
         stall.spawn(kit.cuboid(&floor, stock.tiles.clone()));
         match self {
-            Self::Open => Self::spawn_stall(stall, kit, stock, width, lit, rng),
+            Self::Open => Some(Self::spawn_stall(stall, kit, stock, width, lit, rng)),
             Self::HalfShut => {
-                let edge = Self::spawn_stall(stall, kit, stock, width, lit, rng);
+                let opening = Self::spawn_stall(stall, kit, stock, width, lit, rng);
                 let down = rng.random_range(0.4..1.2);
                 Self::spawn_shutter(stall, kit, stock, width, MARKET_HEIGHT - SHUTTER_BOX - down);
-                edge
+                Some(opening)
             }
             Self::Shut => {
                 Self::spawn_shutter(stall, kit, stock, width, 0.0);
@@ -297,7 +344,7 @@ impl Bay {
         width: f32,
         lit: bool,
         rng: &mut impl Rng,
-    ) -> Option<DripEdge> {
+    ) -> Opening {
         let half = width / 2.0;
         let inner = half - 0.2;
         let counter = Block::between(
@@ -361,9 +408,10 @@ impl Bay {
             ));
         }
 
-        if rng.random_bool(STOOL_CHANCE) {
+        let stools = rng.random_bool(STOOL_CHANCE).then_some(inner * 0.5);
+        if let Some(x) = stools {
             // A couple of stools on the sidewalk, for customers who stay.
-            for x in [-inner * 0.5, inner * 0.5] {
+            for x in [-x, x] {
                 let at = Vec3::new(x, 0.0, STOOL_OUT);
                 let leg = Block::new(Vec3::new(0.05, STOOL_HEIGHT - 0.05, 0.05)).translated(at);
                 let seat = Block::new(Vec3::new(0.32, 0.05, 0.32))
@@ -377,8 +425,13 @@ impl Bay {
         if rng.random_bool(SIGN_CHANCE) {
             Self::spawn_sign(stall, kit, stock, width, rng);
         }
+        let mut opening = Opening {
+            edge: None,
+            stools,
+            counter: inner,
+        };
         if !rng.random_bool(AWNING_CHANCE) {
-            return None;
+            return opening;
         }
         // Fixed to the facade above the opening, over the sign.
         let top = MARKET_HEIGHT + AWNING_ABOVE;
@@ -406,11 +459,12 @@ impl Bay {
                 stock.metal.clone(),
             ));
         }
-        Some(DripEdge {
+        opening.edge = Some(DripEdge {
             from: lip - reach,
             to: lip + reach,
             light: *color,
-        })
+        });
+        opening
     }
 
     /// Small boxes standing in a row on top of `surface`.
