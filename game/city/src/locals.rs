@@ -4,6 +4,7 @@
 mod gaze;
 mod keeper;
 mod limb;
+mod plumage;
 mod shadows;
 mod sound;
 mod strider;
@@ -19,7 +20,8 @@ use rand::{Rng, RngExt, SeedableRng};
 
 use self::gaze::Gaze;
 use self::keeper::Keeper;
-use self::strider::{Posture, Strider};
+use self::plumage::{Coat, PlumageMaterial};
+use self::strider::{Birth, Posture, Strider};
 use self::walk::Walker;
 use super::buildings::Skyline;
 use super::{Pick, glow, rng};
@@ -43,15 +45,6 @@ const SKINS: [Color; 6] = [
     Color::srgb_u8(0xa0, 0x8a, 0x7a),
     Color::srgb_u8(0x6a, 0x64, 0x58),
 ];
-const CLOTHS: [Color; 7] = [
-    Color::srgb_u8(0x3a, 0x4a, 0x5a),
-    Color::srgb_u8(0x6a, 0x3a, 0x34),
-    Color::srgb_u8(0x5a, 0x5a, 0x3a),
-    Color::srgb_u8(0x2e, 0x2e, 0x34),
-    Color::srgb_u8(0x7a, 0x6a, 0x4a),
-    Color::srgb_u8(0x40, 0x58, 0x4e),
-    Color::srgb_u8(0x8a, 0x5a, 0x2a),
-];
 const SHELLS: [Color; 5] = [
     Color::srgb_u8(0x6a, 0x4a, 0x34),
     Color::srgb_u8(0x5a, 0x6a, 0x4a),
@@ -71,26 +64,30 @@ pub(super) struct LocalsPlugin;
 
 impl Plugin for LocalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((sound::LocalSoundPlugin, shadows::ShadowPlugin))
-            .init_resource::<Places>()
-            .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
-            .add_systems(
-                Startup,
-                (Figures::load, Figures::spawn_all)
-                    .chain()
-                    .after(Skyline::spawn),
+        app.add_plugins((
+            sound::LocalSoundPlugin,
+            shadows::ShadowPlugin,
+            plumage::PlumagePlugin,
+        ))
+        .init_resource::<Places>()
+        .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
+        .add_systems(
+            Startup,
+            (Figures::load, Figures::spawn_all)
+                .chain()
+                .after(Skyline::spawn),
+        )
+        .add_systems(
+            Update,
+            (
+                Walker::walk,
+                Keeper::work,
+                Gaze::glance,
+                (Strider::pose, Keeper::pose),
             )
-            .add_systems(
-                Update,
-                (
-                    Walker::walk,
-                    Keeper::work,
-                    Gaze::glance,
-                    (Strider::pose, Keeper::pose),
-                )
-                    .chain(),
-            )
-            .add_systems(Update, Strider::open_umbrellas);
+                .chain(),
+        )
+        .add_systems(Update, (Strider::open_umbrellas, Strider::soak));
     }
 }
 
@@ -127,8 +124,8 @@ struct Figures {
     /// A cylinder one unit across and long, along Y.
     rod: Handle<Mesh>,
     skins: Vec<Handle<SurfaceMaterial>>,
-    cloths: Vec<Handle<SurfaceMaterial>>,
     umbrellas: umbrella::Kit,
+    striders: strider::Kit,
     shells: Vec<Handle<SurfaceMaterial>>,
     eyes: Vec<Handle<StandardMaterial>>,
 }
@@ -137,8 +134,18 @@ struct Figures {
 #[derive(Debug, Clone)]
 struct Colors {
     skin: Handle<SurfaceMaterial>,
-    cloth: Handle<SurfaceMaterial>,
+    /// The skull, skin or feathered.
+    face: Handle<SurfaceMaterial>,
     eyes: Handle<StandardMaterial>,
+}
+
+impl Colors {
+    fn with_face(self, face: &Handle<SurfaceMaterial>) -> Self {
+        Self {
+            face: face.clone(),
+            ..self
+        }
+    }
 }
 
 impl FromWorld for Figures {
@@ -148,6 +155,7 @@ impl FromWorld for Figures {
             umbrella::Kit::new(&mut meshes, &mut materials)
         });
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
+        let striders = strider::Kit::new(&mut meshes, &mut rng(SEED + 2));
         let ball = meshes.add(Sphere::new(0.5).mesh().uv(16, 10));
         let rod = meshes.add(Cylinder::new(0.5, 1.0).mesh().resolution(8));
         let mut surfaces = world.resource_mut::<Assets<SurfaceMaterial>>();
@@ -157,9 +165,8 @@ impl FromWorld for Figures {
                 .map(|&color| surfaces.add(finish.scaled(color)))
                 .collect()
         };
-        let skins = all(&SKINS, Finish::Ceramic);
-        let cloths = all(&CLOTHS, Finish::Fabric);
-        let shells = all(&SHELLS, Finish::Plastic);
+        let skins = all(&SKINS, Finish::Hide);
+        let shells = all(&SHELLS, Finish::Shell);
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
         let eyes = EYES
             .iter()
@@ -169,8 +176,8 @@ impl FromWorld for Figures {
             ball,
             rod,
             skins,
-            cloths,
             umbrellas,
+            striders,
             shells,
             eyes,
         }
@@ -183,19 +190,24 @@ impl Figures {
         world.init_resource::<Self>();
     }
 
-    fn spawn_all(mut commands: Commands, figures: Res<Figures>, places: Res<Places>) {
+    fn spawn_all(
+        mut commands: Commands,
+        figures: Res<Figures>,
+        places: Res<Places>,
+        mut plumages: ResMut<Assets<PlumageMaterial>>,
+        mut surfaces: ResMut<Assets<SurfaceMaterial>>,
+    ) {
         let mut rng = rng(SEED);
         let mut paths = super::rng(SEED + 1);
         for walker in Walker::crowd(&mut paths) {
-            let place = walker.place();
-            let strider = Strider::spawn(
-                &mut commands,
-                &figures,
-                &mut rng,
-                place,
-                Posture::Walking,
-                true,
-            );
+            let birth = Birth {
+                at: walker.place(),
+                posture: Posture::Walking,
+                may_carry: true,
+                sheltered: false,
+                coat: Coat::new(&mut plumages, &mut surfaces, &mut rng),
+            };
+            let strider = Strider::spawn(&mut commands, &figures, &mut rng, birth);
             commands.entity(strider).insert(walker);
         }
         for stool in &places.stools {
@@ -204,14 +216,14 @@ impl Figures {
             }
             let turn = Quat::from_rotation_y(rng.random_range(-0.7..0.7));
             let at = stool.at.with_rotation(stool.at.rotation * turn);
-            Strider::spawn(
-                &mut commands,
-                &figures,
-                &mut rng,
+            let birth = Birth {
                 at,
-                Posture::Seated(stool.height),
-                !stool.covered,
-            );
+                posture: Posture::Seated(stool.height),
+                may_carry: !stool.covered,
+                sheltered: stool.covered,
+                coat: Coat::new(&mut plumages, &mut surfaces, &mut rng),
+            };
+            Strider::spawn(&mut commands, &figures, &mut rng, birth);
         }
         for &(at, half_width) in &places.counters {
             if rng.random_bool(KEEPER_CHANCE) {
@@ -221,9 +233,10 @@ impl Figures {
     }
 
     fn colors(&self, rng: &mut impl Rng) -> Colors {
+        let skin = self.skins.pick(rng).clone();
         Colors {
-            skin: self.skins.pick(rng).clone(),
-            cloth: self.cloths.pick(rng).clone(),
+            face: skin.clone(),
+            skin,
             eyes: self.eyes.pick(rng).clone(),
         }
     }
@@ -245,17 +258,18 @@ impl Figures {
     }
 
     /// A head of `size` on `parent`, its face towards +Z: a long skull with
-    /// two or three glowing eyes, and sometimes feelers.
+    /// two or three glowing eyes, and feelers if it has `feelers`.
     fn spawn_head(
         &self,
         parent: &mut ChildSpawnerCommands,
         colors: &Colors,
         size: f32,
+        feelers: bool,
         rng: &mut impl Rng,
     ) {
         let skull = Vec3::new(0.2, 0.18, 0.28) * size;
         parent.spawn(self.ball(
-            &colors.skin,
+            &colors.face,
             Transform::from_xyz(0.0, 0.0, 0.04 * size).with_scale(skull),
         ));
         let eye = Vec3::splat(0.035 * size);
@@ -269,7 +283,7 @@ impl Figures {
                 Transform::from_translation(at * size).with_scale(eye),
             ));
         }
-        if rng.random_bool(0.5) {
+        if feelers {
             let length = rng.random_range(0.1..0.2);
             for side in [-1.0, 1.0] {
                 let root = Vec3::new(side * 0.05, 0.07, -0.04) * size;

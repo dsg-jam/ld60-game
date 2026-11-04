@@ -130,7 +130,10 @@ impl Keeper {
                         Transform::from_translation(HEAD * size),
                         Visibility::default(),
                     ))
-                    .with_children(|head| figures.spawn_head(head, &colors, size, rng))
+                    .with_children(|head| {
+                        let feelers = rng.random_bool(0.5);
+                        figures.spawn_head(head, &colors, size, feelers, rng);
+                    })
                     .id();
             });
             let shell = body.id();

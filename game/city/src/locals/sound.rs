@@ -37,10 +37,16 @@ pub(super) struct LocalSoundPlugin;
 impl Plugin for LocalSoundPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Footfalls>()
+            .init_resource::<Shakes>()
             .add_systems(Startup, LocalSounds::load)
             .add_systems(
                 Update,
-                (LocalSounds::step, LocalSounds::talk, LocalSounds::patter),
+                (
+                    LocalSounds::step,
+                    LocalSounds::talk,
+                    LocalSounds::patter,
+                    LocalSounds::shake,
+                ),
             );
     }
 }
@@ -48,6 +54,11 @@ impl Plugin for LocalSoundPlugin {
 /// Feet that landed this frame.
 #[derive(Resource, Debug, Default)]
 pub(super) struct Footfalls(pub(super) Vec<Footfall>);
+
+/// Locals that shook the water off their feathers this frame, at their
+/// middle.
+#[derive(Resource, Debug, Default)]
+pub(super) struct Shakes(pub(super) Vec<Vec3>);
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Footfall {
@@ -85,6 +96,7 @@ struct LocalSounds {
     splash: Takes<Handle<AudioSource>>,
     murmur: Takes<Handle<AudioSource>>,
     patter: Takes<Handle<AudioSource>>,
+    shake: Takes<Handle<AudioSource>>,
     rng: SmallRng,
 }
 
@@ -110,6 +122,7 @@ impl LocalSounds {
             splash: Takes::new(handles(Sound::Splash), 2),
             murmur: Takes::new(handles(Sound::Murmur), 3),
             patter: Takes::new(handles(Sound::UmbrellaRain), 4),
+            shake: Takes::new(handles(Sound::Shake), 5),
             rng: rng(SEED),
         });
     }
@@ -197,6 +210,40 @@ impl LocalSounds {
                     distance,
                 ),
                 Transform::from_translation(mouth),
+            ));
+        }
+    }
+
+    /// Feathers rustle and water sprays off when a local shakes.
+    fn shake(
+        mixer: Res<Mixer>,
+        mut shakes: ResMut<Shakes>,
+        sounds: Option<ResMut<LocalSounds>>,
+        listener: Single<&GlobalTransform, With<SpatialListener>>,
+        mut commands: Commands,
+    ) {
+        let Some(mut sounds) = sounds else {
+            shakes.0.clear();
+            return;
+        };
+        let sounds = &mut *sounds;
+        let ear = listener.translation();
+        for at in shakes.0.drain(..) {
+            let distance = at.distance(ear);
+            if distance > STEP_RANGE {
+                continue;
+            }
+            let pitch = sounds.rng.random_range(STEP_PITCH);
+            let emitter = Emitter::new(Sound::Shake, Some(STEP_REACH), pitch).with_level(1.0);
+            commands.spawn((
+                Name::new("shake sound"),
+                emitter.bundle(
+                    sounds.shake.next().clone(),
+                    PlaybackSettings::DESPAWN,
+                    &mixer,
+                    distance,
+                ),
+                Transform::from_translation(at),
             ));
         }
     }

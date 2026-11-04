@@ -50,6 +50,8 @@ const CONCRETE: u32 = 11u;
 const RUST: u32 = 12u;
 const RUG: u32 = 13u;
 const PLATED: u32 = 14u;
+const HIDE: u32 = 15u;
+const SHELL: u32 = 16u;
 /// Matches `Form::code` in `surface.rs`.
 const BOX: u32 = 0u;
 const CYLINDER: u32 = 1u;
@@ -63,6 +65,8 @@ const RUST_COLOR: vec3<f32> = vec3<f32>(0.3, 0.15, 0.07);
 const BARE_PLASTER: vec3<f32> = vec3<f32>(0.62, 0.58, 0.52);
 const SCUFF: vec3<f32> = vec3<f32>(0.05, 0.045, 0.04);
 const GRIP_DIRT: vec3<f32> = vec3<f32>(0.12, 0.1, 0.08);
+/// Rows of scales on skin, per meter.
+const SCALE_ROWS: f32 = 70.0;
 /// Ribs around a screwdriver grip.
 const GRIP_RIBS: f32 = 10.0;
 /// Most light comes from above, which is where the wood's sheen comes from.
@@ -150,7 +154,8 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         // Floors keep their own directions.
         uv = p.xz;
     }
-    let w = surface.wear;
+    // Living skin doesn't wear.
+    let w = select(surface.wear, 0.0, surface.finish == HIDE || surface.finish == SHELL);
     // Size of a pixel on the surface. Detail finer than that fades out.
     let pixel = length(fwidth(p));
     var color = pbr_input.material.base_color.rgb;
@@ -256,6 +261,26 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
             rough = mix(rough, 0.55, look.gloss);
             pbr_input.material.reflectance = vec3<f32>(0.2);
             bumps = rug_height(uv, pixel) * (1.0 - 0.7 * look.worn);
+        }
+        case HIDE: {
+            // Mottled, with rows of scales and darker creases between.
+            color *= mix(0.8, 1.1, noise(uv * 10.0, s)) * mix(0.92, 1.04, noise(uv * 60.0, s + 1.0));
+            let row = fract(p.y * SCALE_ROWS + 0.4 * noise(uv * 8.0, s + 2.0));
+            let scale = smoothstep(0.0, 0.2, row) * (1.0 - smoothstep(0.75, 1.0, row));
+            let seen = visible(1.0 / SCALE_ROWS, pixel);
+            color *= mix(1.0, mix(0.85, 1.0, scale), seen);
+            rough = mix(rough, rough * 0.8, scale * seen);
+            pbr_input.material.reflectance = vec3<f32>(0.35);
+            bumps = 0.00015 * scale * seen;
+        }
+        case SHELL: {
+            // Darker patches, and lines where each layer grew from the rim.
+            let patches = smoothstep(0.4, 0.75, noise(uv * 3.0, s) * 0.7 + noise(uv * 12.0, s + 1.0) * 0.3);
+            let growth = sin((p.y + 0.3 * noise(uv * 2.0, s + 2.0)) * 90.0) * visible(0.035, pixel);
+            color = mix(color, color * 0.45, patches) * (1.0 + 0.06 * growth);
+            rough = mix(rough, rough * 1.6, patches * 0.5);
+            pbr_input.material.reflectance = vec3<f32>(0.6);
+            bumps = 0.00025 * growth;
         }
         case PERFORATED: {
             let open = hole(uv, pixel);

@@ -54,6 +54,12 @@ pub enum Finish {
     /// Plated steel, like a clip. It wears like [`Finish::Metal`] but does
     /// not rust.
     Plated = 14,
+    /// Living skin, leathery and mottled, with rows of fine scales across
+    /// its local Y axis, like a bird's legs. It doesn't wear.
+    Hide = 15,
+    /// A living shell grown in layers: mottled, with faint growth lines
+    /// and a deep gloss. It doesn't wear.
+    Shell = 16,
 }
 
 /// The shape a [`Finish`] covers, which decides where its edges wear.
@@ -144,10 +150,10 @@ impl Finish {
 
     fn roughness(self) -> f32 {
         match self {
-            Self::Ceramic => 0.25,
+            Self::Ceramic | Self::Shell => 0.25,
             Self::Metal | Self::Plated | Self::Perforated => 0.35,
             Self::Plastic => 0.5,
-            Self::Paint | Self::Grip => 0.6,
+            Self::Paint | Self::Grip | Self::Hide => 0.6,
             Self::Wood | Self::Planks => 0.65,
             Self::Paper => 0.9,
             Self::Plaster | Self::Concrete | Self::Rust => 0.95,

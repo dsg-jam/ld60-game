@@ -160,8 +160,7 @@ impl Walker {
         for (index, (mut walker, mut strider, mut gaze, mut transform)) in
             walkers.iter_mut().enumerate()
         {
-            let covered = strider.has_umbrella_open();
-            let rained_on = if covered { 0.0 } else { weather.rain };
+            let rained_on = strider.rained_on(weather.rain);
             strider.hunch += (rained_on - strider.hunch) * (1.0 - (-dt).exp());
 
             let mut target = strider.pace * (1.0 + HURRY * rained_on);

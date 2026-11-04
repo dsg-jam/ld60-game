@@ -117,6 +117,8 @@ pub enum Sound {
     Splash,
     /// A local saying something in their language.
     Murmur,
+    /// A local shaking the rain out of their feathers.
+    Shake,
 }
 
 impl Sound {
@@ -180,6 +182,7 @@ impl Sound {
             | Self::Drip
             | Self::Plunk
             | Self::Splash
+            | Self::Shake
             | Self::ScrewOut
             | Self::ScrewIn
             | Self::ScrewLands
@@ -239,6 +242,7 @@ impl Sound {
             Self::Footstep => Samples::footstep(take),
             Self::Splash => Samples::splash(take),
             Self::Murmur => Samples::murmur(take),
+            Self::Shake => Samples::shake(take),
         }
     }
 
@@ -274,6 +278,7 @@ impl Sound {
             Self::Footstep => 0.3,
             Self::Splash => 0.3,
             Self::Murmur => 0.25,
+            Self::Shake => 0.3,
         }
     }
 }

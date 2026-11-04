@@ -12,6 +12,7 @@ mod paper;
 mod rain;
 mod rings;
 mod room;
+mod shake;
 mod steps;
 mod voice;
 
