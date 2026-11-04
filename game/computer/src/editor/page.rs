@@ -90,23 +90,28 @@ impl Page {
         state: Res<State<Focus>>,
         mut focus: ResMut<InputFocus>,
     ) {
-        **title = active.0.title().into();
+        // Only real changes, so the screen's canvas sleeps while nothing does.
+        title.set_if_neq(active.0.title().into());
         for (command, mut color) in &mut labels {
-            color.0 = if Some(*command) == active.0.command() {
+            let lit = if Some(*command) == active.0.command() {
                 PHOSPHOR
             } else {
                 PHOSPHOR_DIM
             };
+            color.set_if_neq(TextColor(lit));
         }
         let at_computer = *state.get() == Focus::Computer;
         for (entity, &page, mut node) in &mut pages {
-            if page == active.0 {
-                node.display = Display::Flex;
-                if at_computer {
+            let display = if page == active.0 {
+                if at_computer && focus.get() != Some(entity) {
                     focus.set(entity, FocusCause::Navigated);
                 }
+                Display::Flex
             } else {
-                node.display = Display::None;
+                Display::None
+            };
+            if node.display != display {
+                node.display = display;
             }
         }
     }

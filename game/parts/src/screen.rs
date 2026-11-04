@@ -7,13 +7,14 @@ use bevy::{
     image::ImageSampler,
     input::ButtonState,
     input_focus::AcquireFocus,
+    input_focus::InputFocus,
     picking::{
         PickingSystems,
         pointer::{Location, PointerAction, PointerButton, PointerId, PointerInput},
     },
     prelude::*,
     render::render_resource::{TextureFormat, TextureUsages},
-    text::TextLayoutInfo,
+    text::{EditableText, TextLayoutInfo},
     ui::{ComputedUiTargetCamera, UiGlobalTransform, UiSystems},
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
@@ -326,8 +327,9 @@ impl ScreenSurface {
 
 impl Lazy {
     /// Lets each canvas draw in the frames after anything that shows in its
-    /// UI changed. Removed nodes and changed images wake every canvas, as
-    /// they don't say which canvas they were on.
+    /// UI changed, and while a text input on it has the keyboard, for its
+    /// blinking cursor. Removed nodes and changed images wake every canvas,
+    /// as they don't say which canvas they were on.
     #[expect(clippy::type_complexity, reason = "the changes that show")]
     fn wake(
         changed: Query<
@@ -340,10 +342,15 @@ impl Lazy {
                 Changed<BorderColor>,
                 Changed<ImageNode>,
                 Changed<TextColor>,
-                Changed<TextLayoutInfo>,
                 Changed<ComputedUiTargetCamera>,
+                Changed<EditableText>,
+                Changed<ScrollPosition>,
             )>,
         >,
+        // Text inputs lay their text out again every frame, changed or not.
+        laid_out: Query<&ComputedUiTargetCamera, (Changed<TextLayoutInfo>, Without<EditableText>)>,
+        focus: Res<InputFocus>,
+        typed_into: Query<&ComputedUiTargetCamera, With<EditableText>>,
         mut removed: RemovedComponents<ComputedNode>,
         mut images: MessageReader<AssetEvent<Image>>,
         mut canvases: Query<(Entity, &mut Lazy, &mut Camera)>,
@@ -352,8 +359,17 @@ impl Lazy {
             || images
                 .read()
                 .any(|event| matches!(event, AssetEvent::Modified { .. }));
+        let typing = focus
+            .get()
+            .and_then(|focused| typed_into.get(focused).ok())
+            .and_then(ComputedUiTargetCamera::get);
         for (entity, mut lazy, mut camera) in &mut canvases {
-            let woken = everything || changed.iter().any(|target| target.get() == Some(entity));
+            let woken = everything
+                || typing == Some(entity)
+                || changed
+                    .iter()
+                    .chain(&laid_out)
+                    .any(|target| target.get() == Some(entity));
             if woken {
                 lazy.awake = AWAKE;
             }
