@@ -124,6 +124,7 @@ struct Rig {
     shins: [Entity; 2],
     feet: [Entity; 2],
     arms: [Entity; 2],
+    hands: [Entity; 2],
     sleeves: [Entity; 2],
 }
 
@@ -166,6 +167,7 @@ impl Strider {
             let mut plumage = Entity::PLACEHOLDER;
             let mut tail = Entity::PLACEHOLDER;
             let mut arms = [Entity::PLACEHOLDER; 2];
+            let mut hands = [Entity::PLACEHOLDER; 2];
             let mut sleeves = [Entity::PLACEHOLDER; 2];
             hull.with_children(|hull| {
                 hull.spawn(figures.ball(&coat.down, Transform::from_scale(hull_size * 0.94)));
@@ -191,6 +193,7 @@ impl Strider {
                     })
                     .id();
                 arms = [(); 2].map(|()| hull.spawn(figures.rod(&colors.skin, default())).id());
+                hands = [(); 2].map(|()| hull.spawn(figures.ball(&colors.skin, default())).id());
                 sleeves = [(); 2].map(|()| hull.spawn(coat.bundle(&kit.sleeve, default())).id());
             });
             let hull = hull.id();
@@ -218,6 +221,7 @@ impl Strider {
                     shins,
                     feet,
                     arms,
+                    hands,
                     sleeves,
                 },
                 umbrella,
@@ -379,6 +383,7 @@ impl Strider {
                 set(rig.shins[side], pose.shins[side]);
                 set(rig.feet[side], pose.feet[side]);
                 set(rig.arms[side], pose.arms[side]);
+                set(rig.hands[side], pose.hands[side]);
                 set(rig.sleeves[side], pose.sleeves[side]);
             }
             if let (Some(umbrella), Some(placed)) = (&strider.umbrella, pose.umbrella) {

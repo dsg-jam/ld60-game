@@ -28,6 +28,8 @@ const HANG: Vec3 = Vec3::new(0.03, -0.34, 0.12);
 /// Seated, the hands rest in the lap.
 const LAP: Vec3 = Vec3::new(0.12, -0.12, 0.34);
 const ARM_SWING: f32 = 0.12;
+/// A small fist, longest along the arm.
+const HAND: Vec3 = Vec3::new(0.055, 0.07, 0.05);
 /// The hand holding an open umbrella, in the hull's space: in front of the
 /// chest, to the side of the head.
 const HOLD: Vec3 = Vec3::new(0.2, 0.2, 0.3);
@@ -76,6 +78,7 @@ pub(super) struct Pose {
     pub(super) shins: [Transform; 2],
     pub(super) feet: [Transform; 2],
     pub(super) arms: [Transform; 2],
+    pub(super) hands: [Transform; 2],
     pub(super) sleeves: [Transform; 2],
     /// The umbrella in its hand.
     pub(super) umbrella: Option<Transform>,
@@ -137,6 +140,7 @@ impl Strider {
             shins: [Transform::default(); 2],
             feet: [Transform::default(); 2],
             arms: [Transform::default(); 2],
+            hands: [Transform::default(); 2],
             sleeves: [Transform::default(); 2],
             umbrella: None,
             silhouette: Silhouette::default(),
@@ -191,6 +195,10 @@ impl Strider {
                 pose.umbrella = Some(placed);
             }
             pose.arms[index] = rod(shoulder, hand, ARM * size);
+            let reach = (hand - shoulder).try_normalize().unwrap_or(Vec3::NEG_Y);
+            pose.hands[index] = Transform::from_translation(hand)
+                .with_rotation(Quat::from_rotation_arc(Vec3::NEG_Y, reach))
+                .with_scale(HAND * size);
             pose.sleeves[index] = Self::cuff(shoulder, hand, size);
             pose.silhouette.bones[5 + index] = Bone {
                 from: hull.transform_point(shoulder),
