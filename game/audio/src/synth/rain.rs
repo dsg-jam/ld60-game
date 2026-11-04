@@ -145,6 +145,40 @@ impl Samples {
         .leveled(LEVEL)
     }
 
+    /// Rain on an umbrella: thin nylon pulled tight over the ribs. Each
+    /// drop taps it crisply, the small panels ring higher and longer than
+    /// canvas, and big drops make a hollow pat. Fewer drops than on an
+    /// awning, as it is small. Loops.
+    pub(crate) fn umbrella_rain(seed: u32) -> Self {
+        const RATE: f32 = 450.0;
+        let seconds = 4.3 + 1.1 * seed as f32;
+        let mut dice = Dice::new(seed.wrapping_add(130));
+        let mut swell = Swell::new(&mut dice, seconds, 1.0, 0.2);
+        let rainfall = Rainfall::new(RAINFALL.0, RAINFALL.1);
+        let mut rings = Rings::default();
+        let mut nylon = Bands::new(seed.wrapping_add(131), &OCTAVES[2..6], |hz| {
+            60.0 + hz * 0.12
+        });
+        let mut next = 0.0;
+        Self::generate(seconds + SEAM, |t| {
+            let gust = swell.at(t);
+            while next <= t {
+                let size = rainfall.size(&mut dice);
+                let distance = dice.between(1.0, 1.6).sqrt();
+                let hit = strength(size, terminal_speed(size)) / distance;
+                nylon.hit(|hz| hit * (hz / 700.0).min(1.0).powi(2) / (1.0 + hz / 1_500.0));
+                rings.add(Ring::impact(dice.spread(1_800.0, 4_500.0), hit * 0.07));
+                if size > 2.0 {
+                    rings.add(Ring::mode(dice.spread(250.0, 600.0), 0.2, hit * 0.25));
+                }
+                next += dice.gap(RATE * gust);
+            }
+            rings.next() + nylon.next()
+        })
+        .looped(SEAM)
+        .leveled(LEVEL)
+    }
+
     /// Rain drumming on the corrugated steel roof right above the player.
     /// The sheet has too many modes to tell apart, so it rings like noise
     /// that dies down as fast as its rust and bolts damp it. Big drops make

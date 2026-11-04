@@ -7,6 +7,7 @@ mod limb;
 mod shadows;
 mod sound;
 mod strider;
+mod umbrella;
 mod walk;
 
 use std::ops::Range;
@@ -50,14 +51,6 @@ const CLOTHS: [Color; 7] = [
     Color::srgb_u8(0x7a, 0x6a, 0x4a),
     Color::srgb_u8(0x40, 0x58, 0x4e),
     Color::srgb_u8(0x8a, 0x5a, 0x2a),
-];
-const UMBRELLAS: [Color; 6] = [
-    Color::srgb_u8(0xc0, 0x44, 0x3c),
-    Color::srgb_u8(0x3a, 0x8a, 0x84),
-    Color::srgb_u8(0xd0, 0xa8, 0x40),
-    Color::srgb_u8(0x70, 0x50, 0x9a),
-    Color::srgb_u8(0x2a, 0x2a, 0x30),
-    Color::srgb_u8(0xd8, 0xd0, 0xc0),
 ];
 const SHELLS: [Color; 5] = [
     Color::srgb_u8(0x6a, 0x4a, 0x34),
@@ -133,11 +126,9 @@ struct Figures {
     ball: Handle<Mesh>,
     /// A cylinder one unit across and long, along Y.
     rod: Handle<Mesh>,
-    /// A flat cone one unit across and high.
-    canopy: Handle<Mesh>,
     skins: Vec<Handle<SurfaceMaterial>>,
     cloths: Vec<Handle<SurfaceMaterial>>,
-    umbrellas: Vec<Handle<SurfaceMaterial>>,
+    umbrellas: umbrella::Kit,
     shells: Vec<Handle<SurfaceMaterial>>,
     eyes: Vec<Handle<StandardMaterial>>,
 }
@@ -152,10 +143,13 @@ struct Colors {
 
 impl FromWorld for Figures {
     fn from_world(world: &mut World) -> Self {
+        let umbrellas = world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
+            let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
+            umbrella::Kit::new(&mut meshes, &mut materials)
+        });
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let ball = meshes.add(Sphere::new(0.5).mesh().uv(16, 10));
         let rod = meshes.add(Cylinder::new(0.5, 1.0).mesh().resolution(8));
-        let canopy = meshes.add(Cone::new(0.5, 1.0).mesh().resolution(12));
         let mut surfaces = world.resource_mut::<Assets<SurfaceMaterial>>();
         let mut all = |colors: &[Color], finish: Finish| -> Vec<_> {
             colors
@@ -165,7 +159,6 @@ impl FromWorld for Figures {
         };
         let skins = all(&SKINS, Finish::Ceramic);
         let cloths = all(&CLOTHS, Finish::Fabric);
-        let umbrellas = all(&UMBRELLAS, Finish::Fabric);
         let shells = all(&SHELLS, Finish::Plastic);
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
         let eyes = EYES
@@ -175,7 +168,6 @@ impl FromWorld for Figures {
         Self {
             ball,
             rod,
-            canopy,
             skins,
             cloths,
             umbrellas,

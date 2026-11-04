@@ -105,6 +105,8 @@ pub enum Sound {
     AwningRain,
     /// Rain on the shop's roof, a loop.
     RoofRain,
+    /// Rain on an umbrella, a loop.
+    UmbrellaRain,
     /// A drip off an awning hitting the ground.
     Drip,
     /// A drip off an awning falling into a puddle.
@@ -191,7 +193,8 @@ impl Sound {
             | Self::ConcreteRain
             | Self::PuddleRain
             | Self::AwningRain
-            | Self::RoofRain => 2,
+            | Self::RoofRain
+            | Self::UmbrellaRain => 2,
             Self::Chime | Self::Chirp | Self::Thunk | Self::Refuse => 1,
         }
     }
@@ -230,6 +233,7 @@ impl Sound {
             Self::PuddleRain => Samples::puddle_rain(take),
             Self::AwningRain => Samples::awning_rain(take),
             Self::RoofRain => Samples::roof_rain(take),
+            Self::UmbrellaRain => Samples::umbrella_rain(take),
             Self::Drip => Samples::drip(take),
             Self::Plunk => Samples::plunk(take),
             Self::Footstep => Samples::footstep(take),
@@ -265,6 +269,7 @@ impl Sound {
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,
             Self::RoofRain => 0.125,
+            Self::UmbrellaRain => 0.2,
             Self::Drip | Self::Plunk => 0.25,
             Self::Footstep => 0.3,
             Self::Splash => 0.3,

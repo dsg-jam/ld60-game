@@ -1,15 +1,15 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
-use ld60_geometry::surface::SurfaceMaterial;
 use rand::{Rng, RngExt};
 
 use super::super::weather::Weather;
-use super::gaze::Gaze;
+use super::gaze::{self, Gaze};
 use super::limb::{Limb, rod};
 use super::shadows::{Blob, Bone, Silhouette};
 use super::sound::{Footfall, Footfalls, Voice};
-use super::{Figures, Pick, SITTER_TALK, WALKER_TALK};
+use super::umbrella::{self, Canopy, Umbrella};
+use super::{Figures, SITTER_TALK, WALKER_TALK, Whims};
 
 const HIP_HEIGHT: f32 = 1.05;
 const LEG: Limb = Limb {
@@ -41,14 +41,15 @@ const HANG: Vec3 = Vec3::new(0.03, -0.34, 0.12);
 /// Seated, the hands rest in the lap.
 const LAP: Vec3 = Vec3::new(0.12, -0.12, 0.34);
 const ARM_SWING: f32 = 0.12;
-/// The hand holding the umbrella, in the hull's space.
-const GRIP: Vec3 = Vec3::new(0.08, 0.26, 0.36);
+/// The hand holding an open umbrella, in the hull's space: in front of the
+/// chest, to the side of the head.
+const HOLD: Vec3 = Vec3::new(0.2, 0.2, 0.3);
 const UMBRELLA_CHANCE: f64 = 0.55;
-const UMBRELLA_RADIUS: f32 = 0.55;
-const UMBRELLA_RISE: f32 = 0.18;
-/// Height of the umbrella's rim above the head.
-const UMBRELLA_ABOVE: f32 = 0.3;
-const POLE: f32 = 0.014;
+/// Room an open umbrella takes. Less than its radius, as umbrellas tilt
+/// away from each other.
+const UMBRELLA_ROOM: f32 = 0.42;
+/// With an open umbrella, the head turns only this far towards it.
+const UMBRELLA_GLANCE: f32 = 0.45;
 /// Room for the swinging arms beside the hull.
 const ELBOW_ROOM: f32 = 0.08;
 /// The umbrellas open at this much rain.
@@ -88,8 +89,7 @@ pub(super) struct Strider {
     pub(super) pace: f32,
     /// How far it hunches against the rain, from 0 to 1.
     pub(super) hunch: f32,
-    /// Whether it carries an umbrella, and has it open.
-    umbrella: Option<bool>,
+    umbrella: Option<Umbrella>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,7 +108,6 @@ struct Rig {
     shins: [Entity; 2],
     feet: [Entity; 2],
     arms: [Entity; 2],
-    umbrella: Option<Entity>,
 }
 
 impl Strider {
@@ -129,7 +128,6 @@ impl Strider {
         );
         let colors = figures.colors(rng);
         let carries = may_carry && rng.random_bool(UMBRELLA_CHANCE);
-        let umbrella_color = figures.umbrellas.pick(rng).clone();
         let mut root = commands.spawn((
             Name::new("strider"),
             at,
@@ -142,7 +140,6 @@ impl Strider {
             let mut hull = parent.spawn((Transform::default(), Visibility::default()));
             let mut head = Entity::PLACEHOLDER;
             let mut arms = [Entity::PLACEHOLDER; 2];
-            let mut umbrella = None;
             hull.with_children(|hull| {
                 hull.spawn(figures.ball(
                     &colors.cloth,
@@ -160,25 +157,25 @@ impl Strider {
                     .with_children(|head| figures.spawn_head(head, &colors, size, rng))
                     .id();
                 arms = [(); 2].map(|()| hull.spawn(figures.rod(&colors.skin, default())).id());
-                if carries {
-                    umbrella = Some(Self::spawn_umbrella(hull, figures, &umbrella_color, size));
-                }
             });
             let hull = hull.id();
             let thighs = [(); 2].map(|()| parent.spawn(figures.rod(&colors.skin, default())).id());
             let shins = [(); 2].map(|()| parent.spawn(figures.rod(&colors.skin, default())).id());
             let feet = [(); 2].map(|()| parent.spawn(figures.ball(&colors.skin, default())).id());
-            rig = Some(Rig {
-                hull,
-                head,
-                thighs,
-                shins,
-                feet,
-                arms,
+            let umbrella = carries.then(|| Umbrella::spawn(parent, &figures.umbrellas, rng, size));
+            rig = Some((
+                Rig {
+                    hull,
+                    head,
+                    thighs,
+                    shins,
+                    feet,
+                    arms,
+                },
                 umbrella,
-            });
+            ));
         });
-        let Some(rig) = rig else {
+        let Some((rig, umbrella)) = rig else {
             unreachable!("with_children runs at once");
         };
         let talk = match posture {
@@ -197,79 +194,46 @@ impl Strider {
                 speed: 0.0,
                 pace: rng.random_range(1.0..1.4) * size,
                 hunch: 0.0,
-                umbrella: carries.then_some(false),
+                umbrella,
             },
         ));
         root.id()
     }
 
-    /// A closed umbrella is not drawn: an open one, held up over the head.
-    fn spawn_umbrella(
-        hull: &mut ChildSpawnerCommands,
-        figures: &Figures,
-        color: &Handle<SurfaceMaterial>,
-        size: f32,
-    ) -> Entity {
-        let (canopy, scale) = Self::canopy(size);
-        let top = canopy.translation + Vec3::Y * UMBRELLA_RISE / 2.0;
-        hull.spawn((Transform::default(), Visibility::Hidden))
-            .with_children(|umbrella| {
-                umbrella.spawn((
-                    Mesh3d(figures.canopy.clone()),
-                    MeshMaterial3d(color.clone()),
-                    canopy.with_scale(scale),
-                ));
-                umbrella.spawn(figures.rod(color, rod(GRIP * size, top, POLE)));
-            })
-            .id()
-    }
-
-    /// The middle of the canopy in the hull's space, and its size.
-    fn canopy(size: f32) -> (Transform, Vec3) {
-        let rim = (HEAD.y + UMBRELLA_ABOVE) * size;
-        let middle = Vec3::new(0.0, rim + UMBRELLA_RISE / 2.0, HEAD.z * size * 0.8);
-        let scale = Vec3::new(
-            2.0 * UMBRELLA_RADIUS * size,
-            UMBRELLA_RISE,
-            2.0 * UMBRELLA_RADIUS * size,
-        );
-        (Transform::from_translation(middle), scale)
-    }
-
     pub(super) fn has_umbrella_open(&self) -> bool {
-        self.umbrella == Some(true)
+        self.umbrella.as_ref().is_some_and(Umbrella::is_open)
+    }
+
+    /// Tilts its umbrella away from `away`, a direction in its own space, as
+    /// far as `crowded` from 0 to 1.
+    pub(super) fn lean_umbrella(&mut self, away: Vec2, crowded: f32, dt: f32) {
+        if let Some(umbrella) = &mut self.umbrella {
+            umbrella.lean_away(away, crowded, dt);
+        }
     }
 
     /// How far others stay from its middle, umbrella included.
     pub(super) fn radius(&self) -> f32 {
         if self.has_umbrella_open() {
-            UMBRELLA_RADIUS * self.size
+            UMBRELLA_ROOM * self.size
         } else {
             self.hull.x / 2.0 + ELBOW_ROOM
         }
     }
 
-    /// Opens the umbrellas when it rains and closes them when it stops.
+    /// Opens the umbrellas when it rains and closes them when it stops,
+    /// each a little later than the others.
     pub(super) fn open_umbrellas(
+        time: Res<Time>,
         weather: Res<Weather>,
+        mut whims: ResMut<Whims>,
         mut striders: Query<&mut Strider>,
-        mut visibility: Query<&mut Visibility>,
     ) {
-        if !weather.is_changed() {
-            return;
-        }
-        let open = weather.rain >= RAINY;
+        let dt = time.delta_secs();
+        let raining = weather.rain >= RAINY;
         for mut strider in &mut striders {
-            let Some(umbrella) = strider.rig.umbrella else {
-                continue;
-            };
-            strider.umbrella = Some(open);
-            if let Ok(mut visibility) = visibility.get_mut(umbrella) {
-                *visibility = if open {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
-                };
+            if let Some(umbrella) = &mut strider.umbrella {
+                umbrella.follow_rain(raining, dt, &mut whims.0);
             }
         }
     }
@@ -279,6 +243,8 @@ impl Strider {
         mut footfalls: ResMut<Footfalls>,
         mut striders: Query<(&mut Strider, &Gaze, &Transform, &mut Silhouette)>,
         mut parts: Query<&mut Transform, Without<Strider>>,
+        mut visibilities: Query<&mut Visibility>,
+        mut canopies: Query<&mut Canopy>,
     ) {
         let dt = time.delta_secs();
         for (mut strider, gaze, body, mut silhouette) in &mut striders {
@@ -315,6 +281,21 @@ impl Strider {
                 set(rig.feet[side], pose.feet[side]);
                 set(rig.arms[side], pose.arms[side]);
             }
+            if let (Some(umbrella), Some(placed)) = (&strider.umbrella, pose.umbrella) {
+                let mut show = |entity: Entity, shown: bool| {
+                    if let Ok(mut visibility) = visibilities.get_mut(entity) {
+                        visibility.set_if_neq(if shown {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        });
+                    }
+                };
+                umbrella.pose(placed, strider.size, &mut set, &mut show);
+                if let Ok(mut canopy) = canopies.get_mut(umbrella.canopy()) {
+                    canopy.open = umbrella.openness();
+                }
+            }
         }
     }
 
@@ -330,16 +311,19 @@ impl Strider {
                 (Transform::from_translation(hull), feet, SEATED_KNEES, 0.0)
             }
         };
+        let open = self.umbrella.as_ref().map_or(0.0, Umbrella::openness);
+        let glance = gaze.turn.x.min(gaze::YAW.lerp(UMBRELLA_GLANCE, open));
         let mut pose = Pose {
             hull,
             head: Transform::from_translation(HEAD * size).with_rotation(
-                Quat::from_rotation_y(gaze.turn.x)
+                Quat::from_rotation_y(glance)
                     * Quat::from_rotation_x(gaze.turn.y + self.hunch * 0.3 - lean * 0.8),
             ),
             thighs: [Transform::default(); 2],
             shins: [Transform::default(); 2],
             feet: [Transform::default(); 2],
             arms: [Transform::default(); 2],
+            umbrella: None,
             silhouette: Silhouette::default(),
         };
         let skull = hull * pose.head * Transform::from_xyz(0.0, 0.0, 0.04 * size);
@@ -347,12 +331,6 @@ impl Strider {
         shadow.blobs[0] = Blob::new(&hull, self.hull);
         shadow.blobs[1] = Blob::new(&skull, SKULL * size);
         shadow.height = skull.translation.y + SKULL.y * size / 2.0;
-        if self.has_umbrella_open() {
-            let (canopy, scale) = Self::canopy(size);
-            let canopy = hull * canopy;
-            shadow.blobs[2] = Blob::new(&canopy, scale);
-            shadow.height = canopy.translation.y;
-        }
         shadow.bones[4] = Bone {
             from: hull.transform_point(NECK_BASE * size),
             to: hull.transform_point(HEAD * size),
@@ -383,18 +361,21 @@ impl Strider {
             .with_scale(FOOT * size);
 
             let shoulder = SHOULDER * flip * size;
-            let hand = if index == 1 && self.has_umbrella_open() {
-                GRIP * size
-            } else {
-                match self.posture {
-                    Posture::Walking => {
-                        let swing = (self.phase + index as f32 * 0.5) * TAU;
-                        let swing = ARM_SWING * self.gait() * swing.sin();
-                        shoulder + (HANG * flip + Vec3::Z * swing) * size
-                    }
-                    Posture::Seated(_) => LAP * flip * size,
-                }
+            let swing = (self.phase + index as f32 * 0.5) * TAU;
+            let swing = ARM_SWING * self.gait() * swing.sin();
+            let mut hand = match self.posture {
+                Posture::Walking => shoulder + (HANG * flip + Vec3::Z * swing) * size,
+                Posture::Seated(_) => LAP * flip * size,
             };
+            if let Some(umbrella) = self.umbrella.as_ref().filter(|_| index == 1) {
+                hand = umbrella.hand(hand, HOLD * size);
+                let placed = umbrella.place(hull.transform_point(hand), swing * 2.0);
+                if let Some(canopy) = umbrella.shadow(&placed, size) {
+                    pose.silhouette.blobs[2] = canopy;
+                    pose.silhouette.height = placed.translation.y + umbrella::SHAFT * size;
+                }
+                pose.umbrella = Some(placed);
+            }
             pose.arms[index] = rod(shoulder, hand, ARM * size);
             pose.silhouette.bones[5 + index] = Bone {
                 from: hull.transform_point(shoulder),
@@ -453,6 +434,8 @@ struct Pose {
     shins: [Transform; 2],
     feet: [Transform; 2],
     arms: [Transform; 2],
+    /// The umbrella in its hand, in its own space.
+    umbrella: Option<Transform>,
     /// In its own space.
     silhouette: Silhouette,
 }

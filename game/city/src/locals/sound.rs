@@ -1,4 +1,5 @@
 use std::ops::Range;
+use std::time::Duration;
 
 use bevy::prelude::*;
 use ld60_game_audio::{Mixer, Sound, Takes};
@@ -9,6 +10,7 @@ use super::super::rng;
 use super::super::soundscape::Emitter;
 use super::super::street::water;
 use super::super::weather::Weather;
+use super::umbrella::Canopy;
 
 const SEED: u64 = 17;
 /// Only feet and voices this close to the player are heard.
@@ -24,6 +26,11 @@ const STEP_PITCH: Range<f32> = 0.9..1.1;
 const INTONATION: Range<f32> = 0.94..1.06;
 /// Height of the mouth above the feet, before size.
 const MOUTH: f32 = 1.6;
+/// Rain on umbrellas is heard this close, and stops beyond the other.
+const PATTER_RANGE: f32 = 9.0;
+const PATTER_GONE: f32 = 10.0;
+const PATTER_REACH: f32 = 2.0;
+const PATTER_PITCH: Range<f32> = 0.92..1.08;
 
 pub(super) struct LocalSoundPlugin;
 
@@ -31,7 +38,10 @@ impl Plugin for LocalSoundPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Footfalls>()
             .add_systems(Startup, LocalSounds::load)
-            .add_systems(Update, (LocalSounds::step, LocalSounds::talk));
+            .add_systems(
+                Update,
+                (LocalSounds::step, LocalSounds::talk, LocalSounds::patter),
+            );
     }
 }
 
@@ -74,6 +84,7 @@ struct LocalSounds {
     wet: Takes<Handle<AudioSource>>,
     splash: Takes<Handle<AudioSource>>,
     murmur: Takes<Handle<AudioSource>>,
+    patter: Takes<Handle<AudioSource>>,
     rng: SmallRng,
 }
 
@@ -98,6 +109,7 @@ impl LocalSounds {
             wet: Takes::new(unzip(wet), 1),
             splash: Takes::new(handles(Sound::Splash), 2),
             murmur: Takes::new(handles(Sound::Murmur), 3),
+            patter: Takes::new(handles(Sound::UmbrellaRain), 4),
             rng: rng(SEED),
         });
     }
@@ -186,6 +198,59 @@ impl LocalSounds {
                 ),
                 Transform::from_translation(mouth),
             ));
+        }
+    }
+
+    /// Rain drums on the open umbrellas near the player.
+    fn patter(
+        weather: Res<Weather>,
+        mixer: Res<Mixer>,
+        sounds: Option<ResMut<LocalSounds>>,
+        listener: Single<&GlobalTransform, With<SpatialListener>>,
+        mut canopies: Query<(Entity, &mut Canopy, &GlobalTransform)>,
+        mut emitters: Query<&mut Emitter>,
+        mut commands: Commands,
+    ) {
+        let Some(mut sounds) = sounds else {
+            return;
+        };
+        let sounds = &mut *sounds;
+        let ear = listener.translation();
+        for (entity, mut canopy, at) in &mut canopies {
+            let distance = at.translation().distance(ear);
+            let level = weather.rain * canopy.open;
+            match canopy.patter {
+                Some(patter) if level <= 0.0 || distance > PATTER_GONE => {
+                    commands.entity(patter).despawn();
+                    canopy.patter = None;
+                }
+                Some(patter) => {
+                    if let Ok(mut emitter) = emitters.get_mut(patter) {
+                        emitter.level = level;
+                    }
+                }
+                None if level > 0.0 && distance < PATTER_RANGE => {
+                    let pitch = sounds.rng.random_range(PATTER_PITCH);
+                    let start = Duration::from_secs_f32(sounds.rng.random_range(0.0..4.0));
+                    let emitter = Emitter::new(Sound::UmbrellaRain, Some(PATTER_REACH), pitch)
+                        .with_level(level);
+                    let patter = commands
+                        .spawn((
+                            Name::new("rain on an umbrella"),
+                            emitter.bundle(
+                                sounds.patter.next().clone(),
+                                PlaybackSettings::LOOP.with_start_position(start),
+                                &mixer,
+                                distance,
+                            ),
+                            Transform::default(),
+                            ChildOf(entity),
+                        ))
+                        .id();
+                    canopy.patter = Some(patter);
+                }
+                None => {}
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ use super::super::traffic::Vehicle;
 use super::Whims;
 
 /// How far the head turns from the front, and up or down, in radians.
-const YAW: f32 = 1.4;
+pub(super) const YAW: f32 = 1.4;
 const PITCH: f32 = 0.6;
 /// How quickly the head follows where it wants to look, per second.
 const FOLLOW: f32 = 6.0;

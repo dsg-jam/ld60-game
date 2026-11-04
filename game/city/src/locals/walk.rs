@@ -43,6 +43,8 @@ const FORESIGHT: f32 = 2.5;
 /// Passing someone coming the other way on the wrong side costs as much
 /// as stepping this far aside.
 const WRONG_SIDE: f32 = 1.0;
+/// Umbrellas tilt away from others closer than this.
+const CROWDED: f32 = 1.1;
 /// Room taken by a stool, with or without someone on it.
 const STOOL: f32 = 0.32;
 /// How far people walk between stops, and how long they stand.
@@ -86,6 +88,18 @@ pub(super) struct Walker {
     yaw: f32,
     until_stop: f32,
     stopped: f32,
+}
+
+impl Body {
+    /// The way away from the nearest of `others` that crowds it, and how
+    /// close it is, from 0 to 1.
+    fn crowded_by<'a>(&self, others: impl Iterator<Item = &'a Body>) -> Option<(Vec2, f32)> {
+        others
+            .map(|other| (self.at - other.at, self.at.distance(other.at)))
+            .filter(|&(_, distance)| distance < CROWDED)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(away, distance)| (away, 1.0 - distance / CROWDED))
+    }
 }
 
 impl Walker {
@@ -184,7 +198,11 @@ impl Walker {
                 Some(z) if rained_on > SHELTER_RAIN => z,
                 _ => walker.lane,
             };
-            let lane = walker.steer(lane, &me, others);
+            let lane = walker.steer(lane, &me, others.clone());
+            if let Some((away, crowded)) = me.crowded_by(others) {
+                let away = Quat::from_rotation_y(-walker.yaw) * Vec3::new(away.x, 0.0, away.y);
+                strider.lean_umbrella(away.xz(), crowded, dt);
+            }
             let step = SIDESTEP * dt * strider.speed.min(1.0);
             let dz = (lane - walker.z).clamp(-step, step);
             walker.z += dz;
