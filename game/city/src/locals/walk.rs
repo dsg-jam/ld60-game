@@ -38,6 +38,11 @@ const HURRY: f32 = 0.35;
 const SHELTER_RAIN: f32 = 0.3;
 /// People keep this much room to someone slower ahead of them.
 const GAP: f32 = 0.5;
+/// Squeezing past someone costs as much as stepping this far aside, per
+/// meter of overlap.
+const SQUEEZE: f32 = 8.0;
+/// Standing, people step aside this much slower than walking.
+const SHUFFLE: f32 = 0.5;
 /// Seconds ahead people look for someone in their way.
 const FORESIGHT: f32 = 2.5;
 /// Passing someone coming the other way on the wrong side costs as much
@@ -202,7 +207,8 @@ impl Walker {
                 let away = Quat::from_rotation_y(-walker.yaw) * Vec3::new(away.x, 0.0, away.y);
                 strider.lean_umbrella(away.xz(), crowded, dt);
             }
-            let step = SIDESTEP * dt * strider.speed.min(1.0);
+            // Standing people still shuffle aside.
+            let step = SIDESTEP * dt * strider.speed.clamp(SHUFFLE, 1.0);
             let dz = (lane - walker.z).clamp(-step, step);
             walker.z += dz;
             walker.x += walker.heading * strider.speed * dt;
@@ -243,25 +249,24 @@ impl Walker {
         others: impl Iterator<Item = &'a Body> + Clone,
     ) -> f32 {
         let near = others.filter(|other| self.ahead_of(me, other).is_some());
-        let clear = |z: f32| {
-            near.clone()
-                .all(|other| (z - other.at.y).abs() >= me.radius + other.radius - 0.01)
-        };
+        // In a crowd no spot may be clear. Then the least squeezed one
+        // wins, so nobody waits for a gap that never comes.
         let cost = |z: f32| {
-            let wrong = near
-                .clone()
-                .filter(|other| {
-                    other.velocity * self.heading < 0.0 && (z - other.at.y) * self.heading < 0.0
-                })
-                .count();
-            (z - lane).abs() + WRONG_SIDE * wrong as f32
+            let (wrong, squeeze) = near.clone().fold((0, 0.0), |(wrong, squeeze), other| {
+                let oncoming = other.velocity * self.heading < 0.0;
+                let wrong_side = oncoming && (z - other.at.y) * self.heading < 0.0;
+                let overlap = (me.radius + other.radius - (z - other.at.y).abs()).max(0.0);
+                (wrong + usize::from(wrong_side), squeeze + overlap)
+            });
+            (z - lane).abs() + WRONG_SIDE * wrong as f32 + SQUEEZE * squeeze
         };
         iter::once(lane)
+            .chain([self.room.start, self.room.end])
             .chain(near.clone().flat_map(|other| {
                 let room = me.radius + other.radius;
                 [other.at.y - room, other.at.y + room]
             }))
-            .filter(|&z| self.room.contains(&z) && clear(z))
+            .map(|z| z.clamp(self.room.start, self.room.end))
             .min_by(|&a, &b| cost(a).total_cmp(&cost(b)))
             .unwrap_or(lane)
     }
