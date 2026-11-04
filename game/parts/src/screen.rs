@@ -2,6 +2,7 @@ mod crt;
 
 use bevy::{
     asset::uuid::Uuid,
+    camera::visibility::VisibilitySystems,
     camera::{ImageRenderTarget, NormalizedRenderTarget, RenderTarget, visibility::RenderLayers},
     image::ImageSampler,
     input::ButtonState,
@@ -12,6 +13,8 @@ use bevy::{
     },
     prelude::*,
     render::render_resource::{TextureFormat, TextureUsages},
+    text::TextLayoutInfo,
+    ui::{ComputedUiTargetCamera, UiGlobalTransform, UiSystems},
     window::{PrimaryWindow, WindowEvent, WindowRef},
 };
 use ld60_game_core::state::AppState;
@@ -25,6 +28,8 @@ const CANVAS_LAYER: usize = 1;
 /// Texels per UI pixel of a [`UiCanvas::spawn_print`] canvas. Read up close,
 /// a sheet covers more screen pixels than its canvas has UI pixels.
 const PRINT_SCALE: f32 = 2.0;
+/// Frames a canvas keeps drawing after its UI changed.
+const AWAKE: u8 = 2;
 
 pub struct ScreenPlugin;
 
@@ -34,6 +39,12 @@ impl Plugin for ScreenPlugin {
             .add_systems(
                 First,
                 ScreenSurface::drive_pointers.in_set(PickingSystems::Input),
+            )
+            .add_systems(
+                PostUpdate,
+                Lazy::wake
+                    .after(UiSystems::Stack)
+                    .after(VisibilitySystems::VisibilityPropagate),
             )
             .add_observer(ScreenSurface::add_pointer)
             .add_observer(ScreenSurface::keep_ui_focus);
@@ -49,6 +60,14 @@ pub struct CanvasOf(Entity);
 #[derive(Component, Debug, Default)]
 #[relationship_target(relationship = CanvasOf, linked_spawn)]
 pub struct Canvases(Vec<Entity>);
+
+/// A canvas camera that only draws in the frames its UI changes. Its image
+/// keeps what it drew last in between.
+#[derive(Component, Debug)]
+struct Lazy {
+    /// Frames left to draw.
+    awake: u8,
+}
 
 /// An offscreen UI that renders into an image, shown by `owner`.
 pub struct UiCanvas {
@@ -133,6 +152,7 @@ impl UiCanvas {
                 }),
                 RenderLayers::layer(CANVAS_LAYER),
                 CanvasOf(owner),
+                Lazy { awake: AWAKE },
             ))
             .id();
         Self {
@@ -300,6 +320,48 @@ impl ScreenSurface {
                 phase: wheel.phase,
             }),
             _ => None,
+        }
+    }
+}
+
+impl Lazy {
+    /// Lets each canvas draw in the frames after anything that shows in its
+    /// UI changed. Removed nodes and changed images wake every canvas, as
+    /// they don't say which canvas they were on.
+    #[expect(clippy::type_complexity, reason = "the changes that show")]
+    fn wake(
+        changed: Query<
+            &ComputedUiTargetCamera,
+            Or<(
+                Changed<ComputedNode>,
+                Changed<UiGlobalTransform>,
+                Changed<InheritedVisibility>,
+                Changed<BackgroundColor>,
+                Changed<BorderColor>,
+                Changed<ImageNode>,
+                Changed<TextColor>,
+                Changed<TextLayoutInfo>,
+                Changed<ComputedUiTargetCamera>,
+            )>,
+        >,
+        mut removed: RemovedComponents<ComputedNode>,
+        mut images: MessageReader<AssetEvent<Image>>,
+        mut canvases: Query<(Entity, &mut Lazy, &mut Camera)>,
+    ) {
+        let everything = removed.read().count() > 0
+            || images
+                .read()
+                .any(|event| matches!(event, AssetEvent::Modified { .. }));
+        for (entity, mut lazy, mut camera) in &mut canvases {
+            let woken = everything || changed.iter().any(|target| target.get() == Some(entity));
+            if woken {
+                lazy.awake = AWAKE;
+            }
+            let draw = lazy.awake > 0;
+            lazy.awake = lazy.awake.saturating_sub(1);
+            if camera.is_active != draw {
+                camera.is_active = draw;
+            }
         }
     }
 }
