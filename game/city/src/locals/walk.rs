@@ -6,8 +6,8 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use super::super::weather::Weather;
+use super::bird::Bird;
 use super::gaze::Gaze;
-use super::strider::Strider;
 use super::{Places, Whims};
 
 /// The sidewalks people walk along, each with a lane per direction.
@@ -78,7 +78,7 @@ pub(super) struct Body {
     radius: f32,
 }
 
-/// Walks a strider along a sidewalk, past the shop and back around.
+/// Walks a bird along a sidewalk, past the shop and back around.
 #[derive(Component, Debug)]
 pub(super) struct Walker {
     x: f32,
@@ -146,7 +146,7 @@ impl Walker {
         places: Res<Places>,
         mut whims: ResMut<Whims>,
         mut bodies: Local<Vec<Body>>,
-        mut walkers: Query<(&mut Walker, &mut Strider, &mut Gaze, &mut Transform)>,
+        mut walkers: Query<(&mut Walker, &mut Bird, &mut Gaze, &mut Transform)>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
@@ -157,18 +157,14 @@ impl Walker {
             radius: STOOL,
         }));
         let first = bodies.len();
-        bodies.extend(
-            walkers
-                .iter()
-                .map(|(walker, strider, ..)| walker.body(strider)),
-        );
-        for (index, (mut walker, mut strider, mut gaze, mut transform)) in
+        bodies.extend(walkers.iter().map(|(walker, bird, ..)| walker.body(bird)));
+        for (index, (mut walker, mut bird, mut gaze, mut transform)) in
             walkers.iter_mut().enumerate()
         {
-            let rained_on = strider.rained_on(weather.rain);
-            strider.hunch += (rained_on - strider.hunch) * (1.0 - (-dt).exp());
+            let rained_on = bird.rained_on(weather.rain);
+            bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
 
-            let mut target = strider.pace * (1.0 + HURRY * rained_on);
+            let mut target = bird.pace * (1.0 + HURRY * rained_on);
             if walker.stopped > 0.0 {
                 walker.stopped -= dt;
                 target = 0.0;
@@ -180,7 +176,7 @@ impl Walker {
                     gaze.glance_at(Vec2::new(side * 1.2, 0.1), walker.stopped);
                 }
             }
-            let me = walker.body(&strider);
+            let me = walker.body(&bird);
             let others = bodies
                 .iter()
                 .enumerate()
@@ -195,8 +191,8 @@ impl Walker {
                 };
             }
             let change = ACCELERATION * dt;
-            strider.speed += (target - strider.speed).clamp(-change, change);
-            walker.until_stop -= strider.speed * dt;
+            bird.speed += (target - bird.speed).clamp(-change, change);
+            walker.until_stop -= bird.speed * dt;
 
             let lane = match walker.sheltered {
                 Some(z) if rained_on > SHELTER_RAIN => z,
@@ -205,29 +201,29 @@ impl Walker {
             let lane = walker.steer(lane, &me, others.clone());
             if let Some((away, crowded)) = me.crowded_by(others) {
                 let away = Quat::from_rotation_y(-walker.yaw) * Vec3::new(away.x, 0.0, away.y);
-                strider.lean_umbrella(away.xz(), crowded, dt);
+                bird.lean_umbrella(away.xz(), crowded, dt);
             }
             // Standing people still shuffle aside.
-            let step = SIDESTEP * dt * strider.speed.clamp(SHUFFLE, 1.0);
+            let step = SIDESTEP * dt * bird.speed.clamp(SHUFFLE, 1.0);
             let dz = (lane - walker.z).clamp(-step, step);
             walker.z += dz;
-            walker.x += walker.heading * strider.speed * dt;
+            walker.x += walker.heading * bird.speed * dt;
             if walker.x.abs() > WANDER {
                 walker.x -= walker.heading * 2.0 * WANDER;
             }
-            if strider.speed > 0.05 {
-                let yaw = (walker.heading * strider.speed * dt).atan2(dz);
+            if bird.speed > 0.05 {
+                let yaw = (walker.heading * bird.speed * dt).atan2(dz);
                 walker.yaw += (yaw - walker.yaw) * (1.0 - (-4.0 * dt).exp());
             }
             *transform = walker.place();
         }
     }
 
-    fn body(&self, strider: &Strider) -> Body {
+    fn body(&self, bird: &Bird) -> Body {
         Body {
             at: Vec2::new(self.x, self.z),
-            velocity: self.heading * strider.speed,
-            radius: strider.radius(),
+            velocity: self.heading * bird.speed,
+            radius: bird.radius(),
         }
     }
 

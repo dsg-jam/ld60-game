@@ -38,6 +38,9 @@ const SPOTTED: u32 = 3u;
 const CONTOUR: f32 = 0.0;
 const SHIMMER: f32 = 1.0;
 const PLUME: f32 = 2.0;
+const DOWN: f32 = 3.0;
+/// Down is darker than the feathers over it.
+const DOWN_SHADE: f32 = 0.45;
 /// Barbs across the vane of a feather.
 const BARBS: f32 = 70.0;
 /// Barbs sweep towards the tip.
@@ -77,7 +80,8 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let gaps = mix(0.0, 0.35, wet) + 0.12 * step(0.75, hash1(vec2<f32>(seed, 3.0), 2.0));
     let notch = noise(vec2<f32>(along * 9.0, seed), 4.0);
     let width = vane(along, kind) * (1.0 - gaps * step(0.55, notch) * step(0.4, abs(across)));
-    if abs(across) > width || along > 0.995 {
+    let down = kind > DOWN - 0.5;
+    if !down && (abs(across) > width || along > 0.995) {
         discard;
     }
 
@@ -111,11 +115,14 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         // Plumes have their own color at the tip.
         color = mix(color, accent, smoothstep(0.55, 0.9, along));
     }
+    if down {
+        color = pbr_input.material.base_color.rgb * DOWN_SHADE;
+    }
     if abs(kind - SHIMMER) < 0.5 {
         color = shimmer(abs(dot(normalize(in.world_normal), pbr_input.V)), color);
     }
     // Only plumes show their shafts.
-    let shaft = rachis * step(1.5, kind);
+    let shaft = rachis * step(1.5, kind) * step(kind, 2.5);
     color = mix(color, color * 1.4 + 0.03, shaft * 0.3);
     // Water darkens the barbs and leaves a film on them.
     color *= mix(1.0, 0.55, wet);

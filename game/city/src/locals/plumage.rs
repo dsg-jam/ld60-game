@@ -2,16 +2,14 @@ mod feathers;
 
 use bevy::{
     asset::{AssetPath, embedded_asset, embedded_path},
-    light::NotShadowCaster,
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
-use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
-pub(super) use self::feathers::Feathers;
+pub(super) use self::feathers::{Cover, Feather, Feathers, Kind};
 use super::Pick;
 
 /// Wet feathers show it in steps this small, so the materials only change
@@ -80,11 +78,10 @@ struct Palette {
     sheen: f32,
 }
 
-/// One bird's feathers: its material and the down under them.
+/// One bird's feathers.
 #[derive(Debug, Clone)]
 pub(super) struct Coat {
     pub(super) feathers: Handle<PlumageMaterial>,
-    pub(super) down: Handle<SurfaceMaterial>,
     /// How soaked it is, from 0 to 1, as last shown.
     shown_wet: f32,
 }
@@ -106,11 +103,7 @@ impl Palette {
 
 impl Coat {
     /// A coat of one of the palettes, a little different from any other.
-    pub(super) fn new(
-        plumages: &mut Assets<PlumageMaterial>,
-        surfaces: &mut Assets<SurfaceMaterial>,
-        rng: &mut impl Rng,
-    ) -> Self {
+    pub(super) fn new(plumages: &mut Assets<PlumageMaterial>, rng: &mut impl Rng) -> Self {
         let palette = PALETTES.pick(rng);
         let tint = rng.random_range(0.85..1.15f32);
         let base = Palette::color(palette.base).to_linear() * tint;
@@ -132,10 +125,8 @@ impl Coat {
                 },
             },
         });
-        let down = surfaces.add(Finish::Fabric.scaled((base * 0.45).into()));
         Self {
             feathers,
-            down,
             shown_wet: 0.0,
         }
     }
@@ -150,18 +141,6 @@ impl Coat {
         if let Some(mut material) = plumages.get_mut(&self.feathers) {
             material.extension.params.wet = stepped;
         }
-    }
-
-    /// Feathers of this coat in `mesh`, placed by `transform`.
-    pub(super) fn bundle(&self, mesh: &Handle<Mesh>, transform: Transform) -> impl Bundle {
-        (
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(self.feathers.clone()),
-            transform,
-            // Cards cast square shadows, and the shadows of the locals are
-            // drawn on their own.
-            NotShadowCaster,
-        )
     }
 }
 

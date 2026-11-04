@@ -41,19 +41,6 @@ impl Mul<f32> for Limb {
     }
 }
 
-/// A rod of `thickness` from `from` to `to`, for a unit cylinder along Y.
-pub(super) fn rod(from: Vec3, to: Vec3, thickness: f32) -> Transform {
-    let span = to - from;
-    let rotation = span.try_normalize().map_or(Quat::IDENTITY, |along| {
-        Quat::from_rotation_arc(Vec3::Y, along)
-    });
-    Transform {
-        translation: (from + to) / 2.0,
-        rotation,
-        scale: Vec3::new(thickness, span.length().max(1e-4), thickness),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

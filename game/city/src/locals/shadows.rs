@@ -92,7 +92,7 @@ impl Blob {
     fn moved(self, by: &Transform) -> Self {
         Self {
             center: by.transform_point(self.center),
-            axes: self.axes.map(|axis| by.rotation * axis),
+            axes: self.axes.map(|axis| by.rotation * (axis * by.scale)),
         }
     }
 
@@ -114,17 +114,18 @@ impl Bone {
         Self {
             from: by.transform_point(self.from),
             to: by.transform_point(self.to),
-            radius: self.radius,
+            radius: self.radius * by.scale.x,
         }
     }
 }
 
 impl Silhouette {
-    /// This silhouette, made in the space of `by`, in world space.
+    /// This silhouette, made in the space of `by`, in world space. `by`
+    /// scales evenly.
     pub(super) fn moved(&self, by: &Transform) -> Self {
         Self {
             feet: by.transform_point(self.feet),
-            height: self.height,
+            height: self.height * by.scale.y,
             blobs: self.blobs.map(|blob| blob.moved(by)),
             bones: self.bones.map(|bone| bone.moved(by)),
         }

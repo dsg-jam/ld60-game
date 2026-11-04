@@ -1,37 +1,24 @@
-use std::f32::consts::{PI, TAU};
 use std::ops::Range;
 
 use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
-use super::gaze::Gaze;
-use super::limb::{Limb, rod};
-use super::sound::{Footfall, Footfalls, Voice};
-use super::{Figures, KEEPER_TALK, Pick, Whims};
+use super::bird::{Bird, Birth, Posture, Work};
+use super::plumage::Coat;
+use super::sound::{Footfall, Footfalls};
+use super::{Figures, PlumageMaterial, Whims};
 
-/// The shell, low and wide, and the plate on top of it.
-const SHELL: Vec3 = Vec3::new(0.72, 0.8, 0.62);
-const SHELL_HEIGHT: f32 = 0.95;
-const PLATE: Vec3 = Vec3::new(0.6, 0.45, 0.5);
-const PLATE_AT: Vec3 = Vec3::new(0.0, 1.3, -0.06);
-const NECK_BASE: Vec3 = Vec3::new(0.0, 1.18, 0.22);
-const HEAD: Vec3 = Vec3::new(0.0, 1.5, 0.34);
-const NECK: f32 = 0.08;
-const SHOULDER: Vec3 = Vec3::new(0.26, 1.12, 0.2);
-const ARM: Limb = Limb {
-    upper: 0.28,
-    lower: 0.3,
-};
-const UPPER_ARM: f32 = 0.05;
-const FOREARM: f32 = 0.04;
-const HAND: Vec3 = Vec3::new(0.07, 0.035, 0.08);
+/// Keepers stand on a crate behind the counter, this high and this far
+/// towards it from the spot behind it, to reach over it.
+const CRATE: f32 = 0.08;
+const FORWARD: f32 = 0.25;
 /// Hands on the counter, in the keeper's space: the top is this high,
-/// and its edge this far in front.
-const COUNTER_TOP: f32 = 0.995;
-const REACH: Range<f32> = 0.42..0.66;
+/// and the goods lie this far in front.
+const COUNTER_TOP: f32 = 0.995 - CRATE + 0.02;
+const REACH: Range<f32> = 0.2..0.4;
 /// How high hands lift moving between spots, and how fast they move.
 const HAND_LIFT: f32 = 0.06;
-const HAND_SPEED: f32 = 0.6;
+const HAND_SPEED: f32 = 0.5;
 /// Seconds between moving a hand, and between moving along the counter.
 const FIDGET: Range<f32> = 0.8..3.0;
 const SHIFT: Range<f32> = 5.0..15.0;
@@ -39,25 +26,16 @@ const SHIFT: Range<f32> = 5.0..15.0;
 /// length of a step.
 const SHUFFLE: f32 = 0.3;
 const SHUFFLE_ACCELERATION: f32 = 0.6;
-const STEP: f32 = 0.16;
-/// How far the shell rocks to the side, rises and turns along the
-/// counter while shuffling.
-const ROCK: f32 = 0.07;
-const RISE: f32 = 0.02;
-const TURN: f32 = 0.35;
+const STEP: f32 = 0.12;
 /// Loudness of its steps, which the counter muffles.
 const STEP_LOUDNESS: f32 = 0.3;
 /// Room left at the ends of the counter.
 const COUNTER_END: f32 = 0.45;
-const BREATH_RATE: f32 = 0.25;
-const BREATH: f32 = 0.015;
 
-/// A keeper behind the counter of a stall, under a heavy shell, with long
-/// arms for the goods. Its legs are hidden behind the counter, so it has
-/// none.
+/// A bird keeping a stall: it shuffles along the counter and moves its
+/// hands over the goods.
 #[derive(Component, Debug)]
 pub(super) struct Keeper {
-    size: f32,
     home: Transform,
     /// How far it can move along the counter, from the middle.
     room: f32,
@@ -71,92 +49,30 @@ pub(super) struct Keeper {
     aims: [Vec3; 2],
     fidget: f32,
     shift: f32,
-    breath: f32,
-    rig: Rig,
-}
-
-#[derive(Debug)]
-struct Rig {
-    shell: Entity,
-    head: Entity,
-    uppers: [Entity; 2],
-    forearms: [Entity; 2],
-    hands: [Entity; 2],
 }
 
 impl Keeper {
     pub(super) fn spawn(
         commands: &mut Commands,
         figures: &Figures,
+        plumages: &mut Assets<PlumageMaterial>,
         rng: &mut impl Rng,
         home: Transform,
         half_width: f32,
     ) {
-        let size = rng.random_range(0.9..1.1f32);
-        let colors = figures.colors(rng);
-        let shell = figures.shells.pick(rng).clone();
-        let mut rig = None;
-        let mut root = commands.spawn((
-            Name::new("keeper"),
-            home,
-            Visibility::default(),
-            Gaze::default(),
-        ));
-        root.with_children(|parent| {
-            let mut body = parent.spawn((Transform::default(), Visibility::default()));
-            let mut head = Entity::PLACEHOLDER;
-            body.with_children(|body| {
-                body.spawn(figures.ball(
-                    &shell,
-                    Transform::from_xyz(0.0, SHELL_HEIGHT * size, 0.0).with_scale(SHELL * size),
-                ));
-                body.spawn(figures.ball(
-                    &shell,
-                    Transform::from_translation(PLATE_AT * size).with_scale(PLATE * size),
-                ));
-                for index in 0..rng.random_range(2..5) {
-                    let at = Vec3::new(0.0, 1.52 - index as f32 * 0.06, -0.08 - index as f32 * 0.1);
-                    body.spawn(figures.ball(
-                        &shell,
-                        Transform::from_translation(at * size).with_scale(Vec3::splat(0.07 * size)),
-                    ));
-                }
-                body.spawn(figures.rod(
-                    &colors.skin,
-                    rod(NECK_BASE * size, HEAD * size, NECK * size),
-                ));
-                head = body
-                    .spawn((
-                        Transform::from_translation(HEAD * size),
-                        Visibility::default(),
-                    ))
-                    .with_children(|head| {
-                        let feelers = rng.random_bool(0.5);
-                        figures.spawn_head(head, &colors, size, feelers, rng);
-                    })
-                    .id();
-            });
-            let shell = body.id();
-            let uppers = [(); 2].map(|()| parent.spawn(figures.rod(&colors.skin, default())).id());
-            let forearms =
-                [(); 2].map(|()| parent.spawn(figures.rod(&colors.skin, default())).id());
-            let hands = [(); 2].map(|()| parent.spawn(figures.ball(&colors.skin, default())).id());
-            rig = Some(Rig {
-                shell,
-                head,
-                uppers,
-                forearms,
-                hands,
-            });
-        });
-        let Some(rig) = rig else {
-            unreachable!("with_children runs at once");
+        let home = home * Transform::from_xyz(0.0, CRATE, FORWARD);
+        let birth = Birth {
+            at: home,
+            posture: Posture::Keeping,
+            may_carry: false,
+            sheltered: true,
+            coat: Coat::new(plumages, rng),
         };
-        let rest = [-1.0, 1.0].map(|side| Vec3::new(side * 0.22, COUNTER_TOP, 0.5));
-        root.insert((
-            Voice::new(size, KEEPER_TALK, rng),
+        let bird = Bird::spawn(commands, figures, rng, birth);
+        let rest = [-1.0, 1.0].map(|side| Vec3::new(side * 0.15, COUNTER_TOP, REACH.start));
+        commands.entity(bird).insert((
+            Name::new("keeper"),
             Self {
-                size,
                 home,
                 room: (half_width - COUNTER_END).max(0.0),
                 x: 0.0,
@@ -167,29 +83,40 @@ impl Keeper {
                 aims: rest,
                 fidget: rng.random_range(FIDGET),
                 shift: rng.random_range(SHIFT),
-                breath: rng.random_range(0.0..TAU),
-                rig,
             },
         ));
     }
 
+    /// What its hands and feet do, for a bird of `size`.
+    pub(super) fn work(&self, size: f32) -> Work {
+        Work {
+            hands: [0, 1].map(|hand| {
+                let distance = (self.aims[hand] - self.hands[hand]).with_y(0.0).length();
+                let lift = HAND_LIFT * (distance / 0.1).min(1.0);
+                (self.hands[hand] + Vec3::Y * lift) / size
+            }),
+            shuffle: (self.speed.abs() / SHUFFLE).min(1.0),
+            steps: self.steps,
+        }
+    }
+
     /// Moves the hands over the goods and the keeper along the counter.
-    pub(super) fn work(
+    pub(super) fn work_on(
         time: Res<Time>,
         mut whims: ResMut<Whims>,
         mut footfalls: ResMut<Footfalls>,
-        mut keepers: Query<(&mut Keeper, &mut Transform)>,
+        mut keepers: Query<(&mut Keeper, &Bird, &mut Transform)>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
-        for (mut keeper, mut transform) in &mut keepers {
+        for (mut keeper, bird, mut transform) in &mut keepers {
             keeper.fidget -= dt;
             if keeper.fidget <= 0.0 {
                 keeper.fidget = rng.random_range(FIDGET);
                 let hand = usize::from(rng.random_bool(0.5));
                 let side = if hand == 0 { -1.0 } else { 1.0 };
                 keeper.aims[hand] = Vec3::new(
-                    side * rng.random_range(0.05..0.4),
+                    side * rng.random_range(0.05..0.3),
                     COUNTER_TOP,
                     rng.random_range(REACH),
                 );
@@ -208,16 +135,16 @@ impl Keeper {
             keeper.steps += moved.abs() / STEP;
             if keeper.steps.floor() > before.floor() {
                 let side = if (keeper.steps as u32).is_multiple_of(2) {
-                    -0.15
+                    -0.1
                 } else {
-                    0.15
+                    0.1
                 };
                 let at = keeper
                     .home
-                    .transform_point(Vec3::new(keeper.x + side, 0.0, 0.0));
+                    .transform_point(Vec3::new(keeper.x + side, -CRATE, 0.0));
                 footfalls.0.push(Footfall {
                     at,
-                    level: STEP_LOUDNESS * keeper.size,
+                    level: STEP_LOUDNESS * bird.size(),
                     indoors: true,
                 });
             }
@@ -230,56 +157,6 @@ impl Keeper {
                 keeper.hands[hand] = (at + flat.normalize_or_zero() * move_by).with_y(aim.y);
             }
             *transform = keeper.home * Transform::from_xyz(keeper.x, 0.0, 0.0);
-        }
-    }
-
-    pub(super) fn pose(
-        time: Res<Time>,
-        mut keepers: Query<(&mut Keeper, &Gaze)>,
-        mut parts: Query<&mut Transform, Without<Keeper>>,
-    ) {
-        let dt = time.delta_secs();
-        for (mut keeper, gaze) in &mut keepers {
-            keeper.breath += dt * BREATH_RATE * TAU;
-            let size = keeper.size;
-            let breath = 1.0 + BREATH * keeper.breath.sin();
-            let gait = (keeper.speed.abs() / SHUFFLE).min(1.0);
-            let rock = (PI * keeper.steps).sin();
-            let waddle = Transform::from_xyz(0.0, RISE * size * gait * rock.abs(), 0.0)
-                .with_rotation(
-                    Quat::from_rotation_y(TURN * keeper.speed / SHUFFLE)
-                        * Quat::from_rotation_z(ROCK * gait * rock),
-                );
-            let rig = &keeper.rig;
-            let mut set = |entity: Entity, transform: Transform| {
-                if let Ok(mut part) = parts.get_mut(entity) {
-                    *part = transform;
-                }
-            };
-            set(
-                rig.shell,
-                waddle.with_scale(Vec3::new(breath, 1.0 / breath.sqrt(), breath)),
-            );
-            set(
-                rig.head,
-                Transform::from_translation(HEAD * size).with_rotation(
-                    Quat::from_rotation_y(gaze.turn.x) * Quat::from_rotation_x(gaze.turn.y),
-                ),
-            );
-            for (index, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-                let shoulder = waddle.transform_point(SHOULDER * Vec3::new(side, 1.0, 1.0) * size);
-                let hand = keeper.hands[index];
-                let distance = (keeper.aims[index] - hand).with_y(0.0).length();
-                let lifted = hand + Vec3::Y * (HAND_LIFT * (distance / 0.1).min(1.0) + HAND.y);
-                let bend = Vec3::new(side * 0.7, -1.0, -0.4);
-                let (elbow, wrist) = (ARM * size).reach(shoulder, lifted, bend);
-                set(rig.uppers[index], rod(shoulder, elbow, UPPER_ARM * size));
-                set(rig.forearms[index], rod(elbow, wrist, FOREARM * size));
-                set(
-                    rig.hands[index],
-                    Transform::from_translation(wrist).with_scale(HAND * size),
-                );
-            }
         }
     }
 }
