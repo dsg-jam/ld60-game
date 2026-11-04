@@ -29,7 +29,7 @@ const MOUTH: f32 = 1.6;
 /// Rain on umbrellas is heard this close, and stops beyond the other.
 const PATTER_RANGE: f32 = 9.0;
 const PATTER_GONE: f32 = 10.0;
-const PATTER_REACH: f32 = 2.0;
+const PATTER_REACH: f32 = 3.5;
 const PATTER_PITCH: Range<f32> = 0.92..1.08;
 
 pub(super) struct LocalSoundPlugin;

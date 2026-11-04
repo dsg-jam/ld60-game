@@ -133,9 +133,14 @@ impl Silhouette {
 
 /// The lights near the player.
 #[derive(Resource, Debug, Default)]
-struct Lamps(Vec<Lamp>);
+pub(super) struct Lamps(Vec<Lamp>);
 
 impl Lamps {
+    /// The light falling on `at` from all the lamps, in lux per color.
+    pub(super) fn light_at(&self, at: Vec3) -> Vec3 {
+        self.0.iter().map(|lamp| lamp.color * lamp.lux_at(at)).sum()
+    }
+
     fn gather(
         camera: Single<&GlobalTransform, With<PlayerCamera>>,
         spots: Query<(&SpotLight, &GlobalTransform, &InheritedVisibility)>,
@@ -188,6 +193,20 @@ struct Lamp {
 }
 
 impl Lamp {
+    /// Lux at `at`, from any side.
+    fn lux_at(&self, at: Vec3) -> f32 {
+        let to = self.at - at;
+        let distance_squared = to.length_squared().max(0.01);
+        let window = (1.0 - (distance_squared / (self.range * self.range)).powi(2))
+            .clamp(0.0, 1.0)
+            .powi(2);
+        let cone = self.spot.map_or(1.0, |(direction, scale, offset)| {
+            let along = direction.dot(-to.normalize());
+            (along * scale + offset).clamp(0.0, 1.0).powi(2)
+        });
+        self.intensity / distance_squared * window * cone
+    }
+
     /// Lux on the ground at `at`.
     fn lux(&self, at: Vec3) -> f32 {
         let to = self.at - at;

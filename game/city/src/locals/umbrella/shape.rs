@@ -8,7 +8,7 @@ use bevy::{
 use ld60_geometry::triangles::{End, Triangles};
 
 /// Ribs, each with a gore of cloth to the next.
-const RIBS: usize = 8;
+pub(super) const RIBS: usize = 8;
 /// Half the angle the canopy spans on the sphere its ribs bend along.
 const SPAN: f32 = 0.73;
 /// Quads across a gore and along it.

@@ -68,6 +68,7 @@ impl Plugin for LocalsPlugin {
             sound::LocalSoundPlugin,
             shadows::ShadowPlugin,
             plumage::PlumagePlugin,
+            umbrella::DropsPlugin,
         ))
         .init_resource::<Places>()
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))

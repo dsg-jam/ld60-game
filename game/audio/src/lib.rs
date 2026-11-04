@@ -273,7 +273,7 @@ impl Sound {
             Self::PuddleRain => 0.35,
             Self::AwningRain => 0.2,
             Self::RoofRain => 0.125,
-            Self::UmbrellaRain => 0.2,
+            Self::UmbrellaRain => 0.45,
             Self::Drip | Self::Plunk => 0.25,
             Self::Footstep => 0.3,
             Self::Splash => 0.3,

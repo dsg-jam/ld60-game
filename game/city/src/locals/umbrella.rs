@@ -1,3 +1,4 @@
+mod drops;
 mod shape;
 
 use std::f32::consts::PI;
@@ -9,6 +10,9 @@ use rand::{Rng, RngExt};
 use super::Pick;
 use super::shadows::Blob;
 
+pub(super) use self::drops::DropsPlugin;
+/// Ribs, each with a gore of cloth to the next.
+const RIBS: usize = shape::RIBS;
 /// Radius of the canopy, before size.
 const RADIUS: f32 = 0.58;
 /// From the hand to the top of the canopy, before size.
@@ -159,6 +163,7 @@ impl Umbrella {
                     .id();
                 canopy = umbrella
                     .spawn((
+                        Name::new("canopy"),
                         Canopy::default(),
                         Transform::from_xyz(0.0, SHAFT, 0.0),
                         Visibility::Hidden,
