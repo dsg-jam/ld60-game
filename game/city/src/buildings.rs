@@ -5,6 +5,7 @@ mod rows;
 use std::ops::Range;
 
 use bevy::{prelude::*, shader::load_shader_library};
+use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::shop;
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, SurfaceMaterial};
@@ -186,6 +187,11 @@ impl Skyline {
         skyline.spawn_shop_building(&mut commands, &kit, &mut facades, &mut rng);
         commands.insert_resource(skyline);
         commands.insert_resource(DripEdges(finds.drips));
+        let counter = CounterLayout::new();
+        finds
+            .places
+            .in_way
+            .extend(counter.stools().map(|at| at.xz()));
         commands.insert_resource(finds.places);
     }
 

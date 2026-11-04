@@ -7,7 +7,8 @@ use rand::{Rng, RngExt};
 use super::super::weather::Weather;
 use super::gaze::Gaze;
 use super::limb::{Limb, rod};
-use super::sound::{Footfalls, Voice};
+use super::shadows::{Blob, Bone, Silhouette};
+use super::sound::{Footfall, Footfalls, Voice};
 use super::{Figures, Pick, SITTER_TALK, WALKER_TALK};
 
 const HIP_HEIGHT: f32 = 1.05;
@@ -30,6 +31,8 @@ const HULL_ABOVE: f32 = 0.18;
 const HIPS: Vec3 = Vec3::new(HIP_WIDTH / 2.0, -HULL_ABOVE, -0.04);
 const NECK_BASE: Vec3 = Vec3::new(0.0, 0.12, 0.24);
 const HEAD: Vec3 = Vec3::new(0.0, 0.42, 0.34);
+/// Matches the skull in [`Figures::spawn_head`].
+const SKULL: Vec3 = Vec3::new(0.2, 0.18, 0.28);
 const NECK: f32 = 0.07;
 const SHOULDER: Vec3 = Vec3::new(0.17, 0.06, 0.18);
 const ARM: f32 = 0.035;
@@ -46,6 +49,8 @@ const UMBRELLA_RISE: f32 = 0.18;
 /// Height of the umbrella's rim above the head.
 const UMBRELLA_ABOVE: f32 = 0.3;
 const POLE: f32 = 0.014;
+/// Room for the swinging arms beside the hull.
+const ELBOW_ROOM: f32 = 0.08;
 /// The umbrellas open at this much rain.
 const RAINY: f32 = 0.25;
 
@@ -69,6 +74,8 @@ const BREATH: f32 = 0.006;
 #[derive(Component, Debug)]
 pub(super) struct Strider {
     size: f32,
+    /// The size of the hull.
+    hull: Vec3,
     posture: Posture,
     rig: Rig,
     /// Steps taken, in cycles of both feet.
@@ -128,6 +135,7 @@ impl Strider {
             at,
             Visibility::default(),
             Gaze::default(),
+            Silhouette::default(),
         ));
         let mut rig = None;
         root.with_children(|parent| {
@@ -181,6 +189,7 @@ impl Strider {
             Voice::new(size, talk, rng),
             Self {
                 size,
+                hull: HULL * girth * size,
                 posture,
                 rig,
                 phase: rng.random(),
@@ -201,25 +210,43 @@ impl Strider {
         color: &Handle<SurfaceMaterial>,
         size: f32,
     ) -> Entity {
-        let rim = (HEAD.y + UMBRELLA_ABOVE) * size;
-        let top = Vec3::new(0.0, rim + UMBRELLA_RISE, HEAD.z * size * 0.8);
+        let (canopy, scale) = Self::canopy(size);
+        let top = canopy.translation + Vec3::Y * UMBRELLA_RISE / 2.0;
         hull.spawn((Transform::default(), Visibility::Hidden))
             .with_children(|umbrella| {
                 umbrella.spawn((
                     Mesh3d(figures.canopy.clone()),
                     MeshMaterial3d(color.clone()),
-                    Transform::from_translation(top - Vec3::Y * UMBRELLA_RISE / 2.0).with_scale(
-                        Vec3::new(2.0 * UMBRELLA_RADIUS, UMBRELLA_RISE, 2.0 * UMBRELLA_RADIUS)
-                            * Vec3::new(size, 1.0, size),
-                    ),
+                    canopy.with_scale(scale),
                 ));
                 umbrella.spawn(figures.rod(color, rod(GRIP * size, top, POLE)));
             })
             .id()
     }
 
+    /// The middle of the canopy in the hull's space, and its size.
+    fn canopy(size: f32) -> (Transform, Vec3) {
+        let rim = (HEAD.y + UMBRELLA_ABOVE) * size;
+        let middle = Vec3::new(0.0, rim + UMBRELLA_RISE / 2.0, HEAD.z * size * 0.8);
+        let scale = Vec3::new(
+            2.0 * UMBRELLA_RADIUS * size,
+            UMBRELLA_RISE,
+            2.0 * UMBRELLA_RADIUS * size,
+        );
+        (Transform::from_translation(middle), scale)
+    }
+
     pub(super) fn has_umbrella_open(&self) -> bool {
         self.umbrella == Some(true)
+    }
+
+    /// How far others stay from its middle, umbrella included.
+    pub(super) fn radius(&self) -> f32 {
+        if self.has_umbrella_open() {
+            UMBRELLA_RADIUS * self.size
+        } else {
+            self.hull.x / 2.0 + ELBOW_ROOM
+        }
     }
 
     /// Opens the umbrellas when it rains and closes them when it stops.
@@ -250,11 +277,11 @@ impl Strider {
     pub(super) fn pose(
         time: Res<Time>,
         mut footfalls: ResMut<Footfalls>,
-        mut striders: Query<(&mut Strider, &Gaze, &GlobalTransform)>,
+        mut striders: Query<(&mut Strider, &Gaze, &Transform, &mut Silhouette)>,
         mut parts: Query<&mut Transform, Without<Strider>>,
     ) {
         let dt = time.delta_secs();
-        for (mut strider, gaze, body) in &mut striders {
+        for (mut strider, gaze, body, mut silhouette) in &mut striders {
             strider.breath += dt * BREATH_RATE * TAU;
             let before = strider.phase;
             strider.phase += strider.speed * dt * STANCE / (STRIDE * strider.size);
@@ -266,9 +293,14 @@ impl Strider {
                 let landed = (strider.phase + offset).fract() < (before + offset).fract();
                 if landed && gait > STEPPING {
                     let at = body.transform_point(pose.feet[index].translation);
-                    footfalls.0.push((at, gait * strider.size));
+                    footfalls.0.push(Footfall {
+                        at,
+                        level: gait * strider.size,
+                        indoors: false,
+                    });
                 }
             }
+            *silhouette = pose.silhouette.moved(body);
             let rig = &strider.rig;
             let mut set = |entity: Entity, transform: Transform| {
                 if let Ok(mut part) = parts.get_mut(entity) {
@@ -308,6 +340,23 @@ impl Strider {
             shins: [Transform::default(); 2],
             feet: [Transform::default(); 2],
             arms: [Transform::default(); 2],
+            silhouette: Silhouette::default(),
+        };
+        let skull = hull * pose.head * Transform::from_xyz(0.0, 0.0, 0.04 * size);
+        let shadow = &mut pose.silhouette;
+        shadow.blobs[0] = Blob::new(&hull, self.hull);
+        shadow.blobs[1] = Blob::new(&skull, SKULL * size);
+        shadow.height = skull.translation.y + SKULL.y * size / 2.0;
+        if self.has_umbrella_open() {
+            let (canopy, scale) = Self::canopy(size);
+            let canopy = hull * canopy;
+            shadow.blobs[2] = Blob::new(&canopy, scale);
+            shadow.height = canopy.translation.y;
+        }
+        shadow.bones[4] = Bone {
+            from: hull.transform_point(NECK_BASE * size),
+            to: hull.transform_point(HEAD * size),
+            radius: NECK * size / 2.0,
         };
         for (index, side) in [-1.0f32, 1.0].into_iter().enumerate() {
             let flip = Vec3::new(side, 1.0, 1.0);
@@ -316,6 +365,16 @@ impl Strider {
             let (knee, ankle) = (LEG * size).reach(hip, ankle, knees);
             pose.thighs[index] = rod(hip, knee, THIGH * size);
             pose.shins[index] = rod(knee, ankle, SHIN * size);
+            pose.silhouette.bones[index] = Bone {
+                from: hip,
+                to: knee,
+                radius: THIGH * size / 2.0,
+            };
+            pose.silhouette.bones[2 + index] = Bone {
+                from: knee,
+                to: ankle,
+                radius: SHIN * size / 2.0,
+            };
             let lifted = (ankle.y - FOOT.y * size).max(0.0);
             pose.feet[index] = Transform::from_translation(
                 ankle + Vec3::new(0.0, -FOOT.y * size / 2.0, FOOT.z * size * 0.3),
@@ -337,6 +396,11 @@ impl Strider {
                 }
             };
             pose.arms[index] = rod(shoulder, hand, ARM * size);
+            pose.silhouette.bones[5 + index] = Bone {
+                from: hull.transform_point(shoulder),
+                to: hull.transform_point(hand),
+                radius: ARM * size / 2.0,
+            };
         }
         pose
     }
@@ -389,4 +453,6 @@ struct Pose {
     shins: [Transform; 2],
     feet: [Transform; 2],
     arms: [Transform; 2],
+    /// In its own space.
+    silhouette: Silhouette,
 }

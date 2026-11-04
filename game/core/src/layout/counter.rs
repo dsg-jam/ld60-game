@@ -24,6 +24,9 @@ const EYE_HEIGHT: f32 = 0.5;
 const EYE_DISTANCE: f32 = 0.45;
 /// Where the seated player looks, see [`Block::top_spot`].
 const LOOK_SPOT: Vec2 = Vec2::new(0.0, -0.5);
+/// Stools stand this far in front of the counter, at these X positions.
+const STOOL_DISTANCE: f32 = 0.35;
+const STOOLS: [f32; 2] = [-0.55, 0.55];
 
 /// Geometry of the counter in its own space.
 pub struct CounterLayout {
@@ -95,6 +98,12 @@ impl CounterLayout {
     /// The edge of the top on the player's side, `x` along the counter.
     pub fn front_edge(&self, x: f32) -> Vec3 {
         Vec3::new(x, self.top.max().y, self.top.max().z)
+    }
+
+    /// The feet of the stools on the street side.
+    pub fn stools(&self) -> impl Iterator<Item = Vec3> {
+        let z = self.wall.min().z - STOOL_DISTANCE;
+        STOOLS.into_iter().map(move |x| Vec3::new(x, 0.0, z))
     }
 
     /// Camera pose of the seated player.

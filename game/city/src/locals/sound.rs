@@ -35,9 +35,18 @@ impl Plugin for LocalSoundPlugin {
     }
 }
 
-/// Feet that landed this frame, where and how hard.
+/// Feet that landed this frame.
 #[derive(Resource, Debug, Default)]
-pub(super) struct Footfalls(pub(super) Vec<(Vec3, f32)>);
+pub(super) struct Footfalls(pub(super) Vec<Footfall>);
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Footfall {
+    pub(super) at: Vec3,
+    /// How hard, from 0 to 1.
+    pub(super) level: f32,
+    /// Whether a roof keeps the ground dry.
+    pub(super) indoors: bool,
+}
 
 /// A local's voice, and when it next says something.
 #[derive(Component, Debug)]
@@ -109,12 +118,14 @@ impl LocalSounds {
         };
         let sounds = &mut *sounds;
         let ear = listener.translation();
-        for (at, level) in footfalls.0.drain(..) {
+        for Footfall { at, level, indoors } in footfalls.0.drain(..) {
             let distance = at.distance(ear);
             if distance > STEP_RANGE {
                 continue;
             }
-            let (sound, takes) = if water(at.xz(), weather.wetness) > 0.0 {
+            let (sound, takes) = if indoors {
+                (Sound::Footstep, &mut sounds.dry)
+            } else if water(at.xz(), weather.wetness) > 0.0 {
                 (Sound::Splash, &mut sounds.splash)
             } else if weather.wetness > WET {
                 (Sound::Footstep, &mut sounds.wet)

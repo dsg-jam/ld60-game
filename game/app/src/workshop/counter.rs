@@ -11,9 +11,6 @@ const SLAT_GAP: f32 = 0.008;
 const STOOL_HEIGHT: f32 = 0.75;
 const STOOL_SEAT: Vec3 = Vec3::new(0.34, 0.05, 0.34);
 const STOOL_LEG: f32 = 0.05;
-/// Stools stand this far in front of the counter, at these X positions.
-const STOOL_DISTANCE: f32 = 0.35;
-const STOOLS: [f32; 2] = [-0.55, 0.55];
 
 const TOP_WOOD: Color = Color::srgb_u8(0x8e, 0x6c, 0x4c);
 const SLAT_WOOD: Color = Color::srgb_u8(0x5a, 0x40, 0x2c);
@@ -50,8 +47,7 @@ impl Counter {
                 counter.spawn((Shape::cuboid(&slat, SLAT_WOOD), Finish::Wood));
                 x += SLAT;
             }
-            for x in STOOLS {
-                let at = Vec3::new(x, 0.0, wall.min().z - STOOL_DISTANCE);
+            for at in layout.stools() {
                 let leg = Block::new(Vec3::new(STOOL_LEG, STOOL_HEIGHT - STOOL_SEAT.y, STOOL_LEG))
                     .translated(at);
                 let seat = Block::new(STOOL_SEAT).translated(at).on_top_of(&leg);

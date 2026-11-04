@@ -1,4 +1,4 @@
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 use std::ops::Range;
 
 use bevy::prelude::*;
@@ -6,7 +6,7 @@ use rand::{Rng, RngExt};
 
 use super::gaze::Gaze;
 use super::limb::{Limb, rod};
-use super::sound::Voice;
+use super::sound::{Footfall, Footfalls, Voice};
 use super::{Figures, KEEPER_TALK, Pick, Whims};
 
 /// The shell, low and wide, and the plate on top of it.
@@ -35,8 +35,18 @@ const HAND_SPEED: f32 = 0.6;
 /// Seconds between moving a hand, and between moving along the counter.
 const FIDGET: Range<f32> = 0.8..3.0;
 const SHIFT: Range<f32> = 5.0..15.0;
-/// Meters per second along the counter.
-const SHUFFLE: f32 = 0.25;
+/// Meters per second along the counter, how fast it gets there, and the
+/// length of a step.
+const SHUFFLE: f32 = 0.3;
+const SHUFFLE_ACCELERATION: f32 = 0.6;
+const STEP: f32 = 0.16;
+/// How far the shell rocks to the side, rises and turns along the
+/// counter while shuffling.
+const ROCK: f32 = 0.07;
+const RISE: f32 = 0.02;
+const TURN: f32 = 0.35;
+/// Loudness of its steps, which the counter muffles.
+const STEP_LOUDNESS: f32 = 0.3;
 /// Room left at the ends of the counter.
 const COUNTER_END: f32 = 0.45;
 const BREATH_RATE: f32 = 0.25;
@@ -53,6 +63,10 @@ pub(super) struct Keeper {
     room: f32,
     x: f32,
     toward: f32,
+    /// Speed along the counter.
+    speed: f32,
+    /// Steps taken.
+    steps: f32,
     hands: [Vec3; 2],
     aims: [Vec3; 2],
     fidget: f32,
@@ -144,6 +158,8 @@ impl Keeper {
                 room: (half_width - COUNTER_END).max(0.0),
                 x: 0.0,
                 toward: 0.0,
+                speed: 0.0,
+                steps: 0.0,
                 hands: rest,
                 aims: rest,
                 fidget: rng.random_range(FIDGET),
@@ -158,6 +174,7 @@ impl Keeper {
     pub(super) fn work(
         time: Res<Time>,
         mut whims: ResMut<Whims>,
+        mut footfalls: ResMut<Footfalls>,
         mut keepers: Query<(&mut Keeper, &mut Transform)>,
     ) {
         let dt = time.delta_secs();
@@ -179,9 +196,28 @@ impl Keeper {
                 keeper.shift = rng.random_range(SHIFT);
                 keeper.toward = rng.random_range(-1.0..=1.0) * keeper.room;
             }
-            let step = SHUFFLE * dt;
-            let moved = (keeper.toward - keeper.x).clamp(-step, step);
+            let target = ((keeper.toward - keeper.x) * 2.0).clamp(-SHUFFLE, SHUFFLE);
+            let change = SHUFFLE_ACCELERATION * dt;
+            keeper.speed += (target - keeper.speed).clamp(-change, change);
+            let moved = keeper.speed * dt;
             keeper.x += moved;
+            let before = keeper.steps;
+            keeper.steps += moved.abs() / STEP;
+            if keeper.steps.floor() > before.floor() {
+                let side = if (keeper.steps as u32).is_multiple_of(2) {
+                    -0.15
+                } else {
+                    0.15
+                };
+                let at = keeper
+                    .home
+                    .transform_point(Vec3::new(keeper.x + side, 0.0, 0.0));
+                footfalls.0.push(Footfall {
+                    at,
+                    level: STEP_LOUDNESS * keeper.size,
+                    indoors: true,
+                });
+            }
             for hand in 0..2 {
                 let aim = keeper.aims[hand] - Vec3::X * moved;
                 keeper.aims[hand] = aim;
@@ -204,6 +240,13 @@ impl Keeper {
             keeper.breath += dt * BREATH_RATE * TAU;
             let size = keeper.size;
             let breath = 1.0 + BREATH * keeper.breath.sin();
+            let gait = (keeper.speed.abs() / SHUFFLE).min(1.0);
+            let rock = (PI * keeper.steps).sin();
+            let waddle = Transform::from_xyz(0.0, RISE * size * gait * rock.abs(), 0.0)
+                .with_rotation(
+                    Quat::from_rotation_y(TURN * keeper.speed / SHUFFLE)
+                        * Quat::from_rotation_z(ROCK * gait * rock),
+                );
             let rig = &keeper.rig;
             let mut set = |entity: Entity, transform: Transform| {
                 if let Ok(mut part) = parts.get_mut(entity) {
@@ -212,7 +255,7 @@ impl Keeper {
             };
             set(
                 rig.shell,
-                Transform::from_scale(Vec3::new(breath, 1.0 / breath.sqrt(), breath)),
+                waddle.with_scale(Vec3::new(breath, 1.0 / breath.sqrt(), breath)),
             );
             set(
                 rig.head,
@@ -221,7 +264,7 @@ impl Keeper {
                 ),
             );
             for (index, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-                let shoulder = SHOULDER * Vec3::new(side, 1.0, 1.0) * size;
+                let shoulder = waddle.transform_point(SHOULDER * Vec3::new(side, 1.0, 1.0) * size);
                 let hand = keeper.hands[index];
                 let distance = (keeper.aims[index] - hand).with_y(0.0).length();
                 let lifted = hand + Vec3::Y * (HAND_LIFT * (distance / 0.1).min(1.0) + HAND.y);

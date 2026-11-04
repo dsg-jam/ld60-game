@@ -4,6 +4,7 @@
 mod gaze;
 mod keeper;
 mod limb;
+mod shadows;
 mod sound;
 mod strider;
 mod walk;
@@ -77,7 +78,7 @@ pub(super) struct LocalsPlugin;
 
 impl Plugin for LocalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(sound::LocalSoundPlugin)
+        app.add_plugins((sound::LocalSoundPlugin, shadows::ShadowPlugin))
             .init_resource::<Places>()
             .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
             .add_systems(
@@ -108,6 +109,9 @@ pub(super) struct Places {
     /// The floors behind counters, facing the street, with the half width
     /// of the counter.
     pub(super) counters: Vec<(Transform, f32)>,
+    /// Spots on the sidewalks where something stands in the way, like a
+    /// stool, seen from above.
+    pub(super) in_way: Vec<Vec2>,
 }
 
 #[derive(Debug, Clone, Copy)]

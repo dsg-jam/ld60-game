@@ -264,6 +264,12 @@ impl Stock {
                 ..edge
             });
         }
+        if let Some(x) = opening.stools {
+            finds
+                .places
+                .in_way
+                .extend([-x, x].map(|x| place.transform_point(Vec3::new(x, 0.0, STOOL_OUT)).xz()));
+        }
         if !lit {
             return;
         }
