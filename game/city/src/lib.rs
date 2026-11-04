@@ -25,7 +25,7 @@ pub use self::traffic::Draft;
 use std::f32::consts::PI;
 
 use bevy::{
-    light::cluster::GlobalClusterSettings,
+    light::{NotShadowCaster, cluster::GlobalClusterSettings},
     prelude::*,
     shape::{Aabb3d, RayCast3d},
 };
@@ -115,7 +115,9 @@ impl<T> Pick<T> for [T] {
 }
 
 /// A shared mesh placed and scaled to fill a [`Block`].
-type Part<M> = (Mesh3d, MeshMaterial3d<M>, Transform);
+/// A part of the city. None cast shadows: the city has no light with a
+/// shadow map, and the desk lamp's never reaches it.
+type Part<M> = (Mesh3d, MeshMaterial3d<M>, Transform, NotShadowCaster);
 
 /// Shared meshes for the many boxes of the city.
 #[derive(Resource, Debug)]
@@ -138,6 +140,7 @@ impl Kit {
             Mesh3d(self.cube.clone()),
             MeshMaterial3d(material),
             block.transform().with_scale(block.size),
+            NotShadowCaster,
         )
     }
 
@@ -146,6 +149,7 @@ impl Kit {
             Mesh3d(self.cube.clone()),
             MeshMaterial3d(material),
             bar.unit_transform(),
+            NotShadowCaster,
         )
     }
 }

@@ -3,7 +3,11 @@ mod frontage;
 
 use std::ops::Range;
 
-use bevy::{light::VolumetricLight, prelude::*, shape::Aabb3d};
+use bevy::{
+    light::{NotShadowCaster, VolumetricLight},
+    prelude::*,
+    shape::Aabb3d,
+};
 use ld60_game_parts::script::{GLYPH_SIZE, Word};
 use ld60_geometry::bar::Bar;
 use ld60_geometry::block::Block;
@@ -176,6 +180,7 @@ impl Sign {
                         Mesh3d(kit.cube.clone()),
                         MeshMaterial3d(tube_material.clone()),
                         Transform::from_rotation(rotation) * tube.transform(PANEL_DEPTH / 2.0),
+                        NotShadowCaster,
                     ));
                 }
             }

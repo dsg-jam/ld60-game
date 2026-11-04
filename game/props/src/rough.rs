@@ -1,7 +1,9 @@
 //! Props seen from afar, as a few plain boxes and cylinders. All share two
 //! meshes and one material per color and finish, so a street of shelves
-//! costs little.
+//! costs little. They cast no shadows, as no light with a shadow map
+//! reaches that far.
 
+use bevy::light::NotShadowCaster;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use ld60_geometry::block::Block;
@@ -115,8 +117,10 @@ impl Rough {
         } else {
             kit.cube.clone()
         };
-        commands
-            .entity(add.entity)
-            .insert((Mesh3d(mesh), MeshMaterial3d(material)));
+        commands.entity(add.entity).insert((
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            NotShadowCaster,
+        ));
     }
 }

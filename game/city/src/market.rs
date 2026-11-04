@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use std::ops::Range;
 
-use bevy::prelude::*;
+use bevy::{light::NotShadowCaster, prelude::*};
 use ld60_game_core::layout::shop;
 use ld60_game_parts::script::Word;
 use ld60_game_props::Theme;
@@ -524,6 +524,7 @@ impl Bay {
                 Mesh3d(kit.cube.clone()),
                 MeshMaterial3d(stock.ink.clone()),
                 Transform::from_translation(lightbox.center) * local,
+                NotShadowCaster,
             ));
         }
     }

@@ -1,6 +1,10 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{light::VolumetricLight, prelude::*, shape::ConvexPolygonError};
+use bevy::{
+    light::{NotShadowCaster, VolumetricLight},
+    prelude::*,
+    shape::ConvexPolygonError,
+};
 use ld60_geometry::block::Block;
 use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use rand::{Rng, RngExt};
@@ -198,6 +202,7 @@ impl Fleet {
                 MeshMaterial3d(self.tire.clone()),
                 Transform::from_translation(wheel + Vec3::Y * WHEEL_RADIUS)
                     .with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
+                NotShadowCaster,
             ));
         }
         self.lights(parts, kit, front, rear, 0.6, width);
@@ -262,6 +267,7 @@ impl Fleet {
                 Mesh3d(self.pod.clone()),
                 MeshMaterial3d(paint.clone()),
                 Transform::from_translation(center).with_rotation(Quat::from_rotation_z(FRAC_PI_2)),
+                NotShadowCaster,
             ));
             // Exhaust glow at the back of the pod.
             let exhaust = Block::between(
@@ -321,6 +327,10 @@ impl Fleet {
     }
 
     fn part<M: Material>(mesh: &Handle<Mesh>, material: &Handle<M>) -> impl Bundle {
-        (Mesh3d(mesh.clone()), MeshMaterial3d(material.clone()))
+        (
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            NotShadowCaster,
+        )
     }
 }
