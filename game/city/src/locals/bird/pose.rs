@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::super::gaze::{self, Gaze};
 use super::super::shadows::{Blob, Bone as Capsule, Silhouette};
 use super::super::umbrella::{self, Umbrella};
+use super::dress::KNOT;
 use super::skeleton::{
     ARM, Bone, ELBOWS, HEAD, HEAD_RADII, HIP, HULL, HULL_RADII, HULL_TILT, KNEES, LEG, NECK, RUMP,
     SHOULDER, Side, frame,
@@ -14,20 +15,27 @@ use super::{Bird, Posture, SHAKE_TIME, UMBRELLA_SIZE};
 /// Share of a step's cycle that a foot stands on the ground.
 const STANCE: f32 = 0.62;
 const STRIDE: f32 = 0.42;
+/// Where in the cycle the left foot stands right under the hip.
+const MID_STANCE: f32 = STANCE / 2.0;
 /// Herons lift their feet high and set them down with care.
 const LIFT: f32 = 0.09;
-const BOB: f32 = 0.01;
-const SWAY: f32 = 0.012;
-const ROLL: f32 = 0.02;
+/// The hull rides highest over the standing foot, shifts its weight onto
+/// it, rolls a little towards it, pitches with each push and turns its
+/// hips after the swinging leg.
+const BOB: f32 = 0.014;
+const SWAY: f32 = 0.016;
+const ROLL: f32 = 0.025;
+const PITCH: f32 = 0.02;
+const TWIST: f32 = 0.05;
 const LEAN: f32 = 0.06;
-const HUNCH_LEAN: f32 = 0.15;
-const HUNCH_DROP: f32 = 0.03;
+const HUNCH_LEAN: f32 = 0.1;
+const HUNCH_DROP: f32 = 0.015;
 /// Hunched in the rain, the neck folds and the head sinks this far.
-const HUNCH_SINK: Vec3 = Vec3::new(0.0, -0.07, 0.015);
+const HUNCH_SINK: Vec3 = Vec3::new(0.0, -0.06, 0.012);
 /// The head holds still while the body walks on under it, for this share
 /// of each step, then glides forward again, about this far either way.
-const HEAD_HOLD: f32 = 0.6;
-const HEAD_GLIDE: f32 = 0.022;
+const HEAD_HOLD: f32 = 0.5;
+const HEAD_GLIDE: f32 = 0.004;
 /// Feet are heard landing above this much of the walking speed.
 pub(super) const STEPPING: f32 = 0.2;
 const BREATH_RATE: f32 = 0.3;
@@ -35,21 +43,33 @@ const BREATH: f32 = 0.012;
 /// Hands hang at the sides while walking, and rest in the lap.
 const HANG: Vec3 = Vec3::new(0.025, -0.27, -0.04);
 const LAP: Vec3 = Vec3::new(-0.04, -0.2, 0.14);
-const ARM_SWING: f32 = 0.04;
-/// The hand holding an open umbrella: in front of the chest, to the side.
-const HOLD: Vec3 = Vec3::new(0.12, 0.92, 0.24);
+const ARM_SWING: f32 = 0.025;
+/// The hand holding an open umbrella: in front of the chest, to the side,
+/// the elbow tucked in.
+const HOLD: Vec3 = Vec3::new(0.1, 0.8, 0.16);
 /// With an open umbrella, the head turns only this far towards it.
 const UMBRELLA_GLANCE: f32 = 0.5;
 /// Seated, the feet dangle this far below and ahead of the hips, and swing.
 const DANGLE: Vec3 = Vec3::new(0.0, -0.5, 0.18);
 const DANGLE_SWING: f32 = 0.05;
-/// The tail's spring: how stiff, how damped, and how much the hull's
-/// moves throw it.
-const TAIL_STIFFNESS: f32 = 60.0;
-const TAIL_DAMPING: f32 = 7.0;
-const TAIL_THROW: f32 = 20.0;
-/// The tail rests a little raised.
-const TAIL_REST: f32 = 0.2;
+/// The tail rests a little raised. The ends of a scarf hang straight and
+/// swing out from the breast, never into it.
+const TAIL: Spring = Spring {
+    stiffness: 60.0,
+    damping: 7.0,
+    throw: 20.0,
+    rest: Vec2::new(0.2, 0.0),
+    low: Vec2::new(-0.6, -0.6),
+    high: Vec2::new(0.9, 0.6),
+};
+const SCARF: Spring = Spring {
+    stiffness: 22.0,
+    damping: 3.0,
+    throw: 14.0,
+    rest: Vec2::ZERO,
+    low: Vec2::new(0.0, -0.35),
+    high: Vec2::new(0.7, 0.35),
+};
 /// Wet feathers cling to the body, and fluff up while shaking.
 const SLEEK: f32 = 0.05;
 const FLUFF: f32 = 0.15;
@@ -70,14 +90,43 @@ pub(in super::super) struct Work {
     pub(in super::super) steps: f32,
 }
 
-/// The tail swings after the hull on a spring.
+/// A part that swings after the hull on a spring, like the tail.
 #[derive(Debug, Default, Clone, Copy)]
-pub(super) struct Tail {
-    /// Pitch up and swing to the side, in radians, and how fast they change.
+pub(super) struct Swing {
+    /// Pitch and swing to the side, in radians, and how fast they change.
     angle: Vec2,
     speed: Vec2,
-    /// Where the hull was last frame, to feel it move.
+    /// Where the part was last frame, to feel it move.
     last: Option<Vec3>,
+}
+
+/// How a [`Swing`] moves: how stiff and damped its spring is, how much the
+/// moves of the hull throw it, where it rests and how far it goes.
+#[derive(Debug, Clone, Copy)]
+struct Spring {
+    stiffness: f32,
+    damping: f32,
+    throw: f32,
+    rest: Vec2,
+    low: Vec2,
+    high: Vec2,
+}
+
+impl Swing {
+    /// Moves on by `dt` seconds, carried to `at` turned by `turn`. Moving
+    /// along +Y throws it in pitch, along +X to the side.
+    fn follow(&mut self, spring: &Spring, at: Vec3, turn: Quat, dt: f32) {
+        if let Some(last) = self.last
+            && dt > 0.0
+        {
+            let moved = (turn.inverse() * (at - last) / dt).clamp_length_max(3.0);
+            let throw = Vec2::new(moved.y + moved.z, moved.x) * spring.throw;
+            let pull = (spring.rest - self.angle) * spring.stiffness - self.speed * spring.damping;
+            self.speed += (pull - throw) * dt;
+            self.angle = (self.angle + self.speed * dt).clamp(spring.low, spring.high);
+        }
+        self.last = Some(at);
+    }
 }
 
 /// Every joint of a [`Bird`] in its body's space, with what goes with them.
@@ -98,22 +147,9 @@ impl Bird {
         self.phase += self.speed * dt * STANCE / (STRIDE * self.size);
         self.phase = self.phase.fract();
         let hull = *body * self.hull(work).0;
-        let at = hull.translation;
-        let tail = &mut self.tail;
-        if let Some(last) = tail.last
-            && dt > 0.0
-        {
-            // The hull's motion in its own space throws the tail the other
-            // way.
-            let moved = (hull.rotation.inverse() * (at - last) / dt).clamp_length_max(3.0);
-            let throw = Vec2::new(moved.y, moved.x) * TAIL_THROW;
-            let target = Vec2::new(TAIL_REST, 0.0);
-            let pull = (target - tail.angle) * TAIL_STIFFNESS - tail.speed * TAIL_DAMPING;
-            tail.speed += (pull - throw) * dt;
-            tail.angle += tail.speed * dt;
-            tail.angle = tail.angle.clamp(Vec2::new(-0.6, -0.6), Vec2::new(0.9, 0.6));
-        }
-        tail.last = Some(at);
+        self.tail.follow(&TAIL, hull.translation, hull.rotation, dt);
+        let knot = hull.transform_point(KNOT - HULL);
+        self.scarf.follow(&SCARF, knot, hull.rotation, dt);
     }
 
     /// From standing at 0 to walking at 1.
@@ -148,6 +184,13 @@ impl Bird {
                 * Quat::from_rotation_x(gaze.turn.y + self.hunch * 0.15),
         );
         set(Bone::Head, head);
+        set(
+            Bone::Scarf,
+            hull * Transform::from_translation(KNOT - HULL).with_rotation(
+                Quat::from_rotation_z(self.scarf.angle.y)
+                    * Quat::from_rotation_x(-self.scarf.angle.x),
+            ),
+        );
         set(
             Bone::Tail,
             hull * Transform::from_translation(RUMP - HULL).with_rotation(
@@ -247,7 +290,7 @@ impl Bird {
         let thrust = 1.0 - HEAD_HOLD;
         if step < thrust {
             let t = step / thrust;
-            -reach + 2.0 * reach * t * t * (3.0 - 2.0 * t)
+            -reach * (PI * t).cos()
         } else {
             reach - 2.0 * reach * (step - thrust) / HEAD_HOLD
         }
@@ -297,14 +340,17 @@ impl Bird {
 
     fn walking(&self, ankles: [Vec3; 2]) -> (Transform, [Vec3; 2], Vec3, f32) {
         let gait = self.gait();
-        let bob = BOB * gait * (2.0 * TAU * self.phase).cos();
-        let sway = SWAY * gait * (TAU * self.phase).sin();
-        let lean = LEAN * gait + HUNCH_LEAN * self.hunch;
+        // From the left foot standing under the hip, once round both feet.
+        let cycle = TAU * (self.phase - MID_STANCE);
+        let bob = BOB * gait * (2.0 * cycle).cos();
+        let sway = -SWAY * gait * cycle.cos();
+        let lean = LEAN * gait + HUNCH_LEAN * self.hunch + PITCH * gait * (2.0 * cycle).sin();
         let hull =
             Transform::from_translation(HULL + Vec3::new(sway, bob - HUNCH_DROP * self.hunch, 0.0))
                 .with_rotation(
-                    Quat::from_rotation_x(lean)
-                        * Quat::from_rotation_z(-ROLL * gait * (TAU * self.phase).sin()),
+                    Quat::from_rotation_y(TWIST * gait * cycle.sin())
+                        * Quat::from_rotation_x(lean)
+                        * Quat::from_rotation_z(ROLL * gait * cycle.cos()),
                 );
         let feet = [0.0, 0.5].map(|offset| {
             let cycle = (self.phase + offset).fract();

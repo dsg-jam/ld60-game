@@ -1,33 +1,15 @@
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::PI;
 
 use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
 use ld60_geometry::triangles::{End, Skin, Triangles};
 use rand::{Rng, RngExt};
 
 use super::super::plumage::{Cover, Feather, Feathers, Kind, Region, point_along};
-use super::dress;
-use super::skeleton::{
-    Bone, HEAD, HEAD_RADII, HIP, HULL, HULL_RADII, HULL_TILT, NECK, RUMP, SHOULDER, Side,
-};
+use super::skeleton::{Bone, HEAD, HIP, HULL, HULL_RADII, HULL_TILT, NECK, RUMP, SHOULDER, Side};
+use super::{dress, head};
 
 /// Different coats to pick from.
 const VARIANTS: usize = 4;
-/// The eyes, on the head, relative to its middle: small, low and close to
-/// the beak.
-pub(super) const EYE: Vec3 = Vec3::new(0.0165, 0.006, 0.012);
-const EYE_RADIUS: f32 = 0.011;
-/// The back of the head, relative to its middle, and how the head is
-/// narrower than tall.
-const HEAD_BACK: Vec3 = Vec3::new(0.0, 0.004, -0.05);
-const HEAD_SCALE: Vec3 = Vec3::new(0.9, 1.05, 1.0);
-/// The upper lid covers this much of the eye, from its top, in radians.
-const LID: f32 = 1.05;
-/// Where the beak starts, relative to the middle of the head, its length,
-/// its width at the root and how far it points down.
-const BEAK: Vec3 = Vec3::new(0.0, -0.006, 0.042);
-const BEAK_LENGTH: f32 = 0.175;
-const BEAK_WIDTH: f32 = 0.034;
-const BEAK_DROOP: f32 = 0.12;
 /// The neck in the rest pose, from the hull to under the head.
 const NECK_SPINE: [Vec3; 5] = [
     NECK,
@@ -48,9 +30,12 @@ const SIDES: u32 = 8;
 #[derive(Debug)]
 pub(in super::super) struct Kit {
     pub(super) plumages: Vec<Handle<Mesh>>,
+    /// Without the plumes that hang over the breast.
+    pub(super) plumages_under_cloth: Vec<Handle<Mesh>>,
+    pub(super) bill: Handle<Mesh>,
     pub(super) skin: Handle<Mesh>,
-    pub(super) scarf: Handle<Mesh>,
-    pub(super) shawl: Handle<Mesh>,
+    pub(super) scarves: Vec<Handle<Mesh>>,
+    pub(super) cowls: Vec<Handle<Mesh>>,
     pub(super) eye: Handle<Mesh>,
     pub(super) pupil: Handle<Mesh>,
     pub(super) irises: Vec<Handle<StandardMaterial>>,
@@ -65,15 +50,18 @@ impl Kit {
         bindposes: &mut Assets<SkinnedMeshInverseBindposes>,
         rng: &mut impl Rng,
     ) -> Self {
-        let plumages = (0..VARIANTS)
-            .map(|_| meshes.add(skinned(plumage(rng))))
-            .collect();
+        let mut plumages = |breast_plumes| -> Vec<Handle<Mesh>> {
+            (0..VARIANTS)
+                .map(|_| meshes.add(skinned(plumage(breast_plumes, rng))))
+                .collect()
+        };
+        let (plumages, plumages_under_cloth) = (plumages(true), plumages(false));
         let irises = IRISES
             .iter()
             .map(|&color| {
                 materials.add(StandardMaterial {
                     base_color: color,
-                    perceptual_roughness: 0.25,
+                    perceptual_roughness: 0.35,
                     ..default()
                 })
             })
@@ -84,11 +72,17 @@ impl Kit {
             .collect();
         Self {
             plumages,
+            plumages_under_cloth,
+            bill: meshes.add(skinned(head::bill())),
             skin: meshes.add(skinned(skin())),
-            scarf: meshes.add(skinned(dress::scarf())),
-            shawl: meshes.add(skinned(dress::shawl())),
-            eye: meshes.add(Sphere::new(EYE_RADIUS).mesh().uv(16, 12)),
-            pupil: meshes.add(Sphere::new(EYE_RADIUS * 0.5).mesh().uv(12, 8)),
+            scarves: (0..VARIANTS)
+                .map(|_| meshes.add(skinned(dress::scarf(rng))))
+                .collect(),
+            cowls: (0..VARIANTS)
+                .map(|_| meshes.add(skinned(dress::cowl(rng))))
+                .collect(),
+            eye: meshes.add(Sphere::new(head::EYE_RADIUS).mesh().uv(16, 12)),
+            pupil: meshes.add(Sphere::new(head::EYE_RADIUS * 0.55).mesh().uv(12, 8)),
             irises,
             pupil_black: materials.add(StandardMaterial {
                 base_color: Color::srgb_u8(0x08, 0x08, 0x08),
@@ -101,7 +95,7 @@ impl Kit {
 
     /// Where the pupil sits in the right eye: on its outer side.
     pub(super) fn pupil_at() -> Vec3 {
-        Vec3::X * EYE_RADIUS * 0.62
+        Vec3::X * head::EYE_RADIUS * 0.8
     }
 }
 
@@ -176,35 +170,13 @@ fn breast(_: Vec3, normal: Vec3) -> Region {
     }
 }
 
-/// The black stripe from above the eye back to the crest, and pale
-/// elsewhere on the head.
-fn face(point: Vec3) -> Region {
-    let at = point - HEAD;
-    let stripe = at.y > EYE.y + EYE_RADIUS * 0.4
-        && at.y < EYE.y + EYE_RADIUS * 1.8
-        && at.z < EYE.z + EYE_RADIUS
-        && at.x.abs() > 0.008;
-    if stripe { Region::Dark } else { Region::Pale }
-}
-
-/// The head's thickness from its back at 0 to the root of the beak at 1:
-/// a flat wedge that runs on into the beak.
-fn head_radius(t: f32) -> f32 {
-    let smooth = |from: f32, to: f32, t: f32| {
-        let t = ((t - from) / (to - from)).clamp(0.0, 1.0);
-        t * t * (3.0 - 2.0 * t)
-    };
-    let swell = 0.024 + 0.01 * smooth(0.0, 0.35, t);
-    swell - 0.016 * smooth(0.35, 1.0, t)
-}
-
 /// The neck's thickness from its root at 0 to the head at 1.
 fn neck_radius(t: f32) -> f32 {
     0.034 - 0.013 * t
 }
 
 /// The feathers and down of a bird.
-fn plumage(rng: &mut impl Rng) -> Mesh {
+fn plumage(breast_plumes: bool, rng: &mut impl Rng) -> Mesh {
     let mut mesh = Triangles::default();
     let mut feathers = Feathers(&mut mesh);
     let hull = hull_place();
@@ -254,19 +226,19 @@ fn plumage(rng: &mut impl Rng) -> Mesh {
         &smooth(&NECK_SPINE, 5),
         neck_radius,
         Vec2::new(9.0, 22.0),
-        |point, normal| {
-            if point.y > HEAD.y - HEAD_RADII.y * 1.2 {
-                face(point)
-            } else {
-                breast(point, normal)
-            }
-        },
+        breast,
     );
     feathers.bind_since(mark, neck_skin);
 
-    // Fine plumes hanging from the lower neck over the breast.
+    // Fine plumes hanging from the lower neck over the breast, unless
+    // cloth covers it.
     let mark = feathers.mark();
-    for _ in 0..rng.random_range(4..6) {
+    let plumes = if breast_plumes {
+        rng.random_range(4..6)
+    } else {
+        0
+    };
+    for _ in 0..plumes {
         let t = rng.random_range(0.0..0.3);
         let root = NECK_SPINE[1].lerp(NECK_SPINE[2], t) + Vec3::Z * 0.028;
         feathers.push(
@@ -287,37 +259,7 @@ fn plumage(rng: &mut impl Rng) -> Mesh {
         Skin::between(Bone::Hull.joint(), Bone::Neck.joint(), 0.6)
     });
 
-    let mark = feathers.mark();
-    let head_spine: Vec<Vec3> = (0..=10)
-        .map(|step| HEAD + HEAD_BACK.lerp(BEAK, step as f32 / 10.0))
-        .collect();
-    feathers.down_tube(&head_spine, head_radius, Vec2::new(8.0, 5.0), |point, _| {
-        face(point)
-    });
-    let narrow = Transform::from_translation(HEAD).with_scale(HEAD_SCALE)
-        * Transform::from_translation(-HEAD);
-    feathers.0.transform_since(mark, &narrow);
-    for side in Side::BOTH {
-        lid(&mut feathers, HEAD + side.mirror(EYE), side);
-    }
-    let crest = rng.random_range(2..4);
-    for index in 0..crest {
-        let spread = (index as f32 / (crest - 1) as f32 - 0.5) * 0.3;
-        feathers.push(
-            Feather {
-                root: HEAD + HEAD_BACK * 0.8 + Vec3::new(spread * 0.02, 0.016, 0.0),
-                along: Vec3::new(spread, -0.5, -1.0).normalize(),
-                out: Vec3::Y,
-                length: rng.random_range(0.08..0.11),
-                width: 0.014,
-                curl: 0.6,
-                kind: Kind::Plume,
-                region: Region::Dark,
-            },
-            rng,
-        );
-    }
-    feathers.bind_since(mark, |_| Skin::one(Bone::Head.joint()));
+    head::plumage(&mut feathers, rng);
 
     let mark = feathers.mark();
     for index in 0..7 {
@@ -351,29 +293,9 @@ fn plumage(rng: &mut impl Rng) -> Mesh {
         );
         feathers.bind_since(mark, |point| limb_skin(point, side, false));
 
-        let mark = feathers.mark();
         wing(&mut feathers, side, rng);
-        feathers.bind_since(mark, |point| limb_skin(point, side, true));
     }
     mesh.build()
-}
-
-/// The upper lid over an eye: a cap of down over its top.
-fn lid(feathers: &mut Feathers, eye: Vec3, side: Side) {
-    let radius = EYE_RADIUS * 1.12;
-    let profile: Vec<Vec2> = (0..=5)
-        .map(|step| {
-            let angle = LID * step as f32 / 5.0;
-            Vec2::new(angle.sin(), angle.cos()) * radius
-        })
-        .collect();
-    let mark = feathers.mark();
-    feathers.0.lathe(&profile, 12);
-    let place = Transform::from_translation(eye).with_rotation(
-        Quat::from_rotation_y(0.4 * side.sign()) * Quat::from_rotation_z(-0.15 * side.sign()),
-    );
-    feathers.0.transform_since(mark, &place);
-    feathers.paint_down(mark, Vec2::new(6.0, 2.0), |point, _| face(point));
 }
 
 /// The arm as a folded wing: short feathers along it, and long ones
@@ -382,6 +304,7 @@ fn wing(feathers: &mut Feathers, side: Side, rng: &mut impl Rng) {
     let shoulder = side.mirror(SHOULDER);
     let elbow = Bone::Forearm(side).rest().translation;
     let wrist = Bone::Hand(side).rest().translation;
+    let mark = feathers.mark();
     feathers.down_tube(
         &smooth(&[shoulder, elbow, wrist], 3),
         |t| 0.03 - 0.012 * t,
@@ -410,6 +333,7 @@ fn wing(feathers: &mut Feathers, side: Side, rng: &mut impl Rng) {
             rng,
         );
     }
+    feathers.bind_since(mark, |point| limb_skin(point, side, true));
     let out = side.mirror(Vec3::new(0.8, 0.0, -0.6)).normalize();
     for step in 0..10 {
         let t = step as f32 / 9.0;
@@ -418,7 +342,9 @@ fn wing(feathers: &mut Feathers, side: Side, rng: &mut impl Rng) {
         } else {
             elbow.lerp(wrist, (t - 0.4) / 0.6)
         };
-        feathers.push(
+        hang(
+            feathers,
+            side,
             Feather {
                 root: root + out * 0.01,
                 along: Vec3::new(side.sign() * 0.05, -0.75, -0.65).normalize(),
@@ -434,7 +360,9 @@ fn wing(feathers: &mut Feathers, side: Side, rng: &mut impl Rng) {
     }
     for step in 0..5 {
         let t = step as f32 / 4.0;
-        feathers.push(
+        hang(
+            feathers,
+            side,
             Feather {
                 root: elbow.lerp(wrist, 0.6 + 0.4 * t) + out * 0.015,
                 along: Vec3::new(side.sign() * 0.04, -0.55, -0.85).normalize(),
@@ -478,7 +406,21 @@ fn smooth(spine: &[Vec3], between: usize) -> Vec<Vec3> {
     points
 }
 
-/// The bare skin: legs, toes, hands and the beak.
+/// A long feather hanging from the upper arm down the side of the hull.
+/// Its tip goes partly with the hull, so it drapes over the body when the
+/// arm lifts instead of sticking out. The forearm lifts out of it.
+fn hang(feathers: &mut Feathers, side: Side, feather: Feather, rng: &mut impl Rng) {
+    let bone = Bone::UpperArm(side);
+    const DRAPE: f32 = 0.85;
+    let mark = feathers.mark();
+    feathers.push(feather, rng);
+    feathers.bind_since(mark, |point| {
+        let down = (point.distance(feather.root) / feather.length).clamp(0.0, 1.0);
+        Skin::between(bone.joint(), Bone::Hull.joint(), DRAPE * down)
+    });
+}
+
+/// The bare skin: legs, toes and hands.
 fn skin() -> Mesh {
     let mut mesh = Triangles::default();
     for side in Side::BOTH {
@@ -532,23 +474,6 @@ fn skin() -> Mesh {
         mesh.bind_since(mark, |_| Skin::one(Bone::Hand(side).joint()));
     }
 
-    let mark = mesh.mark();
-    mesh.lathe(
-        &[
-            Vec2::new(BEAK_WIDTH * 0.5, -0.02),
-            Vec2::new(BEAK_WIDTH * 0.5, 0.0),
-            Vec2::new(BEAK_WIDTH * 0.42, BEAK_LENGTH * 0.3),
-            Vec2::new(BEAK_WIDTH * 0.27, BEAK_LENGTH * 0.62),
-            Vec2::new(BEAK_WIDTH * 0.1, BEAK_LENGTH * 0.9),
-            Vec2::new(0.0, BEAK_LENGTH),
-        ],
-        12,
-    );
-    let beak = Transform::from_translation(HEAD + BEAK)
-        .with_rotation(Quat::from_rotation_x(FRAC_PI_2 + BEAK_DROOP))
-        .with_scale(Vec3::new(0.7, 1.0, 1.0));
-    mesh.transform_since(mark, &beak);
-    mesh.bind_since(mark, |_| Skin::one(Bone::Head.joint()));
     mesh.build()
 }
 
@@ -591,13 +516,6 @@ fn hand(mesh: &mut Triangles) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn eye_sits_on_the_head() {
-        let t = (EYE.z - HEAD_BACK.z) / (BEAK.z - HEAD_BACK.z);
-        let surface = head_radius(t) * HEAD_SCALE.x;
-        assert!(EYE.x < surface && EYE.x + EYE_RADIUS > surface);
-    }
 
     #[test]
     fn hull_reaches_the_neck() {

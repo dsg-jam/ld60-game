@@ -6,6 +6,8 @@ mod bird;
 mod gaze;
 mod keeper;
 mod limb;
+#[cfg(feature = "debug_port")]
+mod lineup;
 mod plumage;
 mod shadows;
 mod sound;
@@ -15,14 +17,14 @@ mod walk;
 use std::ops::Range;
 
 use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
-use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
+use ld60_geometry::surface::SurfaceMaterial;
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
 
-use self::bird::{Bird, Birth, Posture};
+use self::bird::{Bird, Birth, Carry, Dress, Posture};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
-use self::plumage::{Coat, PlumageMaterial};
+use self::plumage::{Bare, Coat, PlumageMaterial};
 use self::walk::Walker;
 use super::buildings::Skyline;
 use super::{Pick, rng};
@@ -37,17 +39,6 @@ const KEEPER_CHANCE: f64 = 0.85;
 const WALKER_TALK: Range<f32> = 10.0..40.0;
 const SITTER_TALK: Range<f32> = 3.0..10.0;
 const KEEPER_TALK: Range<f32> = 6.0..20.0;
-
-/// Colors of the scarves and shawls, muted so the plumage stays the
-/// main thing.
-const CLOTHS: [Color; 6] = [
-    Color::srgb_u8(0x7a, 0x2e, 0x2a),
-    Color::srgb_u8(0x9a, 0x7a, 0x34),
-    Color::srgb_u8(0x2a, 0x56, 0x58),
-    Color::srgb_u8(0x2c, 0x32, 0x50),
-    Color::srgb_u8(0x56, 0x5e, 0x3a),
-    Color::srgb_u8(0x5a, 0x32, 0x4a),
-];
 
 pub(super) struct LocalsPlugin;
 
@@ -72,6 +63,8 @@ impl Plugin for LocalsPlugin {
             (Walker::walk, Keeper::work_on, Gaze::glance, Bird::pose).chain(),
         )
         .add_systems(Update, (Bird::open_umbrellas, Bird::live));
+        #[cfg(feature = "debug_port")]
+        app.add_plugins(lineup::LineupPlugin);
     }
 }
 
@@ -103,9 +96,8 @@ struct Whims(SmallRng);
 /// Shared meshes and materials for all people.
 #[derive(Resource, Debug)]
 struct Figures {
-    /// One for each kind of heron, see [`Coat::skin_colors`].
-    skins: Vec<Handle<SurfaceMaterial>>,
-    cloths: Vec<Handle<SurfaceMaterial>>,
+    /// One for each kind of heron.
+    bare: Vec<Bare>,
     umbrellas: umbrella::Kit,
     birds: bird::Kit,
 }
@@ -126,25 +118,14 @@ impl FromWorld for Figures {
                 )
             })
         });
-        let mut surfaces = world.resource_mut::<Assets<SurfaceMaterial>>();
-        let skins = Coat::skin_colors()
-            .map(|color| surfaces.add(Finish::Hide.scaled(color)))
-            .collect();
-        let cloths = CLOTHS
-            .iter()
-            .map(|&color| {
-                let base = StandardMaterial {
-                    base_color: color,
-                    double_sided: true,
-                    cull_mode: None,
-                    ..default()
-                };
-                surfaces.add(Finish::Fabric.over(base, Form::Scaled, 0.0))
-            })
-            .collect();
+        let bare = world.resource_scope(|world, mut materials: Mut<Assets<StandardMaterial>>| {
+            Bare::all(
+                &mut world.resource_mut::<Assets<SurfaceMaterial>>(),
+                &mut materials,
+            )
+        });
         Self {
-            skins,
-            cloths,
+            bare,
             umbrellas,
             birds,
         }
@@ -169,9 +150,10 @@ impl Figures {
             let birth = Birth {
                 at: walker.place(),
                 posture: Posture::Walking,
-                may_carry: true,
+                carry: Carry::Maybe,
+                dress: Dress::pick(&mut rng),
                 sheltered: false,
-                coat: Coat::new(&mut plumages, &figures.skins, &mut rng),
+                coat: Coat::new(&mut plumages, &figures.bare, &mut rng),
             };
             let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
             commands.entity(bird).insert(walker);
@@ -185,9 +167,14 @@ impl Figures {
             let birth = Birth {
                 at,
                 posture: Posture::Seated(stool.height),
-                may_carry: !stool.covered,
+                carry: if stool.covered {
+                    Carry::Never
+                } else {
+                    Carry::Maybe
+                },
+                dress: Dress::pick(&mut rng),
                 sheltered: stool.covered,
-                coat: Coat::new(&mut plumages, &figures.skins, &mut rng),
+                coat: Coat::new(&mut plumages, &figures.bare, &mut rng),
             };
             Bird::spawn(&mut commands, &figures, &mut rng, birth);
         }

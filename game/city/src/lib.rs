@@ -2,7 +2,7 @@
 //!
 //! # Features
 //!
-//! - `debug_port`: adds `ld60.weather` to the debug port.
+//! - `debug_port`: adds `ld60.weather` and `ld60.lineup` to the debug port.
 
 mod additions;
 mod atmosphere;

@@ -18,6 +18,8 @@ struct Plumage {
     back: vec4<f32>,
     pale: vec4<f32>,
     dark: vec4<f32>,
+    lore: vec4<f32>,
+    cloth: vec4<f32>,
     /// How soaked the feathers are, from 0 to 1.
     wet: f32,
 }
@@ -27,14 +29,24 @@ struct Plumage {
 /// Matches `Kind` in `plumage/feathers.rs`.
 const PLUME: f32 = 1.0;
 const DOWN: f32 = 2.0;
+const CLOTH: f32 = 3.0;
 /// Matches `Region` in `plumage/feathers.rs`.
 const PALE: f32 = 1.0;
 const DARK: f32 = 2.0;
 const PRIMARY: f32 = 3.0;
+const FACE: f32 = 4.0;
+const LORE: f32 = 5.0;
 /// Down is a little darker than the feathers over it.
 const DOWN_SHADE: f32 = 0.85;
 /// Matches `CELLS` in `plumage/feathers.rs`.
-const CELLS: f32 = 40.0;
+const CELLS: f32 = 100.0;
+/// Where the eye is on the head, along its UV from the back of the head to
+/// the tip of the bill and how far above the side, in radians, how long
+/// the head is and how tall about the eye. Matches `bird/head.rs`.
+const EYE_ALONG: f32 = 0.2322;
+const EYE_RISE: f32 = 0.3;
+const HEAD_LENGTH: f32 = 0.267;
+const HEAD_HEIGHT: f32 = 0.03;
 /// Barbs across the vane of a feather.
 const BARBS: f32 = 70.0;
 /// Barbs sweep towards the tip.
@@ -51,8 +63,42 @@ fn vane(along: f32, plume: bool) -> f32 {
     return sqrt(max(sin(PI * min(t * 0.85 + 0.12, 1.0)), 0.0));
 }
 
+/// The face at `uv` on the head: pale, with a dark stripe from above the
+/// eye back to the crest, and bare skin around the eye and before it.
+fn face(uv: vec2<f32>) -> vec3<f32> {
+    let rise = asin(sin(uv.x * 2.0 * PI));
+    let along = (uv.y - EYE_ALONG) * HEAD_LENGTH;
+    let up = (rise - EYE_RISE) * HEAD_HEIGHT;
+    let behind = smoothstep(0.004, -0.004, along);
+    // The stripe starts above the eye and widens towards the nape.
+    let low = 0.007 - 0.004 * behind;
+    let high = 0.016 + 0.01 * behind * smoothstep(0.0, -0.03, along);
+    let stripe = smoothstep(low - 0.002, low + 0.002, up) * smoothstep(high + 0.002, high - 0.002, up)
+        * smoothstep(0.012, 0.004, along);
+    let ring = smoothstep(0.0125, 0.0105, length(vec2<f32>(along, up)));
+    let before = smoothstep(0.0, 0.01, along) * smoothstep(0.012, 0.004, abs(up + 0.002));
+    var color = mix(plumage.pale.rgb, plumage.dark.rgb, stripe);
+    return mix(color, plumage.lore.rgb, max(ring, before));
+}
+
+/// A knitted surface: rows of stitches like small V shapes, `cells` of
+/// them around and along. Fades out where they get too small to see.
+fn knit(uv: vec2<f32>, cells: vec2<f32>) -> f32 {
+    let cell = uv * cells;
+    let x = fract(cell.x);
+    let stitch = fract(cell.y + abs(x - 0.5) * 0.9);
+    let ridge = 1.0 - pow(abs(stitch * 2.0 - 1.0), 2.0);
+    let gap = smoothstep(0.08, 0.0, abs(x - 0.5));
+    let size = max(length(fwidth(cell)), 1e-4);
+    let fade = 1.0 - smoothstep(0.2, 0.6, size);
+    return mix(0.85, mix(0.7, 1.0, ridge) * (1.0 - 0.2 * gap), fade);
+}
+
 /// The color of `region`, `along` a feather.
 fn region_color(region: f32, along: f32) -> vec3<f32> {
+    if region > LORE - 0.5 {
+        return plumage.lore.rgb;
+    }
     if region > PRIMARY - 0.5 {
         return mix(plumage.back.rgb, plumage.dark.rgb, smoothstep(0.35, 0.9, along));
     }
@@ -85,11 +131,12 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let across = uv.x * 2.0 - 1.0;
     let along = uv.y;
     let shade = in.color.r;
-    let code = round(in.color.g * 15.0);
-    let kind = floor(code / 4.0 + 0.01);
-    let region = code - kind * 4.0;
+    let code = round(in.color.g * 31.0);
+    let kind = floor(code / 8.0 + 0.01);
+    let region = code - kind * 8.0;
     let seed = in.color.b * 97.0;
     let wet = plumage.wet;
+    let cloth = kind > CLOTH - 0.5;
     let down = kind > DOWN - 0.5;
     let plume = abs(kind - PLUME) < 0.5;
 
@@ -108,8 +155,13 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     let rachis = 1.0 - smoothstep(0.03, 0.07, abs(across));
 
     var color = region_color(region, along) * shade;
-    if down {
-        color = region_color(region, 0.0) * DOWN_SHADE * shingles(uv, vec2<f32>(in.color.b, in.color.r) * CELLS);
+    let cells = vec2<f32>(in.color.b, in.color.r) * CELLS;
+    if cloth {
+        color = plumage.cloth.rgb * knit(uv, cells);
+    } else if down && abs(region - FACE) < 0.5 {
+        color = face(uv) * shingles(uv, cells);
+    } else if down {
+        color = region_color(region, 0.0) * DOWN_SHADE * shingles(uv, cells);
     } else {
         // A little darker towards the root, where the next row hides it.
         color *= mix(0.85, 1.0, smoothstep(0.0, 0.5, along));
@@ -120,6 +172,12 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     // Water darkens the barbs and leaves a film on them.
     color *= mix(1.0, 0.6, wet);
     var rough = mix(0.8, 0.4, wet);
+    if cloth {
+        // Wool fuzz catches light at the rim.
+        let rim = pow(1.0 - abs(dot(normalize(in.world_normal), pbr_input.V)), 3.0);
+        color *= 1.0 + 0.35 * rim * (1.0 - wet);
+        rough = mix(0.95, 0.6, wet);
+    }
     rough = mix(rough, rough * 0.8, shaft);
 
     pbr_input.material.base_color = vec4<f32>(color, 1.0);

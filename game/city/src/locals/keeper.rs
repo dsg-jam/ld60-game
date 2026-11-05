@@ -3,7 +3,7 @@ use std::ops::Range;
 use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
-use super::bird::{Bird, Birth, Posture, Work};
+use super::bird::{Bird, Birth, Carry, Dress, Posture, Work};
 use super::plumage::Coat;
 use super::sound::{Footfall, Footfalls};
 use super::{Figures, PlumageMaterial, Whims};
@@ -64,9 +64,10 @@ impl Keeper {
         let birth = Birth {
             at: home,
             posture: Posture::Keeping,
-            may_carry: false,
+            carry: Carry::Never,
+            dress: Dress::pick(rng),
             sheltered: true,
-            coat: Coat::new(plumages, &figures.skins, rng),
+            coat: Coat::new(plumages, &figures.bare, rng),
         };
         let bird = Bird::spawn(commands, figures, rng, birth);
         let rest = [-1.0, 1.0].map(|side| Vec3::new(side * 0.15, COUNTER_TOP, REACH.start));

@@ -14,7 +14,7 @@ const LIFT: f32 = 0.05;
 const SOFT: f32 = 0.9;
 /// The most rows of small feathers down can have, as they are written
 /// into the vertex color as a share of it. Matches `plumage.wesl`.
-const CELLS: f32 = 40.0;
+const CELLS: f32 = 100.0;
 /// Feathers differ this much in shade, so the coat reads as one surface.
 const SHADES: std::ops::Range<f32> = 0.95..1.05;
 
@@ -26,6 +26,8 @@ pub(in super::super) enum Kind {
     Plume = 1,
     /// The soft down under the feathers, a solid surface.
     Down = 2,
+    /// Knitted cloth, a solid surface.
+    Cloth = 3,
 }
 
 /// Which color of the coat a feather takes. Matches the constants in
@@ -39,6 +41,10 @@ pub(in super::super) enum Region {
     Dark = 2,
     /// The flight feathers, from the back color to dark at the tips.
     Primary = 3,
+    /// The face, drawn by the shader from where it is on the head.
+    Face = 4,
+    /// Bare skin, like the lids and the face before the eye.
+    Lore = 5,
 }
 
 /// Feathers written into a mesh. The UV runs across a card in X and from
@@ -77,7 +83,7 @@ pub(in super::super) struct Cover {
 
 impl Region {
     fn code(self, kind: Kind) -> f32 {
-        (kind as u32 * 4 + self as u32) as f32 / 15.0
+        (kind as u32 * 8 + self as u32) as f32 / 31.0
     }
 }
 
@@ -107,6 +113,19 @@ impl Feathers<'_> {
         let mark = self.0.mark();
         self.0.tube(spine, radius, 20, [End::Round, End::Round]);
         self.paint_down(mark, cells, region);
+    }
+
+    /// Makes the vertices added since `mark` knitted cloth, with `cells`
+    /// stitches around and along its UV.
+    pub(in super::super) fn paint_cloth(&mut self, mark: usize, cells: Vec2) {
+        self.0.color_since(mark, |_, _| {
+            [
+                cells.y / CELLS,
+                Region::Back.code(Kind::Cloth),
+                cells.x / CELLS,
+                1.0,
+            ]
+        });
     }
 
     /// Makes the vertices added since `mark` down, colored by `region`,

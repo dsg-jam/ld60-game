@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::super::limb::Limb;
+use super::dress::KNOT;
 
 /// Where the hull is, its size and how far it leans forward. All bird
 /// measures are for a bird of size 1, with its feet at the origin and its
@@ -42,6 +43,8 @@ pub(super) enum Bone {
     Neck,
     Head,
     Tail,
+    /// The knot of a scarf, its ends swinging from it.
+    Scarf,
     Thigh(Side),
     Shin(Side),
     Foot(Side),
@@ -81,10 +84,10 @@ impl Side {
 }
 
 impl Bone {
-    pub(super) const COUNT: usize = 16;
+    pub(super) const COUNT: usize = 17;
 
     pub(super) fn all() -> impl Iterator<Item = Self> {
-        [Self::Hull, Self::Neck, Self::Head, Self::Tail]
+        [Self::Hull, Self::Neck, Self::Head, Self::Tail, Self::Scarf]
             .into_iter()
             .chain(Side::BOTH.into_iter().flat_map(|side| {
                 [
@@ -100,12 +103,13 @@ impl Bone {
 
     /// Its index among the joints of the skinned meshes.
     pub(super) fn joint(self) -> u16 {
-        let limb = |side: Side, offset: usize| (4 + side.index() * 6 + offset) as u16;
+        let limb = |side: Side, offset: usize| (5 + side.index() * 6 + offset) as u16;
         match self {
             Self::Hull => 0,
             Self::Neck => 1,
             Self::Head => 2,
             Self::Tail => 3,
+            Self::Scarf => 4,
             Self::Thigh(side) => limb(side, 0),
             Self::Shin(side) => limb(side, 1),
             Self::Foot(side) => limb(side, 2),
@@ -133,6 +137,7 @@ impl Bone {
             Self::Neck => Transform::from_translation(NECK),
             Self::Head => Transform::from_translation(HEAD),
             Self::Tail => Transform::from_translation(RUMP),
+            Self::Scarf => Transform::from_translation(KNOT),
             Self::Thigh(side) => {
                 let (hip, knee, _) = leg(side);
                 frame(hip, knee - hip, KNEES)

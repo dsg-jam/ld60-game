@@ -22,7 +22,7 @@ const OPENING: f32 = 0.7;
 const REACTION: Range<f32> = 0.3..4.0;
 /// Held open, the shaft leans this way from upright, in the holder's space:
 /// in towards the head.
-const LEAN_IN: Vec3 = Vec3::new(-0.28, 1.0, -0.25);
+const LEAN_IN: Vec3 = Vec3::new(-0.08, 1.0, -0.12);
 /// Carried closed, it points down and a little forward, like a cane.
 const CARRIED: f32 = PI - 0.3;
 /// How far a crowded umbrella tilts away, in radians.
@@ -191,6 +191,13 @@ impl Umbrella {
             reaction: rng.random_range(REACTION),
             tilt: Vec2::ZERO,
         }
+    }
+
+    /// Opens all the way at once.
+    #[cfg(feature = "debug_port")]
+    pub(super) fn open_now(&mut self) {
+        self.open = 1.0;
+        self.wants_open = true;
     }
 
     pub(super) fn is_open(&self) -> bool {

@@ -1,4 +1,5 @@
 mod dress;
+mod head;
 mod model;
 mod pose;
 mod skeleton;
@@ -12,7 +13,7 @@ use bevy::{
 };
 use rand::{Rng, RngExt};
 
-use self::dress::Dress;
+pub(super) use self::dress::Dress;
 pub(super) use self::model::Kit;
 pub(super) use self::pose::Work;
 use self::skeleton::{Bone, Side};
@@ -85,7 +86,8 @@ pub(super) struct Bird {
     shaking: f32,
     /// Seconds until the next blink, below zero while blinking.
     blink: f32,
-    tail: pose::Tail,
+    tail: pose::Swing,
+    scarf: pose::Swing,
     umbrella: Option<Umbrella>,
 }
 
@@ -102,11 +104,23 @@ pub(super) enum Posture {
 pub(super) struct Birth {
     pub(super) at: Transform,
     pub(super) posture: Posture,
-    /// Whether it might carry an umbrella.
-    pub(super) may_carry: bool,
+    pub(super) carry: Carry,
+    pub(super) dress: Dress,
     /// Whether a roof keeps the rain off where it stays.
     pub(super) sheltered: bool,
     pub(super) coat: Coat,
+}
+
+/// Whether a bird carries an umbrella.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Carry {
+    Never,
+    Maybe,
+    #[cfg_attr(
+        not(feature = "debug_port"),
+        expect(dead_code, reason = "only lined up locals always carry one")
+    )]
+    Always,
 }
 
 /// The entities that move.
@@ -127,7 +141,8 @@ impl Bird {
         let Birth {
             at,
             posture,
-            may_carry,
+            carry,
+            dress,
             sheltered,
             coat,
         } = birth;
@@ -137,7 +152,11 @@ impl Bird {
             rng.random_range(0.92..1.1),
             rng.random_range(0.95..1.08),
         );
-        let carries = may_carry && rng.random_bool(UMBRELLA_CHANCE);
+        let carries = match carry {
+            Carry::Never => false,
+            Carry::Maybe => rng.random_bool(UMBRELLA_CHANCE),
+            Carry::Always => true,
+        };
         let kit = &figures.birds;
         let iris = kit.irises.pick(rng).clone();
         let mut root = commands.spawn((
@@ -170,8 +189,13 @@ impl Bird {
                     inverse_bindposes: kit.bindposes.clone(),
                     joints: joints.to_vec(),
                 };
+                let plumages = if dress == Dress::Bare {
+                    &kit.plumages
+                } else {
+                    &kit.plumages_under_cloth
+                };
                 body.spawn((
-                    Mesh3d(kit.plumages.pick(rng).clone()),
+                    Mesh3d(plumages.pick(rng).clone()),
                     MeshMaterial3d(coat.feathers.clone()),
                     skinned.clone(),
                     DynamicSkinnedMeshBounds,
@@ -184,15 +208,22 @@ impl Bird {
                     DynamicSkinnedMeshBounds,
                     NotShadowCaster,
                 ));
-                let dress = match Dress::pick(rng) {
+                body.spawn((
+                    Mesh3d(kit.bill.clone()),
+                    MeshMaterial3d(coat.bill.clone()),
+                    skinned.clone(),
+                    DynamicSkinnedMeshBounds,
+                    NotShadowCaster,
+                ));
+                let dress = match dress {
                     Dress::Bare => None,
-                    Dress::Scarf => Some(&kit.scarf),
-                    Dress::Shawl => Some(&kit.shawl),
+                    Dress::Scarf => Some(kit.scarves.pick(rng)),
+                    Dress::Cowl => Some(kit.cowls.pick(rng)),
                 };
                 if let Some(dress) = dress {
                     body.spawn((
                         Mesh3d(dress.clone()),
-                        MeshMaterial3d(figures.cloths.pick(rng).clone()),
+                        MeshMaterial3d(coat.feathers.clone()),
                         skinned,
                         DynamicSkinnedMeshBounds,
                         NotShadowCaster,
@@ -228,7 +259,8 @@ impl Bird {
                 wet: 0.0,
                 shaking: 0.0,
                 blink: rng.random_range(BLINKS),
-                tail: pose::Tail::default(),
+                tail: pose::Swing::default(),
+                scarf: pose::Swing::default(),
                 umbrella,
             },
         ));
@@ -254,7 +286,7 @@ impl Bird {
                 Mesh3d(kit.pupil.clone()),
                 MeshMaterial3d(kit.pupil_black.clone()),
                 Transform::from_translation(side.mirror(Kit::pupil_at()))
-                    .with_scale(Vec3::new(0.5, 1.0, 1.0)),
+                    .with_scale(Vec3::new(0.45, 1.0, 1.0)),
                 NotShadowCaster,
             ));
         })
@@ -263,13 +295,29 @@ impl Bird {
 
     /// An eye on `side`, as open as `open` from 0 to 1, on the head joint.
     fn eye(side: Side, open: f32) -> Transform {
-        Transform::from_translation(side.mirror(model::EYE))
+        Transform::from_translation(side.mirror(head::eye()))
             .with_rotation(Quat::from_rotation_y(0.4 * side.sign()))
             .with_scale(Vec3::new(1.0, open.max(0.08), 1.0))
     }
 
     pub(super) fn size(&self) -> f32 {
         self.size
+    }
+
+    /// Holds it still at `phase` of its steps, walking in place, or
+    /// standing without one.
+    #[cfg(feature = "debug_port")]
+    pub(super) fn hold_step(&mut self, phase: Option<f32>) {
+        self.speed = if phase.is_some() { self.pace } else { 0.0 };
+        self.phase = phase.unwrap_or(0.0).rem_euclid(1.0);
+    }
+
+    /// Opens its umbrella at once, if it has one.
+    #[cfg(feature = "debug_port")]
+    pub(super) fn open_umbrella_now(&mut self) {
+        if let Some(umbrella) = &mut self.umbrella {
+            umbrella.open_now();
+        }
     }
 
     pub(super) fn has_umbrella_open(&self) -> bool {
