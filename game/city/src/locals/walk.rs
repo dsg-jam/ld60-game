@@ -1,3 +1,4 @@
+mod chat;
 mod meal;
 mod outing;
 
@@ -8,6 +9,7 @@ use std::ops::Range;
 use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
+use self::chat::Passer;
 use self::outing::Activity;
 pub(super) use self::outing::{Customers, Seats};
 use super::super::weather::Weather;
@@ -120,8 +122,10 @@ pub(super) struct Walker {
     yaw: f32,
     until_stop: f32,
     stopped: f32,
-    /// Meters left until it looks for a seat.
+    /// Meters left until it looks for a seat, and until it may stop for a
+    /// chat.
     until_seat: f32,
+    until_chat: f32,
     activity: Activity,
 }
 
@@ -178,6 +182,7 @@ impl Walker {
             until_stop: rng.random_range(STOP_EVERY),
             stopped: 0.0,
             until_seat: 0.0,
+            until_chat: rng.random_range(chat::CHAT_EVERY),
             activity: Activity::Stroll,
         };
         walker.walk_on(heading, rng);
@@ -220,7 +225,9 @@ impl Walker {
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
-        customers.0.clear();
+        let seen = std::mem::take(&mut customers.0);
+        let passers: Vec<Passer> = walkers.iter().map(|(walker, ..)| walker.passer()).collect();
+        let partners = Passer::pairs(&passers, dt, rng);
         bodies.clear();
         bodies.extend(places.in_way.iter().map(|&at| Body {
             at,
@@ -234,9 +241,13 @@ impl Walker {
         {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
+            walker.until_chat -= bird.speed * dt;
+            if let Some(partner) = partners[index] {
+                walker.chat_with(passers[partner].at, rng);
+            }
             if !walker.activity.is_stroll() {
                 walker.go_out(
-                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, dt, rng,
+                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, &seen, dt, rng,
                 );
                 if walker.activity.is_customer() {
                     customers.0.push(transform.translation);

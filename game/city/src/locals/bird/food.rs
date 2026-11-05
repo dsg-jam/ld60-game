@@ -5,6 +5,26 @@ use ld60_geometry::triangles::Triangles;
 
 use super::skeleton::Side;
 
+/// The sides of the dishes: the cup is narrow and tall, the bowl wide.
+const CUP: [Vec2; 5] = [
+    Vec2::new(0.0, 0.0),
+    Vec2::new(0.018, 0.0),
+    Vec2::new(0.02, 0.004),
+    Vec2::new(0.024, 0.05),
+    Vec2::new(0.022, 0.05),
+];
+const BOWL: [Vec2; 6] = [
+    Vec2::new(0.0, 0.0),
+    Vec2::new(0.022, 0.0),
+    Vec2::new(0.024, 0.006),
+    Vec2::new(0.048, 0.026),
+    Vec2::new(0.052, 0.034),
+    Vec2::new(0.048, 0.034),
+];
+/// How full each is.
+const CUP_FULL: f32 = 0.04;
+const BOWL_FULL: f32 = 0.024;
+
 /// What a bird eats or drinks at a stall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum Food {
@@ -25,26 +45,6 @@ pub(in super::super) struct Meal {
     /// How far through a bite or a sip, from 0 to 1.
     pub(in super::super) bite: f32,
 }
-
-/// The sides of the dishes: the cup is narrow and tall, the bowl wide.
-const CUP: [Vec2; 5] = [
-    Vec2::new(0.0, 0.0),
-    Vec2::new(0.018, 0.0),
-    Vec2::new(0.02, 0.004),
-    Vec2::new(0.024, 0.05),
-    Vec2::new(0.022, 0.05),
-];
-const BOWL: [Vec2; 6] = [
-    Vec2::new(0.0, 0.0),
-    Vec2::new(0.022, 0.0),
-    Vec2::new(0.024, 0.006),
-    Vec2::new(0.048, 0.026),
-    Vec2::new(0.052, 0.034),
-    Vec2::new(0.048, 0.034),
-];
-/// How full each is.
-const CUP_FULL: f32 = 0.04;
-const BOWL_FULL: f32 = 0.024;
 
 impl Food {
     pub(in super::super) const ALL: [Self; 2] = [Self::Cup, Self::Bowl];

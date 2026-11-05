@@ -8,6 +8,7 @@ use super::super::bird::Bird;
 use super::super::gaze::Gaze;
 use super::super::sound::Voice;
 use super::super::{Places, SITTER_TALK, Spot, WALKER_TALK};
+use super::chat::{CHAT_TALK, NEIGHBOUR, TURN_EVERY, TURN_FOR};
 use super::meal::Dining;
 use super::{ACCELERATION, Walker};
 
@@ -48,6 +49,9 @@ pub(super) enum Activity {
     /// is the one at its index in the places, `side` is -1 or 1 along the
     /// stool's X.
     ToSeat { stool: usize, side: f32 },
+    /// Standing to chat with someone at `with` for `left` seconds more,
+    /// before walking on towards `heading`.
+    Chat { with: Vec2, left: f32, heading: f32 },
     /// Walking to a spot at a counter and looking over the goods there for
     /// `left` seconds more, at one thing until `look` runs out.
     Browse {
@@ -67,6 +71,8 @@ pub(super) enum Activity {
         dining: Dining,
         left: f32,
         rising: bool,
+        /// Seconds until it turns to a neighbour again.
+        glance: f32,
     },
 }
 
@@ -97,7 +103,7 @@ impl Activity {
         match self {
             Self::Browse { arrived, .. } => arrived,
             Self::Seated { sitting, .. } => sitting > 0.5,
-            Self::Stroll | Self::ToSeat { .. } => false,
+            Self::Stroll | Self::ToSeat { .. } | Self::Chat { .. } => false,
         }
     }
 }
@@ -129,6 +135,7 @@ impl Walker {
             dining: Dining::served(false, rng),
             left: rng.random_range(SIT_FOR),
             rising: false,
+            glance: rng.random_range(TURN_EVERY),
         };
         walker.yaw = facing(stool);
         walker
@@ -234,12 +241,36 @@ impl Walker {
         voice: &mut Voice,
         places: &Places,
         seats: &mut Seats,
+        customers: &[Vec3],
         dt: f32,
         rng: &mut impl Rng,
     ) {
         let stools = &places.stools;
         match self.activity {
             Activity::Stroll => {}
+            Activity::Chat {
+                with,
+                mut left,
+                heading,
+            } => {
+                let change = ACCELERATION * dt;
+                bird.speed = (bird.speed - change).max(0.0);
+                let way = with - Vec2::new(self.x, self.z);
+                self.yaw = turned(self.yaw, way.x.atan2(way.y), TURN_RATE * 0.5 * dt);
+                gaze.glance_at(self.turn_to(with), 0.5);
+                voice.talk_every(CHAT_TALK);
+                left -= dt;
+                if left <= 0.0 {
+                    voice.talk_every(WALKER_TALK);
+                    self.walk_on(heading, rng);
+                } else {
+                    self.activity = Activity::Chat {
+                        with,
+                        left,
+                        heading,
+                    };
+                }
+            }
             Activity::Browse {
                 spot: index,
                 mut arrived,
@@ -288,6 +319,7 @@ impl Walker {
                         dining: Dining::order(bird.has_umbrella_open(), rng),
                         left: rng.random_range(SIT_FOR),
                         rising: false,
+                        glance: rng.random_range(TURN_EVERY),
                     };
                 }
             }
@@ -299,6 +331,7 @@ impl Walker {
                 mut dining,
                 mut left,
                 mut rising,
+                mut glance,
             } => {
                 let stool = &stools[index];
                 bird.speed = 0.0;
@@ -312,11 +345,26 @@ impl Walker {
                 } else if sitting < 1.0 {
                     sitting += dt / SIT_TIME;
                 } else {
-                    voice.talk_every(SITTER_TALK);
                     left -= dt;
                     dining.fit_umbrella(bird.has_umbrella_open());
                     bird.eat(dining.go_on(dt, left <= 0.0, rng));
                     rising = left <= 0.0 && dining.is_done();
+                    glance -= dt;
+                    if glance <= 0.0 {
+                        glance = rng.random_range(TURN_EVERY);
+                        let me = Vec2::new(self.x, self.z);
+                        let neighbour = customers
+                            .iter()
+                            .map(|at| at.xz())
+                            .filter(|at| (0.1..NEIGHBOUR).contains(&at.distance(me)))
+                            .min_by(|a, b| a.distance(me).total_cmp(&b.distance(me)));
+                        if let Some(at) = neighbour {
+                            gaze.glance_at(self.turn_to(at), rng.random_range(TURN_FOR));
+                            voice.talk_every(CHAT_TALK);
+                        } else {
+                            voice.talk_every(SITTER_TALK);
+                        }
+                    }
                 }
                 sitting = sitting.clamp(0.0, 1.0);
                 let (_, spring, _) = Bird::hop(sitting);
@@ -341,6 +389,7 @@ impl Walker {
                         dining,
                         left,
                         rising,
+                        glance,
                     };
                 }
             }
