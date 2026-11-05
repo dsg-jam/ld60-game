@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 
 use bevy::{light::NotShadowCaster, mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
 use ld60_geometry::triangles::{End, Skin, Triangles};
@@ -262,6 +262,7 @@ fn plumage(breast_plumes: bool, rng: &mut impl Rng) -> Mesh {
 
     let mark = feathers.mark();
     feathers.down(HULL_RADII * 0.97, &hull, Vec2::new(26.0, 14.0), breast);
+    ruffle(&mut feathers, mark, rng);
     // Feathers only fringe the lower hull, over the tops of the legs.
     feathers.coat(
         Cover {
@@ -496,6 +497,30 @@ fn hang(feathers: &mut Feathers, side: Side, feather: Feather, rng: &mut impl Rn
     feathers.bind_since(mark, |point| {
         let down = (point.distance(feather.root) / feather.length).clamp(0.0, 1.0);
         Skin::between(bone.joint(), Bone::Hull.joint(), DRAPE * down)
+    });
+}
+
+/// Makes the down added since `mark` a little uneven, so the body isn't a
+/// perfect egg: a few broad, low swells and dips, different for each coat.
+fn ruffle(feathers: &mut Feathers, mark: usize, rng: &mut impl Rng) {
+    const RUFFLE: f32 = 0.005;
+    let waves: [(Vec3, f32); 3] = std::array::from_fn(|_| {
+        let way = Vec3::new(
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+        );
+        (
+            way.normalize_or(Vec3::Y) * rng.random_range(25.0..45.0),
+            rng.random_range(0.0..TAU),
+        )
+    });
+    feathers.0.displace_since(mark, |point, normal| {
+        let swell: f32 = waves
+            .iter()
+            .map(|&(way, phase)| (way.dot(point) + phase).sin())
+            .sum();
+        point + normal * RUFFLE * swell / waves.len() as f32
     });
 }
 

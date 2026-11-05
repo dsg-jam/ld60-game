@@ -127,6 +127,14 @@ impl Triangles {
         }
     }
 
+    /// Moves the vertices added since `mark` to where `to` puts them, from
+    /// where they are and which way they face. Their normals stay.
+    pub fn displace_since(&mut self, mark: usize, to: impl Fn(Vec3, Vec3) -> Vec3) {
+        for (position, normal) in self.positions[mark..].iter_mut().zip(&self.normals[mark..]) {
+            *position = to(*position, *normal);
+        }
+    }
+
     /// Binds the vertices added since `mark` by where they are.
     pub fn bind_since(&mut self, mark: usize, skin: impl Fn(Vec3) -> Skin) {
         let count = self.positions.len();
