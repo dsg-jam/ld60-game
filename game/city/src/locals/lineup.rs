@@ -16,6 +16,8 @@ pub(super) struct LineupPlugin;
 pub(super) struct Lineup {
     phase: Option<f32>,
     meal: Meal,
+    /// How far its eyes are closed in a blink.
+    blink: f32,
     /// How far through opening its umbrella is, or through closing.
     open: f32,
     opening: bool,
@@ -57,6 +59,11 @@ impl Plugin for LineupPlugin {
             .param("closing", ParamKind::Flag, "closing the umbrella instead")
             .param("food", ParamKind::Text, "cup or bowl, held while seated")
             .param("bite", ParamKind::Numbers, "how far through a bite, cycled")
+            .param(
+                "blink",
+                ParamKind::Numbers,
+                "how far the eyes are closed, from 0 to 1, cycled",
+            )
             .param(
                 "phase",
                 ParamKind::Numbers,
@@ -137,6 +144,7 @@ impl Lineup {
         let sittings = numbers("sitting");
         let opens = numbers("open");
         let bites = numbers("bite");
+        let blinks = numbers("blink");
         let food = match params.get("food").and_then(Value::as_str) {
             Some("cup") => Some(Food::Cup),
             Some("bowl") => Some(Food::Bowl),
@@ -150,7 +158,8 @@ impl Lineup {
             .max(phases.len())
             .max(sittings.len())
             .max(opens.len())
-            .max(bites.len());
+            .max(bites.len())
+            .max(blinks.len());
         let mut placed = Vec::with_capacity(count);
         for index in 0..count {
             let at = Vec3::new(x + index as f32 * spacing, 0.0, z);
@@ -177,6 +186,10 @@ impl Lineup {
                         .copied()
                         .unwrap_or(1.0),
                     opening: !closing,
+                    blink: blinks
+                        .get(index % blinks.len().max(1))
+                        .copied()
+                        .unwrap_or(0.0),
                     meal: Meal {
                         food,
                         held: true,
@@ -205,6 +218,7 @@ impl Lineup {
             }
             bird.hold_umbrella(lineup.open, lineup.opening);
             bird.eat(lineup.meal);
+            bird.hold_blink(lineup.blink);
         }
     }
 }

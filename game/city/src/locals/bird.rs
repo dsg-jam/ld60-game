@@ -6,7 +6,7 @@ mod pose;
 mod skeleton;
 mod steam;
 
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 use std::ops::Range;
 
 use bevy::{
@@ -58,7 +58,7 @@ const SHAKE_WET: f32 = 0.3;
 const SHAKEN_OFF: f32 = 0.4;
 /// Seconds between blinks, and of a blink.
 const BLINKS: Range<f32> = 2.0..6.0;
-const BLINK: f32 = 0.13;
+const BLINK: f32 = 0.18;
 
 /// A local: an upright heron of sorts, with a long neck and beak, legs
 /// that bend back, and folded wings with hands at their wrists. Its local
@@ -142,7 +142,8 @@ pub(super) enum Carry {
 struct Rig {
     /// In the order of [`Bone::joint`].
     joints: [Entity; Bone::COUNT],
-    eyes: [Entity; 2],
+    /// The lower lids, which close the eyes.
+    lids: [Entity; 2],
     /// The cup and the bowl, in the order of [`Food::index`].
     dishes: [Entity; 2],
 }
@@ -189,7 +190,7 @@ impl Bird {
                 Visibility::default(),
             ));
             let mut joints = [Entity::PLACEHOLDER; Bone::COUNT];
-            let mut eyes = [Entity::PLACEHOLDER; 2];
+            let mut lids = [Entity::PLACEHOLDER; 2];
             let mut dishes = [Entity::PLACEHOLDER; 2];
             let mut umbrella = None;
             body.with_children(|body| {
@@ -197,7 +198,9 @@ impl Bird {
                     let mut joint = body.spawn((bone.rest(), Visibility::default()));
                     if bone == Bone::Head {
                         joint.with_children(|head| {
-                            eyes = Side::BOTH.map(|side| Self::spawn_eye(head, kit, &iris, side));
+                            lids = Side::BOTH.map(|side| {
+                                Self::spawn_eye(head, kit, &iris, &coat.feathers, side)
+                            });
                         });
                     }
                     joints[bone.joint() as usize] = joint.id();
@@ -278,7 +281,7 @@ impl Bird {
             rig = Some((
                 Rig {
                     joints,
-                    eyes,
+                    lids,
                     dishes,
                 },
                 umbrella,
@@ -323,16 +326,20 @@ impl Bird {
 
     /// An eye on the head joint, looking out to its side and a little
     /// forward, with its pupil.
+    /// An eye on `side`, on the head joint. Returns its lower lid.
     fn spawn_eye(
         head: &mut ChildSpawnerCommands,
         kit: &Kit,
         iris: &Handle<StandardMaterial>,
+        skin: &Handle<PlumageMaterial>,
         side: Side,
     ) -> Entity {
+        let mut lid = Entity::PLACEHOLDER;
         head.spawn((
             Mesh3d(kit.eye.clone()),
             MeshMaterial3d(iris.clone()),
-            Self::eye(side, 1.0),
+            Transform::from_translation(side.mirror(head::eye()))
+                .with_rotation(Quat::from_rotation_y(0.4 * side.sign())),
             NotShadowCaster,
         ))
         .with_children(|eye| {
@@ -343,15 +350,26 @@ impl Bird {
                     .with_scale(Vec3::new(0.45, 1.0, 1.0)),
                 NotShadowCaster,
             ));
-        })
-        .id()
+            lid = eye
+                .spawn((
+                    Mesh3d(kit.lid.clone()),
+                    MeshMaterial3d(skin.clone()),
+                    Self::lid(side, 0.0),
+                    NotShadowCaster,
+                ))
+                .id();
+        });
+        lid
     }
 
-    /// An eye on `side`, as open as `open` from 0 to 1, on the head joint.
-    fn eye(side: Side, open: f32) -> Transform {
-        Transform::from_translation(side.mirror(head::eye()))
-            .with_rotation(Quat::from_rotation_y(0.4 * side.sign()))
-            .with_scale(Vec3::new(1.0, open.max(0.08), 1.0))
+    /// The lower lid of the eye on `side`, `closed` from 0 to 1. Open, it
+    /// lies inside the head, and closing it sweeps up from below over the
+    /// outer side of the eye.
+    fn lid(side: Side, closed: f32) -> Transform {
+        let outward = side.sign();
+        let way = PI * (1.0 - closed);
+        let toward = Vec3::new(outward * way.cos(), -way.sin(), 0.0);
+        Transform::from_rotation(Quat::from_rotation_arc(Vec3::Y, toward))
     }
 
     pub(super) fn size(&self) -> f32 {
@@ -364,6 +382,12 @@ impl Bird {
     pub(super) fn hold_step(&mut self, phase: Option<f32>) {
         self.speed = if phase.is_some() { self.pace } else { 0.0 };
         self.phase = phase.unwrap_or(0.0).rem_euclid(1.0);
+    }
+
+    /// Holds its eyes `closed` from 0 to 1, as at that point of a blink.
+    #[cfg(feature = "debug_port")]
+    pub(super) fn hold_blink(&mut self, closed: f32) {
+        self.blink = -BLINK * closed.clamp(0.0, 1.0).asin() / PI;
     }
 
     /// Holds its umbrella, if it has one, `open` of the way through
@@ -526,9 +550,9 @@ impl Bird {
             for (joint, transform) in rig.joints.iter().zip(pose.joints) {
                 set(*joint, transform);
             }
-            let open = if bird.blink < 0.0 { 0.0 } else { 1.0 };
-            for (eye, side) in rig.eyes.iter().zip(Side::BOTH) {
-                set(*eye, Self::eye(side, open));
+            let closed = (PI * (-bird.blink / BLINK).clamp(0.0, 1.0)).sin();
+            for (lid, side) in rig.lids.iter().zip(Side::BOTH) {
+                set(*lid, Self::lid(side, closed));
             }
             for (food, dish) in Food::ALL.into_iter().zip(rig.dishes) {
                 let placed = pose.dish.filter(|(held, _)| *held == food);

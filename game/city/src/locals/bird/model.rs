@@ -56,6 +56,7 @@ pub(in super::super) struct Kit {
     pub(super) scarves: Vec<Handle<Mesh>>,
     pub(super) cowls: Vec<Handle<Mesh>>,
     pub(super) eye: Handle<Mesh>,
+    pub(super) lid: Handle<Mesh>,
     pub(super) pupil: Handle<Mesh>,
     pub(super) irises: Vec<Handle<StandardMaterial>>,
     pub(super) pupil_black: Handle<StandardMaterial>,
@@ -110,6 +111,7 @@ impl Kit {
                 .map(|_| meshes.add(skinned(dress::cowl(rng))))
                 .collect(),
             eye: meshes.add(Sphere::new(head::EYE_RADIUS).mesh().uv(16, 12)),
+            lid: meshes.add(head::lower_lid()),
             pupil: meshes.add(Sphere::new(head::EYE_RADIUS * 0.55).mesh().uv(12, 8)),
             irises,
             pupil_black: materials.add(StandardMaterial {

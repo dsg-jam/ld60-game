@@ -140,6 +140,24 @@ fn lid(feathers: &mut Feathers, eye: Vec3, side: Side) {
     feathers.paint_down(mark, Vec2::new(6.0, 2.0), |_, _| Region::Lore);
 }
 
+/// The lower lid, which rises over the eye to close it: a cap of bare
+/// skin round +Y, wide enough to cover what shows of the eye.
+pub(super) fn lower_lid() -> Mesh {
+    const COVER: f32 = 1.45;
+    let radius = EYE_RADIUS * 1.1;
+    let profile: Vec<Vec2> = (0..=8)
+        .map(|step| {
+            let angle = COVER * step as f32 / 8.0;
+            Vec2::new(angle.sin(), angle.cos()) * radius
+        })
+        .collect();
+    let mut mesh = Triangles::default();
+    let mut feathers = Feathers(&mut mesh);
+    feathers.0.lathe(&profile, 16);
+    feathers.paint_down(0, Vec2::new(6.0, 2.0), |_, _| Region::Lore);
+    mesh.build()
+}
+
 /// The bill, bound to the head.
 pub(super) fn bill() -> Mesh {
     let mut mesh = Triangles::default();
