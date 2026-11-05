@@ -39,6 +39,15 @@ const LOOK_ASIDE: f32 = 0.45;
 const LOOK_DOWN: Range<f32> = 0.3..0.6;
 /// Looking over the goods, people lean in this far.
 const LEAN_IN: f32 = 0.18;
+/// Caught in the rain, people wait under an awning for at most this many
+/// seconds, looking somewhere new every this many, and walk on once the
+/// rain has eased for this many.
+const SHELTER_FOR: Range<f32> = 40.0..150.0;
+const SHELTER_LOOK: Range<f32> = 1.5..4.5;
+const EASED_FOR: f32 = 3.0;
+/// Having given up waiting, people walk this many meters before they
+/// shelter again.
+const SHELTER_AGAIN: Range<f32> = 40.0..100.0;
 /// Friends sit down together on stools this close to each other, this far
 /// from where they chatted at most.
 const SIDE_BY_SIDE: f32 = 2.0;
@@ -70,6 +79,16 @@ pub(super) enum Activity {
         left: f32,
         look: f32,
     },
+    /// Walking to a spot under an awning and waiting there for the rain
+    /// to ease, for `left` seconds at most, looking around until `look`
+    /// runs out. `eased` counts the seconds the rain has been light.
+    Shelter {
+        spot: usize,
+        arrived: bool,
+        left: f32,
+        look: f32,
+        eased: f32,
+    },
     /// On a stool: sat down as far as `sitting`, turned this far from the
     /// counter, having its meal, and staying for `left` seconds more
     /// before it gets up.
@@ -92,6 +111,7 @@ pub(super) enum Activity {
 pub(in super::super) struct Seats {
     stools: Vec<bool>,
     standing: Vec<bool>,
+    awnings: Vec<bool>,
 }
 
 /// Where the locals buying or eating at the stalls are, for the keepers.
@@ -103,6 +123,7 @@ impl Seats {
         Self {
             stools: vec![false; places.stools.len()],
             standing: vec![false; places.standing.len()],
+            awnings: vec![false; places.awnings.len()],
         }
     }
 
@@ -161,7 +182,7 @@ impl Activity {
         match self {
             Self::Browse { arrived, .. } => arrived,
             Self::Seated { sitting, .. } => sitting > 0.5,
-            Self::Stroll | Self::ToSeat { .. } | Self::Chat { .. } => false,
+            Self::Stroll | Self::ToSeat { .. } | Self::Chat { .. } | Self::Shelter { .. } => false,
         }
     }
 }
@@ -263,6 +284,30 @@ impl Walker {
         spot.is_some()
     }
 
+    /// Caught in the rain, it steps under a free awning just ahead, if
+    /// there is one, to wait for the rain to ease. Returns whether it does.
+    pub(super) fn take_shelter(
+        &mut self,
+        places: &Places,
+        seats: &mut Seats,
+        rng: &mut impl Rng,
+    ) -> bool {
+        let spot = self.free_ahead(&places.awnings, &seats.awnings, false, |spot| {
+            ((), spot.at.translation.xz())
+        });
+        if let Some((spot, ())) = spot {
+            seats.awnings[spot] = true;
+            self.activity = Activity::Shelter {
+                spot,
+                arrived: false,
+                left: rng.random_range(SHELTER_FOR),
+                look: 0.0,
+                eased: 0.0,
+            };
+        }
+        spot.is_some()
+    }
+
     /// The nearest free one of `spots` just ahead on its sidewalk, out of
     /// the rain unless `dry` anyway, with what `approach` says about it,
     /// and where it goes to first.
@@ -300,6 +345,7 @@ impl Walker {
         places: &Places,
         seats: &mut Seats,
         customers: &[Vec3],
+        raining: bool,
         dt: f32,
         rng: &mut impl Rng,
     ) {
@@ -368,6 +414,53 @@ impl Walker {
                         arrived,
                         left,
                         look,
+                    };
+                }
+            }
+            Activity::Shelter {
+                spot: index,
+                mut arrived,
+                mut left,
+                mut look,
+                mut eased,
+            } => {
+                let spot = &places.awnings[index];
+                if !arrived {
+                    arrived = self.walk_to(bird, spot.at.translation.xz(), dt);
+                } else {
+                    bird.speed = 0.0;
+                    self.yaw = turned(self.yaw, facing(spot), TURN_RATE * dt);
+                    look -= dt;
+                    if look <= 0.0 {
+                        look = rng.random_range(SHELTER_LOOK);
+                        // Up at the sky, or along the street.
+                        let turn = if rng.random_bool(0.4) {
+                            Vec2::new(rng.random_range(-0.3..0.3), -0.5)
+                        } else {
+                            let side = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+                            Vec2::new(side * rng.random_range(0.6..1.2), 0.0)
+                        };
+                        gaze.glance_at(turn, look);
+                    }
+                    left -= dt;
+                }
+                bird.stand_under(arrived);
+                eased = if raining { 0.0 } else { eased + dt };
+                if left <= 0.0 || eased >= EASED_FOR {
+                    if left <= 0.0 {
+                        self.until_shelter = rng.random_range(SHELTER_AGAIN);
+                    }
+                    seats.awnings[index] = false;
+                    bird.stand_under(false);
+                    let heading = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+                    self.walk_on(heading, rng);
+                } else {
+                    self.activity = Activity::Shelter {
+                        spot: index,
+                        arrived,
+                        left,
+                        look,
+                        eased,
                     };
                 }
             }
@@ -529,6 +622,7 @@ mod tests {
         let mut seats = Seats {
             stools: vec![false; 3],
             standing: Vec::new(),
+            awnings: Vec::new(),
         };
         let at = [Vec2::new(1.0, -2.5), Vec2::new(-1.0, -2.5)];
         let taken = seats.side_by_side(&stools, at, true, |_| true);
@@ -542,6 +636,7 @@ mod tests {
         let mut seats = Seats {
             stools: vec![false; 2],
             standing: Vec::new(),
+            awnings: Vec::new(),
         };
         let at = [Vec2::new(-1.0, -2.5), Vec2::new(1.0, -2.5)];
         assert_eq!(seats.side_by_side(&stools, at, false, |_| true), None);

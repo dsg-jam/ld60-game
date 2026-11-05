@@ -78,6 +78,8 @@ pub(super) struct Places {
     pub(super) stools: Vec<Spot>,
     /// Spots in front of the counters to stand at.
     pub(super) standing: Vec<Spot>,
+    /// Spots under the awnings to wait out the rain at, facing the street.
+    pub(super) awnings: Vec<Spot>,
     /// The floors behind counters, facing the street, with the half width
     /// of the counter.
     pub(super) counters: Vec<(Transform, f32)>,

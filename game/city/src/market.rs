@@ -63,6 +63,10 @@ const STOOL_OUT: f32 = 0.45;
 const BROWSE: [f32; 2] = [-0.2, 0.2];
 const BROWSE_OUT: f32 = 0.35;
 const AWNING_REACH: f32 = 1.4;
+/// People wait out the rain under an awning near its ends, this far in
+/// from the ends of the counter and this far out.
+const SHELTER_IN: f32 = 0.1;
+const SHELTER_OUT: f32 = 0.9;
 const AWNING_DROP: f32 = 0.45;
 /// How far above the opening the awning is fixed to the facade.
 pub(super) const AWNING_ABOVE: f32 = 0.3;
@@ -270,6 +274,12 @@ impl Stock {
                 to: place.transform_point(edge.to),
                 ..edge
             });
+            let x = opening.counter - SHELTER_IN;
+            finds.places.awnings.extend([-x, x].map(|x| Spot {
+                at: *place * Transform::from_xyz(x, 0.0, SHELTER_OUT),
+                height: 0.0,
+                covered: true,
+            }));
         }
         if let Some(x) = opening.stools {
             finds

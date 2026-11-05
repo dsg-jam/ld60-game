@@ -126,6 +126,9 @@ pub(super) struct Walker {
     /// chat.
     until_seat: f32,
     until_chat: f32,
+    /// Meters left until it shelters from the rain again, after it gave
+    /// up waiting.
+    until_shelter: f32,
     activity: Activity,
 }
 
@@ -183,6 +186,7 @@ impl Walker {
             stopped: 0.0,
             until_seat: 0.0,
             until_chat: rng.random_range(chat::CHAT_EVERY),
+            until_shelter: 0.0,
             activity: Activity::Stroll,
         };
         walker.walk_on(heading, rng);
@@ -259,16 +263,23 @@ impl Walker {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
             walker.until_chat -= bird.speed * dt;
+            walker.until_shelter -= bird.speed * dt;
             if let Some(meeting) = partners[index] {
                 walker.chat_with(passers[meeting.with].at, meeting.left, then[index], rng);
             }
             if !walker.activity.is_stroll() {
                 walker.go_out(
-                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, &seen, dt, rng,
+                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, &seen, raining, dt, rng,
                 );
                 if walker.activity.is_customer() {
                     customers.0.push(transform.translation);
                 }
+                *transform = walker.place();
+                continue;
+            }
+            let wet =
+                rained_on > SHELTER_RAIN && !bird.carries_umbrella() && walker.until_shelter <= 0.0;
+            if wet && walker.take_shelter(&places, &mut seats, rng) {
                 *transform = walker.place();
                 continue;
             }

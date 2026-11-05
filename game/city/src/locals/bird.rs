@@ -418,6 +418,15 @@ impl Bird {
         self.sheltered = covered && self.sitting > 0.5;
     }
 
+    /// Stands under a roof, which keeps the rain off, or steps out again.
+    pub(super) fn stand_under(&mut self, roof: bool) {
+        self.sheltered = roof;
+    }
+
+    pub(super) fn carries_umbrella(&self) -> bool {
+        self.umbrella.is_some()
+    }
+
     pub(super) fn has_umbrella_open(&self) -> bool {
         self.umbrella.as_ref().is_some_and(Umbrella::is_open)
     }
