@@ -144,7 +144,7 @@ impl Bird {
     /// its body at `body`.
     pub(super) fn step(&mut self, dt: f32, body: &Transform, work: Option<&Work>) {
         self.breath += dt * BREATH_RATE * TAU;
-        self.phase += self.speed * dt * STANCE / (STRIDE * self.size);
+        self.phase += self.speed * dt * STANCE / (STRIDE * self.stride * self.size);
         self.phase = self.phase.fract();
         let hull = *body * self.hull(work).0;
         self.tail.follow(&TAIL, hull.translation, hull.rotation, dt);
@@ -355,11 +355,15 @@ impl Bird {
         let feet = [0.0, 0.5].map(|offset| {
             let cycle = (self.phase + offset).fract();
             if cycle < STANCE {
-                Vec3::Z * STRIDE * (0.5 - cycle / STANCE)
+                Vec3::Z * STRIDE * self.stride * (0.5 - cycle / STANCE)
             } else {
                 let t = (cycle - STANCE) / (1.0 - STANCE);
                 let ahead = t * t * (3.0 - 2.0 * t);
-                Vec3::new(0.0, (PI * t).sin() * LIFT * gait, STRIDE * (ahead - 0.5))
+                Vec3::new(
+                    0.0,
+                    (PI * t).sin() * LIFT * gait,
+                    STRIDE * self.stride * (ahead - 0.5),
+                )
             }
         });
         let feet = [ankles[0] + feet[0], ankles[1] + feet[1]];

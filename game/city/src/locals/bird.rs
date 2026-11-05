@@ -30,7 +30,9 @@ use super::{Figures, KEEPER_TALK, Pick, SITTER_TALK, WALKER_TALK, Whims};
 const SIZE: Range<f32> = 1.15..1.35;
 /// Umbrellas for birds are a little smaller than ours.
 const UMBRELLA_SIZE: f32 = 0.85;
-const PACE: Range<f32> = 0.65..0.85;
+const PACE: Range<f32> = 0.55..0.9;
+/// Some take longer steps than others, at the same size.
+const STRIDES: Range<f32> = 0.85..1.15;
 const UMBRELLA_CHANCE: f64 = 0.55;
 /// Room an open umbrella takes. Less than its radius, as umbrellas tilt
 /// away from each other.
@@ -76,6 +78,8 @@ pub(super) struct Bird {
     pub(super) speed: f32,
     /// Its walking speed.
     pub(super) pace: f32,
+    /// How much longer its steps are than usual.
+    stride: f32,
     /// How far it hunches against the rain, from 0 to 1.
     pub(super) hunch: f32,
     /// Whether a roof keeps the rain off.
@@ -254,6 +258,7 @@ impl Bird {
                 breath: rng.random_range(0.0..TAU),
                 speed: 0.0,
                 pace: rng.random_range(PACE) * size,
+                stride: rng.random_range(STRIDES),
                 hunch: 0.0,
                 sheltered,
                 wet: 0.0,

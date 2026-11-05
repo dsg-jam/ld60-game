@@ -1,4 +1,4 @@
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, TAU};
 use std::iter;
 use std::ops::Range;
 
@@ -13,13 +13,13 @@ use super::{Places, Whims};
 /// The sidewalks people walk along, each with a lane per direction.
 const SIDEWALKS: [Sidewalk; 2] = [
     Sidewalk {
-        lanes: [-2.5..-2.1, -3.1..-2.7],
+        lanes: [-2.6..-1.9, -3.3..-2.6],
         sheltered: Some([-1.45, -1.75]),
         room: -3.5..-0.95,
         walkers: 10,
     },
     Sidewalk {
-        lanes: [-14.3..-14.0, -14.8..-14.5],
+        lanes: [-14.5..-13.8, -15.2..-14.5],
         sheltered: None,
         room: -15.3..-13.6,
         walkers: 12,
@@ -55,8 +55,18 @@ const STOOL: f32 = 0.32;
 /// How far people walk between stops, and how long they stand.
 const STOP_EVERY: Range<f32> = 15.0..60.0;
 const STOP_FOR: Range<f32> = 2.0..6.0;
-/// People only stop near the shop, where the stalls are lit.
+/// People mostly stop near the shop, where the stalls are lit. Elsewhere
+/// only this share of the stops happen, for a look around.
 const STOP_NEAR: f32 = 22.0;
+const STOP_AWAY: f64 = 0.3;
+/// Seconds between picking a new place across the sidewalk to walk at,
+/// and how fast people drift over to it.
+const DRIFT_EVERY: Range<f32> = 4.0..14.0;
+const DRIFT: f32 = 0.12;
+/// People walk a little faster and slower as they go, this much, over
+/// about this many seconds.
+const WOBBLE: f32 = 0.08;
+const WOBBLE_TIME: Range<f32> = 6.0..14.0;
 
 struct Sidewalk {
     /// The range of Z for walking towards +X and towards -X. The lane
@@ -85,7 +95,15 @@ pub(super) struct Walker {
     z: f32,
     /// +1 or -1 along X.
     heading: f32,
+    /// The Z it walks at, drifting towards `wish`, which it picks anew
+    /// within `lanes` now and then.
     lane: f32,
+    wish: f32,
+    lanes: Range<f32>,
+    until_drift: f32,
+    /// How far through its slow changes of speed, and how fast they go.
+    wobble: f32,
+    wobble_rate: f32,
     sheltered: Option<f32>,
     room: Range<f32>,
     /// The side of the street the stalls are on, along Z.
@@ -126,6 +144,11 @@ impl Walker {
                     z: lane,
                     heading,
                     lane,
+                    wish: lane,
+                    lanes: sidewalk.lanes[direction].clone(),
+                    until_drift: rng.random_range(DRIFT_EVERY),
+                    wobble: rng.random_range(0.0..TAU),
+                    wobble_rate: TAU / rng.random_range(WOBBLE_TIME),
                     sheltered: sidewalk.sheltered.map(|lanes| lanes[direction]),
                     room: sidewalk.room.clone(),
                     stalls: if index == 0 { 1.0 } else { -1.0 },
@@ -164,13 +187,16 @@ impl Walker {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
 
-            let mut target = bird.pace * (1.0 + HURRY * rained_on);
+            walker.drift(dt, rng);
+            let mut target =
+                bird.pace * (1.0 + HURRY * rained_on) * (1.0 + WOBBLE * walker.wobble.sin());
             if walker.stopped > 0.0 {
                 walker.stopped -= dt;
                 target = 0.0;
             } else if walker.until_stop <= 0.0 {
                 walker.until_stop = rng.random_range(STOP_EVERY);
-                if walker.x.abs() < STOP_NEAR && rained_on < SHELTER_RAIN {
+                let here = walker.x.abs() < STOP_NEAR || rng.random_bool(STOP_AWAY);
+                if here && rained_on < SHELTER_RAIN {
                     walker.stopped = rng.random_range(STOP_FOR);
                     let side = -walker.stalls * walker.heading;
                     gaze.glance_at(Vec2::new(side * 1.2, 0.1), walker.stopped);
@@ -217,6 +243,19 @@ impl Walker {
             }
             *transform = walker.place();
         }
+    }
+
+    /// Drifts across its side of the sidewalk now and then, and walks a
+    /// little faster or slower, so no two walk in step for long.
+    fn drift(&mut self, dt: f32, rng: &mut impl Rng) {
+        self.wobble = (self.wobble + self.wobble_rate * dt) % TAU;
+        self.until_drift -= dt;
+        if self.until_drift <= 0.0 {
+            self.until_drift = rng.random_range(DRIFT_EVERY);
+            self.wish = rng.random_range(self.lanes.clone());
+        }
+        let step = DRIFT * dt;
+        self.lane += (self.wish - self.lane).clamp(-step, step);
     }
 
     fn body(&self, bird: &Bird) -> Body {
