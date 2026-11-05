@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
 };
 
-pub use self::solids::End;
+pub use self::solids::{End, Rings};
 
 /// Collects the triangles of a mesh, each facing the way it is told.
 ///

@@ -18,7 +18,113 @@ pub enum End {
     Round,
 }
 
+/// Rings of points around a body, each running the same way around it,
+/// from one end to the other. Rings that shrink to a point close an end.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use ld60_geometry::triangles::{Rings, Triangles};
+/// let rings = Rings::new((0..=8).map(|step| {
+///     let z = step as f32 / 8.0;
+///     let radius = (std::f32::consts::PI * z).sin() * 0.1;
+///     (0..12).map(move |side| {
+///         let angle = std::f32::consts::TAU * side as f32 / 12.0;
+///         Vec3::new(angle.cos() * radius, angle.sin() * radius, z)
+///     })
+/// }));
+/// let mut mesh = Triangles::default();
+/// mesh.rings(&rings, 0..rings.len());
+/// ```
+#[derive(Debug, Clone)]
+pub struct Rings {
+    points: Vec<Vec<Vec3>>,
+}
+
+impl Rings {
+    /// Panics if the rings differ in length.
+    pub fn new<I: IntoIterator<Item = Vec3>>(rings: impl IntoIterator<Item = I>) -> Self {
+        let points: Vec<Vec<Vec3>> = rings
+            .into_iter()
+            .map(|ring| ring.into_iter().collect())
+            .collect();
+        assert!(
+            points.windows(2).all(|pair| pair[0].len() == pair[1].len()),
+            "rings of different lengths"
+        );
+        Self { points }
+    }
+
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
+
+    fn middle(&self, ring: usize) -> Vec3 {
+        let points = &self.points[ring];
+        points.iter().sum::<Vec3>() / points.len() as f32
+    }
+
+    /// The smooth normal at a point, from the points around it on all the
+    /// rings, so a body cut into parts shades without a seam.
+    fn normal(&self, ring: usize, index: usize) -> Vec3 {
+        let around = self.points[ring].len();
+        let last = self.points.len() - 1;
+        let here = self.points[ring][index];
+        let across = self.points[ring][(index + 1) % around]
+            - self.points[ring][(index + around - 1) % around];
+        let along =
+            self.points[(ring + 1).min(last)][index] - self.points[ring.saturating_sub(1)][index];
+        let outward = if ring == 0 {
+            here - self.middle(1.min(last))
+        } else if ring == last {
+            here - self.middle(last - 1)
+        } else {
+            here - self.middle(ring)
+        };
+        let normal = along.cross(across);
+        let normal = if normal.length_squared() < 1e-12 {
+            outward
+        } else if normal.dot(outward) < 0.0 {
+            -normal
+        } else {
+            normal
+        };
+        normal.normalize_or(Vec3::Y)
+    }
+}
+
 impl Triangles {
+    /// The strip of `rings` over the rings in `range`, smooth across the
+    /// ends of the range. The UV runs around in X and along all the rings
+    /// in Y.
+    pub fn rings(&mut self, rings: &Rings, range: std::ops::Range<usize>) {
+        let last = (rings.len() - 1).max(1) as f32;
+        let mut before: Option<Vec<u32>> = None;
+        for ring in range {
+            let around = rings.points[ring].len();
+            let indices: Vec<u32> = (0..=around)
+                .map(|index| {
+                    let wrapped = index % around;
+                    self.vertex_at(
+                        rings.points[ring][wrapped],
+                        rings.normal(ring, wrapped),
+                        Vec2::new(index as f32 / around as f32, ring as f32 / last),
+                    )
+                })
+                .collect();
+            if let Some(before) = &before {
+                for index in 0..around {
+                    self.triangle([before[index], before[index + 1], indices[index + 1]]);
+                    self.triangle([before[index], indices[index + 1], indices[index]]);
+                }
+            }
+            before = Some(indices);
+        }
+    }
+
     /// A tube along `spine`, `radius(along)` thick from `along` 0 at the
     /// start to 1 at the end, with `sides` around. One piece, so its
     /// shading has no seams where the spine bends.
