@@ -185,6 +185,13 @@ fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
 
+/// A generator of its own for one part of the city, which takes a single
+/// draw from `rng`. However much the part draws, what comes after it in
+/// `rng` stays the same.
+fn fork(rng: &mut impl Rng) -> SmallRng {
+    SmallRng::seed_from_u64(rng.random())
+}
+
 /// No turn for a positive `side`, half a turn about Y for a negative one,
 /// for things that face either way across or along the street.
 fn turned_to(side: f32) -> Quat {

@@ -13,7 +13,7 @@ use rand::{Rng, RngExt};
 use super::drips::DripEdge;
 use super::locals::{Places, Spot};
 use super::signs::Tube;
-use super::{Kit, Pick, glow, turned_to};
+use super::{Kit, Pick, fork, glow, turned_to};
 
 /// Height of the market floor, where the building above starts. The same
 /// as our own shop.
@@ -242,9 +242,12 @@ impl Stock {
             let bay = Bay::random(rng);
             let place = Transform::from_translation(center).with_rotation(rotation);
             let mut opening = None;
+            let mut inside = fork(rng);
             parent
                 .spawn((place, Visibility::default()))
-                .with_children(|stall| opening = bay.spawn(stall, kit, self, width, lit, rng));
+                .with_children(|stall| {
+                    opening = bay.spawn(stall, kit, self, width, lit, &mut inside);
+                });
             if let Some(opening) = opening {
                 Self::find(finds, &place, &opening, lit);
             }

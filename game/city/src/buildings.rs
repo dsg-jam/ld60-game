@@ -16,7 +16,7 @@ use self::rows::{Plot, ROWS, Row, VIEW_CONE};
 use super::additions::Additions;
 use super::drips::DripEdges;
 use super::market::{Finds, MARKET_HEIGHT, STALL_DEPTH, Stock};
-use super::{Kit, NEON, Pick, glow, rng};
+use super::{Kit, NEON, Pick, fork, glow, rng};
 
 const SEED: u64 = 2;
 
@@ -120,6 +120,7 @@ impl Skyline {
         root.with_children(|parent| {
             for row in &ROWS {
                 for plot in row.lay_out(&mut rng) {
+                    let mut rng = fork(&mut rng);
                     let Plot { block, floor, low } = plot;
                     let facade = if row.market {
                         Self::spawn_market_building(
@@ -300,7 +301,7 @@ impl Skyline {
         let facade = facades.add(Facade::random(&upper, facing, floor, rng));
         parent.spawn(kit.cuboid(&upper, facade.clone()));
         parent.spawn(kit.cuboid(&base, market.wall()));
-        market.spawn_market(parent, kit, block, facing, finds, rng);
+        market.spawn_market(parent, kit, block, facing, finds, &mut fork(rng));
         if let Some(grid) = facades
             .get(&facade)
             .map(|material| material.extension.grid())
