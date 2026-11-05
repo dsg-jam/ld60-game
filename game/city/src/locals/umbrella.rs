@@ -1,7 +1,7 @@
 mod drops;
 mod shape;
 
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 use std::ops::Range;
 
 use bevy::{light::NotShadowCaster, material::OpaqueRendererMethod, prelude::*};
@@ -18,7 +18,24 @@ const RADIUS: f32 = 0.58;
 /// From the hand to the top of the canopy, before size.
 pub(super) const SHAFT: f32 = 0.74;
 /// Seconds it takes to open or close, and to react to the rain.
-const OPENING: f32 = 0.7;
+const OPENING: f32 = 1.8;
+/// Opening goes in steps, each to the share of the way it ends at: it is
+/// raised out in front, the other hand pushes the runner up while the
+/// canopy unfolds, and then it is lifted overhead. Closing runs them
+/// backwards and shakes the water off while it is still in front.
+const RAISED: f32 = 0.28;
+const UNFOLDED: f32 = 0.78;
+/// Out in front it points forward and up.
+const IN_FRONT: Vec3 = Vec3::new(0.15, 0.6, 0.8);
+/// The canopy snaps a little past open at the end of unfolding.
+const POP: f32 = 0.07;
+/// Closed, it is shaken this many times, this far, while it is still in
+/// front.
+const SHAKES: f32 = 3.0;
+const SHAKE: f32 = 0.35;
+/// The runner the other hand pushes, as a share of the shaft, closed and
+/// open.
+const RUNNER: Range<f32> = 0.15..0.62;
 const REACTION: Range<f32> = 0.3..4.0;
 /// Held open, the shaft leans this way from upright, in the holder's space:
 /// in towards the head.
@@ -67,6 +84,8 @@ pub(super) struct Kit {
 pub(super) struct Canopy {
     /// From closed at 0 to open at 1.
     pub(super) open: f32,
+    /// How hard it is being shaken, from 0 to 1, throwing off drops.
+    pub(super) shaken: f32,
     /// The sound of the rain on it, while the player is near.
     pub(super) patter: Option<Entity>,
 }
@@ -193,20 +212,63 @@ impl Umbrella {
         }
     }
 
-    /// Opens all the way at once.
+    /// Holds it `open` of the way through opening, or closing if not
+    /// `opening`.
     #[cfg(feature = "debug_port")]
-    pub(super) fn open_now(&mut self) {
-        self.open = 1.0;
-        self.wants_open = true;
+    pub(super) fn hold_open(&mut self, open: f32, opening: bool) {
+        self.open = open.clamp(0.0, 1.0);
+        self.wants_open = opening;
+        self.reaction = f32::INFINITY;
     }
 
     pub(super) fn is_open(&self) -> bool {
-        self.open > 0.5
+        self.openness() > 0.5
     }
 
-    /// How far it is open, eased, from 0 to 1.
+    /// How far the canopy is unfolded, from 0 to 1.
     pub(super) fn openness(&self) -> f32 {
-        self.open * self.open * (3.0 - 2.0 * self.open)
+        ease((self.open - RAISED) / (UNFOLDED - RAISED))
+    }
+
+    /// How far it is raised out in front, and lifted overhead from there,
+    /// each from 0 to 1.
+    fn raised(&self) -> (f32, f32) {
+        (
+            ease(self.open / RAISED),
+            ease((self.open - UNFOLDED) / (1.0 - UNFOLDED)),
+        )
+    }
+
+    /// How hard it is shaken now, from -1 to 1: a few times while closing,
+    /// once folded and still in front.
+    fn shake(&self) -> f32 {
+        if self.wants_open || self.open >= RAISED {
+            return 0.0;
+        }
+        let t = self.open / RAISED;
+        (TAU * SHAKES * t).sin() * (PI * t).sin()
+    }
+
+    /// How far past open the canopy snaps as it finishes opening.
+    fn pop(&self) -> f32 {
+        if !self.wants_open {
+            return 0.0;
+        }
+        let t = ((self.open - (UNFOLDED - 0.1)) / 0.18).clamp(0.0, 1.0);
+        POP * (PI * t).sin()
+    }
+
+    /// Where the other hand goes to push the runner, in the holder's
+    /// space, with the umbrella at `placed` for a holder of `size`, and
+    /// how firmly from 0 to 1. None while the canopy is not moving.
+    pub(super) fn runner(&self, placed: &Transform, size: f32) -> Option<(Vec3, f32)> {
+        let unfold = self.openness();
+        let grip = ease(unfold / 0.15) * ease((1.0 - unfold) / 0.15);
+        let moving = self.open > RAISED * 0.7 && self.open < UNFOLDED + 0.05;
+        (moving && grip > 0.0).then(|| {
+            let along = RUNNER.start + (RUNNER.end - RUNNER.start) * unfold;
+            (placed.transform_point(Vec3::Y * along * SHAFT * size), grip)
+        })
     }
 
     /// Opens it a while after the rain starts, and closes it a while after
@@ -231,19 +293,31 @@ impl Umbrella {
         self.tilt += (target - self.tilt) * (1.0 - (-4.0 * dt).exp());
     }
 
-    /// Where the hand holds it, between `carry` while closed and `hold`
-    /// while open, in the same space.
-    pub(super) fn hand(&self, carry: Vec3, hold: Vec3) -> Vec3 {
-        carry.lerp(hold, self.openness())
+    /// Where the hand holds it: at `carry` while closed, out at `front`
+    /// while opening or closing, and at `hold` while open, all in the same
+    /// space.
+    pub(super) fn hand(&self, carry: Vec3, front: Vec3, hold: Vec3) -> Vec3 {
+        let (raised, lifted) = self.raised();
+        let shaken = Vec3::Y * 0.02 * self.shake();
+        carry.lerp(front, raised).lerp(hold, lifted) + shaken
     }
 
     /// The umbrella in the holder's space with its handle at `hand`, which
     /// swings by `swing` radians while carried closed.
     pub(super) fn place(&self, hand: Vec3, swing: f32) -> Transform {
+        let (raised, lifted) = self.raised();
         let carried = Quat::from_rotation_x(CARRIED + swing);
+        let front = Quat::from_rotation_arc(Vec3::Y, IN_FRONT.normalize());
         let held = LEAN_IN + Vec3::new(self.tilt.x, 0.0, self.tilt.y);
         let held = Quat::from_rotation_arc(Vec3::Y, held.normalize());
-        Transform::from_translation(hand).with_rotation(carried.slerp(held, self.openness()))
+        let shaken = Quat::from_rotation_x(SHAKE * self.shake());
+        let turn = carried.slerp(front, raised).slerp(held, lifted) * shaken;
+        Transform::from_translation(hand).with_rotation(turn)
+    }
+
+    /// How hard it is being shaken, from 0 to 1.
+    pub(super) fn shaken(&self) -> f32 {
+        self.shake().abs()
     }
 
     /// Moves the parts for `placed` and a holder of `size`.
@@ -256,7 +330,7 @@ impl Umbrella {
     ) {
         set(self.root, placed.with_scale(Vec3::splat(size)));
         let open = self.openness();
-        let spread = 0.12 + 0.88 * open;
+        let spread = 0.12 + 0.88 * open + self.pop();
         let height = 1.0 + 2.5 * (1.0 - open);
         set(
             self.canopy,
@@ -270,10 +344,10 @@ impl Umbrella {
     /// The open canopy as a shadow shape, for `placed` and a holder of
     /// `size`.
     pub(super) fn shadow(&self, placed: &Transform, size: f32) -> Option<Blob> {
-        (self.open > 0.3).then(|| {
+        (self.openness() > 0.3).then(|| {
             let rise = shape::rise() * RADIUS;
             let middle = placed.transform_point(Vec3::Y * (SHAFT - rise / 2.0) * size);
-            let spread = (0.12 + 0.88 * self.openness()) * RADIUS * 2.0;
+            let spread = (0.12 + 0.88 * self.openness() + self.pop()) * RADIUS * 2.0;
             Blob::new(
                 &Transform::from_translation(middle).with_rotation(placed.rotation),
                 Vec3::new(spread, rise, spread) * size,
@@ -284,4 +358,10 @@ impl Umbrella {
     pub(super) fn canopy(&self) -> Entity {
         self.canopy
     }
+}
+
+/// `t` from 0 to 1, eased in and out.
+fn ease(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }

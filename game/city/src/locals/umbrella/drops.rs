@@ -20,6 +20,8 @@ use super::{Canopy, RIBS, shape};
 const SLOTS: usize = 512;
 /// Drops a second off each rib tip in full rain.
 const PER_TIP: f32 = 4.0;
+/// Drops per rib tip and second thrown off a closed umbrella shaken hard.
+const SHAKEN_OFF: f32 = 40.0;
 /// Only umbrellas this near the player drip.
 const NEAR: f32 = 16.0;
 const WIDTH: f32 = 0.0015;
@@ -112,11 +114,21 @@ impl Drops {
     ) {
         let eye = camera.translation();
         let now = time.elapsed_secs_wrapped();
-        let chance = (PER_TIP * weather.rain * time.delta_secs()).min(1.0);
+        let dt = time.delta_secs();
         let rng = &mut whims.0;
         let mut shed = false;
         for (canopy, at) in &canopies {
-            if canopy.open < 0.9 || at.translation().distance(eye) > NEAR {
+            if at.translation().distance(eye) > NEAR {
+                continue;
+            }
+            // Open, drops run off now and then. Shaken, they fly off.
+            let rate = if canopy.open >= 0.9 {
+                PER_TIP * weather.rain
+            } else {
+                SHAKEN_OFF * canopy.shaken
+            };
+            let chance = (rate * dt).min(1.0);
+            if chance <= 0.0 {
                 continue;
             }
             for rib in 0..RIBS {

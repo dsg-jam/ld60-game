@@ -44,9 +44,11 @@ const BREATH: f32 = 0.012;
 const HANG: Vec3 = Vec3::new(0.025, -0.27, -0.04);
 const LAP: Vec3 = Vec3::new(-0.04, -0.2, 0.14);
 const ARM_SWING: f32 = 0.025;
-/// The hand holding an open umbrella: in front of the chest, to the side,
-/// the elbow tucked in.
-const HOLD: Vec3 = Vec3::new(0.1, 0.8, 0.16);
+/// The hand holding an open umbrella: out in front of the chest and to the
+/// side, so the handle hangs clear of the breast and the wing. While it
+/// opens or closes the umbrella, the hand holds it out in front, lower.
+const HOLD: Vec3 = Vec3::new(0.155, 0.82, 0.2);
+const FRONT: Vec3 = Vec3::new(0.07, 0.68, 0.24);
 /// With an open umbrella, the head turns only this far towards it.
 const UMBRELLA_GLANCE: f32 = 0.5;
 /// Seated, the hull rests this far above the seat, upright, leaning back
@@ -256,7 +258,12 @@ impl Bird {
                 to: ankle,
                 radius: 0.013,
             };
-
+        }
+        // The right hand holds the umbrella. The left one helps it open and
+        // close, so it goes second.
+        let mut runner = None;
+        for side in [Side::Right, Side::Left] {
+            let index = usize::from(side == Side::Right);
             let shoulder = hull.transform_point(side.mirror(SHOULDER) - HULL);
             let swing = ARM_SWING * self.gait() * ((self.phase + index as f32 * 0.5) * TAU).sin();
             let mut hand = match (self.posture, work) {
@@ -271,7 +278,10 @@ impl Bird {
             };
             let umbrella = self.umbrella.as_ref().filter(|_| side == Side::Right);
             if let Some(umbrella) = umbrella {
-                hand = umbrella.hand(hand, HOLD);
+                hand = umbrella.hand(hand, FRONT, HOLD);
+            }
+            if let Some((at, grip)) = runner.filter(|_| side == Side::Left) {
+                hand = hand.lerp(at, grip);
             }
             let elbows = side.mirror(ELBOWS);
             let (elbow, wrist) = ARM.reach(shoulder, hand, elbows);
@@ -294,6 +304,7 @@ impl Bird {
                     silhouette.blobs[2] = canopy;
                     silhouette.height = placed.translation.y + umbrella::SHAFT * UMBRELLA_SIZE;
                 }
+                runner = umbrella.runner(&placed, UMBRELLA_SIZE);
                 umbrella_at = Some(placed);
             }
         }

@@ -321,11 +321,12 @@ impl Bird {
         self.phase = phase.unwrap_or(0.0).rem_euclid(1.0);
     }
 
-    /// Opens its umbrella at once, if it has one.
+    /// Holds its umbrella, if it has one, `open` of the way through
+    /// opening, or closing if not `opening`.
     #[cfg(feature = "debug_port")]
-    pub(super) fn open_umbrella_now(&mut self) {
+    pub(super) fn hold_umbrella(&mut self, open: f32, opening: bool) {
         if let Some(umbrella) = &mut self.umbrella {
-            umbrella.open_now();
+            umbrella.hold_open(open, opening);
         }
     }
 
@@ -487,6 +488,7 @@ impl Bird {
                 umbrella.pose(placed, UMBRELLA_SIZE, &mut set, &mut show);
                 if let Ok(mut canopy) = canopies.get_mut(umbrella.canopy()) {
                     canopy.open = umbrella.openness();
+                    canopy.shaken = umbrella.shaken();
                 }
             }
         }

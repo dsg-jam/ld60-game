@@ -15,6 +15,9 @@ pub(super) struct LineupPlugin;
 #[derive(Component, Debug)]
 pub(super) struct Lineup {
     phase: Option<f32>,
+    /// How far through opening its umbrella is, or through closing.
+    open: f32,
+    opening: bool,
     /// The height of the seat it sits on, if it sits, and how far down.
     seat: Option<(f32, f32)>,
 }
@@ -44,7 +47,13 @@ impl Plugin for LineupPlugin {
                 ParamKind::Text,
                 "bare, scarf or shawl, cycled, comma separated",
             )
-            .param("umbrella", ParamKind::Flag, "carry an open umbrella")
+            .param("umbrella", ParamKind::Flag, "carry an umbrella")
+            .param(
+                "open",
+                ParamKind::Numbers,
+                "how far through opening the umbrella is, cycled, 1 by default",
+            )
+            .param("closing", ParamKind::Flag, "closing the umbrella instead")
             .param(
                 "phase",
                 ParamKind::Numbers,
@@ -123,12 +132,15 @@ impl Lineup {
         let phases = numbers("phase");
         let seat = numbers("seat").first().copied();
         let sittings = numbers("sitting");
+        let opens = numbers("open");
+        let closing = params.get("closing").and_then(Value::as_bool) == Some(true);
         let mut rng = SmallRng::seed_from_u64(1);
         let count = species
             .len()
             .max(dresses.len())
             .max(phases.len())
-            .max(sittings.len());
+            .max(sittings.len())
+            .max(opens.len());
         let mut placed = Vec::with_capacity(count);
         for index in 0..count {
             let at = Vec3::new(x + index as f32 * spacing, 0.0, z);
@@ -150,6 +162,11 @@ impl Lineup {
                 Name::new("lineup"),
                 Self {
                     phase: (!phases.is_empty()).then(|| phases[index % phases.len()]),
+                    open: opens
+                        .get(index % opens.len().max(1))
+                        .copied()
+                        .unwrap_or(1.0),
+                    opening: !closing,
                     seat: seat.map(|height| {
                         let sitting = sittings.get(index % sittings.len().max(1));
                         (height, sitting.copied().unwrap_or(1.0))
@@ -167,7 +184,7 @@ impl Lineup {
             if let Some((height, sitting)) = lineup.seat {
                 bird.sit(height, sitting, false);
             }
-            bird.open_umbrella_now();
+            bird.hold_umbrella(lineup.open, lineup.opening);
         }
     }
 }
