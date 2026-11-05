@@ -32,6 +32,9 @@ const COUNTER_HEIGHT: f32 = 0.95;
 const COUNTER_DEPTH: f32 = 0.5;
 /// Space between the street edge of the bay and the counter.
 const COUNTER_SETBACK: f32 = 0.4;
+/// Goods on the counter stay this low and this deep, along its front.
+const DISPLAY_HEIGHT: f32 = 0.16;
+const DISPLAY_DEPTH: Range<f32> = 0.06..0.14;
 const SHELF_DEPTH: f32 = 0.45;
 const SHELF_BOARDS: [f32; 4] = [0.9, 1.5, 2.1, 2.7];
 const BOARD: f32 = 0.03;
@@ -374,7 +377,7 @@ impl Bay {
             .translated(Vec3::new(0.0, 0.0, counter.center.z));
         stall.spawn(kit.cuboid(&counter, stock.counters.pick(rng).clone()));
         stall.spawn(kit.cuboid(&top, stock.metal.clone()));
-        Self::spawn_goods(stall, kit, stock, &top, rng);
+        Self::spawn_display(stall, kit, stock, &top, rng);
 
         // Stalls near the shop keep the same things as the shop, seen from
         // afar.
@@ -483,6 +486,37 @@ impl Bay {
             light: *color,
         });
         opening
+    }
+
+    /// Low boxes in a row along the front edge of the counter `top`, so
+    /// that the keeper behind it is seen and has room to work.
+    fn spawn_display(
+        stall: &mut ChildSpawnerCommands,
+        kit: &Kit,
+        stock: &Stock,
+        top: &Block,
+        rng: &mut impl Rng,
+    ) {
+        let mut x = top.min().x + 0.03;
+        while x < top.max().x - 0.1 {
+            let size = Vec3::new(
+                rng.random_range(0.06..0.2),
+                rng.random_range(0.04..DISPLAY_HEIGHT),
+                rng.random_range(DISPLAY_DEPTH),
+            );
+            if x + size.x > top.max().x {
+                break;
+            }
+            if rng.random_bool(0.7) {
+                let item = Block::new(size).on_top_of(top).translated(Vec3::new(
+                    x + size.x / 2.0,
+                    0.0,
+                    top.max().z - 0.04 - size.z / 2.0,
+                ));
+                stall.spawn(kit.cuboid(&item, stock.goods.pick(rng).clone()));
+            }
+            x += size.x + rng.random_range(0.02..0.1);
+        }
     }
 
     /// Small boxes standing in a row on top of `surface`.
