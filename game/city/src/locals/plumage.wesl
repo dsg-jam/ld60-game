@@ -47,6 +47,10 @@ const EYE_ALONG: f32 = 0.2322;
 const EYE_RISE: f32 = 0.3;
 const HEAD_LENGTH: f32 = 0.267;
 const HEAD_HEIGHT: f32 = 0.03;
+/// How far a small feather of the down stands out at its tip, in meters.
+const SHINGLE_HEIGHT: f32 = 0.0012;
+/// How much the fine barbs brighten edges seen at a low angle, dry.
+const SHEEN: f32 = 0.3;
 /// Barbs across the vane of a feather.
 const BARBS: f32 = 70.0;
 /// Barbs sweep towards the tip.
@@ -112,16 +116,26 @@ fn region_color(region: f32, along: f32) -> vec3<f32> {
 }
 
 /// Rows of small rounded feathers on down, `cells` of them around and
-/// along, each a little darker at its root under the row before. Fades
-/// out where they get too small to see.
-fn shingles(uv: vec2<f32>, cells: vec2<f32>) -> f32 {
+/// along. Each lies over the root of the one behind it, so the surface
+/// rises along a feather and steps down at its tip, and each has a shade
+/// of its own. Returns the shade and the height in meters. Fades out where
+/// they get too small to see.
+fn shingles(uv: vec2<f32>, cells: vec2<f32>, seed: f32) -> vec2<f32> {
     let cell = uv * cells;
     let row = floor(cell.y);
-    let x = fract(cell.x + 0.5 * (row - 2.0 * floor(row / 2.0)));
+    let shifted = cell.x + 0.5 * (row - 2.0 * floor(row / 2.0));
+    let x = fract(shifted);
     let edge = fract(cell.y + 0.35 * sin(PI * x));
     let size = max(length(fwidth(cell)), 1e-4);
     let fade = 1.0 - smoothstep(0.15, 0.5, size);
-    return mix(1.0, mix(0.9, 1.0, smoothstep(0.0, 0.7, edge)), fade);
+    let own = mix(0.93, 1.07, hash1(vec2<f32>(floor(shifted), row), seed));
+    // Darker at the root, under the feather before, and a soft dark rim
+    // where the tip lies on the next row.
+    let root = mix(0.88, 1.0, smoothstep(0.0, 0.6, edge));
+    let tip = 1.0 - 0.07 * smoothstep(0.85, 1.0, edge);
+    let shade = mix(1.0, own * root * tip, fade);
+    let height = SHINGLE_HEIGHT * smoothstep(0.0, 0.9, edge) * (1.0 - smoothstep(0.9, 1.0, edge));
+    return vec2<f32>(shade, height * fade);
 }
 
 @fragment
@@ -156,12 +170,18 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
 
     var color = region_color(region, along) * shade;
     let cells = vec2<f32>(in.color.b, in.color.r) * CELLS;
+    // Derivatives need uniform control flow, so the down is worked out
+    // everywhere.
+    let down_rows = shingles(uv, cells, 7.0);
+    var relief = 0.0;
     if cloth {
         color = plumage.cloth.rgb * knit(uv, cells);
     } else if down && abs(region - FACE) < 0.5 {
-        color = face(uv) * shingles(uv, cells);
+        color = face(uv) * down_rows.x;
+        relief = down_rows.y;
     } else if down {
-        color = region_color(region, 0.0) * DOWN_SHADE * shingles(uv, cells);
+        color = region_color(region, 0.0) * DOWN_SHADE * down_rows.x;
+        relief = down_rows.y;
     } else {
         // A little darker towards the root, where the next row hides it.
         color *= mix(0.85, 1.0, smoothstep(0.0, 0.5, along));
@@ -169,21 +189,22 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     // Only plumes show their shafts.
     let shaft = rachis * select(0.0, 1.0, plume);
     color = mix(color, color * 1.2 + 0.02, shaft * 0.3);
-    // Water darkens the barbs and leaves a film on them.
+    // Water darkens the barbs and leaves a film on them, which only
+    // makes them satin, as the barbs stay uneven.
     color *= mix(1.0, 0.6, wet);
-    var rough = mix(0.8, 0.4, wet);
+    var rough = mix(0.8, 0.55, wet);
+    // The fine barbs and the wool fuzz catch light at the rim.
+    let rim = pow(1.0 - abs(dot(normalize(in.world_normal), pbr_input.V)), 3.0);
+    color *= 1.0 + select(SHEEN, 0.35, cloth) * rim * (1.0 - wet);
     if cloth {
-        // Wool fuzz catches light at the rim.
-        let rim = pow(1.0 - abs(dot(normalize(in.world_normal), pbr_input.V)), 3.0);
-        color *= 1.0 + 0.35 * rim * (1.0 - wet);
         rough = mix(0.95, 0.6, wet);
     }
     rough = mix(rough, rough * 0.8, shaft);
 
     pbr_input.material.base_color = vec4<f32>(color, 1.0);
     pbr_input.material.perceptual_roughness = rough;
-    pbr_input.material.reflectance = vec3<f32>(mix(0.25, 0.5, wet));
-    pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, barb_height + 0.0002 * shaft);
+    pbr_input.material.reflectance = vec3<f32>(mix(0.25, 0.35, wet));
+    pbr_input.N = bumped(pbr_input.N, in.world_position.xyz, barb_height + 0.0002 * shaft + relief);
 
     var out: FragmentOutput;
 @if(PREPASS_PIPELINE) {
