@@ -1,3 +1,4 @@
+use std::f32::consts::TAU;
 use std::ops::Range;
 
 use bevy::prelude::*;
@@ -39,6 +40,15 @@ const SERVES: std::ops::Range<f32> = 0.2..2.5;
 const SERVES_PAST: f32 = 0.8;
 /// Serving, keepers hold out goods this far to the customer's side.
 const OFFER: f32 = 0.3;
+/// With no one to serve, keepers wipe the counter now and then, with this
+/// chance per second, for this many seconds, in loops this wide and deep,
+/// this many per second.
+const WIPE_CHANCE: f32 = 0.05;
+const WIPE_FOR: Range<f32> = 3.0..7.0;
+const WIPE: Vec2 = Vec2::new(0.08, 0.035);
+const WIPE_RATE: f32 = 1.2;
+/// The rag lies this far under the hand.
+const RAG_DOWN: f32 = 0.02;
 
 /// A bird keeping a stall: it shuffles along the counter and moves its
 /// hands over the goods.
@@ -57,6 +67,17 @@ pub(super) struct Keeper {
     aims: [Vec3; 2],
     fidget: f32,
     shift: f32,
+    wipe: Option<Wipe>,
+    rag: Entity,
+}
+
+/// A keeper wiping the counter with one hand, round a spot in its space.
+#[derive(Debug, Clone, Copy)]
+struct Wipe {
+    hand: usize,
+    middle: Vec3,
+    left: f32,
+    turn: f32,
 }
 
 impl Keeper {
@@ -79,6 +100,7 @@ impl Keeper {
         };
         let bird = Bird::spawn(commands, figures, rng, birth);
         let rest = [-1.0, 1.0].map(|side| Vec3::new(side * 0.15, COUNTER_TOP, REACH.start));
+        let rag = commands.spawn((figures.birds.rag(rng), ChildOf(bird))).id();
         commands.entity(bird).insert((
             Name::new("keeper"),
             Self {
@@ -92,6 +114,8 @@ impl Keeper {
                 aims: rest,
                 fidget: rng.random_range(FIDGET),
                 shift: rng.random_range(SHIFT),
+                wipe: None,
+                rag,
             },
         ));
     }
@@ -127,6 +151,7 @@ impl Keeper {
         mut footfalls: ResMut<Footfalls>,
         customers: Res<Customers>,
         mut keepers: Query<(&mut Keeper, &Bird, &mut Gaze, &mut Transform)>,
+        mut rags: Query<(&mut Transform, &mut Visibility), Without<Keeper>>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
@@ -148,6 +173,7 @@ impl Keeper {
                 };
                 keeper.aims[hand] = Vec3::new(x, COUNTER_TOP, reach);
             }
+            keeper.wipe_on(customer.is_some(), &mut gaze, dt, rng);
             keeper.shift -= dt;
             if let Some(at) = customer {
                 keeper.toward = at.x.clamp(-keeper.room, keeper.room);
@@ -184,10 +210,66 @@ impl Keeper {
                 keeper.aims[hand] = aim;
                 let at = keeper.hands[hand];
                 let flat = (aim - at).with_y(0.0);
-                let move_by = (HAND_SPEED * dt).min(flat.length());
+                let speed = if keeper.wipe.is_some_and(|wipe| wipe.hand == hand) {
+                    2.0 * HAND_SPEED
+                } else {
+                    HAND_SPEED
+                };
+                let move_by = (speed * dt).min(flat.length());
                 keeper.hands[hand] = (at + flat.normalize_or_zero() * move_by).with_y(aim.y);
+            }
+            if let Ok((mut rag, mut visibility)) = rags.get_mut(keeper.rag) {
+                match keeper.wipe {
+                    Some(wipe) => {
+                        visibility.set_if_neq(Visibility::Inherited);
+                        let hand = keeper.hands[wipe.hand];
+                        *rag = Transform::from_translation(hand - Vec3::Y * RAG_DOWN)
+                            .with_rotation(Quat::from_rotation_y(wipe.turn * 0.3));
+                    }
+                    None => {
+                        visibility.set_if_neq(Visibility::Hidden);
+                    }
+                }
             }
             *transform = keeper.home * Transform::from_xyz(keeper.x, 0.0, 0.0);
         }
+    }
+
+    /// Wipes the counter now and then while no one is `served`, round and
+    /// round a spot with one hand, looking down at it.
+    fn wipe_on(&mut self, served: bool, gaze: &mut Gaze, dt: f32, rng: &mut impl Rng) {
+        if served {
+            self.wipe = None;
+            return;
+        }
+        let chance = f64::from((WIPE_CHANCE * dt).clamp(0.0, 1.0));
+        if self.wipe.is_none() && rng.random_bool(chance) {
+            let hand = usize::from(rng.random_bool(0.5));
+            let side = if hand == 0 { -1.0 } else { 1.0 };
+            self.wipe = Some(Wipe {
+                hand,
+                middle: Vec3::new(
+                    side * rng.random_range(0.05..0.2),
+                    COUNTER_TOP,
+                    REACH.start + WIPE.y,
+                ),
+                left: rng.random_range(WIPE_FOR),
+                turn: 0.0,
+            });
+        }
+        let Some(mut wipe) = self.wipe else {
+            return;
+        };
+        // Stays where it is meanwhile, with the other hand still.
+        self.toward = self.x;
+        self.shift = self.shift.max(0.5);
+        self.fidget = self.fidget.max(0.5);
+        wipe.turn += WIPE_RATE * TAU * dt;
+        wipe.left -= dt;
+        let round = Vec3::new(wipe.turn.cos() * WIPE.x, 0.0, wipe.turn.sin() * WIPE.y);
+        self.aims[wipe.hand] = wipe.middle + round;
+        let at = wipe.middle;
+        gaze.glance_at(Vec2::new(at.x.atan2(at.z), 0.6), 0.5);
+        self.wipe = (wipe.left > 0.0).then_some(wipe);
     }
 }

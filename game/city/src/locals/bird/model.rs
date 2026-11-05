@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
+use bevy::{light::NotShadowCaster, mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
 use ld60_geometry::triangles::{End, Skin, Triangles};
 use rand::{Rng, RngExt};
 
@@ -34,6 +34,12 @@ const GLAZES: [Color; 4] = [
     Color::srgb_u8(0x8a, 0x3a, 0x2a),
     Color::srgb_u8(0x2a, 0x2a, 0x2c),
 ];
+/// Keepers' rags.
+const RAGS: [Color; 3] = [
+    Color::srgb_u8(0xd8, 0xd0, 0xb8),
+    Color::srgb_u8(0x6a, 0x80, 0x90),
+    Color::srgb_u8(0xa0, 0x58, 0x48),
+];
 const FILLINGS: [Color; 2] = [
     Color::srgb_u8(0x5a, 0x34, 0x14),
     Color::srgb_u8(0xc8, 0x98, 0x58),
@@ -61,6 +67,8 @@ pub(in super::super) struct Kit {
     pub(super) foods: [Handle<StandardMaterial>; 2],
     pub(super) steam: Handle<Mesh>,
     pub(super) vapour: Handle<StandardMaterial>,
+    rag: Handle<Mesh>,
+    rags: Vec<Handle<StandardMaterial>>,
 }
 
 impl Kit {
@@ -133,7 +141,33 @@ impl Kit {
             }),
             steam: meshes.add(Steam::mesh()),
             vapour: materials.add(Steam::material()),
+            rag: meshes.add(
+                Sphere::new(0.035)
+                    .mesh()
+                    .uv(10, 6)
+                    .scaled_by(Vec3::new(1.0, 0.3, 0.75)),
+            ),
+            rags: RAGS
+                .iter()
+                .map(|&color| {
+                    materials.add(StandardMaterial {
+                        base_color: color,
+                        perceptual_roughness: 0.9,
+                        ..default()
+                    })
+                })
+                .collect(),
         }
+    }
+
+    /// A rag to wipe a counter with, hidden until used.
+    pub(in super::super) fn rag(&self, rng: &mut impl Rng) -> impl Bundle {
+        (
+            Mesh3d(self.rag.clone()),
+            MeshMaterial3d(self.rags[rng.random_range(0..self.rags.len())].clone()),
+            Visibility::Hidden,
+            NotShadowCaster,
+        )
     }
 
     /// Where the pupil sits in the right eye: on its outer side.
