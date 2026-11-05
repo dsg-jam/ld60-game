@@ -10,7 +10,7 @@ use super::{Figures, PlumageMaterial, Whims};
 
 /// Keepers stand on a crate behind the counter, this high and this far
 /// towards it from the spot behind it, to reach over it.
-const CRATE: f32 = 0.08;
+const CRATE: f32 = 0.18;
 const FORWARD: f32 = 0.25;
 /// Hands on the counter, in the keeper's space: the top is this high,
 /// and the goods lie this far in front.
@@ -66,7 +66,7 @@ impl Keeper {
             posture: Posture::Keeping,
             may_carry: false,
             sheltered: true,
-            coat: Coat::new(plumages, rng),
+            coat: Coat::new(plumages, &figures.skins, rng),
         };
         let bird = Bird::spawn(commands, figures, rng, birth);
         let rest = [-1.0, 1.0].map(|side| Vec3::new(side * 0.15, COUNTER_TOP, REACH.start));

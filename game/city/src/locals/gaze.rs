@@ -15,7 +15,7 @@ const FOLLOW: f32 = 6.0;
 const PLAYER_NEAR: f32 = 7.0;
 const CAR_NEAR: f32 = 12.0;
 /// Height of the eyes above the feet, for aiming, before size.
-const EYES: f32 = 1.4;
+const EYES: f32 = 1.55;
 
 /// Where a head looks, relative to its body.
 #[derive(Component, Debug, Default)]

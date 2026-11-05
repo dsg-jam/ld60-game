@@ -25,7 +25,7 @@ const STEP_PITCH: Range<f32> = 0.9..1.1;
 /// How much each phrase differs in pitch from the voice.
 const INTONATION: Range<f32> = 0.94..1.06;
 /// Height of the mouth above the feet, before size.
-const MOUTH: f32 = 1.35;
+const MOUTH: f32 = 1.5;
 /// Rain on umbrellas is heard this close, and stops beyond the other.
 const PATTER_RANGE: f32 = 9.0;
 const PATTER_GONE: f32 = 10.0;

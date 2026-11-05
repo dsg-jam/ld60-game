@@ -2,39 +2,44 @@ use bevy::prelude::*;
 
 use super::super::limb::Limb;
 
-/// Where the hull is, its size and how it rests on the hips. All bird
+/// Where the hull is, its size and how far it leans forward. All bird
 /// measures are for a bird of size 1, with its feet at the origin and its
 /// front towards +Z.
-pub(super) const HULL: Vec3 = Vec3::new(0.0, 0.8, 0.0);
-pub(super) const HULL_RADII: Vec3 = Vec3::new(0.23, 0.22, 0.27);
-pub(super) const HEAD: Vec3 = Vec3::new(0.0, 1.12, 0.15);
-pub(super) const HEAD_RADII: Vec3 = Vec3::new(0.155, 0.145, 0.155);
+pub(super) const HULL: Vec3 = Vec3::new(0.0, 0.68, -0.02);
+pub(super) const HULL_RADII: Vec3 = Vec3::new(0.095, 0.24, 0.11);
+/// The hull is a slim egg, its top leaning forward this far.
+pub(super) const HULL_TILT: f32 = 0.6;
+/// Where the neck leaves the front of the hull, and the head.
+pub(super) const NECK: Vec3 = Vec3::new(0.0, 0.84, 0.1);
+pub(super) const HEAD: Vec3 = Vec3::new(0.0, 1.215, 0.1);
+pub(super) const HEAD_RADII: Vec3 = Vec3::new(0.03, 0.036, 0.05);
 /// Where the tail leaves the hull.
-pub(super) const RUMP: Vec3 = Vec3::new(0.0, 0.85, -0.24);
+pub(super) const RUMP: Vec3 = Vec3::new(0.0, 0.53, -0.14);
 /// The right hip and shoulder. The left ones mirror them.
-pub(super) const HIP: Vec3 = Vec3::new(0.09, 0.66, -0.02);
-pub(super) const SHOULDER: Vec3 = Vec3::new(0.17, 0.88, 0.1);
+pub(super) const HIP: Vec3 = Vec3::new(0.055, 0.6, -0.03);
+pub(super) const SHOULDER: Vec3 = Vec3::new(0.085, 0.82, 0.04);
+/// The upper leg is the feathered drumstick, the lower one the bare shank
+/// below the joint that bends back.
 pub(super) const LEG: Limb = Limb {
-    upper: 0.3,
-    lower: 0.34,
+    upper: 0.36,
+    lower: 0.27,
 };
 pub(super) const ARM: Limb = Limb {
-    upper: 0.15,
-    lower: 0.14,
+    upper: 0.16,
+    lower: 0.15,
 };
 /// The knees bend back, like a bird's, and the elbows out and back.
 pub(super) const KNEES: Vec3 = Vec3::NEG_Z;
-pub(super) const ELBOWS: Vec3 = Vec3::new(0.6, -0.2, -0.8);
-/// The rest pose of the right leg and arm: knee, ankle, elbow and wrist.
-const KNEE: Vec3 = Vec3::new(0.09, 0.37, -0.1);
-const ANKLE: Vec3 = Vec3::new(0.1, 0.04, 0.0);
-const ELBOW: Vec3 = Vec3::new(0.22, 0.75, 0.1);
-const WRIST: Vec3 = Vec3::new(0.23, 0.62, 0.16);
+pub(super) const ELBOWS: Vec3 = Vec3::new(0.3, -0.2, -0.9);
+/// The rest pose of the right ankle and wrist.
+const ANKLE: Vec3 = Vec3::new(0.06, 0.035, 0.0);
+const WRIST: Vec3 = Vec3::new(0.11, 0.55, 0.0);
 
 /// The joints of a bird. Each moves the parts of the mesh bound to it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Bone {
     Hull,
+    Neck,
     Head,
     Tail,
     Thigh(Side),
@@ -76,10 +81,10 @@ impl Side {
 }
 
 impl Bone {
-    pub(super) const COUNT: usize = 15;
+    pub(super) const COUNT: usize = 16;
 
     pub(super) fn all() -> impl Iterator<Item = Self> {
-        [Self::Hull, Self::Head, Self::Tail]
+        [Self::Hull, Self::Neck, Self::Head, Self::Tail]
             .into_iter()
             .chain(Side::BOTH.into_iter().flat_map(|side| {
                 [
@@ -95,11 +100,12 @@ impl Bone {
 
     /// Its index among the joints of the skinned meshes.
     pub(super) fn joint(self) -> u16 {
-        let limb = |side: Side, offset: usize| (3 + side.index() * 6 + offset) as u16;
+        let limb = |side: Side, offset: usize| (4 + side.index() * 6 + offset) as u16;
         match self {
             Self::Hull => 0,
-            Self::Head => 1,
-            Self::Tail => 2,
+            Self::Neck => 1,
+            Self::Head => 2,
+            Self::Tail => 3,
             Self::Thigh(side) => limb(side, 0),
             Self::Shin(side) => limb(side, 1),
             Self::Foot(side) => limb(side, 2),
@@ -112,32 +118,40 @@ impl Bone {
     /// Where it is and how it is turned in the rest pose, which the meshes
     /// are made in. Limb bones run along their +Y, with +Z towards the bend.
     pub(super) fn rest(self) -> Transform {
+        let leg = |side: Side| {
+            let hip = side.mirror(HIP);
+            let (knee, ankle) = LEG.reach(hip, side.mirror(ANKLE), KNEES);
+            (hip, knee, ankle)
+        };
+        let arm = |side: Side| {
+            let shoulder = side.mirror(SHOULDER);
+            let (elbow, wrist) = ARM.reach(shoulder, side.mirror(WRIST), side.mirror(ELBOWS));
+            (shoulder, elbow, wrist)
+        };
         match self {
             Self::Hull => Transform::from_translation(HULL),
+            Self::Neck => Transform::from_translation(NECK),
             Self::Head => Transform::from_translation(HEAD),
             Self::Tail => Transform::from_translation(RUMP),
             Self::Thigh(side) => {
-                let hip = side.mirror(HIP);
-                let knee = side.mirror(KNEE);
+                let (hip, knee, _) = leg(side);
                 frame(hip, knee - hip, KNEES)
             }
             Self::Shin(side) => {
-                let knee = side.mirror(KNEE);
-                frame(knee, side.mirror(ANKLE) - knee, KNEES)
+                let (_, knee, ankle) = leg(side);
+                frame(knee, ankle - knee, KNEES)
             }
-            Self::Foot(side) => Transform::from_translation(side.mirror(ANKLE)),
+            Self::Foot(side) => Transform::from_translation(leg(side).2),
             Self::UpperArm(side) => {
-                let shoulder = side.mirror(SHOULDER);
-                let elbow = side.mirror(ELBOW);
+                let (shoulder, elbow, _) = arm(side);
                 frame(shoulder, elbow - shoulder, side.mirror(ELBOWS))
             }
             Self::Forearm(side) => {
-                let elbow = side.mirror(ELBOW);
-                frame(elbow, side.mirror(WRIST) - elbow, side.mirror(ELBOWS))
+                let (_, elbow, wrist) = arm(side);
+                frame(elbow, wrist - elbow, side.mirror(ELBOWS))
             }
             Self::Hand(side) => {
-                let elbow = side.mirror(ELBOW);
-                let wrist = side.mirror(WRIST);
+                let (_, elbow, wrist) = arm(side);
                 frame(wrist, wrist - elbow, side.mirror(ELBOWS))
             }
         }

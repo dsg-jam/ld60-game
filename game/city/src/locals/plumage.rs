@@ -7,26 +7,25 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
+use ld60_geometry::surface::SurfaceMaterial;
 use rand::{Rng, RngExt};
 
-pub(super) use self::feathers::{Cover, Feather, Feathers, Kind};
-use super::Pick;
+pub(super) use self::feathers::{Cover, Feather, Feathers, Kind, Region, point_along};
 
 /// Wet feathers show it in steps this small, so the materials only change
 /// now and then.
 const WET_STEP: f32 = 0.05;
 const ALPHA_CUTOFF: f32 = 0.5;
 
-/// Feathers of every kind.
-const PALETTES: [Palette; 8] = [
-    Palette::new(0x5a6068, 0x3a6a4a, Pattern::Plain, 0.9),
-    Palette::new(0x6a4a30, 0xd8c8a0, Pattern::Barred, 0.0),
-    Palette::new(0x2e2c30, 0xb0502a, Pattern::Tipped, 0.3),
-    Palette::new(0x5a6230, 0xd0b040, Pattern::Tipped, 0.2),
-    Palette::new(0x3a5a64, 0xe07a30, Pattern::Spotted, 0.4),
-    Palette::new(0xc8bca8, 0x2a2420, Pattern::Tipped, 0.0),
-    Palette::new(0x2c2e50, 0xb08040, Pattern::Plain, 1.0),
-    Palette::new(0x7a5a48, 0x3a2a24, Pattern::Spotted, 0.1),
+/// Herons of a few kinds: grey, great blue, great white, purple, black and
+/// slate.
+const SPECIES: [Species; 6] = [
+    Species::new(0x7c838c, 0xdedcd6, 0x26282c, 0x8a7a58),
+    Species::new(0x56657a, 0xc8c4bc, 0x22252c, 0x6e6450),
+    Species::new(0xe2e0da, 0xf0eee8, 0xc4c0b8, 0x2a2826),
+    Species::new(0x5e5650, 0x9a6040, 0x24201e, 0x8a7448),
+    Species::new(0x34363c, 0x46484e, 0x1c1c20, 0x3a3634),
+    Species::new(0x4a5560, 0xb8bcc0, 0x1e2228, 0x7a7458),
 ];
 
 pub(super) struct PlumagePlugin;
@@ -50,49 +49,38 @@ pub(super) struct Plumage {
 /// Matches `Plumage` in `plumage.wesl`.
 #[derive(ShaderType, Reflect, Debug, Clone)]
 struct PlumageParams {
-    accent: Vec4,
-    pattern: u32,
+    back: Vec4,
+    pale: Vec4,
+    dark: Vec4,
     wet: f32,
-    sheen: f32,
-    seed: f32,
 }
 
-/// Matches the constants in `plumage.wesl`.
+/// The colors of one kind of heron.
 #[derive(Debug, Clone, Copy)]
-enum Pattern {
-    Plain = 0,
-    /// Bands across each feather.
-    Barred = 1,
-    /// A tip of another color.
-    Tipped = 2,
-    /// A spot near the tip.
-    Spotted = 3,
+struct Species {
+    back: u32,
+    pale: u32,
+    dark: u32,
+    /// The legs, the hands and the beak.
+    skin: u32,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Palette {
-    base: u32,
-    accent: u32,
-    pattern: Pattern,
-    /// How much the neck and head shimmer, from 0 to 1.
-    sheen: f32,
-}
-
-/// One bird's feathers.
+/// One bird's feathers, and its skin to go with them.
 #[derive(Debug, Clone)]
 pub(super) struct Coat {
     pub(super) feathers: Handle<PlumageMaterial>,
+    pub(super) skin: Handle<SurfaceMaterial>,
     /// How soaked it is, from 0 to 1, as last shown.
     shown_wet: f32,
 }
 
-impl Palette {
-    const fn new(base: u32, accent: u32, pattern: Pattern, sheen: f32) -> Self {
+impl Species {
+    const fn new(back: u32, pale: u32, dark: u32, skin: u32) -> Self {
         Self {
-            base,
-            accent,
-            pattern,
-            sheen,
+            back,
+            pale,
+            dark,
+            skin,
         }
     }
 
@@ -102,14 +90,25 @@ impl Palette {
 }
 
 impl Coat {
-    /// A coat of one of the palettes, a little different from any other.
-    pub(super) fn new(plumages: &mut Assets<PlumageMaterial>, rng: &mut impl Rng) -> Self {
-        let palette = PALETTES.pick(rng);
-        let tint = rng.random_range(0.85..1.15f32);
-        let base = Palette::color(palette.base).to_linear() * tint;
+    /// The skin colors, one for each kind of heron, in the order
+    /// [`Coat::new`] expects them.
+    pub(super) fn skin_colors() -> impl Iterator<Item = Color> {
+        SPECIES.iter().map(|species| Species::color(species.skin))
+    }
+
+    /// A coat of one of the kinds of heron, a little different from any
+    /// other, with one of `skins` from [`Coat::skin_colors`].
+    pub(super) fn new(
+        plumages: &mut Assets<PlumageMaterial>,
+        skins: &[Handle<SurfaceMaterial>],
+        rng: &mut impl Rng,
+    ) -> Self {
+        let index = rng.random_range(0..SPECIES.len());
+        let species = SPECIES[index];
+        let tint = rng.random_range(0.92..1.08f32);
+        let color = |rgb| (Species::color(rgb).to_linear() * tint).to_vec4();
         let feathers = plumages.add(ExtendedMaterial {
             base: StandardMaterial {
-                base_color: base.into(),
                 alpha_mode: AlphaMode::Mask(ALPHA_CUTOFF),
                 double_sided: true,
                 cull_mode: None,
@@ -117,16 +116,16 @@ impl Coat {
             },
             extension: Plumage {
                 params: PlumageParams {
-                    accent: Palette::color(palette.accent).to_linear().to_vec4(),
-                    pattern: palette.pattern as u32,
+                    back: color(species.back),
+                    pale: color(species.pale),
+                    dark: color(species.dark),
                     wet: 0.0,
-                    sheen: palette.sheen,
-                    seed: rng.random_range(0.0..10.0),
                 },
             },
         });
         Self {
             feathers,
+            skin: skins[index].clone(),
             shown_wet: 0.0,
         }
     }

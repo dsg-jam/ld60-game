@@ -1,3 +1,4 @@
+mod dress;
 mod model;
 mod pose;
 mod skeleton;
@@ -11,6 +12,7 @@ use bevy::{
 };
 use rand::{Rng, RngExt};
 
+use self::dress::Dress;
 pub(super) use self::model::Kit;
 pub(super) use self::pose::Work;
 use self::skeleton::{Bone, Side};
@@ -27,7 +29,7 @@ use super::{Figures, KEEPER_TALK, Pick, SITTER_TALK, WALKER_TALK, Whims};
 const SIZE: Range<f32> = 1.15..1.35;
 /// Umbrellas for birds are a little smaller than ours.
 const UMBRELLA_SIZE: f32 = 0.85;
-const PACE: Range<f32> = 0.75..1.0;
+const PACE: Range<f32> = 0.65..0.85;
 const UMBRELLA_CHANCE: f64 = 0.55;
 /// Room an open umbrella takes. Less than its radius, as umbrellas tilt
 /// away from each other.
@@ -51,8 +53,9 @@ const SHAKEN_OFF: f32 = 0.4;
 const BLINKS: Range<f32> = 2.0..6.0;
 const BLINK: f32 = 0.13;
 
-/// A local: a small, round bird of sorts on two legs, with a big head,
-/// a beak, feathered arms and hands. Its local +Z is its front.
+/// A local: an upright heron of sorts, with a long neck and beak, legs
+/// that bend back, and folded wings with hands at their wrists. Its local
+/// +Z is its front.
 ///
 /// It walks the sidewalks, sits on the stools of the stalls, or keeps a
 /// stall from behind its counter, all with the same body.
@@ -134,7 +137,6 @@ impl Bird {
             rng.random_range(0.92..1.1),
             rng.random_range(0.95..1.08),
         );
-        let skin = figures.colors(rng).skin;
         let carries = may_carry && rng.random_bool(UMBRELLA_CHANCE);
         let kit = &figures.birds;
         let iris = kit.irises.pick(rng).clone();
@@ -177,11 +179,25 @@ impl Bird {
                 ));
                 body.spawn((
                     Mesh3d(kit.skin.clone()),
-                    MeshMaterial3d(skin),
-                    skinned,
+                    MeshMaterial3d(coat.skin.clone()),
+                    skinned.clone(),
                     DynamicSkinnedMeshBounds,
                     NotShadowCaster,
                 ));
+                let dress = match Dress::pick(rng) {
+                    Dress::Bare => None,
+                    Dress::Scarf => Some(&kit.scarf),
+                    Dress::Shawl => Some(&kit.shawl),
+                };
+                if let Some(dress) = dress {
+                    body.spawn((
+                        Mesh3d(dress.clone()),
+                        MeshMaterial3d(figures.cloths.pick(rng).clone()),
+                        skinned,
+                        DynamicSkinnedMeshBounds,
+                        NotShadowCaster,
+                    ));
+                }
                 umbrella =
                     carries.then(|| Umbrella::spawn(body, &figures.umbrellas, rng, UMBRELLA_SIZE));
             });
@@ -219,8 +235,8 @@ impl Bird {
         root.id()
     }
 
-    /// An eye on the head joint, looking out to its side and forward, with
-    /// a glint of light in it.
+    /// An eye on the head joint, looking out to its side and a little
+    /// forward, with its pupil.
     fn spawn_eye(
         head: &mut ChildSpawnerCommands,
         kit: &Kit,
@@ -234,13 +250,11 @@ impl Bird {
             NotShadowCaster,
         ))
         .with_children(|eye| {
-            // The glint sits on the same side in both eyes, as the light
-            // that makes it comes from one side.
-            let glint = Kit::glint_at() * Vec3::new(-side.sign(), 1.0, 1.0);
             eye.spawn((
-                Mesh3d(kit.glint.clone()),
-                MeshMaterial3d(kit.glint_light.clone()),
-                Transform::from_translation(glint),
+                Mesh3d(kit.pupil.clone()),
+                MeshMaterial3d(kit.pupil_black.clone()),
+                Transform::from_translation(side.mirror(Kit::pupil_at()))
+                    .with_scale(Vec3::new(0.5, 1.0, 1.0)),
                 NotShadowCaster,
             ));
         })

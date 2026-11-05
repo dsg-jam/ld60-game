@@ -1,6 +1,6 @@
 //! The people of the city: walkers on the sidewalks, customers on the
 //! stools of the stalls and keepers behind their counters, all of them
-//! small, round birds of sorts.
+//! upright herons of sorts.
 
 mod bird;
 mod gaze;
@@ -15,9 +15,9 @@ mod walk;
 use std::ops::Range;
 
 use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
-use ld60_geometry::surface::{Finish, SurfaceMaterial};
+use ld60_geometry::surface::{Finish, Form, SurfaceMaterial};
 use rand::rngs::SmallRng;
-use rand::{Rng, RngExt, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use self::bird::{Bird, Birth, Posture};
 use self::gaze::Gaze;
@@ -38,14 +38,15 @@ const WALKER_TALK: Range<f32> = 10.0..40.0;
 const SITTER_TALK: Range<f32> = 3.0..10.0;
 const KEEPER_TALK: Range<f32> = 6.0..20.0;
 
-/// Colors of the bare skin: the legs, the hands and the beak.
-const SKINS: [Color; 6] = [
-    Color::srgb_u8(0xd0, 0x8a, 0x3a),
-    Color::srgb_u8(0xc8, 0xa0, 0x50),
-    Color::srgb_u8(0xb0, 0x8a, 0x80),
-    Color::srgb_u8(0x6a, 0x6a, 0x70),
-    Color::srgb_u8(0x3a, 0x36, 0x34),
-    Color::srgb_u8(0xd8, 0xc0, 0x70),
+/// Colors of the scarves and shawls, muted so the plumage stays the
+/// main thing.
+const CLOTHS: [Color; 6] = [
+    Color::srgb_u8(0x7a, 0x2e, 0x2a),
+    Color::srgb_u8(0x9a, 0x7a, 0x34),
+    Color::srgb_u8(0x2a, 0x56, 0x58),
+    Color::srgb_u8(0x2c, 0x32, 0x50),
+    Color::srgb_u8(0x56, 0x5e, 0x3a),
+    Color::srgb_u8(0x5a, 0x32, 0x4a),
 ];
 
 pub(super) struct LocalsPlugin;
@@ -102,15 +103,11 @@ struct Whims(SmallRng);
 /// Shared meshes and materials for all people.
 #[derive(Resource, Debug)]
 struct Figures {
+    /// One for each kind of heron, see [`Coat::skin_colors`].
     skins: Vec<Handle<SurfaceMaterial>>,
+    cloths: Vec<Handle<SurfaceMaterial>>,
     umbrellas: umbrella::Kit,
     birds: bird::Kit,
-}
-
-/// The colors of one bird.
-#[derive(Debug, Clone)]
-struct Colors {
-    skin: Handle<SurfaceMaterial>,
 }
 
 impl FromWorld for Figures {
@@ -130,12 +127,24 @@ impl FromWorld for Figures {
             })
         });
         let mut surfaces = world.resource_mut::<Assets<SurfaceMaterial>>();
-        let skins = SKINS
+        let skins = Coat::skin_colors()
+            .map(|color| surfaces.add(Finish::Hide.scaled(color)))
+            .collect();
+        let cloths = CLOTHS
             .iter()
-            .map(|&color| surfaces.add(Finish::Hide.scaled(color)))
+            .map(|&color| {
+                let base = StandardMaterial {
+                    base_color: color,
+                    double_sided: true,
+                    cull_mode: None,
+                    ..default()
+                };
+                surfaces.add(Finish::Fabric.over(base, Form::Scaled, 0.0))
+            })
             .collect();
         Self {
             skins,
+            cloths,
             umbrellas,
             birds,
         }
@@ -162,7 +171,7 @@ impl Figures {
                 posture: Posture::Walking,
                 may_carry: true,
                 sheltered: false,
-                coat: Coat::new(&mut plumages, &mut rng),
+                coat: Coat::new(&mut plumages, &figures.skins, &mut rng),
             };
             let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
             commands.entity(bird).insert(walker);
@@ -178,7 +187,7 @@ impl Figures {
                 posture: Posture::Seated(stool.height),
                 may_carry: !stool.covered,
                 sheltered: stool.covered,
-                coat: Coat::new(&mut plumages, &mut rng),
+                coat: Coat::new(&mut plumages, &figures.skins, &mut rng),
             };
             Bird::spawn(&mut commands, &figures, &mut rng, birth);
         }
@@ -193,12 +202,6 @@ impl Figures {
                     half_width,
                 );
             }
-        }
-    }
-
-    fn colors(&self, rng: &mut impl Rng) -> Colors {
-        Colors {
-            skin: self.skins.pick(rng).clone(),
         }
     }
 }

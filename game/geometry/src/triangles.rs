@@ -113,6 +113,20 @@ impl Triangles {
         }
     }
 
+    /// Colors the vertices added since `mark` by where they are and which
+    /// way they face.
+    pub fn color_since(&mut self, mark: usize, color: impl Fn(Vec3, Vec3) -> [f32; 4]) {
+        let count = self.positions.len();
+        let colors = self.colors.get_or_insert_with(|| vec![[1.0; 4]; count]);
+        for ((color_of, position), normal) in colors[mark..]
+            .iter_mut()
+            .zip(&self.positions[mark..])
+            .zip(&self.normals[mark..])
+        {
+            *color_of = color(*position, *normal);
+        }
+    }
+
     /// Binds the vertices added since `mark` by where they are.
     pub fn bind_since(&mut self, mark: usize, skin: impl Fn(Vec3) -> Skin) {
         let count = self.positions.len();

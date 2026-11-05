@@ -6,34 +6,38 @@ use super::super::gaze::{self, Gaze};
 use super::super::shadows::{Blob, Bone as Capsule, Silhouette};
 use super::super::umbrella::{self, Umbrella};
 use super::skeleton::{
-    ARM, Bone, ELBOWS, HEAD, HEAD_RADII, HIP, HULL, HULL_RADII, KNEES, LEG, RUMP, SHOULDER, Side,
-    frame,
+    ARM, Bone, ELBOWS, HEAD, HEAD_RADII, HIP, HULL, HULL_RADII, HULL_TILT, KNEES, LEG, NECK, RUMP,
+    SHOULDER, Side, frame,
 };
 use super::{Bird, Posture, SHAKE_TIME, UMBRELLA_SIZE};
 
 /// Share of a step's cycle that a foot stands on the ground.
-const STANCE: f32 = 0.6;
-const STRIDE: f32 = 0.36;
-const LIFT: f32 = 0.06;
-const BOB: f32 = 0.018;
-const SWAY: f32 = 0.02;
-/// Small birds waddle, rolling onto the foot that stands.
-const WADDLE: f32 = 0.08;
-const LEAN: f32 = 0.1;
-const HUNCH_LEAN: f32 = 0.3;
-const HUNCH_DROP: f32 = 0.05;
-/// The head thrusts forward and back with each step, like a pigeon's.
-const NOD: f32 = 0.02;
+const STANCE: f32 = 0.62;
+const STRIDE: f32 = 0.42;
+/// Herons lift their feet high and set them down with care.
+const LIFT: f32 = 0.09;
+const BOB: f32 = 0.01;
+const SWAY: f32 = 0.012;
+const ROLL: f32 = 0.02;
+const LEAN: f32 = 0.06;
+const HUNCH_LEAN: f32 = 0.15;
+const HUNCH_DROP: f32 = 0.03;
+/// Hunched in the rain, the neck folds and the head sinks this far.
+const HUNCH_SINK: Vec3 = Vec3::new(0.0, -0.07, 0.015);
+/// The head holds still while the body walks on under it, for this share
+/// of each step, then glides forward again, about this far either way.
+const HEAD_HOLD: f32 = 0.6;
+const HEAD_GLIDE: f32 = 0.022;
 /// Feet are heard landing above this much of the walking speed.
 pub(super) const STEPPING: f32 = 0.2;
 const BREATH_RATE: f32 = 0.3;
 const BREATH: f32 = 0.012;
-/// Hands hang beside the hull while walking, and rest in the lap.
-const HANG: Vec3 = Vec3::new(0.03, -0.22, 0.06);
-const LAP: Vec3 = Vec3::new(-0.06, -0.16, 0.15);
-const ARM_SWING: f32 = 0.08;
+/// Hands hang at the sides while walking, and rest in the lap.
+const HANG: Vec3 = Vec3::new(0.025, -0.27, -0.04);
+const LAP: Vec3 = Vec3::new(-0.04, -0.2, 0.14);
+const ARM_SWING: f32 = 0.04;
 /// The hand holding an open umbrella: in front of the chest, to the side.
-const HOLD: Vec3 = Vec3::new(0.15, 0.96, 0.26);
+const HOLD: Vec3 = Vec3::new(0.12, 0.92, 0.24);
 /// With an open umbrella, the head turns only this far towards it.
 const UMBRELLA_GLANCE: f32 = 0.5;
 /// Seated, the feet dangle this far below and ahead of the hips, and swing.
@@ -131,14 +135,17 @@ impl Bird {
             hull.with_scale(self.girth * fluff * Vec3::new(breath, 1.0, breath)),
         );
 
+        let neck = hull * Transform::from_translation(NECK - HULL);
+        set(Bone::Neck, neck);
         // The head stays level as the hull rolls, like a bird's.
         let open = self.umbrella.as_ref().map_or(0.0, Umbrella::openness);
         let glance = gaze.turn.x.min(gaze::YAW.lerp(UMBRELLA_GLANCE, open));
-        let nod = NOD * self.gait() * (2.0 * TAU * self.phase).sin();
-        let head_at = hull.transform_point(HEAD - HULL) + Vec3::Z * nod;
+        let head_at = neck.transform_point(HEAD - NECK)
+            + Vec3::Z * self.head_glide()
+            + HUNCH_SINK * self.hunch;
         let head = Transform::from_translation(head_at).with_rotation(
             Quat::from_rotation_y(glance - shake * 0.6)
-                * Quat::from_rotation_x(gaze.turn.y + self.hunch * 0.3),
+                * Quat::from_rotation_x(gaze.turn.y + self.hunch * 0.15),
         );
         set(Bone::Head, head);
         set(
@@ -155,12 +162,13 @@ impl Bird {
             height: head_at.y + HEAD_RADII.y,
             ..default()
         };
-        silhouette.blobs[0] = Blob::new(&hull, HULL_RADII * 2.0 * self.girth * fluff);
+        let egg = hull * Transform::from_rotation(Quat::from_rotation_x(HULL_TILT));
+        silhouette.blobs[0] = Blob::new(&egg, HULL_RADII * 2.0 * self.girth * fluff);
         silhouette.blobs[1] = Blob::new(&head, HEAD_RADII * 2.0);
         silhouette.bones[6] = Capsule {
-            from: hull.translation,
+            from: neck.translation,
             to: head_at,
-            radius: 0.09,
+            radius: 0.04,
         };
         let mut umbrella_at = None;
         let mut soles = [Vec3::ZERO; 2];
@@ -179,12 +187,12 @@ impl Bird {
             silhouette.bones[index] = Capsule {
                 from: hip,
                 to: knee,
-                radius: 0.04,
+                radius: 0.03,
             };
             silhouette.bones[2 + index] = Capsule {
                 from: knee,
                 to: ankle,
-                radius: 0.022,
+                radius: 0.013,
             };
 
             let shoulder = hull.transform_point(side.mirror(SHOULDER) - HULL);
@@ -210,7 +218,7 @@ impl Bird {
             silhouette.bones[4 + index] = Capsule {
                 from: shoulder,
                 to: wrist,
-                radius: 0.035,
+                radius: 0.045,
             };
             if let Some(umbrella) = umbrella {
                 let grip = palm.transform_point(Vec3::Y * 0.03);
@@ -227,6 +235,21 @@ impl Bird {
             feet: soles,
             umbrella: umbrella_at,
             silhouette,
+        }
+    }
+
+    /// How far ahead of its place on the neck the head is, holding still
+    /// in the world while a foot stands and gliding forward as the back
+    /// foot lifts.
+    fn head_glide(&self) -> f32 {
+        let reach = HEAD_GLIDE * self.gait();
+        let step = (2.0 * (self.phase - STANCE + 0.5)).rem_euclid(1.0);
+        let thrust = 1.0 - HEAD_HOLD;
+        if step < thrust {
+            let t = step / thrust;
+            -reach + 2.0 * reach * t * t * (3.0 - 2.0 * t)
+        } else {
+            reach - 2.0 * reach * (step - thrust) / HEAD_HOLD
         }
     }
 
@@ -281,7 +304,7 @@ impl Bird {
             Transform::from_translation(HULL + Vec3::new(sway, bob - HUNCH_DROP * self.hunch, 0.0))
                 .with_rotation(
                     Quat::from_rotation_x(lean)
-                        * Quat::from_rotation_z(-WADDLE * gait * (TAU * self.phase).sin()),
+                        * Quat::from_rotation_z(-ROLL * gait * (TAU * self.phase).sin()),
                 );
         let feet = [0.0, 0.5].map(|offset| {
             let cycle = (self.phase + offset).fract();
