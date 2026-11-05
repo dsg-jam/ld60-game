@@ -1,4 +1,5 @@
 mod chat;
+mod cross;
 mod meal;
 mod outing;
 
@@ -10,9 +11,11 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use self::chat::Passer;
-use self::outing::Activity;
+use self::outing::{Activity, Around};
 pub(super) use self::outing::{Customers, Seats};
+use super::super::traffic::Vehicle;
 use super::super::weather::Weather;
+use super::super::{FAR_CURB, NEAR_CURB};
 use super::bird::Bird;
 use super::gaze::Gaze;
 use super::sound::Voice;
@@ -24,6 +27,7 @@ static SIDEWALKS: [Sidewalk; 2] = [
         lanes: [-2.6..-1.9, -3.3..-2.6],
         sheltered: Some([-1.45, -1.75]),
         room: -3.5..-0.95,
+        curb: NEAR_CURB + 0.25,
         walkers: 10,
         stalls: 1.0,
     },
@@ -31,6 +35,7 @@ static SIDEWALKS: [Sidewalk; 2] = [
         lanes: [-14.5..-13.8, -15.2..-14.5],
         sheltered: None,
         room: -15.3..-13.6,
+        curb: FAR_CURB - 0.25,
         walkers: 12,
         stalls: -1.0,
     },
@@ -87,6 +92,8 @@ struct Sidewalk {
     sheltered: Option<[f32; 2]>,
     /// The range of Z people may walk in.
     room: Range<f32>,
+    /// The Z people wait at before they cross the street.
+    curb: f32,
     walkers: usize,
     /// The side of the street the stalls are on, along Z.
     stalls: f32,
@@ -129,6 +136,8 @@ pub(super) struct Walker {
     /// Meters left until it shelters from the rain again, after it gave
     /// up waiting.
     until_shelter: f32,
+    /// Meters left until it crosses the street.
+    until_cross: f32,
     activity: Activity,
 }
 
@@ -187,6 +196,7 @@ impl Walker {
             until_seat: 0.0,
             until_chat: rng.random_range(chat::CHAT_EVERY),
             until_shelter: 0.0,
+            until_cross: rng.random_range(cross::CROSS_EVERY),
             activity: Activity::Stroll,
         };
         walker.walk_on(heading, rng);
@@ -207,7 +217,8 @@ impl Walker {
     }
 
     pub(super) fn place(&self) -> Transform {
-        Transform::from_xyz(self.x, 0.0, self.z).with_rotation(Quat::from_rotation_y(self.yaw))
+        Transform::from_xyz(self.x, cross::ground(self.z), self.z)
+            .with_rotation(Quat::from_rotation_y(self.yaw))
     }
 
     #[expect(clippy::too_many_arguments, reason = "Bevy system")]
@@ -226,10 +237,15 @@ impl Walker {
             &mut Voice,
             &mut Transform,
         )>,
+        vehicles: Query<(&Vehicle, &Transform), Without<Walker>>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
         let seen = std::mem::take(&mut customers.0);
+        let cars: Vec<_> = vehicles
+            .iter()
+            .map(|(vehicle, transform)| (vehicle, transform.translation))
+            .collect();
         let passers: Vec<Passer> = walkers.iter().map(|(walker, ..)| walker.passer()).collect();
         let partners = Passer::pairs(&passers, dt, rng);
         let raining = weather.rain >= SHELTER_RAIN;
@@ -264,12 +280,19 @@ impl Walker {
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
             walker.until_chat -= bird.speed * dt;
             walker.until_shelter -= bird.speed * dt;
+            walker.until_cross -= bird.speed * dt;
             if let Some(meeting) = partners[index] {
                 walker.chat_with(passers[meeting.with].at, meeting.left, then[index], rng);
             }
             if !walker.activity.is_stroll() {
+                let around = Around {
+                    places: &places,
+                    customers: &seen,
+                    cars: &cars,
+                    raining,
+                };
                 walker.go_out(
-                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, &seen, raining, dt, rng,
+                    &mut bird, &mut gaze, &mut voice, &around, &mut seats, dt, rng,
                 );
                 if walker.activity.is_customer() {
                     customers.0.push(transform.translation);
@@ -279,7 +302,8 @@ impl Walker {
             }
             let wet =
                 rained_on > SHELTER_RAIN && !bird.carries_umbrella() && walker.until_shelter <= 0.0;
-            if wet && walker.take_shelter(&places, &mut seats, rng) {
+            let crossing = walker.until_cross <= 0.0 && walker.start_crossing(rng);
+            if crossing || wet && walker.take_shelter(&places, &mut seats, rng) {
                 *transform = walker.place();
                 continue;
             }

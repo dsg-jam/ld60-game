@@ -5,6 +5,7 @@ mod sound;
 mod spray;
 
 use std::error::Error;
+use std::ops::Range;
 
 use bevy::prelude::*;
 use ld60_game_parts::liquid::Shake;
@@ -46,6 +47,8 @@ const LANES: [Lane; 2] = [
 ];
 /// Vehicles wrap around this far beyond the street ends.
 const WRAP: f32 = 1.5;
+/// No vehicle reaches further than this from its middle, along X.
+const HALF_LONG: f32 = 2.5;
 /// How hard a vehicle shakes the ground at the shop: m/s² per m/s of speed,
 /// divided by the squared distance plus [`RUMBLE_NEAR`].
 const RUMBLE: f32 = 0.4;
@@ -81,6 +84,19 @@ pub(super) struct Vehicle {
 }
 
 impl Vehicle {
+    /// Whether the vehicle now at `at` comes within `room` of `x` at some
+    /// point in the next `during` seconds. Vehicles keep their speed, so
+    /// this is known in advance.
+    pub(super) fn passes(&self, at: Vec3, x: f32, room: f32, during: Range<f32>) -> bool {
+        let reach = HALF_LONG + room;
+        let span = 2.0 * HALF_LENGTH * WRAP;
+        (-1..=1).any(|lap| {
+            let from = at.x + lap as f32 * span;
+            let [a, b] = [x - reach, x + reach].map(|edge| (edge - from) / self.velocity);
+            a.min(b) < during.end && a.max(b) > during.start
+        })
+    }
+
     /// Millimeters of water under each wheel of the vehicle at `transform`,
     /// in the order of [`Body::wheels`]. The front wheels push a puddle's
     /// water aside, so the rear ones get less of it.
@@ -168,5 +184,37 @@ impl Vehicle {
             }
             transform.translation.x = x;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn car(velocity: f32) -> Vehicle {
+        Vehicle {
+            velocity,
+            body: Body::Sedan,
+        }
+    }
+
+    #[test]
+    fn a_car_passes_while_it_is_near() {
+        let car = car(10.0);
+        let at = Vec3::new(-20.0, 0.0, -6.0);
+        assert!(car.passes(at, 0.0, 1.0, 1.0..3.0));
+        assert!(!car.passes(at, 0.0, 1.0, 0.0..1.0));
+        assert!(!car.passes(at, 0.0, 1.0, 3.0..5.0));
+    }
+
+    #[test]
+    fn a_car_comes_round_again() {
+        let car = car(-10.0);
+        let span = 2.0 * HALF_LENGTH * WRAP;
+        // Just past the spot, it comes back after driving the whole span.
+        let at = Vec3::new(-5.0, 0.0, -10.0);
+        let back = (span - 5.0) / 10.0;
+        assert!(car.passes(at, 0.0, 0.0, back - 0.5..back + 0.5));
+        assert!(!car.passes(at, 0.0, 0.0, 1.0..back - 1.0));
     }
 }

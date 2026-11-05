@@ -9,6 +9,7 @@ use super::super::gaze::Gaze;
 use super::super::sound::Voice;
 use super::super::{Places, SITTER_TALK, Spot, WALKER_TALK};
 use super::chat::{CHAT_TALK, NEIGHBOUR, TURN_EVERY, TURN_FOR};
+use super::cross::{Cars, Crossing};
 use super::meal::Dining;
 use super::{ACCELERATION, Walker};
 
@@ -79,6 +80,8 @@ pub(super) enum Activity {
         left: f32,
         look: f32,
     },
+    /// Crossing the street at `x`.
+    Cross { x: f32, step: Crossing },
     /// Walking to a spot under an awning and waiting there for the rain
     /// to ease, for `left` seconds at most, looking around until `look`
     /// runs out. `eased` counts the seconds the rain has been light.
@@ -117,6 +120,16 @@ pub(in super::super) struct Seats {
 /// Where the locals buying or eating at the stalls are, for the keepers.
 #[derive(Resource, Debug, Default)]
 pub(in super::super) struct Customers(pub(in super::super) Vec<Vec3>);
+
+/// What an outing sees around it this frame.
+pub(super) struct Around<'a> {
+    pub(super) places: &'a Places,
+    /// Where the customers at the stalls were last frame.
+    pub(super) customers: &'a [Vec3],
+    pub(super) cars: &'a Cars<'a>,
+    /// Whether it rains hard enough to want shelter.
+    pub(super) raining: bool,
+}
 
 impl Seats {
     pub(in super::super) fn new(places: &Places) -> Self {
@@ -182,12 +195,14 @@ impl Activity {
         match self {
             Self::Browse { arrived, .. } => arrived,
             Self::Seated { sitting, .. } => sitting > 0.5,
-            Self::Stroll | Self::ToSeat { .. } | Self::Chat { .. } | Self::Shelter { .. } => false,
+            Self::Stroll
+            | Self::ToSeat { .. }
+            | Self::Chat { .. }
+            | Self::Shelter { .. }
+            | Self::Cross { .. } => false,
         }
     }
-}
 
-impl Activity {
     pub(super) fn is_stroll(self) -> bool {
         matches!(self, Self::Stroll)
     }
@@ -342,16 +357,21 @@ impl Walker {
         bird: &mut Bird,
         gaze: &mut Gaze,
         voice: &mut Voice,
-        places: &Places,
+        around: &Around,
         seats: &mut Seats,
-        customers: &[Vec3],
-        raining: bool,
         dt: f32,
         rng: &mut impl Rng,
     ) {
+        let Around {
+            places,
+            customers,
+            cars,
+            raining,
+        } = *around;
         let stools = &places.stools;
         match self.activity {
             Activity::Stroll => {}
+            Activity::Cross { .. } => self.cross(bird, gaze, cars, dt, rng),
             Activity::Chat {
                 with,
                 mut left,
@@ -388,7 +408,7 @@ impl Walker {
             } => {
                 let spot = &places.standing[index];
                 if !arrived {
-                    arrived = self.walk_to(bird, spot.at.translation.xz(), dt);
+                    arrived = self.walk_to(bird, spot.at.translation.xz(), bird.pace, dt);
                 } else {
                     bird.speed = 0.0;
                     self.yaw = turned(self.yaw, facing(spot), TURN_RATE * dt);
@@ -426,7 +446,7 @@ impl Walker {
             } => {
                 let spot = &places.awnings[index];
                 if !arrived {
-                    arrived = self.walk_to(bird, spot.at.translation.xz(), dt);
+                    arrived = self.walk_to(bird, spot.at.translation.xz(), bird.pace, dt);
                 } else {
                     bird.speed = 0.0;
                     self.yaw = turned(self.yaw, facing(spot), TURN_RATE * dt);
@@ -466,7 +486,7 @@ impl Walker {
             }
             Activity::ToSeat { stool: index, side } => {
                 let stool = &stools[index];
-                if self.walk_to(bird, beside(stool, side), dt) {
+                if self.walk_to(bird, beside(stool, side), bird.pace, dt) {
                     self.activity = Activity::Seated {
                         stool: index,
                         side,
@@ -552,12 +572,12 @@ impl Walker {
         }
     }
 
-    /// Steps towards `to`, slowing down as it gets there. Returns whether
-    /// it is there.
-    fn walk_to(&mut self, bird: &mut Bird, to: Vec2, dt: f32) -> bool {
+    /// Steps towards `to` at `speed`, slowing down as it gets there.
+    /// Returns whether it is there.
+    pub(super) fn walk_to(&mut self, bird: &mut Bird, to: Vec2, speed: f32, dt: f32) -> bool {
         let way = to - Vec2::new(self.x, self.z);
         let distance = way.length();
-        let target = bird.pace * (distance / SLOW_DOWN).min(1.0);
+        let target = speed * (distance / SLOW_DOWN).min(1.0);
         let change = ACCELERATION * dt;
         bird.speed += (target - bird.speed).clamp(-change, change);
         let step = way.normalize_or_zero() * (bird.speed * dt).min(distance);
@@ -594,7 +614,7 @@ fn facing(stool: &Spot) -> f32 {
 }
 
 /// `from` turned towards `to` by up to `step`, the short way round.
-fn turned(from: f32, to: f32, step: f32) -> f32 {
+pub(super) fn turned(from: f32, to: f32, step: f32) -> f32 {
     let difference = (to - from + PI).rem_euclid(TAU) - PI;
     from + difference.clamp(-step, step)
 }
