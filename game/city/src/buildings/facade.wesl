@@ -73,6 +73,10 @@ const UPLIGHT: vec3<f32> = vec3<f32>(0.18, 0.12, 0.15);
 const UPLIGHT_HEIGHT: f32 = 12.0;
 /// Rain leaves walls damp rather than glossy.
 const WET_ROUGHNESS: f32 = 0.6;
+/// Meters per pixel at which the bumps of the walls start to vanish, and
+/// at which they are gone.
+const BUMPS_SEEN: f32 = 0.01;
+const BUMPS_LOST: f32 = 0.08;
 const SKYLIGHT: vec3<f32> = vec3<f32>(0.03, 0.028, 0.045);
 const HALLWAY: f32 = 0.04;
 /// Seconds a bulb takes to light up and to go dark.
@@ -296,10 +300,14 @@ fn window(upper: vec2<f32>, d: vec3<f32>, face: f32, front: bool, blend: f32) ->
     if covered(id, front) || id.y >= facade.floors {
         return out;
     }
-    // Far away the windows are smaller than a pixel. Use their average.
-    let average = facade.lit * 0.25 * facade.window.x * facade.window.y * NEUTRAL;
+    // Far away the windows are smaller than a pixel. Use their average:
+    // a little light, and the wall darkened by the glass.
+    let share = facade.window.x * facade.window.y;
+    let average = facade.lit * 0.25 * share * NEUTRAL;
+    let far_shade = 1.0 - share;
     if blend > 0.999 {
         out.light = average;
+        out.shade = far_shade;
         return out;
     }
     let q = upper - id * cell;
@@ -307,6 +315,7 @@ fn window(upper: vec2<f32>, d: vec3<f32>, face: f32, front: bool, blend: f32) ->
     let hi = cell * (0.5 + facade.window * 0.5);
     if !inside(q, lo, hi) {
         out.light = average * blend;
+        out.shade = mix(1.0, far_shade, blend);
         return out;
     }
     let h = hash(id, facade.seed + face);
@@ -330,6 +339,8 @@ fn window(upper: vec2<f32>, d: vec3<f32>, face: f32, front: bool, blend: f32) ->
         out.shade = select(0.35, 0.8, qg.y < lo.y);
     }
     out.light = mix(near, average, blend);
+    out.glass *= 1.0 - blend;
+    out.shade = mix(out.shade, far_shade, blend);
     return out;
 }
 
@@ -347,8 +358,12 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     // Derivatives need uniform control flow, so take them up front.
     let window_pixel = fwidth(upper / cell);
     let window_blend = smoothstep(0.08, 0.3, max(window_pixel.x, window_pixel.y));
+    // Once a pixel covers more than the joints and pores, their bumps only
+    // alias into a sheen. The wall then stays flat, but rough.
+    let pixel = max(length(dpdx(in.world_position.xyz)), length(dpdy(in.world_position.xyz)));
+    let unseen_bumps = smoothstep(BUMPS_SEEN, BUMPS_LOST, pixel);
     let bumps = cladding_height(facade.cladding, upper, cell, facade.seed);
-    let rough_wall = bumped(n, in.world_position.xyz, bumps);
+    let rough_wall = normalize(mix(bumped(n, in.world_position.xyz, bumps), n, unseen_bumps));
 
     if abs(n.y) < 0.5 {
         let face = select(0.0, 1.0, abs(n.x) > abs(n.z)) + select(0.0, 2.0, n.x + n.z < 0.0);
@@ -368,7 +383,8 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
         let wet = facade.wetness * clamp(0.2 + 0.8 * marks.runoff, 0.0, 1.0);
         wall *= (1.0 - 0.2 * wet) * surface.shade;
         pbr_input.material.base_color = vec4<f32>(mix(wall, GLASS, surface.glass), 1.0);
-        pbr_input.material.perceptual_roughness = mix(mix(0.95, WET_ROUGHNESS, wet), 0.15, surface.glass);
+        let wall_roughness = mix(mix(0.95, WET_ROUGHNESS, wet), 0.95, unseen_bumps);
+        pbr_input.material.perceptual_roughness = mix(wall_roughness, 0.15, surface.glass);
         // Walls reflect little, glass the usual amount.
         pbr_input.material.reflectance = vec3<f32>(mix(0.25, 0.5, surface.glass));
         pbr_input.N = normalize(mix(rough_wall, n, surface.glass));
