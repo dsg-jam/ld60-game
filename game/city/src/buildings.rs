@@ -62,6 +62,9 @@ impl Plugin for BuildingsPlugin {
 #[derive(Resource, Debug, Default)]
 pub(super) struct Skyline {
     pub(super) front: Vec<Frontage>,
+    /// The buildings on the shop's side of the street, the shop's own
+    /// upper floors among them.
+    pub(super) near: Vec<Frontage>,
     /// Tall buildings in the rows behind the street.
     pub(super) back: Vec<Backdrop>,
     /// Space taken by every building, which flying cars keep out of.
@@ -174,6 +177,8 @@ impl Skyline {
                     Self::spawn_roof_gear(parent, &kit, &roof, &gear, &beacon, &mut rng);
                     if row.market && row.facing > 0.0 {
                         skyline.front.push(Frontage { block, facade });
+                    } else if row.market {
+                        skyline.near.push(Frontage { block, facade });
                     } else if row.facing > 0.0 && !low && block.size.y > BACKDROP_HEIGHT {
                         let free = !crowned && !Self::near_view(&roof, 1.15);
                         skyline.back.push(Backdrop {
@@ -256,14 +261,18 @@ impl Skyline {
             ),
         ];
         self.volumes.extend(parts);
-        for part in parts {
+        for (index, part) in parts.into_iter().enumerate() {
+            let facade = facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, rng));
             commands.spawn((
                 Name::new("shop building"),
-                kit.cuboid(
-                    &part,
-                    facades.add(Facade::random(&part, 0.0, SHOP_FLOOR, rng)),
-                ),
+                kit.cuboid(&part, facade.clone()),
             ));
+            if index == 0 {
+                self.near.push(Frontage {
+                    block: part,
+                    facade,
+                });
+            }
         }
     }
 

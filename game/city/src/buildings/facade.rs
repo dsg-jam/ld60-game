@@ -106,6 +106,22 @@ impl Facade {
         }
     }
 
+    /// Whether `point`, on the wall facing along Z, is on a window or
+    /// within `margin` of one. Matches `window` in `facade.wesl`.
+    pub(crate) fn has_window_near(&self, point: Vec3, margin: f32) -> bool {
+        let params = &self.params;
+        let at = (point - params.origin).xy();
+        let columns = (params.size.x / params.cell.x).round().max(1.0);
+        let cell = Vec2::new(params.size.x / columns, params.cell.y);
+        let id = (at / cell).floor();
+        if id.y < 0.0 || id.y >= params.floors {
+            return false;
+        }
+        let off = (at - (id + 0.5) * cell).abs();
+        let reach = cell * params.window / 2.0 + margin;
+        off.x < reach.x && off.y < reach.y
+    }
+
     fn follow_weather(weather: Res<Weather>, mut facades: ResMut<Assets<FacadeMaterial>>) {
         for (_, facade) in facades.iter_mut() {
             facade.extension.params.wetness = weather.wetness;
@@ -185,5 +201,28 @@ impl MaterialExtension for Facade {
 
     fn deferred_fragment_shader() -> ShaderRef {
         Self::shader()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
+
+    use super::*;
+
+    #[test]
+    fn windows_sit_in_the_middle_of_their_cells() {
+        let block = Block::between(Vec3::new(2.0, 4.0, -1.0), Vec3::new(14.0, 30.0, 5.0));
+        let material = Facade::random(&block, -1.0, 3.0, &mut SmallRng::seed_from_u64(1));
+        let facade = &material.extension;
+        let grid = facade.grid();
+        let columns = (block.size.x / grid.cell.x).round();
+        let cell = Vec2::new(block.size.x / columns, grid.cell.y);
+        let middle = block.min() + (cell * Vec2::new(1.5, 2.5)).extend(0.0);
+        let corner = block.min() + (cell * Vec2::new(1.0, 2.0)).extend(0.0);
+        assert!(facade.has_window_near(middle, 0.0));
+        assert!(!facade.has_window_near(corner, 0.1));
+        assert!(!facade.has_window_near(block.min() - Vec3::Y, 0.1));
     }
 }
