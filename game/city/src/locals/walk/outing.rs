@@ -258,7 +258,7 @@ impl Walker {
                 let way = with - Vec2::new(self.x, self.z);
                 self.yaw = turned(self.yaw, way.x.atan2(way.y), TURN_RATE * 0.5 * dt);
                 gaze.glance_at(self.turn_to(with), 0.5);
-                voice.talk_every(CHAT_TALK);
+                voice.chat(CHAT_TALK);
                 left -= dt;
                 if left <= 0.0 {
                     voice.talk_every(WALKER_TALK);
@@ -360,7 +360,7 @@ impl Walker {
                             .min_by(|a, b| a.distance(me).total_cmp(&b.distance(me)));
                         if let Some(at) = neighbour {
                             gaze.glance_at(self.turn_to(at), rng.random_range(TURN_FOR));
-                            voice.talk_every(CHAT_TALK);
+                            voice.chat(CHAT_TALK);
                         } else {
                             voice.talk_every(SITTER_TALK);
                         }

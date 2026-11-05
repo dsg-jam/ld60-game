@@ -24,6 +24,13 @@ const WET: f32 = 0.2;
 const STEP_PITCH: Range<f32> = 0.9..1.1;
 /// How much each phrase differs in pitch from the voice.
 const INTONATION: Range<f32> = 0.94..1.06;
+/// In a chat, the other answers a phrase with this chance, this many
+/// seconds after it starts, if it stands this close. The one who spoke
+/// then waits at least this long.
+const ANSWER: f64 = 0.75;
+const ANSWER_AFTER: Range<f32> = 1.4..2.4;
+const ANSWER_NEAR: f32 = 2.2;
+const HEAR_OUT: f32 = 3.5;
 /// Height of the mouth above the feet, before size.
 const MOUTH: f32 = 1.5;
 /// Rain on umbrellas is heard this close, and stops beyond the other.
@@ -76,6 +83,8 @@ pub(super) struct Voice {
     /// Seconds between phrases.
     every: Range<f32>,
     until: f32,
+    /// Whether it is in a chat and answers the others in it.
+    chatting: bool,
 }
 
 impl Voice {
@@ -85,16 +94,25 @@ impl Voice {
             pitch: rng.random_range(0.9..1.1) / size,
             until: rng.random_range(every.clone()),
             every,
+            chatting: false,
         }
     }
 
     /// Talks once every `every` seconds from now on, like more often when
     /// sitting down with others.
     pub(super) fn talk_every(&mut self, every: Range<f32>) {
+        self.chatting = false;
         if self.every != every {
             self.until = self.until.min(every.end);
             self.every = every;
         }
+    }
+
+    /// Chats with those close by, talking once every `every` seconds when
+    /// not answering them.
+    pub(super) fn chat(&mut self, every: Range<f32>) {
+        self.talk_every(every);
+        self.chatting = true;
     }
 }
 
@@ -182,13 +200,15 @@ impl LocalSounds {
         }
     }
 
-    /// Now and then, a local near the player says something.
+    /// Now and then, a local near the player says something, and those
+    /// chatting with it answer.
     fn talk(
         time: Res<Time>,
         mixer: Res<Mixer>,
         sounds: Option<ResMut<LocalSounds>>,
         listener: Single<&GlobalTransform, With<SpatialListener>>,
-        mut voices: Query<(&mut Voice, &GlobalTransform)>,
+        mut voices: Query<(Entity, &mut Voice, &GlobalTransform)>,
+        mut spoken: Local<Vec<(Entity, Vec3)>>,
         mut commands: Commands,
     ) {
         let Some(mut sounds) = sounds else {
@@ -197,13 +217,18 @@ impl LocalSounds {
         let sounds = &mut *sounds;
         let dt = time.delta_secs();
         let ear = listener.translation();
-        for (mut voice, body) in &mut voices {
+        spoken.clear();
+        for (entity, mut voice, body) in &mut voices {
             voice.until -= dt;
             if voice.until > 0.0 {
                 continue;
             }
             voice.until = sounds.rng.random_range(voice.every.clone());
             let mouth = body.transform_point(Vec3::Y * MOUTH);
+            if voice.chatting {
+                voice.until = voice.until.max(HEAR_OUT);
+                spoken.push((entity, mouth));
+            }
             let distance = mouth.distance(ear);
             if distance > VOICE_RANGE {
                 continue;
@@ -220,6 +245,21 @@ impl LocalSounds {
                 ),
                 Transform::from_translation(mouth),
             ));
+        }
+        if spoken.is_empty() {
+            return;
+        }
+        for (entity, mut voice, body) in &mut voices {
+            if !voice.chatting {
+                continue;
+            }
+            let mouth = body.transform_point(Vec3::Y * MOUTH);
+            let heard = spoken
+                .iter()
+                .any(|&(by, at)| by != entity && at.distance(mouth) < ANSWER_NEAR);
+            if heard && sounds.rng.random_bool(ANSWER) {
+                voice.until = sounds.rng.random_range(ANSWER_AFTER);
+            }
         }
     }
 
