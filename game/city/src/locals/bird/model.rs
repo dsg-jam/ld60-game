@@ -7,6 +7,7 @@ use rand::{Rng, RngExt};
 use super::super::plumage::{Cover, Feather, Feathers, Kind, Region, point_along};
 use super::food::Food;
 use super::skeleton::{Bone, HEAD, HIP, HULL, HULL_RADII, HULL_TILT, NECK, RUMP, SHOULDER, Side};
+use super::steam::Steam;
 use super::{dress, head};
 
 /// Different coats to pick from.
@@ -58,6 +59,8 @@ pub(in super::super) struct Kit {
     pub(super) fillings: [Handle<Mesh>; 2],
     pub(super) glazes: Vec<Handle<StandardMaterial>>,
     pub(super) foods: [Handle<StandardMaterial>; 2],
+    pub(super) steam: Handle<Mesh>,
+    pub(super) vapour: Handle<StandardMaterial>,
 }
 
 impl Kit {
@@ -128,6 +131,8 @@ impl Kit {
                     ..default()
                 })
             }),
+            steam: meshes.add(Steam::mesh()),
+            vapour: materials.add(Steam::material()),
         }
     }
 

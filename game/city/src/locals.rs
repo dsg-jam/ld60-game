@@ -22,7 +22,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
 
-use self::bird::{Bird, Birth, Carry, Dress, Posture};
+use self::bird::{Bird, Birth, Carry, Dress, Posture, Steam};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
@@ -65,7 +65,7 @@ impl Plugin for LocalsPlugin {
             Update,
             (Walker::walk, Keeper::work_on, Gaze::glance, Bird::pose).chain(),
         )
-        .add_systems(Update, (Bird::open_umbrellas, Bird::live));
+        .add_systems(Update, (Bird::open_umbrellas, Bird::live, Steam::drift));
         #[cfg(feature = "debug_port")]
         app.add_plugins(lineup::LineupPlugin);
     }

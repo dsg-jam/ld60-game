@@ -62,16 +62,20 @@ impl Food {
 
     /// What is in it: a disc at the height it is filled to.
     pub(in super::super) fn filling(self) -> Mesh {
-        let (radius, height) = match self {
-            Self::Cup => (0.0225, CUP_FULL),
-            Self::Bowl => (0.044, BOWL_FULL),
-        };
-        Circle::new(radius)
+        Circle::new(self.surface().x)
             .mesh()
             .resolution(16)
             .build()
             .rotated_by(Quat::from_rotation_x(-PI / 2.0))
-            .translated_by(Vec3::Y * height)
+            .translated_by(Vec3::Y * self.surface().y)
+    }
+
+    /// How wide and how high up the top of what is in it is.
+    pub(in super::super) fn surface(self) -> Vec2 {
+        match self {
+            Self::Cup => Vec2::new(0.0225, CUP_FULL),
+            Self::Bowl => Vec2::new(0.044, BOWL_FULL),
+        }
     }
 
     /// The hand that holds it.

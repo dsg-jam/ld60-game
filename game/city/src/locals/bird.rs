@@ -4,6 +4,7 @@ mod head;
 mod model;
 mod pose;
 mod skeleton;
+mod steam;
 
 use std::f32::consts::TAU;
 use std::ops::Range;
@@ -19,6 +20,7 @@ pub(super) use self::food::{Food, Meal};
 pub(super) use self::model::Kit;
 pub(super) use self::pose::Work;
 use self::skeleton::{Bone, Side};
+pub(super) use self::steam::Steam;
 use super::super::weather::Weather;
 use super::gaze::Gaze;
 use super::keeper::Keeper;
@@ -255,11 +257,21 @@ impl Bird {
                         Visibility::Hidden,
                         NotShadowCaster,
                     ))
-                    .with_child((
-                        Mesh3d(kit.fillings[index].clone()),
-                        MeshMaterial3d(kit.foods[index].clone()),
-                        NotShadowCaster,
-                    ))
+                    .with_children(|dish| {
+                        dish.spawn((
+                            Mesh3d(kit.fillings[index].clone()),
+                            MeshMaterial3d(kit.foods[index].clone()),
+                            NotShadowCaster,
+                        ));
+                        let surface = food.surface();
+                        dish.spawn((
+                            Mesh3d(kit.steam.clone()),
+                            MeshMaterial3d(kit.vapour.clone()),
+                            Steam::over(surface.x, rng.random_range(0.0..TAU)),
+                            Transform::from_translation(Vec3::Y * surface.y),
+                            NotShadowCaster,
+                        ));
+                    })
                     .id()
                 });
             });
