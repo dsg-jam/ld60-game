@@ -49,9 +49,15 @@ const ARM_SWING: f32 = 0.025;
 const HOLD: Vec3 = Vec3::new(0.1, 0.8, 0.16);
 /// With an open umbrella, the head turns only this far towards it.
 const UMBRELLA_GLANCE: f32 = 0.5;
-/// Seated, the feet dangle this far below and ahead of the hips, and swing.
-const DANGLE: Vec3 = Vec3::new(0.0, -0.5, 0.18);
-const DANGLE_SWING: f32 = 0.05;
+/// Seated, the hull rests this far above the seat, upright, leaning back
+/// this far. The feet tuck up this far below and ahead of the hips, and
+/// swing a little.
+const SEAT_RISE: f32 = 0.2;
+const SEAT_LEAN: f32 = -0.12;
+const TUCK: Vec3 = Vec3::new(0.0, -0.36, 0.14);
+const TUCK_SWING: f32 = 0.04;
+/// Knees of a seated bird point forward and up.
+const SEATED_KNEES: Vec3 = Vec3::new(0.0, 0.6, 1.0);
 /// The tail rests a little raised. The ends of a scarf hang straight and
 /// swing out from the breast, never into it.
 const TAIL: Spring = Spring {
@@ -242,8 +248,10 @@ impl Bird {
             let swing = ARM_SWING * self.gait() * ((self.phase + index as f32 * 0.5) * TAU).sin();
             let mut hand = match (self.posture, work) {
                 (Posture::Keeping, Some(work)) => work.hands[index],
-                (Posture::Seated(_), _) => shoulder + side.mirror(LAP),
-                _ => shoulder + side.mirror(HANG) + Vec3::Z * swing,
+                _ => {
+                    let hang = side.mirror(HANG) + Vec3::Z * swing;
+                    shoulder + hang.lerp(side.mirror(LAP), ease(self.sitting))
+                }
             };
             let umbrella = self.umbrella.as_ref().filter(|_| side == Side::Right);
             if let Some(umbrella) = umbrella {
@@ -310,16 +318,6 @@ impl Bird {
     fn hull(&self, work: Option<&Work>) -> (Transform, [Vec3; 2], Vec3, f32) {
         let ankles = Side::BOTH.map(|side| side.mirror(Bone::Foot(Side::Right).rest().translation));
         match (self.posture, work) {
-            (Posture::Seated(height), _) => {
-                let hull =
-                    Transform::from_translation(Vec3::new(0.0, height + HULL.y - HIP.y, 0.0));
-                let feet = Side::BOTH.map(|side| {
-                    let hip = hull.transform_point(side.mirror(HIP) - HULL);
-                    let swing = (self.breath * 0.7 + side.sign()).sin() * DANGLE_SWING;
-                    hip + DANGLE + Vec3::Z * swing
-                });
-                (hull, feet, Vec3::new(0.0, 0.6, 1.0), 0.0)
-            }
             (Posture::Keeping, Some(work)) => {
                 let rock = (PI * work.steps).sin();
                 let hull = Transform::from_translation(HULL + Vec3::Y * 0.01 * rock.abs())
@@ -334,8 +332,30 @@ impl Bird {
                 });
                 (hull, feet, KNEES, 0.0)
             }
+            _ if self.sitting > 0.0 => self.sitting_down(ankles),
             _ => self.walking(ankles),
         }
+    }
+
+    /// Between standing and seated, as far as it has sat down. The hull
+    /// settles first, then the feet leave the ground and tuck up.
+    fn sitting_down(&self, ankles: [Vec3; 2]) -> (Transform, [Vec3; 2], Vec3, f32) {
+        let (stand, standing, _, lean) = self.walking(ankles);
+        let seat = self.seat / self.size;
+        let seated = Transform::from_translation(Vec3::new(0.0, seat + SEAT_RISE, 0.0))
+            .with_rotation(Quat::from_rotation_x(SEAT_LEAN));
+        let settle = ease((self.sitting / 0.7).min(1.0));
+        let hull = Transform::from_translation(stand.translation.lerp(seated.translation, settle))
+            .with_rotation(stand.rotation.slerp(seated.rotation, settle));
+        let tuck = ease(((self.sitting - 0.4) / 0.6).clamp(0.0, 1.0));
+        let feet = Side::BOTH.map(|side| {
+            let hip = hull.transform_point(side.mirror(HIP) - HULL);
+            let swing = (self.breath * 0.7 + side.sign()).sin() * TUCK_SWING;
+            let index = usize::from(side == Side::Right);
+            standing[index].lerp(hip + TUCK + Vec3::Z * swing, tuck)
+        });
+        let knees = KNEES.lerp(SEATED_KNEES, tuck).normalize_or(Vec3::Y);
+        (hull, feet, knees, lean * (1.0 - settle))
     }
 
     fn walking(&self, ankles: [Vec3; 2]) -> (Transform, [Vec3; 2], Vec3, f32) {
@@ -369,4 +389,9 @@ impl Bird {
         let feet = [ankles[0] + feet[0], ankles[1] + feet[1]];
         (hull, feet, KNEES, lean)
     }
+}
+
+/// `t` from 0 to 1, eased in and out.
+fn ease(t: f32) -> f32 {
+    t * t * (3.0 - 2.0 * t)
 }

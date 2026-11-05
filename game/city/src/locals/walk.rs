@@ -1,3 +1,5 @@
+mod outing;
+
 use std::f32::consts::{FRAC_PI_2, TAU};
 use std::iter;
 use std::ops::Range;
@@ -5,31 +7,36 @@ use std::ops::Range;
 use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
+use self::outing::Activity;
+pub(super) use self::outing::Seats;
 use super::super::weather::Weather;
 use super::bird::Bird;
 use super::gaze::Gaze;
+use super::sound::Voice;
 use super::{Places, Whims};
 
 /// The sidewalks people walk along, each with a lane per direction.
-const SIDEWALKS: [Sidewalk; 2] = [
+static SIDEWALKS: [Sidewalk; 2] = [
     Sidewalk {
         lanes: [-2.6..-1.9, -3.3..-2.6],
         sheltered: Some([-1.45, -1.75]),
         room: -3.5..-0.95,
         walkers: 10,
+        stalls: 1.0,
     },
     Sidewalk {
         lanes: [-14.5..-13.8, -15.2..-14.5],
         sheltered: None,
         room: -15.3..-13.6,
         walkers: 12,
+        stalls: -1.0,
     },
 ];
 /// People walk this far to each side of the shop before they come back
 /// along the other end.
 const WANDER: f32 = 45.0;
 /// Meters per second squared.
-const ACCELERATION: f32 = 1.2;
+pub(super) const ACCELERATION: f32 = 1.2;
 /// How fast people step aside, in meters per second.
 const SIDESTEP: f32 = 0.6;
 /// People hurry this much more when the rain falls on them.
@@ -68,6 +75,7 @@ const DRIFT: f32 = 0.12;
 const WOBBLE: f32 = 0.08;
 const WOBBLE_TIME: Range<f32> = 6.0..14.0;
 
+#[derive(Debug)]
 struct Sidewalk {
     /// The range of Z for walking towards +X and towards -X. The lane
     /// towards +X has the larger Z.
@@ -77,6 +85,8 @@ struct Sidewalk {
     /// The range of Z people may walk in.
     room: Range<f32>,
     walkers: usize,
+    /// The side of the street the stalls are on, along Z.
+    stalls: f32,
 }
 
 /// Someone or something on a sidewalk, seen from above.
@@ -88,29 +98,30 @@ pub(super) struct Body {
     radius: f32,
 }
 
-/// Walks a bird along a sidewalk, past the shop and back around.
+/// Takes a bird out along a sidewalk, past the shop and back around. On
+/// the way it stops to look at the stalls, and sits down on their stools
+/// for a while.
 #[derive(Component, Debug)]
 pub(super) struct Walker {
+    sidewalk: &'static Sidewalk,
     x: f32,
     z: f32,
     /// +1 or -1 along X.
     heading: f32,
     /// The Z it walks at, drifting towards `wish`, which it picks anew
-    /// within `lanes` now and then.
+    /// within its lane now and then.
     lane: f32,
     wish: f32,
-    lanes: Range<f32>,
     until_drift: f32,
     /// How far through its slow changes of speed, and how fast they go.
     wobble: f32,
     wobble_rate: f32,
-    sheltered: Option<f32>,
-    room: Range<f32>,
-    /// The side of the street the stalls are on, along Z.
-    stalls: f32,
     yaw: f32,
     until_stop: f32,
     stopped: f32,
+    /// Meters left until it looks for a seat.
+    until_seat: f32,
+    activity: Activity,
 }
 
 impl Body {
@@ -130,33 +141,59 @@ impl Walker {
     pub(super) fn crowd(rng: &mut impl Rng) -> impl Iterator<Item = Self> {
         SIDEWALKS
             .iter()
-            .enumerate()
-            .flat_map(|(index, sidewalk)| {
+            .flat_map(|sidewalk| {
                 let spacing = 2.0 * WANDER / sidewalk.walkers as f32;
-                (0..sidewalk.walkers).map(move |n| (index, sidewalk, -WANDER + spacing * n as f32))
+                (0..sidewalk.walkers).map(move |n| (sidewalk, -WANDER + spacing * n as f32))
             })
-            .map(|(index, sidewalk, x)| {
-                let direction = usize::from(rng.random_bool(0.5));
-                let heading = if direction == 0 { 1.0 } else { -1.0 };
-                let lane = rng.random_range(sidewalk.lanes[direction].clone());
-                Self {
-                    x: x + rng.random_range(0.0..2.0 * WANDER / sidewalk.walkers as f32 * 0.7),
-                    z: lane,
-                    heading,
-                    lane,
-                    wish: lane,
-                    lanes: sidewalk.lanes[direction].clone(),
-                    until_drift: rng.random_range(DRIFT_EVERY),
-                    wobble: rng.random_range(0.0..TAU),
-                    wobble_rate: TAU / rng.random_range(WOBBLE_TIME),
-                    sheltered: sidewalk.sheltered.map(|lanes| lanes[direction]),
-                    room: sidewalk.room.clone(),
-                    stalls: if index == 0 { 1.0 } else { -1.0 },
-                    yaw: heading * FRAC_PI_2,
-                    until_stop: rng.random_range(STOP_EVERY),
-                    stopped: 0.0,
-                }
+            .map(|(sidewalk, x)| {
+                let mut walker = Self::on(sidewalk, rng);
+                walker.x = x + rng.random_range(0.0..2.0 * WANDER / sidewalk.walkers as f32 * 0.7);
+                walker
             })
+    }
+
+    /// A walker for a stool at `at` on whichever sidewalk reaches it.
+    pub(super) fn near(at: Vec3, rng: &mut impl Rng) -> Option<Self> {
+        SIDEWALKS
+            .iter()
+            .map(|sidewalk| Self::on(sidewalk, rng))
+            .find(|walker| walker.reaches(at))
+    }
+
+    /// A walker on `sidewalk`, going either way.
+    fn on(sidewalk: &'static Sidewalk, rng: &mut impl Rng) -> Self {
+        let heading = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+        let mut walker = Self {
+            sidewalk,
+            x: 0.0,
+            z: 0.0,
+            heading,
+            lane: 0.0,
+            wish: 0.0,
+            until_drift: rng.random_range(DRIFT_EVERY),
+            wobble: rng.random_range(0.0..TAU),
+            wobble_rate: TAU / rng.random_range(WOBBLE_TIME),
+            yaw: heading * FRAC_PI_2,
+            until_stop: rng.random_range(STOP_EVERY),
+            stopped: 0.0,
+            until_seat: 0.0,
+            activity: Activity::Stroll,
+        };
+        walker.walk_on(heading, rng);
+        walker.z = walker.lane;
+        walker
+    }
+
+    /// Its own side of the sidewalk, for the way it goes.
+    fn lanes(&self) -> Range<f32> {
+        self.sidewalk.lanes[usize::from(self.heading < 0.0)].clone()
+    }
+
+    /// Where it walks out of the rain, if anywhere.
+    fn shelter(&self) -> Option<f32> {
+        self.sidewalk
+            .sheltered
+            .map(|lanes| lanes[usize::from(self.heading < 0.0)])
     }
 
     pub(super) fn place(&self) -> Transform {
@@ -167,9 +204,16 @@ impl Walker {
         time: Res<Time>,
         weather: Res<Weather>,
         places: Res<Places>,
+        mut seats: ResMut<Seats>,
         mut whims: ResMut<Whims>,
         mut bodies: Local<Vec<Body>>,
-        mut walkers: Query<(&mut Walker, &mut Bird, &mut Gaze, &mut Transform)>,
+        mut walkers: Query<(
+            &mut Walker,
+            &mut Bird,
+            &mut Gaze,
+            &mut Voice,
+            &mut Transform,
+        )>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
@@ -181,11 +225,24 @@ impl Walker {
         }));
         let first = bodies.len();
         bodies.extend(walkers.iter().map(|(walker, bird, ..)| walker.body(bird)));
-        for (index, (mut walker, mut bird, mut gaze, mut transform)) in
+        for (index, (mut walker, mut bird, mut gaze, mut voice, mut transform)) in
             walkers.iter_mut().enumerate()
         {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
+            if !walker.activity.is_stroll() {
+                walker.go_out(&mut bird, &mut voice, &places.stools, &mut seats, dt, rng);
+                *transform = walker.place();
+                continue;
+            }
+            walker.look_for_seat(
+                &bird,
+                &places.stools,
+                &mut seats,
+                weather.rain >= SHELTER_RAIN,
+                dt,
+                rng,
+            );
 
             walker.drift(dt, rng);
             let mut target =
@@ -198,7 +255,7 @@ impl Walker {
                 let here = walker.x.abs() < STOP_NEAR || rng.random_bool(STOP_AWAY);
                 if here && rained_on < SHELTER_RAIN {
                     walker.stopped = rng.random_range(STOP_FOR);
-                    let side = -walker.stalls * walker.heading;
+                    let side = -walker.sidewalk.stalls * walker.heading;
                     gaze.glance_at(Vec2::new(side * 1.2, 0.1), walker.stopped);
                 }
             }
@@ -220,7 +277,7 @@ impl Walker {
             bird.speed += (target - bird.speed).clamp(-change, change);
             walker.until_stop -= bird.speed * dt;
 
-            let lane = match walker.sheltered {
+            let lane = match walker.shelter() {
                 Some(z) if rained_on > SHELTER_RAIN => z,
                 _ => walker.lane,
             };
@@ -252,7 +309,7 @@ impl Walker {
         self.until_drift -= dt;
         if self.until_drift <= 0.0 {
             self.until_drift = rng.random_range(DRIFT_EVERY);
-            self.wish = rng.random_range(self.lanes.clone());
+            self.wish = rng.random_range(self.lanes());
         }
         let step = DRIFT * dt;
         self.lane += (self.wish - self.lane).clamp(-step, step);
@@ -296,12 +353,12 @@ impl Walker {
             (z - lane).abs() + WRONG_SIDE * wrong as f32 + SQUEEZE * squeeze
         };
         iter::once(lane)
-            .chain([self.room.start, self.room.end])
+            .chain([self.sidewalk.room.start, self.sidewalk.room.end])
             .chain(near.clone().flat_map(|other| {
                 let room = me.radius + other.radius;
                 [other.at.y - room, other.at.y + room]
             }))
-            .map(|z| z.clamp(self.room.start, self.room.end))
+            .map(|z| z.clamp(self.sidewalk.room.start, self.sidewalk.room.end))
             .min_by(|&a, &b| cost(a).total_cmp(&cost(b)))
             .unwrap_or(lane)
     }

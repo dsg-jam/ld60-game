@@ -15,6 +15,8 @@ pub(super) struct LineupPlugin;
 #[derive(Component, Debug)]
 pub(super) struct Lineup {
     phase: Option<f32>,
+    /// The height of the seat it sits on, if it sits, and how far down.
+    seat: Option<(f32, f32)>,
 }
 
 impl Plugin for LineupPlugin {
@@ -48,7 +50,12 @@ impl Plugin for LineupPlugin {
                 ParamKind::Numbers,
                 "points of the steps to walk in place at, cycled",
             )
-            .param("seat", ParamKind::Numbers, "height to sit at instead"),
+            .param("seat", ParamKind::Numbers, "height to sit at instead")
+            .param(
+                "sitting",
+                ParamKind::Numbers,
+                "how far sat down, from 0 to 1, cycled",
+            ),
             Lineup::spawn,
         )
         .add_systems(
@@ -114,18 +121,20 @@ impl Lineup {
             Carry::Never
         };
         let phases = numbers("phase");
-        let posture = match numbers("seat").first() {
-            Some(&height) => Posture::Seated(height),
-            None => Posture::Walking,
-        };
+        let seat = numbers("seat").first().copied();
+        let sittings = numbers("sitting");
         let mut rng = SmallRng::seed_from_u64(1);
-        let count = species.len().max(dresses.len()).max(phases.len());
+        let count = species
+            .len()
+            .max(dresses.len())
+            .max(phases.len())
+            .max(sittings.len());
         let mut placed = Vec::with_capacity(count);
         for index in 0..count {
             let at = Vec3::new(x + index as f32 * spacing, 0.0, z);
             let birth = Birth {
                 at: Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
-                posture,
+                posture: Posture::Out,
                 carry,
                 dress: dresses[index % dresses.len()],
                 sheltered: false,
@@ -141,6 +150,10 @@ impl Lineup {
                 Name::new("lineup"),
                 Self {
                     phase: (!phases.is_empty()).then(|| phases[index % phases.len()]),
+                    seat: seat.map(|height| {
+                        let sitting = sittings.get(index % sittings.len().max(1));
+                        (height, sitting.copied().unwrap_or(1.0))
+                    }),
                 },
             ));
             placed.push([at.x, at.z]);
@@ -151,6 +164,9 @@ impl Lineup {
     fn hold(mut birds: Query<(&Lineup, &mut Bird)>) {
         for (lineup, mut bird) in &mut birds {
             bird.hold_step(lineup.phase);
+            if let Some((height, sitting)) = lineup.seat {
+                bird.sit(height, sitting, false);
+            }
             bird.open_umbrella_now();
         }
     }

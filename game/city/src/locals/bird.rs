@@ -24,7 +24,7 @@ use super::plumage::{Coat, PlumageMaterial};
 use super::shadows::Silhouette;
 use super::sound::{Footfall, Footfalls, Shakes, Voice};
 use super::umbrella::{Canopy, Umbrella};
-use super::{Figures, KEEPER_TALK, Pick, SITTER_TALK, WALKER_TALK, Whims};
+use super::{Figures, KEEPER_TALK, Pick, WALKER_TALK, Whims};
 
 /// The model is about 1.3 m tall, so most birds stand about 1.6 m.
 const SIZE: Range<f32> = 1.15..1.35;
@@ -84,6 +84,10 @@ pub(super) struct Bird {
     pub(super) hunch: f32,
     /// Whether a roof keeps the rain off.
     sheltered: bool,
+    /// How far it has sat down, from standing at 0 to seated at 1, and
+    /// the height of the seat in meters.
+    sitting: f32,
+    seat: f32,
     /// How soaked its feathers are, from 0 to 1.
     wet: f32,
     /// Seconds left of shaking the water off.
@@ -95,11 +99,10 @@ pub(super) struct Bird {
     umbrella: Option<Umbrella>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Posture {
-    Walking,
-    /// Sitting on a seat this high, its feet dangling.
-    Seated(f32),
+    /// Out and about: walking, standing or sitting down.
+    Out,
     /// Standing behind a counter, its hands on it.
     Keeping,
 }
@@ -242,8 +245,7 @@ impl Bird {
             unreachable!("with_children runs at once");
         };
         let talk = match posture {
-            Posture::Walking => WALKER_TALK,
-            Posture::Seated(_) => SITTER_TALK,
+            Posture::Out => WALKER_TALK,
             Posture::Keeping => KEEPER_TALK,
         };
         root.insert((
@@ -261,6 +263,8 @@ impl Bird {
                 stride: rng.random_range(STRIDES),
                 hunch: 0.0,
                 sheltered,
+                sitting: 0.0,
+                seat: 0.0,
                 wet: 0.0,
                 shaking: 0.0,
                 blink: rng.random_range(BLINKS),
@@ -325,6 +329,15 @@ impl Bird {
         }
     }
 
+    /// Sits down on a seat `height` meters high, as far as `amount` from
+    /// standing at 0 to seated at 1. A `covered` seat keeps the rain off
+    /// once it sits.
+    pub(super) fn sit(&mut self, height: f32, amount: f32, covered: bool) {
+        self.seat = height;
+        self.sitting = amount.clamp(0.0, 1.0);
+        self.sheltered = covered && self.sitting > 0.5;
+    }
+
     pub(super) fn has_umbrella_open(&self) -> bool {
         self.umbrella.as_ref().is_some_and(Umbrella::is_open)
     }
@@ -366,8 +379,9 @@ impl Bird {
         let dt = time.delta_secs();
         let raining = weather.rain >= RAINY;
         for mut bird in &mut birds {
+            let open = raining && !bird.sheltered;
             if let Some(umbrella) = &mut bird.umbrella {
-                umbrella.follow_rain(raining, dt, &mut whims.0);
+                umbrella.follow_rain(open, dt, &mut whims.0);
             }
         }
     }
@@ -438,7 +452,7 @@ impl Bird {
             for (index, offset) in [0.0, 0.5].into_iter().enumerate() {
                 // A foot lands as its cycle starts over.
                 let landed = (bird.phase + offset).fract() < (before + offset).fract();
-                if landed && gait > pose::STEPPING && matches!(bird.posture, Posture::Walking) {
+                if landed && gait > pose::STEPPING && bird.posture == Posture::Out {
                     footfalls.0.push(Footfall {
                         at: body.transform_point(pose.feet[index]),
                         level: gait * bird.size,

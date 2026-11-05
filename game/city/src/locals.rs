@@ -19,19 +19,20 @@ use std::ops::Range;
 use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
 use ld60_geometry::surface::SurfaceMaterial;
 use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
 
 use self::bird::{Bird, Birth, Carry, Dress, Posture};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
-use self::walk::Walker;
+use self::walk::{Seats, Walker};
 use super::buildings::Skyline;
 use super::{Pick, rng};
 
 const SEED: u64 = 9;
-/// Share of the stools near the shop that someone sits on.
-const SEATED_CHANCE: f64 = 0.55;
+/// Share of the stools near the shop that someone sits on at first.
+const SEATED_SHARE: f32 = 0.5;
 /// Share of the open stalls near the shop with their keeper in.
 const KEEPER_CHANCE: f64 = 0.85;
 /// Seconds between the phrases of people walking by, sitting and keeping
@@ -51,6 +52,7 @@ impl Plugin for LocalsPlugin {
             umbrella::DropsPlugin,
         ))
         .init_resource::<Places>()
+        .init_resource::<Seats>()
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
         .add_systems(
             Startup,
@@ -149,7 +151,7 @@ impl Figures {
         for walker in Walker::crowd(&mut paths) {
             let birth = Birth {
                 at: walker.place(),
-                posture: Posture::Walking,
+                posture: Posture::Out,
                 carry: Carry::Maybe,
                 dress: Dress::pick(&mut rng),
                 sheltered: false,
@@ -158,26 +160,28 @@ impl Figures {
             let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
             commands.entity(bird).insert(walker);
         }
-        for stool in &places.stools {
-            if !rng.random_bool(SEATED_CHANCE) {
+        let mut seats = Seats::new(places.stools.len());
+        let mut stools: Vec<usize> = (0..places.stools.len()).collect();
+        stools.shuffle(&mut super::rng(SEED + 3));
+        let seated = (places.stools.len() as f32 * SEATED_SHARE).round() as usize;
+        for index in stools.into_iter().take(seated) {
+            let stool = &places.stools[index];
+            let Some(walker) = Walker::near(stool.at.translation, &mut paths) else {
                 continue;
-            }
-            let turn = Quat::from_rotation_y(rng.random_range(-0.7..0.7));
-            let at = stool.at.with_rotation(stool.at.rotation * turn);
+            };
+            let walker = Walker::seated(walker, index, stool, &mut seats, &mut rng);
             let birth = Birth {
-                at,
-                posture: Posture::Seated(stool.height),
-                carry: if stool.covered {
-                    Carry::Never
-                } else {
-                    Carry::Maybe
-                },
+                at: walker.place(),
+                posture: Posture::Out,
+                carry: Carry::Maybe,
                 dress: Dress::pick(&mut rng),
-                sheltered: stool.covered,
+                sheltered: false,
                 coat: Coat::new(&mut plumages, &figures.bare, &mut rng),
             };
-            Bird::spawn(&mut commands, &figures, &mut rng, birth);
+            let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
+            commands.entity(bird).insert(walker);
         }
+        commands.insert_resource(seats);
         for &(at, half_width) in &places.counters {
             if rng.random_bool(KEEPER_CHANCE) {
                 Keeper::spawn(

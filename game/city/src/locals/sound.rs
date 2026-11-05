@@ -87,6 +87,15 @@ impl Voice {
             every,
         }
     }
+
+    /// Talks once every `every` seconds from now on, like more often when
+    /// sitting down with others.
+    pub(super) fn talk_every(&mut self, every: Range<f32>) {
+        if self.every != every {
+            self.until = self.until.min(every.end);
+            self.every = every;
+        }
+    }
 }
 
 #[derive(Resource)]
