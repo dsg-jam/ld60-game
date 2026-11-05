@@ -39,6 +39,10 @@ const LOOK_ASIDE: f32 = 0.45;
 const LOOK_DOWN: Range<f32> = 0.3..0.6;
 /// Looking over the goods, people lean in this far.
 const LEAN_IN: f32 = 0.18;
+/// Friends sit down together on stools this close to each other, this far
+/// from where they chatted at most.
+const SIDE_BY_SIDE: f32 = 2.0;
+const TOGETHER_WITHIN: f32 = 8.0;
 
 /// What a local is doing on its outing.
 #[derive(Debug, Clone, Copy)]
@@ -50,8 +54,14 @@ pub(super) enum Activity {
     /// stool's X.
     ToSeat { stool: usize, side: f32 },
     /// Standing to chat with someone at `with` for `left` seconds more,
-    /// before walking on towards `heading`.
-    Chat { with: Vec2, left: f32, heading: f32 },
+    /// before going to sit on a stool from a side, if it has one, or
+    /// walking on towards `heading`.
+    Chat {
+        with: Vec2,
+        left: f32,
+        heading: f32,
+        then: Option<(usize, f32)>,
+    },
     /// Walking to a spot at a counter and looking over the goods there for
     /// `left` seconds more, at one thing until `look` runs out.
     Browse {
@@ -94,6 +104,54 @@ impl Seats {
             stools: vec![false; places.stools.len()],
             standing: vec![false; places.standing.len()],
         }
+    }
+
+    /// Claims two free stools side by side near two people at `at`, out of
+    /// the rain unless `dry`, and only those `reaches` allows. Returns for
+    /// each person its stool and the side it comes at it from, the outer
+    /// one, so that they do not cross.
+    pub(super) fn side_by_side(
+        &mut self,
+        stools: &[Spot],
+        at: [Vec2; 2],
+        dry: bool,
+        reaches: impl Fn(Vec3) -> bool,
+    ) -> Option<[(usize, f32); 2]> {
+        let middle = (at[0] + at[1]) / 2.0;
+        let free = |index: usize| {
+            let stool = &stools[index];
+            !self.stools[index] && (dry || stool.covered) && reaches(stool.at.translation)
+        };
+        let (a, b, _) = (0..stools.len())
+            .filter(|&a| free(a))
+            .flat_map(|a| ((a + 1)..stools.len()).map(move |b| (a, b)))
+            .filter(|&(a, b)| {
+                free(b)
+                    && stools[a].at.translation.distance(stools[b].at.translation) < SIDE_BY_SIDE
+            })
+            .map(|(a, b)| {
+                let between = (stools[a].at.translation + stools[b].at.translation).xz() / 2.0;
+                (a, b, between.distance(middle))
+            })
+            .filter(|&(.., away)| away < TOGETHER_WITHIN)
+            .min_by(|x, y| x.2.total_cmp(&y.2))?;
+        self.stools[a] = true;
+        self.stools[b] = true;
+        let across = stools[a].at.rotation * Vec3::X;
+        let along = |point: Vec2| point.dot(across.xz());
+        let [low, high] =
+            if along(stools[a].at.translation.xz()) < along(stools[b].at.translation.xz()) {
+                [a, b]
+            } else {
+                [b, a]
+            };
+        let (first, second) = if along(at[0]) < along(at[1]) {
+            (low, high)
+        } else {
+            (high, low)
+        };
+        let outer = |stool| (stool, if stool == low { -1.0 } else { 1.0 });
+        Some([outer(first), outer(second)])
     }
 }
 
@@ -252,6 +310,7 @@ impl Walker {
                 with,
                 mut left,
                 heading,
+                then,
             } => {
                 let change = ACCELERATION * dt;
                 bird.speed = (bird.speed - change).max(0.0);
@@ -262,12 +321,16 @@ impl Walker {
                 left -= dt;
                 if left <= 0.0 {
                     voice.talk_every(WALKER_TALK);
-                    self.walk_on(heading, rng);
+                    match then {
+                        Some((stool, side)) => self.activity = Activity::ToSeat { stool, side },
+                        None => self.walk_on(heading, rng),
+                    }
                 } else {
                     self.activity = Activity::Chat {
                         with,
                         left,
                         heading,
+                        then,
                     };
                 }
             }
@@ -446,4 +509,41 @@ fn turned(from: f32, to: f32, step: f32) -> f32 {
 fn ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stool(x: f32, covered: bool) -> Spot {
+        Spot {
+            at: Transform::from_xyz(x, 0.0, -2.0),
+            height: 0.75,
+            covered,
+        }
+    }
+
+    #[test]
+    fn friends_take_neighbouring_stools_without_crossing() {
+        let stools = [stool(-6.0, true), stool(0.5, true), stool(-0.5, true)];
+        let mut seats = Seats {
+            stools: vec![false; 3],
+            standing: Vec::new(),
+        };
+        let at = [Vec2::new(1.0, -2.5), Vec2::new(-1.0, -2.5)];
+        let taken = seats.side_by_side(&stools, at, true, |_| true);
+        assert_eq!(taken, Some([(1, 1.0), (2, -1.0)]));
+        assert_eq!(seats.stools, [false, true, true]);
+    }
+
+    #[test]
+    fn friends_stay_dry_in_the_rain() {
+        let stools = [stool(-0.5, true), stool(0.5, false)];
+        let mut seats = Seats {
+            stools: vec![false; 2],
+            standing: Vec::new(),
+        };
+        let at = [Vec2::new(-1.0, -2.5), Vec2::new(1.0, -2.5)];
+        assert_eq!(seats.side_by_side(&stools, at, false, |_| true), None);
+    }
 }

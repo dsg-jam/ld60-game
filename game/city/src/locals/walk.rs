@@ -228,6 +228,23 @@ impl Walker {
         let seen = std::mem::take(&mut customers.0);
         let passers: Vec<Passer> = walkers.iter().map(|(walker, ..)| walker.passer()).collect();
         let partners = Passer::pairs(&passers, dt, rng);
+        let raining = weather.rain >= SHELTER_RAIN;
+        let mut then = vec![None; partners.len()];
+        for (a, meeting) in partners.iter().enumerate() {
+            let Some(meeting) = meeting.filter(|m| m.together && m.with > a) else {
+                continue;
+            };
+            let Some((walker, bird, ..)) = walkers.iter().nth(a) else {
+                continue;
+            };
+            let dry = !raining || bird.has_umbrella_open();
+            let at = [passers[a].at, passers[meeting.with].at];
+            let stools = seats.side_by_side(&places.stools, at, dry, |at| walker.reaches(at));
+            if let Some([first, second]) = stools {
+                then[a] = Some(first);
+                then[meeting.with] = Some(second);
+            }
+        }
         bodies.clear();
         bodies.extend(places.in_way.iter().map(|&at| Body {
             at,
@@ -242,8 +259,8 @@ impl Walker {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
             walker.until_chat -= bird.speed * dt;
-            if let Some(partner) = partners[index] {
-                walker.chat_with(passers[partner].at, rng);
+            if let Some(meeting) = partners[index] {
+                walker.chat_with(passers[meeting.with].at, meeting.left, then[index], rng);
             }
             if !walker.activity.is_stroll() {
                 walker.go_out(
@@ -255,14 +272,7 @@ impl Walker {
                 *transform = walker.place();
                 continue;
             }
-            walker.look_for_seat(
-                &bird,
-                &places,
-                &mut seats,
-                weather.rain >= SHELTER_RAIN,
-                dt,
-                rng,
-            );
+            walker.look_for_seat(&bird, &places, &mut seats, raining, dt, rng);
 
             walker.drift(dt, rng);
             let mut target =
@@ -272,7 +282,6 @@ impl Walker {
                 target = 0.0;
             } else if walker.until_stop <= 0.0 {
                 walker.until_stop = rng.random_range(STOP_EVERY);
-                let raining = weather.rain >= SHELTER_RAIN;
                 let here = walker.x.abs() < STOP_NEAR || rng.random_bool(STOP_AWAY);
                 if walker.browse(&bird, &places, &mut seats, raining, rng) {
                     target = 0.0;
