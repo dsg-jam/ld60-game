@@ -4,8 +4,10 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use super::bird::{Bird, Birth, Carry, Dress, Posture, Work};
+use super::gaze::Gaze;
 use super::plumage::Coat;
 use super::sound::{Footfall, Footfalls};
+use super::walk::Customers;
 use super::{Figures, PlumageMaterial, Whims};
 
 /// Keepers stand on a crate behind the counter, this high and this far
@@ -31,6 +33,12 @@ const STEP: f32 = 0.12;
 const STEP_LOUDNESS: f32 = 0.3;
 /// Room left at the ends of the counter.
 const COUNTER_END: f32 = 0.45;
+/// Customers this far in front of the counter, and this far past its
+/// ends, get served.
+const SERVES: std::ops::Range<f32> = 0.2..2.5;
+const SERVES_PAST: f32 = 0.8;
+/// Serving, keepers hold out goods this far to the customer's side.
+const OFFER: f32 = 0.3;
 
 /// A bird keeping a stall: it shuffles along the counter and moves its
 /// hands over the goods.
@@ -88,6 +96,17 @@ impl Keeper {
         ));
     }
 
+    /// The nearest customer in front of its counter, in its home's space.
+    fn customer(&self, customers: &Customers) -> Option<Vec3> {
+        let home = self.home.to_matrix().inverse();
+        customers
+            .0
+            .iter()
+            .map(|at| home.transform_point3(*at))
+            .filter(|at| SERVES.contains(&at.z) && at.x.abs() < self.room + SERVES_PAST)
+            .min_by(|a, b| (a.x - self.x).abs().total_cmp(&(b.x - self.x).abs()))
+    }
+
     /// What its hands and feet do, for a bird of `size`.
     pub(super) fn work(&self, size: f32) -> Work {
         Work {
@@ -106,24 +125,35 @@ impl Keeper {
         time: Res<Time>,
         mut whims: ResMut<Whims>,
         mut footfalls: ResMut<Footfalls>,
-        mut keepers: Query<(&mut Keeper, &Bird, &mut Transform)>,
+        customers: Res<Customers>,
+        mut keepers: Query<(&mut Keeper, &Bird, &mut Gaze, &mut Transform)>,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
-        for (mut keeper, bird, mut transform) in &mut keepers {
+        for (mut keeper, bird, mut gaze, mut transform) in &mut keepers {
+            let customer = keeper.customer(&customers);
             keeper.fidget -= dt;
             if keeper.fidget <= 0.0 {
                 keeper.fidget = rng.random_range(FIDGET);
                 let hand = usize::from(rng.random_bool(0.5));
                 let side = if hand == 0 { -1.0 } else { 1.0 };
-                keeper.aims[hand] = Vec3::new(
-                    side * rng.random_range(0.05..0.3),
-                    COUNTER_TOP,
-                    rng.random_range(REACH),
-                );
+                let x = match customer {
+                    // Holds something out towards the customer.
+                    Some(at) => (at.x - keeper.x).clamp(-OFFER, OFFER) + side * 0.05,
+                    None => side * rng.random_range(0.05..0.3),
+                };
+                let reach = match customer {
+                    Some(_) => REACH.end,
+                    None => rng.random_range(REACH),
+                };
+                keeper.aims[hand] = Vec3::new(x, COUNTER_TOP, reach);
             }
             keeper.shift -= dt;
-            if keeper.shift <= 0.0 {
+            if let Some(at) = customer {
+                keeper.toward = at.x.clamp(-keeper.room, keeper.room);
+                let turn = (at.x - keeper.x).atan2(at.z);
+                gaze.glance_at(Vec2::new(turn, 0.15), 0.5);
+            } else if keeper.shift <= 0.0 {
                 keeper.shift = rng.random_range(SHIFT);
                 keeper.toward = rng.random_range(-1.0..=1.0) * keeper.room;
             }

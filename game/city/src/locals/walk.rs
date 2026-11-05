@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use rand::{Rng, RngExt};
 
 use self::outing::Activity;
-pub(super) use self::outing::Seats;
+pub(super) use self::outing::{Customers, Seats};
 use super::super::weather::Weather;
 use super::bird::Bird;
 use super::gaze::Gaze;
@@ -205,6 +205,7 @@ impl Walker {
         weather: Res<Weather>,
         places: Res<Places>,
         mut seats: ResMut<Seats>,
+        mut customers: ResMut<Customers>,
         mut whims: ResMut<Whims>,
         mut bodies: Local<Vec<Body>>,
         mut walkers: Query<(
@@ -217,6 +218,7 @@ impl Walker {
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
+        customers.0.clear();
         bodies.clear();
         bodies.extend(places.in_way.iter().map(|&at| Body {
             at,
@@ -231,13 +233,18 @@ impl Walker {
             let rained_on = bird.rained_on(weather.rain);
             bird.hunch += (rained_on - bird.hunch) * (1.0 - (-dt).exp());
             if !walker.activity.is_stroll() {
-                walker.go_out(&mut bird, &mut voice, &places.stools, &mut seats, dt, rng);
+                walker.go_out(
+                    &mut bird, &mut gaze, &mut voice, &places, &mut seats, dt, rng,
+                );
+                if walker.activity.is_customer() {
+                    customers.0.push(transform.translation);
+                }
                 *transform = walker.place();
                 continue;
             }
             walker.look_for_seat(
                 &bird,
-                &places.stools,
+                &places,
                 &mut seats,
                 weather.rain >= SHELTER_RAIN,
                 dt,
@@ -252,8 +259,11 @@ impl Walker {
                 target = 0.0;
             } else if walker.until_stop <= 0.0 {
                 walker.until_stop = rng.random_range(STOP_EVERY);
+                let raining = weather.rain >= SHELTER_RAIN;
                 let here = walker.x.abs() < STOP_NEAR || rng.random_bool(STOP_AWAY);
-                if here && rained_on < SHELTER_RAIN {
+                if walker.browse(&bird, &places, &mut seats, raining, rng) {
+                    target = 0.0;
+                } else if here && rained_on < SHELTER_RAIN {
                     walker.stopped = rng.random_range(STOP_FOR);
                     let side = -walker.sidewalk.stalls * walker.heading;
                     gaze.glance_at(Vec2::new(side * 1.2, 0.1), walker.stopped);

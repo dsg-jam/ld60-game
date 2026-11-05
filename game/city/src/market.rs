@@ -11,7 +11,7 @@ use ld60_geometry::surface::{Finish, SurfaceMaterial};
 use rand::{Rng, RngExt};
 
 use super::drips::DripEdge;
-use super::locals::{Places, Stool};
+use super::locals::{Places, Spot};
 use super::signs::Tube;
 use super::{Kit, Pick, glow, turned_to};
 
@@ -55,6 +55,10 @@ const STOOL_CHANCE: f64 = 0.25;
 const STOOL_HEIGHT: f32 = 0.75;
 /// How far the stools stand out on the sidewalk.
 const STOOL_OUT: f32 = 0.45;
+/// People stand at the counter here to look at the goods, across from the
+/// middle and this far out.
+const BROWSE: [f32; 2] = [-0.2, 0.2];
+const BROWSE_OUT: f32 = 0.35;
 const AWNING_REACH: f32 = 1.4;
 const AWNING_DROP: f32 = 0.45;
 /// How far above the opening the awning is fixed to the facade.
@@ -278,12 +282,20 @@ impl Stock {
             for side in [-1.0, 1.0] {
                 let at =
                     *place * Transform::from_xyz(side * x, 0.0, STOOL_OUT).with_rotation(facing_in);
-                finds.places.stools.push(Stool {
+                finds.places.stools.push(Spot {
                     at,
                     height: STOOL_HEIGHT,
                     covered: opening.edge.is_some(),
                 });
             }
+        }
+        for x in BROWSE {
+            let at = *place * Transform::from_xyz(x, 0.0, BROWSE_OUT).with_rotation(facing_in);
+            finds.places.standing.push(Spot {
+                at,
+                height: 0.0,
+                covered: opening.edge.is_some(),
+            });
         }
         let behind =
             *place * Transform::from_xyz(0.0, STEP, -COUNTER_SETBACK - COUNTER_DEPTH - KEEPER_BACK);

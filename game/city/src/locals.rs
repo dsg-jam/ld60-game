@@ -26,7 +26,7 @@ use self::bird::{Bird, Birth, Carry, Dress, Posture};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
-use self::walk::{Seats, Walker};
+use self::walk::{Customers, Seats, Walker};
 use super::buildings::Skyline;
 use super::{Pick, rng};
 
@@ -53,6 +53,7 @@ impl Plugin for LocalsPlugin {
         ))
         .init_resource::<Places>()
         .init_resource::<Seats>()
+        .init_resource::<Customers>()
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
         .add_systems(
             Startup,
@@ -74,7 +75,9 @@ impl Plugin for LocalsPlugin {
 #[derive(Resource, Debug, Default)]
 pub(super) struct Places {
     /// Stools, each at its foot, facing the stall.
-    pub(super) stools: Vec<Stool>,
+    pub(super) stools: Vec<Spot>,
+    /// Spots in front of the counters to stand at.
+    pub(super) standing: Vec<Spot>,
     /// The floors behind counters, facing the street, with the half width
     /// of the counter.
     pub(super) counters: Vec<(Transform, f32)>,
@@ -83,9 +86,11 @@ pub(super) struct Places {
     pub(super) in_way: Vec<Vec2>,
 }
 
+/// A place to sit or stand at a stall, at its foot, facing the stall.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Stool {
+pub(super) struct Spot {
     pub(super) at: Transform,
+    /// The height of the seat, for a stool.
     pub(super) height: f32,
     /// Whether an awning keeps the rain off.
     pub(super) covered: bool,
@@ -160,7 +165,7 @@ impl Figures {
             let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
             commands.entity(bird).insert(walker);
         }
-        let mut seats = Seats::new(places.stools.len());
+        let mut seats = Seats::new(&places);
         let mut stools: Vec<usize> = (0..places.stools.len()).collect();
         stools.shuffle(&mut super::rng(SEED + 3));
         let seated = (places.stools.len() as f32 * SEATED_SHARE).round() as usize;

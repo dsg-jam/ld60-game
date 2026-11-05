@@ -408,7 +408,10 @@ impl Bird {
         let cycle = TAU * (self.phase - MID_STANCE);
         let bob = BOB * gait * (2.0 * cycle).cos();
         let sway = -SWAY * gait * cycle.cos();
-        let lean = LEAN * gait + HUNCH_LEAN * self.hunch + PITCH * gait * (2.0 * cycle).sin();
+        let lean = LEAN * gait
+            + HUNCH_LEAN * self.hunch
+            + self.leaning_in
+            + PITCH * gait * (2.0 * cycle).sin();
         let hull =
             Transform::from_translation(HULL + Vec3::new(sway, bob - HUNCH_DROP * self.hunch, 0.0))
                 .with_rotation(

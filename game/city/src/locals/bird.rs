@@ -84,6 +84,8 @@ pub(super) struct Bird {
     pub(super) hunch: f32,
     /// Whether a roof keeps the rain off.
     sheltered: bool,
+    /// How far it leans in to look at something close, in radians.
+    leaning_in: f32,
     /// How far it has sat down, from standing at 0 to seated at 1, and
     /// the height of the seat in meters.
     sitting: f32,
@@ -263,6 +265,7 @@ impl Bird {
                 stride: rng.random_range(STRIDES),
                 hunch: 0.0,
                 sheltered,
+                leaning_in: 0.0,
                 sitting: 0.0,
                 seat: 0.0,
                 wet: 0.0,
@@ -328,6 +331,11 @@ impl Bird {
         if let Some(umbrella) = &mut self.umbrella {
             umbrella.hold_open(open, opening);
         }
+    }
+
+    /// Leans in towards `lean` radians, to look at something close.
+    pub(super) fn lean_in(&mut self, lean: f32, dt: f32) {
+        self.leaning_in += (lean - self.leaning_in) * (1.0 - (-3.0 * dt).exp());
     }
 
     /// Sits down on a seat `height` meters high, as far as `amount` from
