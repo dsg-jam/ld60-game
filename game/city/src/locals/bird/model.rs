@@ -5,6 +5,7 @@ use ld60_geometry::triangles::{End, Skin, Triangles};
 use rand::{Rng, RngExt};
 
 use super::super::plumage::{Cover, Feather, Feathers, Kind, Region, point_along};
+use super::food::Food;
 use super::skeleton::{Bone, HEAD, HIP, HULL, HULL_RADII, HULL_TILT, NECK, RUMP, SHOULDER, Side};
 use super::{dress, head};
 
@@ -25,6 +26,17 @@ const IRISES: [Color; 3] = [
     Color::srgb_u8(0xd0, 0xa8, 0x58),
 ];
 const SIDES: u32 = 8;
+/// Glazes of the cups and bowls, and the tea and the soup in them.
+const GLAZES: [Color; 4] = [
+    Color::srgb_u8(0xe8, 0xe2, 0xd4),
+    Color::srgb_u8(0x3a, 0x5a, 0x6a),
+    Color::srgb_u8(0x8a, 0x3a, 0x2a),
+    Color::srgb_u8(0x2a, 0x2a, 0x2c),
+];
+const FILLINGS: [Color; 2] = [
+    Color::srgb_u8(0x5a, 0x34, 0x14),
+    Color::srgb_u8(0xc8, 0x98, 0x58),
+];
 
 /// The meshes all birds share, made in the rest pose of [`Bone::rest`].
 #[derive(Debug)]
@@ -41,6 +53,11 @@ pub(in super::super) struct Kit {
     pub(super) irises: Vec<Handle<StandardMaterial>>,
     pub(super) pupil_black: Handle<StandardMaterial>,
     pub(super) bindposes: Handle<SkinnedMeshInverseBindposes>,
+    /// The dishes and what is in them, in the order of [`Food::index`].
+    pub(super) dishes: [Handle<Mesh>; 2],
+    pub(super) fillings: [Handle<Mesh>; 2],
+    pub(super) glazes: Vec<Handle<StandardMaterial>>,
+    pub(super) foods: [Handle<StandardMaterial>; 2],
 }
 
 impl Kit {
@@ -90,6 +107,27 @@ impl Kit {
                 ..default()
             }),
             bindposes: bindposes.add(SkinnedMeshInverseBindposes::from(inverse)),
+            dishes: Food::ALL.map(|food| meshes.add(food.dish())),
+            fillings: Food::ALL.map(|food| meshes.add(food.filling())),
+            glazes: GLAZES
+                .iter()
+                .map(|&color| {
+                    materials.add(StandardMaterial {
+                        base_color: color,
+                        perceptual_roughness: 0.25,
+                        double_sided: true,
+                        cull_mode: None,
+                        ..default()
+                    })
+                })
+                .collect(),
+            foods: FILLINGS.map(|color| {
+                materials.add(StandardMaterial {
+                    base_color: color,
+                    perceptual_roughness: 0.15,
+                    ..default()
+                })
+            }),
         }
     }
 

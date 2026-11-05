@@ -1,4 +1,5 @@
 mod dress;
+mod food;
 mod head;
 mod model;
 mod pose;
@@ -14,6 +15,7 @@ use bevy::{
 use rand::{Rng, RngExt};
 
 pub(super) use self::dress::Dress;
+pub(super) use self::food::{Food, Meal};
 pub(super) use self::model::Kit;
 pub(super) use self::pose::Work;
 use self::skeleton::{Bone, Side};
@@ -86,6 +88,7 @@ pub(super) struct Bird {
     sheltered: bool,
     /// How far it leans in to look at something close, in radians.
     leaning_in: f32,
+    meal: Meal,
     /// How far it has sat down, from standing at 0 to seated at 1, and
     /// the height of the seat in meters.
     sitting: f32,
@@ -138,6 +141,8 @@ struct Rig {
     /// In the order of [`Bone::joint`].
     joints: [Entity; Bone::COUNT],
     eyes: [Entity; 2],
+    /// The cup and the bowl, in the order of [`Food::index`].
+    dishes: [Entity; 2],
 }
 
 impl Bird {
@@ -183,6 +188,7 @@ impl Bird {
             ));
             let mut joints = [Entity::PLACEHOLDER; Bone::COUNT];
             let mut eyes = [Entity::PLACEHOLDER; 2];
+            let mut dishes = [Entity::PLACEHOLDER; 2];
             let mut umbrella = None;
             body.with_children(|body| {
                 for bone in Bone::all() {
@@ -240,8 +246,31 @@ impl Bird {
                 }
                 umbrella =
                     carries.then(|| Umbrella::spawn(body, &figures.umbrellas, rng, UMBRELLA_SIZE));
+                let glaze = kit.glazes.pick(rng).clone();
+                dishes = Food::ALL.map(|food| {
+                    let index = food.index();
+                    body.spawn((
+                        Mesh3d(kit.dishes[index].clone()),
+                        MeshMaterial3d(glaze.clone()),
+                        Visibility::Hidden,
+                        NotShadowCaster,
+                    ))
+                    .with_child((
+                        Mesh3d(kit.fillings[index].clone()),
+                        MeshMaterial3d(kit.foods[index].clone()),
+                        NotShadowCaster,
+                    ))
+                    .id()
+                });
             });
-            rig = Some((Rig { joints, eyes }, umbrella));
+            rig = Some((
+                Rig {
+                    joints,
+                    eyes,
+                    dishes,
+                },
+                umbrella,
+            ));
         });
         let Some((rig, umbrella)) = rig else {
             unreachable!("with_children runs at once");
@@ -266,6 +295,7 @@ impl Bird {
                 hunch: 0.0,
                 sheltered,
                 leaning_in: 0.0,
+                meal: Meal::default(),
                 sitting: 0.0,
                 seat: 0.0,
                 wet: 0.0,
@@ -331,6 +361,11 @@ impl Bird {
         if let Some(umbrella) = &mut self.umbrella {
             umbrella.hold_open(open, opening);
         }
+    }
+
+    /// Eats or drinks as `meal` says.
+    pub(super) fn eat(&mut self, meal: Meal) {
+        self.meal = meal;
     }
 
     /// Leans in towards `lean` radians, to look at something close.
@@ -482,6 +517,19 @@ impl Bird {
             let open = if bird.blink < 0.0 { 0.0 } else { 1.0 };
             for (eye, side) in rig.eyes.iter().zip(Side::BOTH) {
                 set(*eye, Self::eye(side, open));
+            }
+            for (food, dish) in Food::ALL.into_iter().zip(rig.dishes) {
+                let placed = pose.dish.filter(|(held, _)| *held == food);
+                if let Some((_, at)) = placed {
+                    set(dish, at);
+                }
+                if let Ok(mut visibility) = visibilities.get_mut(dish) {
+                    visibility.set_if_neq(if placed.is_some() {
+                        Visibility::Inherited
+                    } else {
+                        Visibility::Hidden
+                    });
+                }
             }
             if let (Some(umbrella), Some(placed)) = (&bird.umbrella, pose.umbrella) {
                 let mut show = |entity: Entity, shown: bool| {

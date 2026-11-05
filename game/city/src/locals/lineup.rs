@@ -5,7 +5,7 @@ use rand::rngs::SmallRng;
 use serde_json::{Value, json};
 
 use super::Figures;
-use super::bird::{Bird, Birth, Carry, Dress, Posture};
+use super::bird::{Bird, Birth, Carry, Dress, Food, Meal, Posture};
 use super::plumage::{Coat, PlumageMaterial};
 
 /// Adds `ld60.lineup` to the debug port.
@@ -15,6 +15,7 @@ pub(super) struct LineupPlugin;
 #[derive(Component, Debug)]
 pub(super) struct Lineup {
     phase: Option<f32>,
+    meal: Meal,
     /// How far through opening its umbrella is, or through closing.
     open: f32,
     opening: bool,
@@ -54,6 +55,8 @@ impl Plugin for LineupPlugin {
                 "how far through opening the umbrella is, cycled, 1 by default",
             )
             .param("closing", ParamKind::Flag, "closing the umbrella instead")
+            .param("food", ParamKind::Text, "cup or bowl, held while seated")
+            .param("bite", ParamKind::Numbers, "how far through a bite, cycled")
             .param(
                 "phase",
                 ParamKind::Numbers,
@@ -133,6 +136,12 @@ impl Lineup {
         let seat = numbers("seat").first().copied();
         let sittings = numbers("sitting");
         let opens = numbers("open");
+        let bites = numbers("bite");
+        let food = match params.get("food").and_then(Value::as_str) {
+            Some("cup") => Some(Food::Cup),
+            Some("bowl") => Some(Food::Bowl),
+            _ => None,
+        };
         let closing = params.get("closing").and_then(Value::as_bool) == Some(true);
         let mut rng = SmallRng::seed_from_u64(1);
         let count = species
@@ -140,7 +149,8 @@ impl Lineup {
             .max(dresses.len())
             .max(phases.len())
             .max(sittings.len())
-            .max(opens.len());
+            .max(opens.len())
+            .max(bites.len());
         let mut placed = Vec::with_capacity(count);
         for index in 0..count {
             let at = Vec3::new(x + index as f32 * spacing, 0.0, z);
@@ -167,6 +177,15 @@ impl Lineup {
                         .copied()
                         .unwrap_or(1.0),
                     opening: !closing,
+                    meal: Meal {
+                        food,
+                        held: true,
+                        reach: 0.0,
+                        bite: bites
+                            .get(index % bites.len().max(1))
+                            .copied()
+                            .unwrap_or(0.0),
+                    },
                     seat: seat.map(|height| {
                         let sitting = sittings.get(index % sittings.len().max(1));
                         (height, sitting.copied().unwrap_or(1.0))
@@ -185,6 +204,7 @@ impl Lineup {
                 bird.sit(height, sitting, false);
             }
             bird.hold_umbrella(lineup.open, lineup.opening);
+            bird.eat(lineup.meal);
         }
     }
 }

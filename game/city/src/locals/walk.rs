@@ -1,3 +1,4 @@
+mod meal;
 mod outing;
 
 use std::f32::consts::{FRAC_PI_2, TAU};
@@ -200,6 +201,7 @@ impl Walker {
         Transform::from_xyz(self.x, 0.0, self.z).with_rotation(Quat::from_rotation_y(self.yaw))
     }
 
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     pub(super) fn walk(
         time: Res<Time>,
         weather: Res<Weather>,

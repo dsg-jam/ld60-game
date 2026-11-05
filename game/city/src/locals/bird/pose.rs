@@ -6,6 +6,7 @@ use super::super::gaze::{self, Gaze};
 use super::super::shadows::{Blob, Bone as Capsule, Silhouette};
 use super::super::umbrella::{self, Umbrella};
 use super::dress::KNOT;
+use super::food::Food;
 use super::skeleton::{
     ARM, Bone, ELBOWS, HEAD, HEAD_RADII, HIP, HULL, HULL_RADII, HULL_TILT, KNEES, LEG, NECK, RUMP,
     SHOULDER, Side, frame,
@@ -71,6 +72,19 @@ const CROUCH_DROP: f32 = 0.06;
 const CROUCH_LEAN: f32 = 0.3;
 const HOP: f32 = 0.06;
 const BOUNCE: f32 = 0.03;
+/// Holding food, the hand holds it in front of the chest, and reaches
+/// this far over the counter to take it or put it back.
+const CHEST: Vec3 = Vec3::new(-0.07, -0.13, 0.16);
+const OVER_COUNTER: Vec3 = Vec3::new(0.0, -0.04, 0.36);
+/// For a bite, the hand lifts the food up to here, before the neck.
+const UP_TO_BILL: Vec3 = Vec3::new(0.0, 0.82, 0.24);
+/// Dipping into the food, the neck bows this far, the head goes this far
+/// down and the bill points this far down. Swallowing, the head tips back
+/// this far.
+const NECK_BOW: f32 = 0.5;
+const HEAD_DIP: Vec3 = Vec3::new(0.0, -0.1, 0.02);
+const HEAD_BOW: f32 = 1.3;
+const SWALLOW: f32 = 0.5;
 /// Mid hop the wings lift a little for balance, this far.
 const BALANCE: Vec3 = Vec3::new(0.1, 0.12, -0.03);
 /// The tail rests a little raised. The ends of a scarf hang straight and
@@ -157,6 +171,8 @@ pub(super) struct Pose {
     pub(super) feet: [Vec3; 2],
     /// The umbrella in its hand.
     pub(super) umbrella: Option<Transform>,
+    /// The food in its hand.
+    pub(super) dish: Option<(Food, Transform)>,
     pub(super) silhouette: Silhouette,
 }
 
@@ -192,17 +208,24 @@ impl Bird {
             hull.with_scale(self.girth * fluff * Vec3::new(breath, 1.0, breath)),
         );
 
-        let neck = hull * Transform::from_translation(NECK - HULL);
+        // Eating, the neck bows to dip the bill into the food, and the
+        // head tips back to swallow.
+        let (dip, swallow) = self.meal.dip();
+        let neck = hull
+            * Transform::from_translation(NECK - HULL)
+                .with_rotation(Quat::from_rotation_x(NECK_BOW * dip));
         set(Bone::Neck, neck);
         // The head stays level as the hull rolls, like a bird's.
         let open = self.umbrella.as_ref().map_or(0.0, Umbrella::openness);
-        let glance = gaze.turn.x.min(gaze::YAW.lerp(UMBRELLA_GLANCE, open));
+        let glance = gaze.turn.x.min(gaze::YAW.lerp(UMBRELLA_GLANCE, open)) * (1.0 - dip);
         let head_at = neck.transform_point(HEAD - NECK)
             + Vec3::Z * self.head_glide()
-            + HUNCH_SINK * self.hunch;
+            + HUNCH_SINK * self.hunch
+            + HEAD_DIP * dip;
+        let pitch =
+            gaze.turn.y * (1.0 - dip) + self.hunch * 0.15 + HEAD_BOW * dip - SWALLOW * swallow;
         let head = Transform::from_translation(head_at).with_rotation(
-            Quat::from_rotation_y(glance - shake * 0.6)
-                * Quat::from_rotation_x(gaze.turn.y + self.hunch * 0.15),
+            Quat::from_rotation_y(glance - shake * 0.6) * Quat::from_rotation_x(pitch),
         );
         set(Bone::Head, head);
         set(
@@ -235,6 +258,7 @@ impl Bird {
             radius: 0.04,
         };
         let mut umbrella_at = None;
+        let mut dish = None;
         let mut soles = [Vec3::ZERO; 2];
         for (index, side) in Side::BOTH.into_iter().enumerate() {
             let hip = hull.transform_point(side.mirror(HIP) - HULL);
@@ -283,6 +307,16 @@ impl Bird {
             if let Some((at, grip)) = runner.filter(|_| side == Side::Left) {
                 hand = hand.lerp(at, grip);
             }
+            let food = self.meal.food.filter(|&food| food.side() == side);
+            if food.is_some() {
+                let rest = if self.meal.held {
+                    shoulder + side.mirror(CHEST)
+                } else {
+                    hand
+                };
+                hand = rest.lerp(shoulder + side.mirror(OVER_COUNTER), ease(self.meal.reach));
+                hand = hand.lerp(hull.transform_point(side.mirror(UP_TO_BILL) - HULL), dip);
+            }
             let elbows = side.mirror(ELBOWS);
             let (elbow, wrist) = ARM.reach(shoulder, hand, elbows);
             set(
@@ -292,6 +326,10 @@ impl Bird {
             set(Bone::Forearm(side), frame(elbow, wrist - elbow, elbows));
             let palm = frame(wrist, wrist - elbow, elbows);
             set(Bone::Hand(side), palm);
+            if let Some(food) = food.filter(|_| self.meal.held) {
+                let at = palm.transform_point(Vec3::Y * 0.04) - Vec3::Y * 0.02;
+                dish = Some((food, Transform::from_translation(at)));
+            }
             silhouette.bones[4 + index] = Capsule {
                 from: shoulder,
                 to: wrist,
@@ -312,6 +350,7 @@ impl Bird {
             joints,
             feet: soles,
             umbrella: umbrella_at,
+            dish,
             silhouette,
         }
     }

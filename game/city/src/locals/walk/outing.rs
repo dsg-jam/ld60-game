@@ -8,6 +8,7 @@ use super::super::bird::Bird;
 use super::super::gaze::Gaze;
 use super::super::sound::Voice;
 use super::super::{Places, SITTER_TALK, Spot, WALKER_TALK};
+use super::meal::Dining;
 use super::{ACCELERATION, Walker};
 
 /// People feel like sitting down after walking this many meters, and
@@ -56,12 +57,14 @@ pub(super) enum Activity {
         look: f32,
     },
     /// On a stool: sat down as far as `sitting`, turned this far from the
-    /// counter, and staying for `left` seconds more before it gets up.
+    /// counter, having its meal, and staying for `left` seconds more
+    /// before it gets up.
     Seated {
         stool: usize,
         side: f32,
         sitting: f32,
         turn: f32,
+        dining: Dining,
         left: f32,
         rising: bool,
     },
@@ -123,6 +126,7 @@ impl Walker {
             side: if rng.random_bool(0.5) { 1.0 } else { -1.0 },
             sitting: 1.0,
             turn: rng.random_range(-SEAT_TURN..SEAT_TURN),
+            dining: Dining::served(false, rng),
             left: rng.random_range(SIT_FOR),
             rising: false,
         };
@@ -281,6 +285,7 @@ impl Walker {
                         side,
                         sitting: 0.0,
                         turn: rng.random_range(-SEAT_TURN..SEAT_TURN),
+                        dining: Dining::order(bird.has_umbrella_open(), rng),
                         left: rng.random_range(SIT_FOR),
                         rising: false,
                     };
@@ -291,6 +296,7 @@ impl Walker {
                 side,
                 mut sitting,
                 turn,
+                mut dining,
                 mut left,
                 mut rising,
             } => {
@@ -308,7 +314,9 @@ impl Walker {
                 } else {
                     voice.talk_every(SITTER_TALK);
                     left -= dt;
-                    rising = left <= 0.0;
+                    dining.fit_umbrella(bird.has_umbrella_open());
+                    bird.eat(dining.go_on(dt, left <= 0.0, rng));
+                    rising = left <= 0.0 && dining.is_done();
                 }
                 sitting = sitting.clamp(0.0, 1.0);
                 let (_, spring, _) = Bird::hop(sitting);
@@ -330,6 +338,7 @@ impl Walker {
                         side,
                         sitting,
                         turn,
+                        dining,
                         left,
                         rising,
                     };
