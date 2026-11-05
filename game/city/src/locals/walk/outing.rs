@@ -22,7 +22,7 @@ const BESIDE: f32 = 0.38;
 /// They slow down this close to where they go.
 const SLOW_DOWN: f32 = 0.8;
 /// Seconds to sit down or get up, and to stay seated.
-const SIT_TIME: f32 = 1.3;
+const SIT_TIME: f32 = 1.8;
 const SIT_FOR: Range<f32> = 25.0..120.0;
 /// Seated, people turn this far from the counter, to the side.
 const SEAT_TURN: f32 = 0.6;
@@ -185,8 +185,13 @@ impl Walker {
             } => {
                 let stool = &stools[index];
                 bird.speed = 0.0;
+                let (_, spring, _) = Bird::hop(sitting);
+                let facing_seat = facing(stool) + turn * ease(spring);
+                let ready = (facing_seat - self.yaw + PI).rem_euclid(TAU) - PI;
                 if rising {
                     sitting -= dt / SIT_TIME;
+                } else if sitting == 0.0 && ready.abs() > 0.08 {
+                    // Turns to the counter before it hops on.
                 } else if sitting < 1.0 {
                     sitting += dt / SIT_TIME;
                 } else {
@@ -195,7 +200,8 @@ impl Walker {
                     rising = left <= 0.0;
                 }
                 sitting = sitting.clamp(0.0, 1.0);
-                let onto = ease(sitting / 0.6);
+                let (_, spring, _) = Bird::hop(sitting);
+                let onto = ease(spring);
                 let at = beside(stool, side).lerp(stool.at.translation.xz(), onto);
                 self.x = at.x;
                 self.z = at.y;
