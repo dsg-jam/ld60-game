@@ -20,6 +20,7 @@ mod shop;
 mod stamp;
 mod ticket;
 mod till;
+mod trainer;
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -45,6 +46,7 @@ use self::shop::Shop;
 use self::stamp::RubberStamp;
 use self::ticket::Clipboard;
 use self::till::Till;
+use self::trainer::{Datasheet, Trainer};
 
 const COMPUTER_YAW: f32 = -0.4;
 const LAMP_YAW: f32 = -0.7;
@@ -55,6 +57,12 @@ const STAMP_YAW: f32 = 0.3;
 /// Standing at the back, right of the radio.
 const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
+/// On the back right of the mat, for now.
+const TRAINER_SPOT: Vec2 = Vec2::new(0.55, -0.45);
+const TRAINER_YAW: f32 = -0.25;
+/// In front of the panel.
+const DATASHEET_SPOT: Vec2 = Vec2::new(0.62, 0.3);
+const DATASHEET_YAW: f32 = -0.15;
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
 
@@ -94,6 +102,7 @@ impl Plugin for WorkshopPlugin {
             till::TillPlugin,
             ld60_game_run::tutorial::TutorialPlugin,
         ))
+        .add_plugins(trainer::TrainerPlugin)
         .add_systems(Startup, spawn_stage)
         .add_observer(Focused::leave_on::<NewRun>);
     }
@@ -157,6 +166,16 @@ fn spawn_stage(mut commands: Commands) {
         Name::new("planet dial"),
         Dial,
         Transform::from_translation(DIAL_SPOT).with_rotation(Quat::from_rotation_y(FRAC_PI_2)),
+    ));
+    commands.spawn((
+        Name::new("front panel"),
+        Trainer::default(),
+        counter.place_on_mat(TRAINER_SPOT, TRAINER_YAW),
+    ));
+    commands.spawn((
+        Name::new("tick datasheet"),
+        Datasheet,
+        counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
     ));
     commands.spawn((
         Name::new("camera"),

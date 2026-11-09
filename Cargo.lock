@@ -3591,6 +3591,7 @@ version = "0.3.0"
 dependencies = [
  "ld60-calco",
  "ld60-machine",
+ "ld60-tick",
  "serde",
 ]
 
@@ -3626,6 +3627,7 @@ dependencies = [
  "ld60-locale",
  "ld60-machine",
  "ld60-store",
+ "ld60-tick",
  "rand",
  "ron",
  "serde",
@@ -3837,6 +3839,14 @@ dependencies = [
  "ron",
  "serde",
  "web-sys",
+]
+
+[[package]]
+name = "ld60-tick"
+version = "0.3.0"
+dependencies = [
+ "ld60-machine",
+ "serde",
 ]
 
 [[package]]

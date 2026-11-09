@@ -59,6 +59,7 @@ pub enum Focus {
     Device,
     Paper,
     Radio,
+    Trainer,
 }
 
 impl Focus {

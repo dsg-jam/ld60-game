@@ -144,3 +144,16 @@ erratum-ds-clears-carry-on-zero =
     .title = DS CLEARS C WHEN THE RESULT IS 0
     .description = When DS adds 10 and the result is 0, C is cleared instead of kept. The borrow to the next digit is lost.
     .affects = Rev B, date codes before 7624
+
+# The card for the Tick watch chip.
+tick-sheet-title = TICK 4-bit watch chip
+tick-sheet-revision = Revision A. 4 words of program memory.
+tick-sheet-word = Word
+tick-sheet-name = Name
+tick-sheet-effect = What it does
+tick-op-nop = Nothing. An erased word reads 1111.
+tick-op-step = Moves the hand one mark on.
+tick-op-wait = Sleeps until the next tick of the crystal, once a second.
+tick-sheet-other = Other words do nothing.
+tick-sheet-order = The chip runs the words in order. After the last word, it starts again at word 0.
+tick-sheet-erase = Programming can only change a 1 to a 0. To change a word back, erase the whole chip with UV light.

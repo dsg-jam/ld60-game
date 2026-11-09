@@ -41,6 +41,7 @@ ld60-levels = { workspace = true }
 ld60-locale = { workspace = true }
 ld60-machine = { workspace = true }
 ld60-store = { workspace = true }
+ld60-tick = { workspace = true }
 rand = { workspace = true }
 ron = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive", "std"] }
