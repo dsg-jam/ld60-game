@@ -79,7 +79,11 @@ impl Cpu {
         }
         let word = rom.get(usize::from(self.pc) % rom.len());
         let next = self.pc + 1;
-        self.set_pc(if next.is_multiple_of(Revision::PAGE) { 0 } else { next });
+        self.set_pc(if next.is_multiple_of(Revision::PAGE) {
+            0
+        } else {
+            next
+        });
         match self.revision.decode(word as u8) {
             Op::Step => Effect::Step,
             Op::Home => Effect::Home,
