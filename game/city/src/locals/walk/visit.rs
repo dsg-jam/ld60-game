@@ -16,8 +16,11 @@ use super::outing::{Activity, BESIDE, SIT_TIME, ease, turned};
 use super::{SIDEWALKS, Walker};
 
 /// Someone takes an errand when it is this many meters ahead of where it
-/// goes, out of sight of the shop.
-const TAKE_WITHIN: Range<f32> = 8.0..18.0;
+/// goes.
+const TAKE_WITHIN: Range<f32> = 3.0..9.0;
+/// On the way, it keeps to its side of the sidewalk like everyone else,
+/// and turns in to the counter this far before it, along the street.
+const TURN_IN: f32 = 1.2;
 /// Having left, a visitor is out of sight this far from the counter.
 const GONE: f32 = 12.0;
 /// Seconds to hold the hand out, and to draw it back.
@@ -33,7 +36,7 @@ const BOB: f32 = 0.025;
 const BOB_RATE: f32 = 2.5;
 /// How far a visitor leans in, in radians: holding something out over the
 /// counter, calling, and shifting about while it waits.
-const LEAN_OVER: f32 = 0.35;
+const LEAN_OVER: f32 = 0.45;
 const LEAN_CALL: f32 = 0.15;
 const FIDGET: Range<f32> = 0.0..0.08;
 /// Showing something, a visitor tips it this far towards the player.
@@ -177,6 +180,11 @@ impl Errands {
                 *item = held;
             }
             let away = (walker.x - visitor.stand.x).abs();
+            if visitor.ask == Ask::Leave && !walker.activity.is_visit() {
+                // Out from under the roof before the umbrella opens again.
+                let near = Vec2::new(walker.x, walker.z).distance(visitor.stand) < CLOSE_WITHIN;
+                bird.stand_under(near);
+            }
             if visitor.ask == Ask::Leave && !walker.activity.is_visit() && away > GONE {
                 bird.carry(false);
                 commands.entity(entity).remove::<Visitor>();
@@ -281,7 +289,6 @@ impl Walker {
                 bird.lean_in(0.0, dt);
                 bird.present(0.0, f32::INFINITY);
                 bird.stop_reaching();
-                bird.stand_under(false);
                 voice.talk_every(WALKER_TALK);
                 let heading = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
                 self.walk_on(heading, rng);
@@ -304,8 +311,13 @@ impl Walker {
             if away < CLOSE_WITHIN {
                 bird.stand_under(true);
             }
+            let ahead = (visitor.stand.x - self.x) * self.heading;
             if away < SHUT_BY && !bird.has_umbrella_shut() {
                 bird.speed = 0.0;
+            } else if ahead > TURN_IN {
+                // Aiming at the turn-in spot, it would slow down there.
+                let along = Vec2::new(visitor.stand.x, self.lane);
+                self.walk_to(bird, along, bird.pace, dt);
             } else {
                 self.walk_to(bird, visitor.stand, bird.pace, dt);
             }
