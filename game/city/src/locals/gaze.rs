@@ -16,6 +16,13 @@ const PLAYER_NEAR: f32 = 7.0;
 const CAR_NEAR: f32 = 12.0;
 /// Height of the eyes above the feet, for aiming, before size.
 const EYES: f32 = 1.55;
+/// The eyes sit on the sides of the head, so it turns this far away from
+/// what it looks at closely, to see it with one eye. It rolls the head to
+/// follow up and down with that eye, this much of the pitch.
+const EYE_SIDE: f32 = 1.0;
+const EYE_ROLL: f32 = 0.8;
+/// It looks with the other eye every so many seconds.
+const SWITCH_EYES: std::ops::Range<f32> = 2.5..6.0;
 
 /// Where a head looks, relative to its body.
 #[derive(Component, Debug, Default)]
@@ -23,9 +30,15 @@ pub(super) struct Gaze {
     /// The head's turn now and where it turns to, as yaw and pitch. A
     /// positive pitch looks down.
     pub(super) turn: Vec2,
+    /// How far the head rolls, positive to the right.
+    pub(super) roll: f32,
     focus: Focus,
     /// Seconds until it looks at something else.
     until: f32,
+    /// Which eye it looks with, -1 for the left and 1 for the right, and
+    /// for how many seconds more. 0 looks ahead with both.
+    eye: f32,
+    until_switch: f32,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -43,6 +56,17 @@ impl Gaze {
     pub(super) fn glance_at(&mut self, turn: Vec2, seconds: f32) {
         self.focus = Focus::Turn(turn);
         self.until = seconds;
+        self.eye = 0.0;
+    }
+
+    /// Looks closely at what is at `turn` for `seconds`, with one eye.
+    pub(super) fn eye_at(&mut self, turn: Vec2, seconds: f32) {
+        self.focus = Focus::Turn(turn);
+        self.until = seconds;
+        if self.eye == 0.0 {
+            self.eye = if turn.x > 0.0 { -1.0 } else { 1.0 };
+            self.until_switch = 0.0;
+        }
     }
 
     pub(super) fn glance(
@@ -79,6 +103,12 @@ impl Gaze {
                     )),
                 };
                 gaze.until = rng.random_range(1.5..4.0);
+                // The player is looked at closely, with one eye.
+                gaze.eye = match gaze.focus {
+                    Focus::Player if rng.random_bool(0.5) => 1.0,
+                    Focus::Player => -1.0,
+                    Focus::Ahead | Focus::Turn(_) | Focus::Car(_) => 0.0,
+                };
             }
             let aim = match gaze.focus {
                 Focus::Ahead => Vec2::new(0.0, 0.05),
@@ -88,8 +118,26 @@ impl Gaze {
                     Self::turn_to(body, eyes, car.translation())
                 }),
             };
+            let roll = if gaze.eye == 0.0 {
+                0.0
+            } else {
+                gaze.until_switch -= dt;
+                // Only an eye that the head can turn far enough for.
+                let fits = |eye: f32| (aim.x - eye * EYE_SIDE).abs() < YAW;
+                if gaze.until_switch <= 0.0 && fits(-gaze.eye) || !fits(gaze.eye) {
+                    gaze.eye = -gaze.eye;
+                    gaze.until_switch = rng.random_range(SWITCH_EYES);
+                }
+                -gaze.eye * aim.y * EYE_ROLL
+            };
+            let aim = Vec2::new(
+                aim.x - gaze.eye * EYE_SIDE,
+                aim.y * (1.0 - gaze.eye.abs() * EYE_ROLL),
+            );
             let aim = aim.clamp(Vec2::new(-YAW, -PITCH), Vec2::new(YAW, PITCH));
-            gaze.turn = gaze.turn.lerp(aim, 1.0 - (-FOLLOW * dt).exp());
+            let follow = 1.0 - (-FOLLOW * dt).exp();
+            gaze.turn = gaze.turn.lerp(aim, follow);
+            gaze.roll += (roll - gaze.roll) * follow;
         }
     }
 

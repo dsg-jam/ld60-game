@@ -108,6 +108,9 @@ pub(super) struct Bird {
     carrying: bool,
     /// Where the left hand reaches to in its body's space, and how far.
     reach: Option<(Vec3, f32)>,
+    /// How far what it carries tips towards whoever it is shown to, in
+    /// radians.
+    presenting: f32,
     /// Where what the left hand holds is in the world, after the last pose.
     held: Option<Transform>,
 }
@@ -327,6 +330,7 @@ impl Bird {
                 umbrella,
                 carrying: false,
                 reach: None,
+                presenting: 0.0,
                 held: None,
             },
         ));
@@ -444,6 +448,12 @@ impl Bird {
         self.reach = Some((body.compute_affine().inverse().transform_point3(at), amount));
     }
 
+    /// Tips what it carries towards whoever it faces, towards `tilt`
+    /// radians.
+    pub(super) fn present(&mut self, tilt: f32, dt: f32) {
+        self.presenting += (tilt - self.presenting) * (1.0 - (-4.0 * dt).exp());
+    }
+
     pub(super) fn stop_reaching(&mut self) {
         self.reach = None;
     }
@@ -455,6 +465,13 @@ impl Bird {
 
     pub(super) fn carries_umbrella(&self) -> bool {
         self.umbrella.is_some()
+    }
+
+    /// Whether it has no umbrella or has it all the way closed.
+    pub(super) fn has_umbrella_shut(&self) -> bool {
+        self.umbrella
+            .as_ref()
+            .is_none_or(|umbrella| umbrella.openness() == 0.0)
     }
 
     pub(super) fn has_umbrella_open(&self) -> bool {
@@ -580,8 +597,10 @@ impl Bird {
                 }
             }
             *silhouette = pose.silhouette.moved(&body);
+            let tilt = Quat::from_rotation_x(bird.presenting);
             bird.held = pose.held.map(|at| {
-                Transform::from_translation(body.transform_point(at)).with_rotation(root.rotation)
+                Transform::from_translation(body.transform_point(at))
+                    .with_rotation(root.rotation * tilt)
             });
             let rig = &bird.rig;
             let mut set = |entity: Entity, transform: Transform| {

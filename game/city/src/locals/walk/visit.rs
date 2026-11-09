@@ -9,6 +9,7 @@ use rand::{Rng, RngExt};
 use super::super::WALKER_TALK;
 use super::super::bird::Bird;
 use super::super::gaze::Gaze;
+use super::super::shadows::Silhouette;
 use super::super::sound::Voice;
 use super::chat::CHAT_TALK;
 use super::outing::{Activity, BESIDE, SIT_TIME, ease, turned};
@@ -22,15 +23,25 @@ const GONE: f32 = 12.0;
 /// Seconds to hold the hand out, and to draw it back.
 const REACH_TIME: f32 = 1.2;
 const WITHDRAW_TIME: f32 = 0.6;
-/// Calling, a visitor waves for this many seconds out of every this many.
-const WAVE_FOR: f32 = 1.8;
+/// Calling, a visitor holds up what it has for this many seconds out of
+/// every this many, this far below the eyes, to the side and in front,
+/// bobbing it this far this many times a second.
+const SHOW_FOR: f32 = 1.8;
 const CALL_EVERY: f32 = 4.5;
-/// Waving, the hand goes up this high above the eyes, this far out to the
-/// side and in front, and swings this far this many times a second.
-const WAVE_UP: f32 = 0.12;
-const WAVE_OUT: Vec2 = Vec2::new(0.22, 0.3);
-const WAVE_SWING: f32 = 0.09;
-const WAVE_RATE: f32 = 2.2;
+const SHOW_AT: Vec3 = Vec3::new(0.12, -0.12, 0.38);
+const BOB: f32 = 0.025;
+const BOB_RATE: f32 = 2.5;
+/// How far a visitor leans in, in radians: holding something out over the
+/// counter, calling, and shifting about while it waits.
+const LEAN_OVER: f32 = 0.35;
+const LEAN_CALL: f32 = 0.15;
+const FIDGET: Range<f32> = 0.0..0.08;
+/// Showing something, a visitor tips it this far towards the player.
+const PRESENT: f32 = 0.5;
+/// An umbrella closes this far from the counter, and the visitor waits
+/// this far away until it is shut, so it does not swing into the counter.
+const CLOSE_WITHIN: f32 = 3.5;
+const SHUT_BY: f32 = 0.9;
 /// Urging, the held out hand shakes this far this many times a second.
 const SHAKE: f32 = 0.025;
 const SHAKE_RATE: f32 = 3.5;
@@ -38,8 +49,11 @@ const SHAKE_RATE: f32 = 3.5;
 const TURN_RATE: f32 = 4.0;
 /// Eyes are this high for each meter of size.
 const EYES: f32 = 1.15;
-/// Seated, a visitor looks at the player's hands, and at the player for
-/// this many seconds now and then.
+/// Seconds a visitor looks at the player, and at something else between.
+const AT_PLAYER: Range<f32> = 1.5..4.0;
+const ELSEWHERE: Range<f32> = 0.8..2.0;
+/// Seated, it watches the player's hands for this many seconds, and looks
+/// up at the player for this many.
 const WATCH_FOR: Range<f32> = 3.0..8.0;
 const LOOK_UP_FOR: Range<f32> = 0.8..1.6;
 
@@ -51,6 +65,13 @@ pub struct Summon {
     pub errand: Entity,
     pub stand: Vec2,
     pub carrying: Entity,
+}
+
+/// The shop no longer needs the visitor of `errand`. It walks on, or
+/// never comes.
+#[derive(Event, Clone, Copy, Debug)]
+pub struct CallOff {
+    pub errand: Entity,
 }
 
 /// The visitor of `errand` left and is out of sight.
@@ -68,6 +89,8 @@ pub struct Visitor {
     pub carrying: Option<Entity>,
     stand: Vec2,
     at_counter: bool,
+    /// The middle of its head in the world, after the last pose.
+    head: Vec3,
     /// The stool it sits on, as far as it sat down.
     seat: Option<(Vec3, f32)>,
     sitting: f32,
@@ -76,9 +99,23 @@ pub struct Visitor {
     reach: f32,
     /// Seconds into calling or urging.
     clock: f32,
-    /// Seconds until it looks somewhere else, while seated.
+    /// Seconds until it looks somewhere else, and where it looks.
     look: f32,
     at_player: bool,
+    gaze: Glance,
+    /// How far it leans in, in radians.
+    lean: f32,
+}
+
+/// Where a visitor looks when not at the player.
+#[derive(Debug, Clone, Copy)]
+enum Glance {
+    /// At what it carries.
+    Carried,
+    /// Down at the player's work.
+    Work,
+    /// Off along the street, to this side.
+    Street(f32),
 }
 
 /// What the shop asks a [`Visitor`] to do.
@@ -108,14 +145,31 @@ impl Errands {
         errands.waiting.push(*summon);
     }
 
+    pub(in super::super) fn call_off(
+        call_off: On<CallOff>,
+        mut errands: ResMut<Errands>,
+        mut visitors: Query<&mut Visitor>,
+    ) {
+        errands
+            .waiting
+            .retain(|summon| summon.errand != call_off.errand);
+        for mut visitor in &mut visitors {
+            if visitor.errand == call_off.errand {
+                visitor.carrying = None;
+                visitor.ask = Ask::Leave;
+            }
+        }
+    }
+
     /// Moves what visitors carry along with their hands, and lets them go
     /// once out of sight.
     pub(in super::super) fn carry(
-        mut visitors: Query<(Entity, &Walker, &mut Bird, &Visitor)>,
+        mut visitors: Query<(Entity, &Walker, &mut Bird, &mut Visitor, &Silhouette)>,
         mut items: Query<&mut Transform, Without<Walker>>,
         mut commands: Commands,
     ) {
-        for (entity, walker, mut bird, visitor) in &mut visitors {
+        for (entity, walker, mut bird, mut visitor, silhouette) in &mut visitors {
+            visitor.head = silhouette.blobs[1].center;
             if let (Some(held), Some(mut item)) = (
                 bird.held(),
                 visitor.carrying.and_then(|item| items.get_mut(item).ok()),
@@ -153,6 +207,7 @@ impl Errands {
                 carrying: Some(summon.carrying),
                 stand: summon.stand,
                 at_counter: false,
+                head: Vec3::ZERO,
                 seat: None,
                 sitting: 0.0,
                 hand: Vec3::ZERO,
@@ -160,6 +215,8 @@ impl Errands {
                 clock: 0.0,
                 look: 0.0,
                 at_player: false,
+                gaze: Glance::Work,
+                lean: 0.0,
             });
         }
     }
@@ -169,6 +226,11 @@ impl Visitor {
     /// Whether it stands at the counter.
     pub fn at_counter(&self) -> bool {
         self.at_counter
+    }
+
+    /// The middle of its head in the world.
+    pub fn head(&self) -> Vec3 {
+        self.head
     }
 
     /// Whether it sits on its stool.
@@ -216,6 +278,8 @@ impl Walker {
         }
         match visitor.ask {
             Ask::Leave => {
+                bird.lean_in(0.0, dt);
+                bird.present(0.0, f32::INFINITY);
                 bird.stop_reaching();
                 bird.stand_under(false);
                 voice.talk_every(WALKER_TALK);
@@ -236,15 +300,79 @@ impl Walker {
         }
         if !visitor.at_counter {
             gaze.glance_at(self.look_at(player, bird), 0.5);
-            self.walk_to(bird, visitor.stand, bird.pace, dt);
+            let away = Vec2::new(self.x, self.z).distance(visitor.stand);
+            if away < CLOSE_WITHIN {
+                bird.stand_under(true);
+            }
+            if away < SHUT_BY && !bird.has_umbrella_shut() {
+                bird.speed = 0.0;
+            } else {
+                self.walk_to(bird, visitor.stand, bird.pace, dt);
+            }
             return;
         }
-        // The shop's roof keeps the rain off at the counter.
         bird.stand_under(true);
         bird.speed = 0.0;
         self.yaw = turned(self.yaw, 0.0, TURN_RATE * dt);
-        gaze.glance_at(self.look_at(player, bird), 0.5);
         self.gesture(visitor, bird, voice, dt);
+        self.look_around(visitor, bird, gaze, &counter, dt, rng);
+        bird.lean_in(visitor.lean, dt);
+        let showing = matches!(visitor.ask, Ask::Call | Ask::HoldOut { .. });
+        bird.present(if showing { PRESENT } else { 0.0 }, dt);
+    }
+
+    /// At the counter, it looks at the player with one eye, and in between
+    /// at what it carries, at the player's work, or off down the street.
+    /// It shifts about while it waits.
+    fn look_around(
+        &self,
+        visitor: &mut Visitor,
+        bird: &Bird,
+        gaze: &mut Gaze,
+        counter: &CounterLayout,
+        dt: f32,
+        rng: &mut impl Rng,
+    ) {
+        visitor.look -= dt;
+        if visitor.look <= 0.0 {
+            visitor.at_player = !visitor.at_player;
+            visitor.look = if visitor.at_player {
+                rng.random_range(AT_PLAYER)
+            } else {
+                rng.random_range(ELSEWHERE)
+            };
+            let wanting = matches!(visitor.ask, Ask::Call | Ask::HoldOut { .. });
+            visitor.gaze = match rng.random_range(0.0..1.0) {
+                x if x < 0.5 && visitor.carrying.is_some() => Glance::Carried,
+                x if x < 0.75 || wanting => Glance::Work,
+                _ => Glance::Street(if rng.random_bool(0.5) { 1.0 } else { -1.0 }),
+            };
+            if matches!(visitor.ask, Ask::Wait) {
+                visitor.lean = rng.random_range(FIDGET);
+            }
+        }
+        visitor.lean = match visitor.ask {
+            Ask::HoldOut { .. } => LEAN_OVER,
+            Ask::Call => LEAN_CALL,
+            Ask::Wait if visitor.lean > FIDGET.end => 0.0,
+            _ => visitor.lean,
+        };
+        let player = counter.seated_view().translation;
+        let target = if visitor.at_player {
+            Some(player)
+        } else {
+            match visitor.gaze {
+                Glance::Carried => bird.held().map(|held| held.translation),
+                Glance::Work => Some(counter.mat.top_spot(Vec2::ZERO)),
+                Glance::Street(side) => {
+                    gaze.glance_at(Vec2::new(side * 1.2, 0.05), 0.5);
+                    None
+                }
+            }
+        };
+        if let Some(target) = target {
+            gaze.eye_at(self.look_at(target, bird), 0.5);
+        }
     }
 
     /// Moves the free hand as the shop asks, at the counter. An umbrella
@@ -259,10 +387,10 @@ impl Walker {
                 if into < dt {
                     voice.speak_now();
                 }
-                let swing = WAVE_SWING * (into * WAVE_RATE * TAU).sin();
-                let up = EYES * bird.size() + WAVE_UP;
-                let wave = root.transform_point(Vec3::new(WAVE_OUT.x + swing, up, WAVE_OUT.y));
-                (wave, into < WAVE_FOR)
+                let bob = BOB * (into * BOB_RATE * TAU).sin();
+                let up = EYES * bird.size() + SHOW_AT.y + bob;
+                let show = root.transform_point(SHOW_AT.with_y(up));
+                (show, into < SHOW_FOR)
             }
             Ask::HoldOut { at, urge } => {
                 let shake = if urge {
@@ -351,7 +479,7 @@ impl Walker {
             )
         };
         visitor.look = look;
-        gaze.glance_at(self.look_at(target, bird), look);
+        gaze.eye_at(self.look_at(target, bird), look);
     }
 
     /// Where to stand to sit down on the stool at `stool`, on its outer

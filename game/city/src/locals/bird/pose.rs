@@ -72,6 +72,9 @@ const CROUCH_DROP: f32 = 0.06;
 const CROUCH_LEAN: f32 = 0.3;
 const HOP: f32 = 0.06;
 const BOUNCE: f32 = 0.03;
+/// Carrying something, it rests this far along the palm and above it, on
+/// the curled fingers.
+const ON_FINGERS: Vec3 = Vec3::new(0.0, 0.035, 0.036);
 /// Holding food, the hand holds it in front of the chest, and reaches
 /// this far over the counter to take it or put it back.
 const CHEST: Vec3 = Vec3::new(-0.07, -0.13, 0.16);
@@ -227,7 +230,9 @@ impl Bird {
         let pitch =
             gaze.turn.y * (1.0 - dip) + self.hunch * 0.15 + HEAD_BOW * dip - SWALLOW * swallow;
         let head = Transform::from_translation(head_at).with_rotation(
-            Quat::from_rotation_y(glance - shake * 0.6) * Quat::from_rotation_x(pitch),
+            Quat::from_rotation_y(glance - shake * 0.6)
+                * Quat::from_rotation_x(pitch)
+                * Quat::from_rotation_z(gaze.roll * (1.0 - dip)),
         );
         set(Bone::Head, head);
         set(
@@ -335,10 +340,18 @@ impl Bird {
                 frame(shoulder, elbow - shoulder, elbows),
             );
             set(Bone::Forearm(side), frame(elbow, wrist - elbow, elbows));
-            let palm = frame(wrist, wrist - elbow, elbows);
+            let carrying = side == Side::Left && self.carrying;
+            // Carrying, the palm faces up under what it holds, which rests
+            // on the curled fingers.
+            let palm = if carrying {
+                let ahead = (wrist - elbow).with_y(0.0).normalize_or(Vec3::Z);
+                frame(wrist, ahead, Vec3::Y)
+            } else {
+                frame(wrist, wrist - elbow, elbows)
+            };
             set(Bone::Hand(side), palm);
-            if side == Side::Left && self.carrying {
-                held = Some(palm.transform_point(Vec3::Y * 0.04) - Vec3::Y * 0.02);
+            if carrying {
+                held = Some(palm.transform_point(ON_FINGERS));
             }
             if let Some(food) = food.filter(|_| self.meal.held) {
                 let at = palm.transform_point(Vec3::Y * 0.04) - Vec3::Y * 0.02;

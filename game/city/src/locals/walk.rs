@@ -15,7 +15,7 @@ use self::chat::Passer;
 use self::outing::{Activity, Around};
 pub(super) use self::outing::{Customers, Seats};
 pub(super) use self::visit::Errands;
-pub use self::visit::{Ask, Left, Summon, Visitor};
+pub use self::visit::{Ask, CallOff, Left, Summon, Visitor};
 use super::super::traffic::Vehicle;
 use super::super::weather::Weather;
 use super::super::{FAR_CURB, NEAR_CURB};

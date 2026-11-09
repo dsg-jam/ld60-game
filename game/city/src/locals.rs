@@ -26,7 +26,7 @@ use self::bird::{Bird, Birth, Carry, Dress, Posture, Steam};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
-pub use self::walk::{Ask, Left, Summon, Visitor};
+pub use self::walk::{Ask, CallOff, Left, Summon, Visitor};
 use self::walk::{Customers, Errands, Seats, Walker};
 use super::buildings::Skyline;
 use super::{Pick, rng};
@@ -57,6 +57,7 @@ impl Plugin for LocalsPlugin {
         .init_resource::<Customers>()
         .init_resource::<Errands>()
         .add_observer(Errands::ask)
+        .add_observer(Errands::call_off)
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
         .add_systems(
             Startup,
