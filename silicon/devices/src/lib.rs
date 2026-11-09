@@ -29,6 +29,6 @@ pub use error::{DeviceError, ProgramError, RunError, UnknownBoardRev, UnknownDev
 pub use fault::Fault;
 pub use isa_kind::IsaKind;
 pub use line_test::LineTest;
-pub use movement::{MARKS, Movement};
+pub use movement::{MARKS, Movement, Wanted, WatchComplaint};
 pub use readout::Readout;
 pub use rom::{Rom, RomKind, can_program};

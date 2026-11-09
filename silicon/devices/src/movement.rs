@@ -1,6 +1,9 @@
+mod wanted;
+
 use ld60_machine::Image;
 use ld60_tick::{Cpu, Effect, Revision, WORD_BITS};
 
+pub use self::wanted::{Wanted, WatchComplaint};
 use crate::{DeviceError, Rom, RomKind};
 
 /// Marks around the dial.
@@ -68,6 +71,12 @@ impl Movement {
             Effect::None | Effect::Asleep => {}
         }
         effect
+    }
+
+    /// Starts from the top with the chip reset, as when a battery goes in.
+    pub fn power_on(&mut self) {
+        self.cpu.reset();
+        self.hand = 0;
     }
 
     pub fn tick(&mut self) {
