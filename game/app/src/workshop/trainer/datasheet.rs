@@ -2,15 +2,20 @@ use bevy::prelude::*;
 use ld60_game_parts::paper::{INK, PAPER};
 use ld60_game_parts::screen::UiCanvas;
 use ld60_locale::{Localized, Message};
-use ld60_tick::Op;
+use ld60_tick::{Op, WORD_BITS};
 
 const SIZE: Vec2 = Vec2::new(0.105, 0.148);
 const CANVAS: UVec2 = UVec2::new(420, 592);
 const PADDING: f32 = 22.0;
 const TITLE_SIZE: f32 = 24.0;
 const TEXT_SIZE: f32 = 14.0;
-const WORD_WIDTH: f32 = 60.0;
-const NAME_WIDTH: f32 = 60.0;
+const WORD_WIDTH: f32 = 72.0;
+const NAME_WIDTH: f32 = 52.0;
+/// A switch in the pictures of words: its slot, its knob, and the gap
+/// between switches.
+const SLOT: Vec2 = Vec2::new(12.0, 24.0);
+const KNOB: f32 = 8.0;
+const SWITCH_GAP: f32 = 4.0;
 
 /// The printed datasheet of the Tick chip, lying face up.
 #[derive(Component, Debug)]
@@ -74,15 +79,8 @@ impl Datasheet {
                 });
                 for (op, id) in ops {
                     page.spawn(row()).with_children(|line| {
-                        line.spawn((
-                            cell(WORD_WIDTH),
-                            Text::new(format!("{:04b}", op.word())),
-                            TextFont {
-                                font_size: FontSize::Px(TEXT_SIZE),
-                                ..default()
-                            },
-                            TextColor(INK),
-                        ));
+                        line.spawn(cell(WORD_WIDTH))
+                            .with_children(|cell| Self::picture(cell, op.word()));
                         line.spawn((
                             cell(NAME_WIDTH),
                             Text::new(format!("{op:?}").to_uppercase()),
@@ -95,9 +93,9 @@ impl Datasheet {
                         line.spawn((Node::default(), text(id, TEXT_SIZE)));
                     });
                 }
+                page.spawn(text("tick-sheet-switches", TEXT_SIZE));
                 page.spawn(text("tick-sheet-other", TEXT_SIZE));
                 page.spawn(text("tick-sheet-order", TEXT_SIZE));
-                page.spawn(text("tick-sheet-erase", TEXT_SIZE));
             });
         super::sheet::lay(
             &mut commands,
@@ -106,5 +104,49 @@ impl Datasheet {
             &mut meshes,
             &mut materials,
         );
+    }
+
+    /// Draws `word` as a row of switches, the highest bit on the left, up
+    /// for 1.
+    fn picture(parent: &mut ChildSpawnerCommands, word: u8) {
+        parent
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: px(SWITCH_GAP),
+                ..default()
+            })
+            .with_children(|switches| {
+                for bit in (0..WORD_BITS).rev() {
+                    let up = word >> bit & 1 != 0;
+                    switches
+                        .spawn((
+                            Node {
+                                width: px(SLOT.x),
+                                height: px(SLOT.y),
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                justify_content: if up {
+                                    JustifyContent::FlexStart
+                                } else {
+                                    JustifyContent::FlexEnd
+                                },
+                                padding: px(1).all(),
+                                border: px(1.5).all(),
+                                border_radius: BorderRadius::all(px(3)),
+                                ..default()
+                            },
+                            BorderColor::all(INK),
+                        ))
+                        .with_child((
+                            Node {
+                                width: px(KNOB),
+                                height: px(KNOB),
+                                border_radius: BorderRadius::all(px(KNOB / 2.0)),
+                                ..default()
+                            },
+                            BackgroundColor(INK),
+                        ));
+                }
+            });
     }
 }

@@ -9,9 +9,8 @@ mod sheet;
 
 use bevy::prelude::*;
 use ld60_devices::Movement;
-use ld60_game_audio::{Play, PlayAt, Sound};
+use ld60_game_audio::{PlayAt, Sound};
 use ld60_game_parts::led::Led;
-use ld60_game_parts::push_button::{PushButton, Pushed};
 use ld60_game_parts::toggle::Toggle;
 use ld60_game_player::cursor::WantsFinger;
 use ld60_game_player::focus::{Focus, FocusTarget, Focused, View};
@@ -33,19 +32,14 @@ use self::movement::Hand;
 const SPEED: f32 = 200.0;
 /// Seconds between two ticks of the crystal.
 const TICK: f32 = 1.0;
-/// Seconds the UV lamp takes to erase the chip.
-const ERASE_TIME: f32 = 3.0;
+/// Words the panel has a row of switches for.
+const WORDS: usize = 4;
 /// Camera above the front of the panel while focused, and where it looks,
 /// to see the movement in front of the panel too.
-const VIEW: Vec3 = Vec3::new(0.0, 0.34, 0.36);
+const VIEW: Vec3 = Vec3::new(0.0, 0.25, 0.26);
 const VIEW_AT: Vec3 = Vec3::new(0.0, 0.0, 0.07);
 
-const RED: Color = Color::srgb_u8(0xff, 0x30, 0x20);
 const GREEN: Color = Color::srgb_u8(0x40, 0xff, 0x50);
-const AMBER: Color = Color::srgb_u8(0xff, 0xb0, 0x20);
-const VIOLET: Color = Color::srgb_u8(0xa0, 0x40, 0xff);
-const BUTTON: Color = Color::srgb_u8(0xd8, 0xd4, 0xc8);
-const ERASE_BUTTON: Color = Color::srgb_u8(0xc0, 0x30, 0x28);
 
 pub(crate) struct TrainerPlugin;
 
@@ -55,6 +49,7 @@ impl Plugin for TrainerPlugin {
             Update,
             (
                 Trainer::print,
+                Trainer::wire,
                 Trainer::run,
                 Trainer::show,
                 Trainer::arm_controls,
@@ -63,8 +58,7 @@ impl Plugin for TrainerPlugin {
         )
         .add_observer(Trainer::on_add)
         .add_observer(Datasheet::on_add)
-        .add_observer(Flyer::on_add)
-        .add_observer(Trainer::push);
+        .add_observer(Flyer::on_add);
         // The watch job replaces the old first jobs for now.
         app.init_resource::<HeldJobs>();
         WatchJob::register(app);
@@ -73,18 +67,20 @@ impl Plugin for TrainerPlugin {
     }
 }
 
-/// A front panel to program and step the chip of a watch movement on the
-/// mat. Switches set a word, lamps show the address and the word there.
+/// A front panel wired to the memory of a watch movement on the mat. Each
+/// row of switches is a word of the program, up for 1. The lamp of the
+/// row the chip is on lights, and RUN lets it run.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Trainer {
     /// The movement it works on, if one is on the mat, and its model.
     movement: Option<Movement>,
     model: Option<Entity>,
+    /// Whether the switches show the movement's memory yet. They are set
+    /// to it once it comes, and write to it after.
+    synced: bool,
     /// Seconds until the next tick.
     until_tick: f32,
-    /// Seconds left of an erase.
-    erasing: Option<f32>,
     /// Instructions owed to the running chip.
     owed: f32,
 }
@@ -94,8 +90,8 @@ impl Default for Trainer {
         Self {
             movement: None,
             model: None,
+            synced: false,
             until_tick: TICK,
-            erasing: None,
             owed: 0.0,
         }
     }
@@ -104,23 +100,19 @@ impl Default for Trainer {
 /// What a control on the panel is for.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 enum Control {
-    /// The switch for one bit of the word to deposit.
-    Data(u8),
+    /// The switch for one bit of one word.
+    Bit {
+        word: usize,
+        bit: u8,
+    },
     Run,
-    Reset,
-    Erase,
-    Next,
-    Deposit,
-    Step,
 }
 
 /// What a lamp on the panel shows.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 enum Lamp {
-    Address(u8),
-    Data(u8),
-    Wait,
-    Erasing,
+    /// The chip is on this word.
+    Row(usize),
 }
 
 /// The top of the case, printed once the words are loaded.
@@ -144,24 +136,17 @@ impl Trainer {
                 parent.spawn((Shape::cuboid(&case, PLATE_COLOR), Finish::Paint));
                 parent.spawn((Unprinted, Transform::default()));
                 for (control, at) in layout::controls() {
-                    let mut entity = parent.spawn((control, top(at)));
-                    match control {
-                        Control::Data(_) => entity.insert(Toggle { up: false }),
-                        Control::Run => entity.insert(Toggle { up: false }),
-                        Control::Erase => entity.insert(PushButton::new(ERASE_BUTTON)),
-                        Control::Reset | Control::Next | Control::Deposit | Control::Step => {
-                            entity.insert(PushButton::new(BUTTON))
-                        }
-                    };
+                    parent.spawn((control, Toggle { up: false }, top(at)));
                 }
                 for (lamp, at) in layout::lamps() {
-                    let color = match lamp {
-                        Lamp::Address(_) => RED,
-                        Lamp::Data(_) => GREEN,
-                        Lamp::Wait => AMBER,
-                        Lamp::Erasing => VIOLET,
-                    };
-                    parent.spawn((lamp, Led { color, on: false }, top(at)));
+                    parent.spawn((
+                        lamp,
+                        Led {
+                            color: GREEN,
+                            on: false,
+                        },
+                        top(at),
+                    ));
                 }
             });
     }
@@ -186,63 +171,44 @@ impl Trainer {
         }
     }
 
-    /// Does what a pushed button on a panel is for.
-    fn push(
-        push: On<Pushed>,
-        controls: Query<(&Control, &ChildOf)>,
+    /// Sets the switches to the memory of a movement that just came, and
+    /// writes what they say into it after.
+    fn wire(
         mut trainers: Query<(&mut Trainer, &Children)>,
-        switches: Query<(&Control, &Toggle)>,
-        mut commands: Commands,
+        mut switches: Query<(&Control, &mut Toggle)>,
     ) {
-        let Ok((&control, child_of)) = controls.get(push.entity) else {
-            return;
-        };
-        let Ok((mut trainer, children)) = trainers.get_mut(child_of.parent()) else {
-            return;
-        };
-        let erasing = trainer.erasing.is_some();
-        let Some(movement) = trainer.movement.as_mut() else {
-            if !matches!(control, Control::Data(_) | Control::Run) {
-                commands.trigger(Play(Sound::Refuse));
-            }
-            return;
-        };
-        let pc = movement.cpu().pc();
-        match control {
-            Control::Reset => movement.cpu_mut().reset(),
-            Control::Next => movement.cpu_mut().set_pc(pc + 1),
-            Control::Step => {
-                movement.step();
-            }
-            Control::Erase => {
-                if !erasing {
-                    trainer.erasing = Some(ERASE_TIME);
+        for (mut trainer, children) in &mut trainers {
+            let trainer = &mut *trainer;
+            let Some(movement) = trainer.movement.as_mut() else {
+                continue;
+            };
+            let mut words = [0; WORDS];
+            let mut parts = switches.iter_many_mut(children);
+            while let Some(part) = parts.fetch_next() {
+                let Ok((&Control::Bit { word, bit }, mut toggle)) = part else {
+                    continue;
+                };
+                let up = movement.rom().image().get(word) >> bit & 1 != 0;
+                if !trainer.synced {
+                    toggle.set_if_neq(Toggle { up });
+                } else if toggle.up {
+                    words[word] |= 1 << bit;
                 }
             }
-            Control::Deposit => {
-                let word = switches
-                    .iter_many(children)
-                    .filter_map(|part| match part {
-                        Ok((Control::Data(bit), toggle)) if toggle.up => Some(1 << bit),
-                        _ => None,
-                    })
-                    .sum();
-                let written = !erasing
-                    && movement
-                        .rom_mut()
-                        .program_word(usize::from(pc), word)
-                        .is_ok();
-                if written {
-                    movement.cpu_mut().set_pc(pc + 1);
-                } else {
-                    commands.trigger(Play(Sound::Refuse));
+            if trainer.synced {
+                for (address, word) in words.into_iter().enumerate() {
+                    if movement.rom().image().get(address) != word {
+                        // The memory of the first chip takes any word.
+                        let _ = movement.rom_mut().program_word(address, word);
+                    }
                 }
             }
-            Control::Data(_) | Control::Run => {}
+            trainer.synced = true;
         }
     }
 
-    /// Ticks the crystal, erases and runs the chip while RUN is up.
+    /// Ticks the crystal and runs the chip while RUN is up. Down, the chip
+    /// waits at word 0.
     fn run(
         time: Res<Time>,
         mut trainers: Query<(&mut Trainer, &Children)>,
@@ -254,27 +220,20 @@ impl Trainer {
             let Some(movement) = trainer.movement.as_mut() else {
                 continue;
             };
-            trainer.until_tick -= dt;
-            if trainer.until_tick <= 0.0 {
-                trainer.until_tick += TICK;
-                movement.tick();
-            }
-            if let Some(left) = trainer.erasing {
-                if left > dt {
-                    trainer.erasing = Some(left - dt);
-                } else {
-                    trainer.erasing = None;
-                    // The chip in a movement is always an EPROM.
-                    let _ = movement.rom_mut().erase();
-                }
-            }
             let running = switches
                 .iter_many(children)
                 .flatten()
                 .any(|(control, toggle)| *control == Control::Run && toggle.up);
             if !running {
+                movement.power_on();
+                trainer.until_tick = TICK;
                 trainer.owed = 0.0;
                 continue;
+            }
+            trainer.until_tick -= dt;
+            if trainer.until_tick <= 0.0 {
+                trainer.until_tick += TICK;
+                movement.tick();
             }
             trainer.owed += SPEED * dt;
             while trainer.owed >= 1.0 {
@@ -286,9 +245,8 @@ impl Trainer {
         }
     }
 
-    /// The lamps show the address, the word there and whether the chip
-    /// waits. The hand shows where the movement points, and ticks as it
-    /// moves.
+    /// The lamp of the word the chip is on lights. The hand shows where the
+    /// movement points, and ticks as it moves.
     fn show(
         trainers: Query<(&Trainer, &Children)>,
         children: Query<&Children>,
@@ -300,16 +258,9 @@ impl Trainer {
             let movement = trainer.movement.as_ref();
             for &part in parts {
                 if let Ok((lamp, mut led)) = lamps.get_mut(part) {
-                    let on = movement.is_some_and(|movement| {
-                        let cpu = movement.cpu();
-                        let word = movement.rom().image().get(usize::from(cpu.pc()));
-                        match *lamp {
-                            Lamp::Address(bit) => cpu.pc() >> bit & 1 != 0,
-                            Lamp::Data(bit) => word >> bit & 1 != 0,
-                            Lamp::Wait => cpu.waiting(),
-                            Lamp::Erasing => trainer.erasing.is_some(),
-                        }
-                    });
+                    let Lamp::Row(word) = *lamp;
+                    let on =
+                        movement.is_some_and(|movement| usize::from(movement.cpu().at()) == word);
                     if led.on != on {
                         led.on = on;
                     }
@@ -335,12 +286,12 @@ impl Trainer {
         movement.power_on();
         self.movement = Some(movement);
         self.model = Some(model);
+        self.synced = false;
         self.until_tick = TICK;
     }
 
     /// Lets go of the movement, if it works on one.
     pub(crate) fn take(&mut self) -> Option<Movement> {
-        self.erasing = None;
         self.model = None;
         self.movement.take()
     }
@@ -374,19 +325,11 @@ mod tests {
         Locale::on_disk().assert_formats(
             [
                 "click-trainer",
-                "panel-address",
-                "panel-wait",
-                "panel-data",
                 "panel-run",
-                "panel-reset",
-                "panel-erase",
-                "panel-next",
-                "panel-deposit",
-                "panel-step",
                 "click-datasheet",
                 "click-flyer",
                 "click-take-movement",
-                "click-take-flyer",
+                "click-take-papers",
                 "click-hand-back",
                 "tick-sheet-title",
                 "tick-sheet-revision",
@@ -398,7 +341,7 @@ mod tests {
                 "tick-op-wait",
                 "tick-sheet-other",
                 "tick-sheet-order",
-                "tick-sheet-erase",
+                "tick-sheet-switches",
             ]
             .map(Message::new),
         );

@@ -34,7 +34,7 @@ impl Plugin for TogglePlugin {
 /// A small toggle switch with a chrome lever. It stands up along +Y from
 /// the panel at the origin. Up leans the lever towards -Z. A click flips it
 /// while the thing it is on is focused.
-#[derive(Component, Debug)]
+#[derive(Component, Debug, PartialEq, Eq)]
 #[require(Transform, Visibility, WantsFinger)]
 pub struct Toggle {
     pub up: bool,

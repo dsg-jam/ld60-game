@@ -22,8 +22,9 @@ use rand::{RngExt, SeedableRng};
 use super::super::delivery::{DEVICE_SPOT, DEVICE_YAW};
 use super::{Datasheet, Flyer, Trainer, movement, sheet};
 
-/// Seconds to look around after the shop opens, before the customer comes.
-const SETTLE: f32 = 5.0;
+/// Seconds after the shop opens before someone walking by is asked over.
+/// Their walk to the counter gives the player time to look around.
+const SETTLE: f32 = 1.0;
 /// Seconds of waiting to be seen before calling out.
 const CALL_AFTER: f32 = 2.5;
 /// Seconds of holding something out before shaking it.
@@ -47,7 +48,7 @@ const SEATED_CONE: f32 = 0.15;
 /// of it, and holds things out this high above the top and this far over
 /// it.
 const STAND_X: f32 = 0.08;
-const STAND_BACK: f32 = 0.22;
+const STAND_BACK: f32 = 0.3;
 const HOLD_UP: f32 = 0.28;
 const HOLD_OVER: f32 = 0.4;
 /// Things are held out on the side of the hand that holds them, clear of
@@ -58,9 +59,10 @@ const FLYER_SPOT: Vec2 = Vec2::new(-0.65, 0.3);
 const FLYER_YAW: f32 = 0.1;
 const DATASHEET_SPOT: Vec2 = Vec2::new(0.75, 0.35);
 const DATASHEET_YAW: f32 = -0.15;
-/// In the customer's hand, the movement lies on the datasheet, this far
-/// off its middle.
-const ON_DATASHEET: Vec3 = Vec3::new(0.02, 0.001, 0.0);
+/// In the customer's hand, the flyer lies on the datasheet, this far off
+/// its middle and turned this far.
+const ON_DATASHEET: Vec3 = Vec3::new(0.01, 0.001, 0.02);
+const ON_DATASHEET_YAW: f32 = 0.2;
 
 /// A regular brings a bare watch movement for the first job of a run,
 /// hands it over and then the flyer of what it should do, and waits on a
@@ -74,10 +76,10 @@ pub(super) struct WatchJob {
     looked: f32,
     /// The movement while the panel does not work on it.
     brought: Option<Movement>,
-    /// The datasheet with the movement model on it, as the customer
-    /// brings them, the model, the datasheet and the flyer.
-    bundle: Entity,
+    /// The model of the movement, and the datasheet with the flyer on it
+    /// as the customer brings them.
     movement: Entity,
+    papers: Entity,
     datasheet: Entity,
     flyer: Entity,
 }
@@ -151,7 +153,7 @@ impl WatchJob {
             .spawn((
                 Name::new("brought movement"),
                 Leftover,
-                Transform::from_translation(ON_DATASHEET),
+                Transform::from_xyz(0.0, -10.0, 0.0),
                 Visibility::default(),
             ))
             .with_children(movement::spawn(stopped))
@@ -159,23 +161,23 @@ impl WatchJob {
         let datasheet = commands
             .spawn((Name::new("tick datasheet"), Leftover, Datasheet))
             .id();
-        let bundle = commands
-            .spawn((
-                Name::new("brought bundle"),
-                Leftover,
-                Transform::from_xyz(0.0, -10.0, 0.0),
-                Visibility::default(),
-            ))
-            .add_children(&[datasheet, movement])
-            .id();
         let flyer = commands
             .spawn((
                 Name::new("flyer"),
                 Leftover,
                 Flyer { seed: 1 },
+                Transform::from_translation(ON_DATASHEET)
+                    .with_rotation(Quat::from_rotation_y(ON_DATASHEET_YAW)),
+            ))
+            .id();
+        let papers = commands
+            .spawn((
+                Name::new("brought papers"),
+                Leftover,
                 Transform::from_xyz(0.0, -10.0, 0.0),
                 Visibility::Hidden,
             ))
+            .add_children(&[datasheet, flyer])
             .id();
         commands.spawn((
             Name::new("watch job"),
@@ -184,8 +186,8 @@ impl WatchJob {
                 clock: 0.0,
                 looked: 0.0,
                 brought: Some(Movement::blank(Revision::A).stopped_at(stopped)),
-                bundle,
                 movement,
+                papers,
                 datasheet,
                 flyer,
             },
@@ -210,7 +212,7 @@ impl WatchJob {
                     commands.trigger(Summon {
                         errand,
                         stand: Self::stand(),
-                        carrying: job.bundle,
+                        carrying: job.movement,
                     });
                     job.go(Step::Coming);
                 }
@@ -250,23 +252,31 @@ impl WatchJob {
                         Ask::Wait
                     };
                     if job.looked > SEEN_AFTER {
-                        Self::offer(&mut commands, job.bundle, "click-take-movement");
+                        Self::offer(&mut commands, job.movement, "click-take-movement");
                         job.go(Step::Offering);
                     }
                 }
                 Step::Offering | Step::OfferingFlyer | Step::Returning => visitor.ask = hold_out,
+                // Looking back at the customer early brings the papers at
+                // once. Calling is for those who stay at the panel.
                 Step::Trying => {
                     visitor.ask = Ask::Wait;
-                    if job.clock > FLYER_AFTER {
-                        visitor.carrying = Some(job.flyer);
-                        commands.entity(job.flyer).insert(Visibility::Inherited);
+                    let seen = job.looked > SEEN_AFTER;
+                    if seen || job.clock > FLYER_AFTER {
+                        visitor.carrying = Some(job.papers);
+                        commands.entity(job.papers).insert(Visibility::Inherited);
+                    }
+                    if seen {
+                        Self::offer(&mut commands, job.papers, "click-take-papers");
+                        job.go(Step::OfferingFlyer);
+                    } else if job.clock > FLYER_AFTER {
                         job.go(Step::Calling);
                     }
                 }
                 Step::Calling => {
                     visitor.ask = Ask::Call;
                     if job.looked > SEEN_AFTER {
-                        Self::offer(&mut commands, job.flyer, "click-take-flyer");
+                        Self::offer(&mut commands, job.papers, "click-take-papers");
                         job.go(Step::OfferingFlyer);
                     }
                 }
@@ -365,13 +375,7 @@ impl WatchJob {
         Self::withdraw(&mut commands, entity);
         let counter = CounterLayout::new();
         match job.step {
-            Step::Offering if entity == job.bundle => {
-                commands.entity(job.datasheet).remove::<ChildOf>().insert((
-                    counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
-                    sheet::reading("click-datasheet"),
-                ));
-                commands.entity(job.movement).remove::<ChildOf>();
-                commands.entity(job.bundle).despawn();
+            Step::Offering if entity == job.movement => {
                 job.put_down(&mut visitor, &mut trainer, &mut commands);
                 commands.trigger(FocusOn { entity: panel });
                 job.go(Step::Trying);
@@ -380,12 +384,17 @@ impl WatchJob {
                 job.put_down(&mut visitor, &mut trainer, &mut commands);
                 job.go(Step::Watching);
             }
-            Step::OfferingFlyer if entity == job.flyer => {
+            Step::OfferingFlyer if entity == job.papers => {
                 visitor.carrying = None;
-                commands.entity(job.flyer).insert((
+                commands.entity(job.flyer).remove::<ChildOf>().insert((
                     counter.place_on_mat(FLYER_SPOT, FLYER_YAW),
                     sheet::reading("click-flyer"),
                 ));
+                commands.entity(job.datasheet).remove::<ChildOf>().insert((
+                    counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
+                    sheet::reading("click-datasheet"),
+                ));
+                commands.entity(job.papers).despawn();
                 commands.trigger(Play(Sound::PageSlide));
                 commands.trigger(FocusOn { entity: job.flyer });
                 job.go(Step::Watching);

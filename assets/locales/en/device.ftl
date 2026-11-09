@@ -29,12 +29,4 @@ silk-keys = KEYS
 silk-battery = BAT
 
 # Printed on the front panel. Its font has only A to Z and digits.
-panel-address = ADDRESS
-panel-wait = WAIT
-panel-data = DATA
 panel-run = RUN
-panel-reset = RESET
-panel-erase = ERASE
-panel-next = NEXT
-panel-deposit = DEPOSIT
-panel-step = STEP
