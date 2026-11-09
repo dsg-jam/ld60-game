@@ -60,6 +60,11 @@ pub struct Job {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct JobId(u32);
 
+/// While this exists, a new run brings no level job. The run starts with
+/// the watch job instead.
+#[derive(Resource, Debug, Default)]
+pub struct HeldJobs;
+
 /// A job came on the bench, so its device and ticket come to the counter.
 #[derive(Event, Debug)]
 pub struct JobOnBench;
@@ -173,8 +178,13 @@ impl Job {
     }
 
     /// Puts the current job of the run on the bench.
-    pub fn start(run: Res<Run>, levels: Option<Res<Levels>>, mut commands: Commands) {
-        let Some(levels) = levels else {
+    pub fn start(
+        run: Res<Run>,
+        levels: Option<Res<Levels>>,
+        held: Option<Res<HeldJobs>>,
+        mut commands: Commands,
+    ) {
+        let Some(levels) = levels.filter(|_| held.is_none()) else {
             return;
         };
         match Job::for_run(&run, &levels) {
@@ -224,6 +234,7 @@ impl Job {
         run: Res<Run>,
         job: Option<Res<Job>>,
         bench: Option<Res<Bench>>,
+        held: Option<Res<HeldJobs>>,
         mut started: Local<bool>,
         mut commands: Commands,
     ) {
@@ -242,6 +253,7 @@ impl Job {
                 commands.remove_resource::<Bench>();
                 bench.reopen(&levels)
             }
+            (None, None) if held.is_some() => return,
             (None, None) => Job::for_run(&run, &levels),
         };
         match built {

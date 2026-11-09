@@ -3,12 +3,11 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 
-use ld60_game_core::layout::counter::CounterLayout;
+use ld60_game_core::layout::counter::{CounterLayout, STOOL_HEIGHT};
 
 const SLAT: f32 = 0.12;
 const SLAT_GAP: f32 = 0.008;
 
-const STOOL_HEIGHT: f32 = 0.75;
 const STOOL_SEAT: Vec3 = Vec3::new(0.34, 0.05, 0.34);
 const STOOL_LEG: f32 = 0.05;
 

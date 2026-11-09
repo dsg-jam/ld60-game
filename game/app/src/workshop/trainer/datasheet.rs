@@ -103,9 +103,11 @@ impl Datasheet {
             &mut commands,
             add.entity,
             (canvas.image, SIZE, "tick-datasheet"),
-            "click-datasheet",
             &mut meshes,
             &mut materials,
         );
+        commands
+            .entity(add.entity)
+            .insert(super::sheet::reading("click-datasheet"));
     }
 }

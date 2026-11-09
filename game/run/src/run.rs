@@ -427,12 +427,17 @@ impl Run {
         }
     }
 
+    /// Takes in `amount` a customer paid.
+    pub fn earn(&mut self, amount: u32) {
+        self.till += amount;
+        self.stats.earned += amount;
+    }
+
     /// Takes in what the customer paid for `job`. Once the device leaves
     /// the shop, the run moves on to the next job.
     pub fn settle(&mut self, job: &Job, pickup: &Pickup) {
         if let Pickup::Paid(payment) = pickup {
-            self.till += payment.amount();
-            self.stats.earned += payment.amount();
+            self.earn(payment.amount());
         }
         if !pickup.ends_job() {
             return;

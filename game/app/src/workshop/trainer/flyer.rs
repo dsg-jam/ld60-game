@@ -22,6 +22,7 @@ const SMALL_STEP: f32 = 0.0016;
 
 /// A customer's flyer for what a watch should do, in their own script.
 /// A strip of three dials shows the hand going on one mark each tick.
+/// It can be read once it lies on the mat.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Flyer {
@@ -45,7 +46,6 @@ impl Flyer {
             &mut commands,
             add.entity,
             (image, SIZE, ("flyer", flyer.seed)),
-            "click-flyer",
             &mut meshes,
             &mut materials,
         );

@@ -1,8 +1,10 @@
+#[cfg(feature = "debug_port")]
+mod command;
+mod customer;
 mod datasheet;
 mod flyer;
 mod layout;
 mod movement;
-mod parcel;
 mod sheet;
 
 use bevy::prelude::*;
@@ -13,17 +15,18 @@ use ld60_game_parts::push_button::{PushButton, Pushed};
 use ld60_game_parts::toggle::Toggle;
 use ld60_game_player::cursor::WantsFinger;
 use ld60_game_player::focus::{Focus, FocusTarget, Focused, View};
+use ld60_game_run::job::HeldJobs;
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use ld60_locale::Locale;
 use ld60_tick::Effect;
 
+use self::customer::WatchJob;
 pub(crate) use self::datasheet::Datasheet;
 pub(crate) use self::flyer::Flyer;
 use self::layout::{CASE, MOVEMENT, PLATE_COLOR};
 use self::movement::Hand;
-pub(crate) use self::parcel::Parcel;
 
 /// Instructions a second while running. Fast enough that a program
 /// without a wait spins the hand.
@@ -60,7 +63,11 @@ impl Plugin for TrainerPlugin {
         .add_observer(Datasheet::on_add)
         .add_observer(Flyer::on_add)
         .add_observer(Trainer::push);
-        Parcel::register(app);
+        // The watch job replaces the old first jobs for now.
+        app.init_resource::<HeldJobs>();
+        WatchJob::register(app);
+        #[cfg(feature = "debug_port")]
+        command::register(app);
     }
 }
 
@@ -302,6 +309,9 @@ impl Trainer {
                     {
                         led.on = false;
                     }
+                    if let Ok(mut visibility) = mounts.get_mut(part) {
+                        visibility.set_if_neq(Visibility::Hidden);
+                    }
                 }
                 continue;
             };
@@ -340,6 +350,12 @@ impl Trainer {
         movement.power_on();
         self.movement = Some(movement);
         self.until_tick = TICK;
+    }
+
+    /// Takes the movement off the panel, if one stands on it.
+    pub(crate) fn take(&mut self) -> Option<Movement> {
+        self.erasing = None;
+        self.movement.take()
     }
 
     /// The controls of the focused panel take clicks.
@@ -382,7 +398,9 @@ mod tests {
                 "panel-step",
                 "click-datasheet",
                 "click-flyer",
-                "click-mount-movement",
+                "click-take-movement",
+                "click-take-flyer",
+                "click-hand-back",
                 "tick-sheet-title",
                 "tick-sheet-revision",
                 "tick-sheet-word",

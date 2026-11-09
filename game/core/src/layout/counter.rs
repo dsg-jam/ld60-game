@@ -27,6 +27,8 @@ const LOOK_SPOT: Vec2 = Vec2::new(0.0, -0.5);
 /// Stools stand this far in front of the counter, at these X positions.
 const STOOL_DISTANCE: f32 = 0.35;
 const STOOLS: [f32; 2] = [-0.55, 0.55];
+/// How high the seats of the stools are.
+pub const STOOL_HEIGHT: f32 = 0.75;
 
 /// Geometry of the counter in its own space.
 pub struct CounterLayout {
