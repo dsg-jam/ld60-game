@@ -15,6 +15,7 @@ ticket-chip-calco = CalCo rev { $revision }, date code { $date-code }
 ticket-rom-blank = EPROM, blank in stock
 ticket-rom-no-blank = EPROM, no blank. Burn over it.
 ticket-rom-mask = Mask ROM, cannot be burned
+ticket-rom-ram = Battery memory, rewritable
 
 ticket-complaint = COMPLAINT
 ticket-complaint-visit = { $story } { $complaint }

@@ -184,6 +184,7 @@ impl JobTicket {
             (RomKind::Eprom, true) => "ticket-rom-blank",
             (RomKind::Eprom, false) => "ticket-rom-no-blank",
             (RomKind::Mask, _) => "ticket-rom-mask",
+            (RomKind::Ram, _) => "ticket-rom-ram",
         };
 
         page.spawn(Paper::title(Message::new("ticket-title")));

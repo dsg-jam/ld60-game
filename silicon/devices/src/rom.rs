@@ -7,6 +7,8 @@ use crate::ProgramError;
 pub enum RomKind {
     Mask,
     Eprom,
+    /// Memory the battery keeps. Any bit can be written either way.
+    Ram,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,7 +42,7 @@ impl Rom {
             .words()
             .iter()
             .zip(wanted.words())
-            .position(|(&current, &new)| !can_program(current, new));
+            .position(|(&current, &new)| !self.can_write(current, new));
         match conflict {
             Some(addr) => Err(ProgramError::BitConflict { addr }),
             None => {
@@ -50,13 +52,13 @@ impl Rom {
         }
     }
 
-    /// Programs one word, which can only clear bits.
+    /// Programs one word. In an EPROM, that can only clear bits.
     pub fn program_word(&mut self, addr: usize, wanted: u16) -> Result<(), ProgramError> {
         if self.kind == RomKind::Mask {
             return Err(ProgramError::MaskRom);
         }
         let wanted = wanted & self.image.mask();
-        if !can_program(self.image.get(addr), wanted) {
+        if !self.can_write(self.image.get(addr), wanted) {
             return Err(ProgramError::BitConflict { addr });
         }
         self.image.set(addr, wanted);
@@ -74,6 +76,12 @@ impl Rom {
     /// Sets bits to 1, as UV light does over time.
     pub fn fade(&mut self, addr: usize, mask: u16) {
         self.image.set(addr, self.image.get(addr) | mask);
+    }
+}
+
+impl Rom {
+    fn can_write(&self, current: u16, wanted: u16) -> bool {
+        self.kind == RomKind::Ram || can_program(current, wanted)
     }
 }
 

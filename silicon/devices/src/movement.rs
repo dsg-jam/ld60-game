@@ -20,9 +20,14 @@ pub struct Movement {
 }
 
 impl Movement {
-    /// A movement with an erased EPROM.
+    /// A movement with blank memory. Revision A keeps its program in
+    /// memory the battery keeps, later ones in an EPROM.
     pub fn blank(revision: Revision) -> Self {
-        let rom = Rom::new(RomKind::Eprom, Image::blank(revision.rom_len(), WORD_BITS));
+        let kind = match revision {
+            Revision::A => RomKind::Ram,
+            Revision::B => RomKind::Eprom,
+        };
+        let rom = Rom::new(kind, Image::blank(revision.rom_len(), WORD_BITS));
         Self {
             cpu: Cpu::new(revision),
             rom,
@@ -119,8 +124,17 @@ mod tests {
     }
 
     #[test]
-    fn a_programmed_word_needs_an_erase_to_change() {
+    fn the_first_chip_rewrites_any_word() {
         let mut movement = Movement::blank(Revision::A);
+        let rom = movement.rom_mut();
+        rom.program_word(0, u16::from(Op::STEP)).unwrap();
+        rom.program_word(0, u16::from(Op::WAIT)).unwrap();
+        assert_eq!(rom.image().get(0), u16::from(Op::WAIT));
+    }
+
+    #[test]
+    fn a_programmed_word_needs_an_erase_to_change() {
+        let mut movement = Movement::blank(Revision::B);
         let rom = movement.rom_mut();
         rom.program_word(0, u16::from(Op::STEP)).unwrap();
         assert!(rom.program_word(0, u16::from(Op::WAIT)).is_err());
