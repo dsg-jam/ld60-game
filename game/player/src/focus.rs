@@ -202,7 +202,7 @@ impl FocusTarget {
 
     fn focus_on_press(
         mut press: On<PointerPress>,
-        targets: Query<(), With<FocusTarget>>,
+        targets: Query<(), (With<FocusTarget>, Without<Disabled>)>,
         state: Res<State<Focus>>,
         mut commands: Commands,
     ) {

@@ -61,6 +61,19 @@ impl Monitor {
         }
     }
 
+    /// The outline of the monitor seen from above, in x and z, and the
+    /// height of its top.
+    pub(super) fn outline(&self) -> (Rect, f32) {
+        let front = self.bezel[0].max().z.max(self.glass.max().z + GLASS_BULGE);
+        let outline = Rect::new(
+            self.body.min().x,
+            self.neck.min().z,
+            self.body.max().x,
+            front,
+        );
+        (outline, self.body.max().y)
+    }
+
     /// Spawns the monitor and returns it. `glass` is the screen surface,
     /// placed onto the glass bounds.
     pub(super) fn spawn(

@@ -1,7 +1,7 @@
 //! Cloth covered boards, like the covers of a file, and the strips where
 //! they bend into each other.
 
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, TAU};
 
 use bevy::{asset::RenderAssetUsages, mesh::Indices, prelude::*, render::mesh::PrimitiveTopology};
 
@@ -32,6 +32,60 @@ impl Builder {
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, self.normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
         .with_inserted_indices(Indices::U32(self.indices))
+    }
+}
+
+/// How a sheet of cloth falls over a box, see [`drape`].
+#[derive(Clone, Copy, Debug)]
+pub struct Drape {
+    /// The top of the box in x and z.
+    pub top: Rect,
+    /// The height of the top above the ground.
+    pub height: f32,
+    /// How far the cloth lies on the ground past the foot of each side.
+    /// Below zero, the hem hangs this far above the ground.
+    pub pool: f32,
+    /// Radius the cloth rolls over the edges of the top with.
+    pub roll: f32,
+    /// Depth and length of the folds down the sides.
+    pub folds: Vec2,
+    /// Grid cells along each side of the sheet.
+    pub cells: u32,
+}
+
+impl Drape {
+    /// Where the point `flat` of the sheet, laid out flat over the top,
+    /// ends up.
+    fn fall(&self, flat: Vec2) -> Vec3 {
+        let edge = flat.clamp(self.top.min, self.top.max);
+        let off = flat - edge;
+        let past = off.length();
+        if past == 0.0 {
+            return edge.extend(self.height).xzy();
+        }
+        let out = off / past;
+        let quarter = FRAC_PI_2 * self.roll;
+        if past < quarter {
+            let angle = past / self.roll;
+            let at = edge + out * self.roll * angle.sin();
+            return Vec3::new(at.x, self.height - self.roll * (1.0 - angle.cos()), at.y);
+        }
+        let down = past - quarter;
+        // Folds run down the side and grow towards the ground. They only
+        // bulge out, so the cloth never dips into the box.
+        let along = flat.dot(out.perp());
+        let deep = (down / self.height).clamp(0.0, 1.0);
+        let wave = |length: f32, phase: f32| 0.5 + 0.5 * (TAU * along / length + phase).sin();
+        let fold = self.folds.x
+            * deep
+            * (0.7 * wave(self.folds.y, 0.0) + 0.3 * wave(0.37 * self.folds.y, 1.3));
+        let mut at = edge + out * (self.roll + fold);
+        let mut y = self.height - self.roll - down;
+        if y < 0.0 {
+            at += out * -y;
+            y = 0.0;
+        }
+        Vec3::new(at.x, y, at.y)
     }
 }
 
@@ -125,6 +179,45 @@ pub fn hinge(from: f32, to: f32, radius: f32, length: f32) -> Mesh {
         }
     }
     builder.build()
+}
+
+/// A square sheet of cloth thrown over a box standing on the ground at
+/// y = 0. It lies flat on the top, rolls over the edges, hangs down the
+/// sides in folds that deepen towards the ground, and lies on the ground
+/// around the foot. The UVs are the flat sheet in meters.
+pub fn drape(drape: &Drape) -> Mesh {
+    let reach = drape.height + drape.pool;
+    let sheet = Rect::from_corners(
+        drape.top.min - Vec2::splat(reach),
+        drape.top.max + Vec2::splat(reach),
+    );
+    let cells = drape.cells;
+    let mut positions = Vec::new();
+    let mut uvs = Vec::new();
+    for row in 0..=cells {
+        for column in 0..=cells {
+            let flat = sheet.min + sheet.size() * UVec2::new(column, row).as_vec2() / cells as f32;
+            positions.push(drape.fall(flat));
+            uvs.push(flat - sheet.min);
+        }
+    }
+    let mut indices = Vec::new();
+    let stride = cells + 1;
+    for row in 0..cells {
+        for column in 0..cells {
+            let corner = row * stride + column;
+            indices.extend([corner, corner + stride, corner + 1]);
+            indices.extend([corner + 1, corner + stride, corner + stride + 1]);
+        }
+    }
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(Indices::U32(indices))
+    .with_computed_smooth_normals()
 }
 
 #[cfg(test)]

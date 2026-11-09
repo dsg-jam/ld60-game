@@ -34,6 +34,8 @@ impl Plugin for CrtLightPlugin {
 pub struct CrtLight {
     /// Width and height of the picture.
     pub size: Vec2,
+    /// Casts no light, as when the screen is covered.
+    pub dark: bool,
 }
 
 /// When a [`CrtLight`] next looks at the screen, and its light.
@@ -75,13 +77,25 @@ impl CrtLight {
     /// surroundings with it.
     fn sample(
         time: Res<Time>,
-        mut glasses: Query<(&mut Sampling, &MeshMaterial3d<CrtMaterial>)>,
+        mut glasses: Query<(
+            Entity,
+            &CrtLight,
+            &mut Sampling,
+            &MeshMaterial3d<CrtMaterial>,
+        )>,
+        mut lights: Query<&mut RectLight>,
         materials: Res<Assets<CrtMaterial>>,
         images: Res<Assets<Image>>,
         mut commands: Commands,
     ) {
-        for (mut sampling, material) in &mut glasses {
+        for (entity, glass, mut sampling, material) in &mut glasses {
             if !sampling.timer.tick(time.delta()).just_finished() {
+                continue;
+            }
+            if glass.dark {
+                if let Ok(mut rect) = lights.get_mut(sampling.light) {
+                    rect.intensity = 0.0;
+                }
                 continue;
             }
             let Some(material) = materials.get(material) else {
@@ -100,9 +114,11 @@ impl CrtLight {
                 .spawn(ReadbackOnce::texture(material.screen.clone()))
                 .observe(
                     move |done: On<ReadbackComplete>,
+                          glasses: Query<&CrtLight>,
                           mut lights: Query<&mut RectLight>,
                           mut commands: Commands| {
-                        if let Ok(mut rect) = lights.get_mut(light) {
+                        let dark = glasses.get(entity).is_ok_and(|glass| glass.dark);
+                        if !dark && let Ok(mut rect) = lights.get_mut(light) {
                             Self::shine(&mut rect, Self::average(&done.data, size));
                         }
                         // Bevy only takes the readback off the entity.

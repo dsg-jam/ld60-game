@@ -1,3 +1,4 @@
+mod cover;
 mod editor;
 mod keyboard;
 mod monitor;
@@ -16,6 +17,7 @@ use ld60_game_player::hints::Hints;
 use ld60_game_run::tutorial::FirstNote;
 use ld60_geometry::block::Block;
 
+pub use self::cover::DustCover;
 use self::editor::Editor;
 use self::keyboard::{Keyboard, KeyboardKey};
 use self::monitor::Monitor;
@@ -45,7 +47,7 @@ pub struct ComputerPlugin;
 
 impl Plugin for ComputerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((editor::EditorPlugin, views::ViewsPlugin))
+        app.add_plugins((cover::CoverPlugin, editor::EditorPlugin, views::ViewsPlugin))
             .add_systems(OnEnter(Focus::Computer), Computer::activate::<true>)
             .add_systems(
                 OnExit(Focus::Computer),
@@ -151,6 +153,7 @@ impl Computer {
                         MeshMaterial3d(crt_materials.add(CrtMaterial::new(&canvas))),
                         CrtLight {
                             size: monitor::GLASS_SIZE,
+                            dark: false,
                         },
                     ),
                 );
@@ -166,7 +169,7 @@ impl Computer {
 
 /// The glass of the computer's monitor.
 #[derive(Component)]
-struct ComputerScreen;
+pub(crate) struct ComputerScreen;
 
 /// Geometry of a [`Computer`] in its own space.
 pub struct ComputerLayout {
