@@ -42,6 +42,14 @@ impl Movement {
         })
     }
 
+    /// The same movement with its hand stopped at `mark`.
+    pub fn stopped_at(self, mark: u8) -> Self {
+        Self {
+            hand: mark % MARKS,
+            ..self
+        }
+    }
+
     pub fn cpu(&self) -> &Cpu {
         &self.cpu
     }
@@ -73,10 +81,10 @@ impl Movement {
         effect
     }
 
-    /// Starts from the top with the chip reset, as when a battery goes in.
+    /// Resets the chip, as when a battery goes in. The hand stays where it
+    /// stopped.
     pub fn power_on(&mut self) {
         self.cpu.reset();
-        self.hand = 0;
     }
 
     pub fn tick(&mut self) {
