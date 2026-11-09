@@ -10,11 +10,17 @@ readme = { workspace = true }
 publish = { workspace = true }
 
 [features]
-serde = ["dep:serde", "ld60-calco/serde", "ld60-machine/serde"]
+serde = [
+  "dep:serde",
+  "ld60-calco/serde",
+  "ld60-machine/serde",
+  "ld60-tick/serde",
+]
 
 [dependencies]
 ld60-calco = { workspace = true }
 ld60-machine = { workspace = true }
+ld60-tick = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 
 [lints]

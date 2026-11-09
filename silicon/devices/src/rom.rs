@@ -50,6 +50,19 @@ impl Rom {
         }
     }
 
+    /// Programs one word, which can only clear bits.
+    pub fn program_word(&mut self, addr: usize, wanted: u16) -> Result<(), ProgramError> {
+        if self.kind == RomKind::Mask {
+            return Err(ProgramError::MaskRom);
+        }
+        let wanted = wanted & self.image.mask();
+        if !can_program(self.image.get(addr), wanted) {
+            return Err(ProgramError::BitConflict { addr });
+        }
+        self.image.set(addr, wanted);
+        Ok(())
+    }
+
     pub fn erase(&mut self) -> Result<(), ProgramError> {
         if self.kind == RomKind::Mask {
             return Err(ProgramError::MaskRom);

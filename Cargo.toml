@@ -23,6 +23,7 @@ members = [
   "silicon/devices",
   "silicon/dsl",
   "silicon/machine",
+  "silicon/tick",
 ]
 
 [workspace.package]
@@ -55,6 +56,7 @@ ld60-geometry = { path = "game/geometry" }
 ld60-levels = { path = "game/levels" }
 ld60-locale = { path = "game/locale" }
 ld60-machine = { path = "silicon/machine" }
+ld60-tick = { path = "silicon/tick" }
 ld60-store = { path = "game/store" }
 
 bevy = { version = "0.20.0", default-features = false }

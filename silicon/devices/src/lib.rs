@@ -1,5 +1,5 @@
 //! Devices that run firmware on an emulated chip, like the Summa6 adding
-//! machine.
+//! machine or a watch movement.
 //!
 //! # Features
 //!
@@ -15,6 +15,7 @@ mod error;
 mod fault;
 mod isa_kind;
 mod line_test;
+mod movement;
 mod readout;
 mod rng;
 mod rom;
@@ -28,5 +29,6 @@ pub use error::{DeviceError, ProgramError, RunError, UnknownBoardRev, UnknownDev
 pub use fault::Fault;
 pub use isa_kind::IsaKind;
 pub use line_test::LineTest;
+pub use movement::{MARKS, Movement};
 pub use readout::Readout;
 pub use rom::{Rom, RomKind, can_program};
