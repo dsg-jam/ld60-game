@@ -5,9 +5,8 @@ use ld60_locale::{Locale, Message};
 use super::{Control, Lamp};
 
 pub(super) const CASE: Vec3 = Vec3::new(0.24, 0.03, 0.16);
-/// Where things stand on the top of the case, from its middle, +Y towards
-/// the front.
-pub(super) const MOVEMENT: Vec2 = Vec2::new(-0.06, -0.025);
+/// Rows of things on the top of the case, from its middle, +Y towards the
+/// front.
 const ADDRESS_ROW: f32 = -0.05;
 const DATA_ROW: f32 = -0.015;
 const SWITCH_ROW: f32 = 0.015;

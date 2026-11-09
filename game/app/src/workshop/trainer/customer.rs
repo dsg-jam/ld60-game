@@ -2,19 +2,25 @@ use bevy::{
     picking::{events::PointerPress, pointer::PointerButton},
     prelude::*,
 };
+use ld60_devices::MARKS;
 use ld60_devices::{Movement, Wanted};
 use ld60_game_audio::{Play, Sound};
-use ld60_game_city::{Ask, Left, Summon, Visitor};
+use ld60_game_city::{Ask, CallOff, Left, Summon, Visitor};
 #[cfg(feature = "debug_port")]
 use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
 use ld60_game_core::layout::counter::{CounterLayout, STOOL_HEIGHT};
 use ld60_game_core::state::AppState;
+use ld60_game_device::Holdable;
 use ld60_game_player::camera::PlayerCamera;
-use ld60_game_player::focus::{Clickable, Focus, FocusOn};
+use ld60_game_player::focus::{Clickable, Focus, FocusOn, FocusTarget};
+use ld60_game_player::hints::Hints;
 use ld60_game_run::{Leftover, NewRun, Run};
 use ld60_tick::Revision;
+use rand::rngs::SmallRng;
+use rand::{RngExt, SeedableRng};
 
-use super::{Flyer, Mount, Trainer, movement, sheet};
+use super::super::delivery::{DEVICE_SPOT, DEVICE_YAW};
+use super::{Datasheet, Flyer, Trainer, movement, sheet};
 
 /// Seconds to look around after the shop opens, before the customer comes.
 const SETTLE: f32 = 5.0;
@@ -34,21 +40,27 @@ const GIVE_UP: f32 = 10.0;
 const JUDGE_FOR: f32 = 4.0;
 const FEE: u32 = 3;
 /// The player looks at someone when the view is this many radians from
-/// its face at most, standing and seated. Faces are this high.
+/// its head at most, standing and seated.
 const LOOK_CONE: f32 = 0.3;
 const SEATED_CONE: f32 = 0.15;
-const FACE: f32 = 1.6;
-const SEATED_FACE: f32 = 1.4;
 /// The customer stands this far along the counter and this far in front
 /// of it, and holds things out this high above the top and this far over
 /// it.
 const STAND_X: f32 = 0.08;
-const STAND_BACK: f32 = 0.36;
+const STAND_BACK: f32 = 0.22;
 const HOLD_UP: f32 = 0.28;
-const HOLD_OVER: f32 = 0.16;
-/// Where the flyer lies once taken, on the mat.
-const FLYER_SPOT: Vec2 = Vec2::new(-0.3, -0.45);
+const HOLD_OVER: f32 = 0.4;
+/// Things are held out on the side of the hand that holds them, clear of
+/// the head.
+const HOLD_ASIDE: f32 = 0.15;
+/// Where the flyer and the datasheet lie once taken, on the mat.
+const FLYER_SPOT: Vec2 = Vec2::new(-0.65, 0.3);
 const FLYER_YAW: f32 = 0.1;
+const DATASHEET_SPOT: Vec2 = Vec2::new(0.75, 0.35);
+const DATASHEET_YAW: f32 = -0.15;
+/// In the customer's hand, the movement lies on the datasheet, this far
+/// off its middle.
+const ON_DATASHEET: Vec3 = Vec3::new(0.02, 0.001, 0.0);
 
 /// A regular brings a bare watch movement for the first job of a run,
 /// hands it over and then the flyer of what it should do, and waits on a
@@ -60,10 +72,13 @@ pub(super) struct WatchJob {
     /// Seconds since the step began, and of being looked at in it.
     clock: f32,
     looked: f32,
-    /// The movement while it is not on the panel.
+    /// The movement while the panel does not work on it.
     brought: Option<Movement>,
-    /// The movement as it shows in the customer's hand, and the flyer.
+    /// The datasheet with the movement model on it, as the customer
+    /// brings them, the model, the datasheet and the flyer.
+    bundle: Entity,
     movement: Entity,
+    datasheet: Entity,
     flyer: Entity,
 }
 
@@ -90,7 +105,7 @@ enum Step {
     Done,
 }
 
-/// The movement, flyer or panel the customer offers or wants now.
+/// The movement, datasheet or flyer the customer offers or wants now.
 #[derive(Component, Debug)]
 struct Offered;
 
@@ -125,19 +140,33 @@ impl WatchJob {
         );
     }
 
-    /// Each run starts with this job.
-    fn open(jobs: Query<(), With<WatchJob>>, mut commands: Commands) {
+    /// Each run starts with this job. The movement comes with its hand
+    /// stopped wherever it stopped.
+    fn open(jobs: Query<(), With<WatchJob>>, run: Res<Run>, mut commands: Commands) {
         if !jobs.is_empty() {
             return;
         }
+        let stopped = SmallRng::seed_from_u64(run.seed()).random_range(1..MARKS);
         let movement = commands
             .spawn((
                 Name::new("brought movement"),
                 Leftover,
+                Transform::from_translation(ON_DATASHEET),
+                Visibility::default(),
+            ))
+            .with_children(movement::spawn(stopped))
+            .id();
+        let datasheet = commands
+            .spawn((Name::new("tick datasheet"), Leftover, Datasheet))
+            .id();
+        let bundle = commands
+            .spawn((
+                Name::new("brought bundle"),
+                Leftover,
                 Transform::from_xyz(0.0, -10.0, 0.0),
                 Visibility::default(),
             ))
-            .with_children(movement::spawn)
+            .add_children(&[datasheet, movement])
             .id();
         let flyer = commands
             .spawn((
@@ -154,22 +183,22 @@ impl WatchJob {
                 step: Step::Settle,
                 clock: 0.0,
                 looked: 0.0,
-                brought: Some(Movement::blank(Revision::A)),
+                brought: Some(Movement::blank(Revision::A).stopped_at(stopped)),
+                bundle,
                 movement,
+                datasheet,
                 flyer,
             },
         ));
     }
 
     /// Moves the job on as the customer and the player go.
-    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn follow(
         time: Res<Time>,
         focus: Res<State<Focus>>,
         camera: Single<&GlobalTransform, With<PlayerCamera>>,
         mut jobs: Query<(Entity, &mut WatchJob)>,
-        mut visitors: Query<(&mut Visitor, &GlobalTransform)>,
-        mounts: Query<Entity, With<Mount>>,
+        mut visitors: Query<&mut Visitor>,
         mut run: ResMut<Run>,
         mut commands: Commands,
     ) {
@@ -181,25 +210,25 @@ impl WatchJob {
                     commands.trigger(Summon {
                         errand,
                         stand: Self::stand(),
-                        carrying: job.movement,
+                        carrying: job.bundle,
                     });
                     job.go(Step::Coming);
                 }
                 continue;
             }
-            let Some((mut visitor, placed)) = visitors
-                .iter_mut()
-                .find(|(visitor, _)| visitor.errand == errand)
+            let Some(mut visitor) = visitors.iter_mut().find(|visitor| visitor.errand == errand)
             else {
                 continue;
             };
-            let (face, cone) = if visitor.seated() {
-                (SEATED_FACE, SEATED_CONE)
+            let cone = if visitor.seated() {
+                SEATED_CONE
             } else {
-                (FACE, LOOK_CONE)
+                LOOK_CONE
             };
-            let face = placed.translation() + Vec3::Y * face;
+            let face = visitor.head();
+            // Only from inside the shop, where the customer faces.
             let seen = *focus.get() == Focus::Desk
+                && camera.translation().z > face.z
                 && camera.forward().angle_between(face - camera.translation()) < cone;
             job.looked = if seen { job.looked + dt } else { 0.0 };
             let urge = job.clock > URGE_AFTER;
@@ -221,7 +250,7 @@ impl WatchJob {
                         Ask::Wait
                     };
                     if job.looked > SEEN_AFTER {
-                        Self::offer(&mut commands, job.movement, "click-take-movement");
+                        Self::offer(&mut commands, job.bundle, "click-take-movement");
                         job.go(Step::Offering);
                     }
                 }
@@ -244,9 +273,11 @@ impl WatchJob {
                 Step::Watching => {
                     visitor.ask = Self::sit();
                     if visitor.seated() && job.looked > COME_AFTER {
-                        for mount in &mounts {
-                            Self::offer(&mut commands, mount, "click-hand-back");
-                        }
+                        // The movement can't be picked up while it is wanted.
+                        commands
+                            .entity(job.movement)
+                            .remove::<(Holdable, FocusTarget, Hints)>();
+                        Self::offer(&mut commands, job.movement, "click-hand-back");
                         job.go(Step::Collecting);
                     }
                 }
@@ -256,9 +287,8 @@ impl WatchJob {
                         urge: false,
                     };
                     if job.clock > GIVE_UP {
-                        for mount in &mounts {
-                            Self::withdraw(&mut commands, mount);
-                        }
+                        Self::withdraw(&mut commands, job.movement);
+                        commands.entity(job.movement).insert(Holdable::default());
                         job.go(Step::Watching);
                     }
                 }
@@ -320,7 +350,6 @@ impl WatchJob {
         mut jobs: Query<(Entity, &mut WatchJob)>,
         mut visitors: Query<&mut Visitor>,
         mut trainers: Query<(Entity, &mut Trainer)>,
-        mounts: Query<(), With<Mount>>,
         mut commands: Commands,
     ) {
         let entity = hand_over.entity;
@@ -334,41 +363,55 @@ impl WatchJob {
             return;
         };
         Self::withdraw(&mut commands, entity);
+        let counter = CounterLayout::new();
         match job.step {
-            Step::Offering | Step::Returning if entity == job.movement => {
-                if let Some(movement) = job.brought.take() {
-                    trainer.mount(movement);
-                }
-                visitor.carrying = None;
-                commands.entity(job.movement).insert(Visibility::Hidden);
-                commands.trigger(Play(Sound::PlugIn));
+            Step::Offering if entity == job.bundle => {
+                commands.entity(job.datasheet).remove::<ChildOf>().insert((
+                    counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
+                    sheet::reading("click-datasheet"),
+                ));
+                commands.entity(job.movement).remove::<ChildOf>();
+                commands.entity(job.bundle).despawn();
+                job.put_down(&mut visitor, &mut trainer, &mut commands);
                 commands.trigger(FocusOn { entity: panel });
-                let next = if job.step == Step::Offering {
-                    Step::Trying
-                } else {
-                    Step::Watching
-                };
-                job.go(next);
+                job.go(Step::Trying);
+            }
+            Step::Returning if entity == job.movement => {
+                job.put_down(&mut visitor, &mut trainer, &mut commands);
+                job.go(Step::Watching);
             }
             Step::OfferingFlyer if entity == job.flyer => {
                 visitor.carrying = None;
-                let on_mat = CounterLayout::new().place_on_mat(FLYER_SPOT, FLYER_YAW);
-                commands
-                    .entity(job.flyer)
-                    .insert((on_mat, sheet::reading("click-flyer")));
+                commands.entity(job.flyer).insert((
+                    counter.place_on_mat(FLYER_SPOT, FLYER_YAW),
+                    sheet::reading("click-flyer"),
+                ));
                 commands.trigger(Play(Sound::PageSlide));
                 commands.trigger(FocusOn { entity: job.flyer });
                 job.go(Step::Watching);
             }
-            Step::Collecting if mounts.contains(entity) => {
+            Step::Collecting if entity == job.movement => {
                 job.brought = trainer.take();
                 visitor.carrying = Some(job.movement);
-                commands.entity(job.movement).insert(Visibility::Inherited);
                 commands.trigger(Play(Sound::PlugOut));
                 job.go(Step::Judging);
             }
             _ => {}
         }
+    }
+
+    /// Takes the movement from the customer and puts it down where devices
+    /// go, for the panel to work on and the player to pick up.
+    fn put_down(&mut self, visitor: &mut Visitor, trainer: &mut Trainer, commands: &mut Commands) {
+        visitor.carrying = None;
+        if let Some(movement) = self.brought.take() {
+            trainer.mount(movement, self.movement);
+        }
+        commands.entity(self.movement).insert((
+            CounterLayout::new().place(DEVICE_SPOT, DEVICE_YAW),
+            Holdable::default(),
+        ));
+        commands.trigger(Play(Sound::PlugIn));
     }
 
     /// Once the customer is out of sight, so is the movement it took.
@@ -382,12 +425,12 @@ impl WatchJob {
     /// to start over.
     fn restart(
         _: On<NewRun>,
-        mut visitors: Query<&mut Visitor>,
+        jobs: Query<Entity, With<WatchJob>>,
         mut trainers: Query<&mut Trainer>,
+        mut commands: Commands,
     ) {
-        for mut visitor in &mut visitors {
-            visitor.carrying = None;
-            visitor.ask = Ask::Leave;
+        for errand in &jobs {
+            commands.trigger(CallOff { errand });
         }
         for mut trainer in &mut trainers {
             trainer.take();
@@ -412,7 +455,7 @@ impl WatchJob {
     fn hold_out() -> Vec3 {
         let top = CounterLayout::new().top;
         Vec3::new(
-            STAND_X / 2.0,
+            STAND_X + HOLD_ASIDE,
             top.max().y + HOLD_UP,
             top.min().z + HOLD_OVER,
         )

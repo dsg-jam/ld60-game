@@ -106,8 +106,5 @@ impl Datasheet {
             &mut meshes,
             &mut materials,
         );
-        commands
-            .entity(add.entity)
-            .insert(super::sheet::reading("click-datasheet"));
     }
 }

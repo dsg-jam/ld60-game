@@ -38,8 +38,12 @@ impl Hand {
 }
 
 /// Spawns a bare watch movement lying dial up on posts, centered on the
-/// origin.
-pub(super) fn spawn(parent: &mut ChildSpawnerCommands) {
+/// origin, with its hand at `mark`.
+pub(super) fn spawn(mark: u8) -> impl FnOnce(&mut ChildSpawnerCommands) {
+    move |parent| spawn_at(parent, mark)
+}
+
+fn spawn_at(parent: &mut ChildSpawnerCommands, mark: u8) {
     for index in 0..3 {
         let angle = TAU * index as f32 / 3.0 + 0.5;
         let at = Vec3::new(angle.cos(), 0.0, angle.sin()) * (PLATE.x - 0.006);
@@ -55,8 +59,8 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands) {
     let dial = Block::new(Vec3::new(2.0 * DIAL.x, DIAL.y, 2.0 * DIAL.x)).translated(Vec3::Y * face);
     parent.spawn((Shape::cylinder(&dial, ENAMEL), Finish::Ceramic));
     let face = dial.max().y;
-    for mark in 0..MARKS {
-        let length = if mark == 0 { 2.0 * MARK.z } else { MARK.z };
+    for index in 0..MARKS {
+        let length = if index == 0 { 2.0 * MARK.z } else { MARK.z };
         let block = Block::new(MARK.with_z(length)).translated(Vec3::new(
             0.0,
             face,
@@ -64,7 +68,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands) {
         ));
         parent
             .spawn((
-                Transform::from_rotation(Hand::at(mark)),
+                Transform::from_rotation(Hand::at(index)),
                 Visibility::default(),
             ))
             .with_children(|turned| {
@@ -76,7 +80,7 @@ pub(super) fn spawn(parent: &mut ChildSpawnerCommands) {
     parent
         .spawn((
             Hand,
-            Transform::from_xyz(0.0, face + 0.0004, 0.0),
+            Transform::from_xyz(0.0, face + 0.0004, 0.0).with_rotation(Hand::at(mark)),
             Visibility::default(),
         ))
         .with_children(|pivot| {
