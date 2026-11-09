@@ -17,23 +17,92 @@ const MARK_RADIUS: f32 = 0.028;
 const HAND: Vec3 = Vec3::new(0.0016, 0.0006, 0.029);
 const TAIL: f32 = 0.006;
 const CAP: Vec2 = Vec2::new(0.0025, 0.0016);
-/// The chip on the side of the plate.
+/// A small board sticks out of the plate at mark 0, with the chip on it
+/// and the socket for the panel's cable at its end.
+const BOARD: Vec3 = Vec3::new(0.02, 0.0016, 0.03);
 const CHIP: Vec3 = Vec3::new(0.012, 0.003, 0.008);
+const SOCKET: Vec3 = Vec3::new(0.014, 0.004, 0.005);
+/// The hand swings to a new mark like a spring this stiff and this damped,
+/// a little past it and back.
+const STIFFNESS: f32 = 2500.0;
+const DAMPING: f32 = 45.0;
+const SUBSTEPS: usize = 4;
 
 const BRASS: Color = Color::srgb_u8(0xb0, 0x8a, 0x48);
 const ENAMEL: Color = Color::srgb_u8(0xee, 0xe8, 0xd8);
 const INK: Color = Color::srgb_u8(0x1a, 0x1a, 0x1c);
 const BLUED: Color = Color::srgb_u8(0x1c, 0x24, 0x48);
 const CHIP_BLACK: Color = Color::srgb_u8(0x22, 0x22, 0x24);
+const BOARD_GREEN: Color = Color::srgb_u8(0x2c, 0x5a, 0x3c);
+
+/// Where the panel's cable plugs in, in the movement's space, and the way
+/// it leaves.
+pub(super) const CABLE_PLUG: Vec3 = Vec3::new(
+    0.0,
+    POST.y + PLATE.y / 2.0 + SOCKET.y / 2.0,
+    -PLATE.x - BOARD.z + 0.008 - SOCKET.z,
+);
 
 /// The hand of the movement, turning about +Y. It points at `-Z` at mark 0
-/// and goes clockwise seen from above.
+/// and goes clockwise seen from above. It swings over to its mark, always
+/// forwards.
 #[derive(Component, Debug)]
-pub(super) struct Hand;
+pub(super) struct Hand {
+    mark: u8,
+    /// Its turn now and where it swings to, in radians, and how fast it
+    /// turns.
+    angle: f32,
+    goal: f32,
+    speed: f32,
+}
 
 impl Hand {
-    pub(super) fn at(mark: u8) -> Quat {
-        Quat::from_rotation_y(-TAU * f32::from(mark) / f32::from(MARKS))
+    fn new(mark: u8) -> Self {
+        let angle = Self::turn(mark);
+        Self {
+            mark,
+            angle,
+            goal: angle,
+            speed: 0.0,
+        }
+    }
+
+    fn turn(mark: u8) -> f32 {
+        -TAU * f32::from(mark) / f32::from(MARKS)
+    }
+
+    fn at(mark: u8) -> Quat {
+        Quat::from_rotation_y(Self::turn(mark))
+    }
+
+    /// Moves on to `mark`. Returns whether it moved.
+    pub(super) fn go_to(&mut self, mark: u8) -> bool {
+        if mark == self.mark {
+            return false;
+        }
+        let marks = (mark + MARKS - self.mark) % MARKS;
+        self.goal += Self::turn(marks);
+        self.mark = mark;
+        true
+    }
+
+    pub(super) fn swing(time: Res<Time>, mut hands: Query<(&mut Hand, &mut Transform)>) {
+        let dt = time.delta_secs() / SUBSTEPS as f32;
+        for (mut hand, mut transform) in &mut hands {
+            if hand.speed == 0.0 && hand.angle == hand.goal {
+                continue;
+            }
+            for _ in 0..SUBSTEPS {
+                let pull = STIFFNESS * (hand.goal - hand.angle) - DAMPING * hand.speed;
+                hand.speed += pull * dt;
+                hand.angle += hand.speed * dt;
+            }
+            if (hand.goal - hand.angle).abs() < 1e-4 && hand.speed.abs() < 1e-3 {
+                hand.angle = hand.goal;
+                hand.speed = 0.0;
+            }
+            transform.rotation = Quat::from_rotation_y(hand.angle);
+        }
     }
 }
 
@@ -53,8 +122,20 @@ fn spawn_at(parent: &mut ChildSpawnerCommands, mark: u8) {
     let plate =
         Block::new(Vec3::new(2.0 * PLATE.x, PLATE.y, 2.0 * PLATE.x)).translated(Vec3::Y * POST.y);
     parent.spawn((Shape::cylinder(&plate, BRASS), Finish::Plated));
-    let chip = Block::new(CHIP).translated(Vec3::new(PLATE.x * 0.55, POST.y - CHIP.y, PLATE.x));
+    let board = Block::new(BOARD).translated(Vec3::new(
+        0.0,
+        POST.y + PLATE.y / 2.0 - BOARD.y / 2.0,
+        -PLATE.x - BOARD.z / 2.0 + 0.008,
+    ));
+    parent.spawn((Shape::cuboid(&board, BOARD_GREEN), Finish::Plastic));
+    let chip = Block::new(CHIP)
+        .translated(Vec3::new(0.0, 0.0, -PLATE.x - 0.004))
+        .on_top_of(&board);
     parent.spawn((Shape::cuboid(&chip, CHIP_BLACK), Finish::Plastic));
+    let socket = Block::new(SOCKET)
+        .translated(Vec3::new(0.0, 0.0, CABLE_PLUG.z + SOCKET.z / 2.0))
+        .on_top_of(&board);
+    parent.spawn((Shape::cuboid(&socket, CHIP_BLACK), Finish::Plastic));
     let face = plate.max().y;
     let dial = Block::new(Vec3::new(2.0 * DIAL.x, DIAL.y, 2.0 * DIAL.x)).translated(Vec3::Y * face);
     parent.spawn((Shape::cylinder(&dial, ENAMEL), Finish::Ceramic));
@@ -79,7 +160,7 @@ fn spawn_at(parent: &mut ChildSpawnerCommands, mark: u8) {
     let cap = Block::new(Vec3::new(2.0 * CAP.x, CAP.y, 2.0 * CAP.x));
     parent
         .spawn((
-            Hand,
+            Hand::new(mark),
             Transform::from_xyz(0.0, face + 0.0004, 0.0).with_rotation(Hand::at(mark)),
             Visibility::default(),
         ))

@@ -11,8 +11,8 @@ const TITLE_SIZE: f32 = 24.0;
 const TEXT_SIZE: f32 = 14.0;
 const WORD_WIDTH: f32 = 72.0;
 const NAME_WIDTH: f32 = 52.0;
-/// A switch in the pictures of words: its slot, its knob, and the gap
-/// between switches.
+/// A slide switch in the pictures of words: its slot, its slider, and the
+/// gap between switches.
 const SLOT: Vec2 = Vec2::new(12.0, 24.0);
 const KNOB: f32 = 8.0;
 const SWITCH_GAP: f32 = 4.0;
@@ -141,7 +141,7 @@ impl Datasheet {
                             Node {
                                 width: px(KNOB),
                                 height: px(KNOB),
-                                border_radius: BorderRadius::all(px(KNOB / 2.0)),
+                                border_radius: BorderRadius::all(px(1)),
                                 ..default()
                             },
                             BackgroundColor(INK),

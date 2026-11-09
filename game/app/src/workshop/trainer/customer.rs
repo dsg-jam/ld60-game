@@ -131,13 +131,16 @@ impl WatchJob {
         .add_observer(Self::restart);
         #[cfg(feature = "debug_port")]
         app.add_debug_method(
-            DebugMethod::new("ld60.watch_job", "Returns the step of the watch job.")
-                .param("hurry", ParamKind::Flag, "skips the wait of the step")
-                .param(
-                    "take",
-                    ParamKind::Flag,
-                    "takes or gives what the customer offers or wants",
-                ),
+            DebugMethod::new(
+                "ld60.watch_job",
+                "Returns the step of the watch job and where the customer's head is.",
+            )
+            .param("hurry", ParamKind::Flag, "skips the wait of the step")
+            .param(
+                "take",
+                ParamKind::Flag,
+                "takes or gives what the customer offers or wants",
+            ),
             Self::debug_step,
         );
     }
@@ -252,7 +255,7 @@ impl WatchJob {
                         Ask::Wait
                     };
                     if job.looked > SEEN_AFTER {
-                        Self::offer(&mut commands, job.movement, "click-take-movement");
+                        Self::offer(&mut commands, job.movement, "click-take-device");
                         job.go(Step::Offering);
                     }
                 }
@@ -331,7 +334,7 @@ impl WatchJob {
             visitor.ask = Ask::Leave;
             self.go(Step::Done);
         } else {
-            Self::offer(commands, self.movement, "click-take-movement");
+            Self::offer(commands, self.movement, "click-take-device");
             self.go(Step::Returning);
         }
     }
@@ -486,8 +489,9 @@ impl WatchJob {
     #[cfg(feature = "debug_port")]
     fn debug_step(
         In(params): In<Option<serde_json::Value>>,
-        mut jobs: Query<&mut WatchJob>,
+        mut jobs: Query<(Entity, &mut WatchJob)>,
         offered: Query<Entity, With<Offered>>,
+        visitors: Query<&Visitor>,
         mut commands: Commands,
     ) -> bevy::remote::BrpResult {
         let flag = |name: &str| {
@@ -503,13 +507,17 @@ impl WatchJob {
             }
         }
         let mut steps = Vec::new();
-        for mut job in &mut jobs {
+        for (errand, mut job) in &mut jobs {
             if flag("hurry")
                 && let Some(wait) = job.step.wait()
             {
                 job.clock = job.clock.max(wait);
             }
-            steps.push(format!("{:?}", job.step));
+            let head = visitors
+                .iter()
+                .find(|visitor| visitor.errand == errand)
+                .map(|visitor| visitor.head().to_array());
+            steps.push(serde_json::json!({ "step": format!("{:?}", job.step), "head": head }));
         }
         Ok(serde_json::json!(steps))
     }

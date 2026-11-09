@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::remote::BrpResult;
 use ld60_game_core::debug_port::{DebugMethod, DebugMethods, ParamKind};
+use ld60_game_parts::dip::DipSwitch;
 use ld60_game_parts::toggle::Toggle;
 use serde_json::{Value, json};
 
@@ -26,7 +27,8 @@ pub(super) fn register(app: &mut App) {
 fn panel(
     In(params): In<Option<Value>>,
     trainers: Query<&Trainer>,
-    mut controls: Query<(&Control, &mut Toggle)>,
+    mut bits: Query<(&Control, &mut DipSwitch)>,
+    mut toggles: Query<(&Control, &mut Toggle)>,
 ) -> BrpResult {
     let params = params.unwrap_or_default();
     let words: Option<Vec<u64>> = params
@@ -34,15 +36,15 @@ fn panel(
         .and_then(Value::as_array)
         .map(|words| words.iter().filter_map(Value::as_u64).collect());
     let run = params.get("run").and_then(Value::as_bool);
-    for (control, mut toggle) in &mut controls {
-        let up = match *control {
-            Control::Bit { word, bit } => words
-                .as_ref()
-                .and_then(|words| words.get(word))
-                .map(|value| value >> bit & 1 != 0),
-            Control::Run => run,
-        };
-        if let Some(up) = up {
+    for (control, mut switch) in &mut bits {
+        if let Control::Bit { word, bit } = *control
+            && let Some(value) = words.as_ref().and_then(|words| words.get(word))
+        {
+            switch.on = value >> bit & 1 != 0;
+        }
+    }
+    for (control, mut toggle) in &mut toggles {
+        if let (Control::Run, Some(up)) = (control, run) {
             toggle.up = up;
         }
     }

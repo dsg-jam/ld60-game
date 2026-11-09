@@ -1,4 +1,5 @@
 pub mod bulb;
+pub mod dip;
 pub mod dot_matrix;
 pub mod downwash;
 pub mod drawing;
@@ -45,6 +46,7 @@ impl Plugin for PartsPlugin {
             sticker::StickerPlugin,
         ))
         .add_plugins((
+            dip::DipPlugin,
             led::LedPlugin,
             push_button::PushButtonPlugin,
             toggle::TogglePlugin,

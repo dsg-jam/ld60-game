@@ -5,11 +5,13 @@ mod datasheet;
 mod flyer;
 mod layout;
 mod movement;
+mod ribbon;
 mod sheet;
 
 use bevy::prelude::*;
 use ld60_devices::Movement;
 use ld60_game_audio::{PlayAt, Sound};
+use ld60_game_parts::dip::DipSwitch;
 use ld60_game_parts::led::Led;
 use ld60_game_parts::toggle::Toggle;
 use ld60_game_player::cursor::WantsFinger;
@@ -26,18 +28,20 @@ pub(crate) use self::datasheet::Datasheet;
 pub(crate) use self::flyer::Flyer;
 use self::layout::{CASE, PLATE_COLOR};
 use self::movement::Hand;
+use self::ribbon::Ribbon;
 
-/// Instructions a second while running. Fast enough that a program
-/// without a wait spins the hand.
-const SPEED: f32 = 200.0;
+/// Instructions a second while running. Slow enough to see the lamp go
+/// from row to row, fast enough that a program without a wait spins the
+/// hand.
+const SPEED: f32 = 10.0;
 /// Seconds between two ticks of the crystal.
 const TICK: f32 = 1.0;
 /// Words the panel has a row of switches for.
 const WORDS: usize = 4;
 /// Camera above the front of the panel while focused, and where it looks,
 /// to see the movement in front of the panel too.
-const VIEW: Vec3 = Vec3::new(0.0, 0.25, 0.26);
-const VIEW_AT: Vec3 = Vec3::new(0.0, 0.0, 0.07);
+const VIEW: Vec3 = Vec3::new(0.0, 0.3, 0.32);
+const VIEW_AT: Vec3 = Vec3::new(0.0, 0.0, 0.11);
 
 const GREEN: Color = Color::srgb_u8(0x40, 0xff, 0x50);
 
@@ -53,6 +57,8 @@ impl Plugin for TrainerPlugin {
                 Trainer::run,
                 Trainer::show,
                 Trainer::arm_controls,
+                Hand::swing,
+                Ribbon::lay,
             )
                 .chain(),
         )
@@ -68,7 +74,7 @@ impl Plugin for TrainerPlugin {
 }
 
 /// A front panel wired to the memory of a watch movement on the mat. Each
-/// row of switches is a word of the program, up for 1. The lamp of the
+/// row of switches is a word of the program, on for 1. The lamp of the
 /// row the chip is on lights, and RUN lets it run.
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
@@ -136,7 +142,11 @@ impl Trainer {
                 parent.spawn((Shape::cuboid(&case, PLATE_COLOR), Finish::Paint));
                 parent.spawn((Unprinted, Transform::default()));
                 for (control, at) in layout::controls() {
-                    parent.spawn((control, Toggle { up: false }, top(at)));
+                    let mut entity = parent.spawn((control, top(at)));
+                    match control {
+                        Control::Bit { .. } => entity.insert(DipSwitch { on: false }),
+                        Control::Run => entity.insert(Toggle { up: false }),
+                    };
                 }
                 for (lamp, at) in layout::lamps() {
                     parent.spawn((
@@ -175,7 +185,7 @@ impl Trainer {
     /// writes what they say into it after.
     fn wire(
         mut trainers: Query<(&mut Trainer, &Children)>,
-        mut switches: Query<(&Control, &mut Toggle)>,
+        mut switches: Query<(&Control, &mut DipSwitch)>,
     ) {
         for (mut trainer, children) in &mut trainers {
             let trainer = &mut *trainer;
@@ -185,13 +195,13 @@ impl Trainer {
             let mut words = [0; WORDS];
             let mut parts = switches.iter_many_mut(children);
             while let Some(part) = parts.fetch_next() {
-                let Ok((&Control::Bit { word, bit }, mut toggle)) = part else {
+                let Ok((&Control::Bit { word, bit }, mut switch)) = part else {
                     continue;
                 };
-                let up = movement.rom().image().get(word) >> bit & 1 != 0;
+                let on = movement.rom().image().get(word) >> bit & 1 != 0;
                 if !trainer.synced {
-                    toggle.set_if_neq(Toggle { up });
-                } else if toggle.up {
+                    switch.set_if_neq(DipSwitch { on });
+                } else if switch.on {
                     words[word] |= 1 << bit;
                 }
             }
@@ -251,7 +261,7 @@ impl Trainer {
         trainers: Query<(&Trainer, &Children)>,
         children: Query<&Children>,
         mut lamps: Query<(&Lamp, &mut Led)>,
-        mut hands: Query<(&mut Transform, &GlobalTransform), With<Hand>>,
+        mut hands: Query<(&mut Hand, &GlobalTransform)>,
         mut commands: Commands,
     ) {
         for (trainer, parts) in &trainers {
@@ -270,12 +280,10 @@ impl Trainer {
                 continue;
             };
             for descendant in children.iter_descendants(model) {
-                if let Ok((mut hand, placed)) = hands.get_mut(descendant) {
-                    let goal = Hand::at(movement.hand());
-                    if hand.rotation != goal {
-                        hand.rotation = goal;
-                        commands.trigger(PlayAt(Sound::Ratchet, placed.translation()));
-                    }
+                if let Ok((mut hand, placed)) = hands.get_mut(descendant)
+                    && hand.go_to(movement.hand())
+                {
+                    commands.trigger(PlayAt(Sound::Ratchet, placed.translation()));
                 }
             }
         }
@@ -328,7 +336,7 @@ mod tests {
                 "panel-run",
                 "click-datasheet",
                 "click-flyer",
-                "click-take-movement",
+                "click-take-device",
                 "click-take-papers",
                 "click-hand-back",
                 "tick-sheet-title",

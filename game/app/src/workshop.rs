@@ -59,7 +59,7 @@ const MANUALS_SPOT: Vec2 = Vec2::new(-0.19, -0.68);
 const MANUALS_YAW: f32 = 0.15;
 /// Right behind where devices go, to watch the movement there while
 /// working the panel.
-const TRAINER_SPOT: Vec2 = Vec2::new(0.1, -0.25);
+const TRAINER_SPOT: Vec2 = Vec2::new(0.1, -0.6);
 const TRAINER_YAW: f32 = 0.0;
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);

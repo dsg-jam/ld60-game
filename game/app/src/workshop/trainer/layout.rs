@@ -5,21 +5,21 @@ use ld60_tick::WORD_BITS;
 
 use super::{Control, Lamp, WORDS};
 
-pub(super) const CASE: Vec3 = Vec3::new(0.17, 0.03, 0.15);
+pub(super) const CASE: Vec3 = Vec3::new(0.13, 0.03, 0.15);
 /// The rows of words from word 0 at the back, and the columns of their
 /// bits from the highest on the left, from the middle of the top, +Y
-/// towards the front.
-const ROWS: [f32; WORDS] = [-0.045, -0.02, 0.005, 0.03];
-const COLUMNS: [f32; WORD_BITS as usize] = [-0.04, -0.018, 0.004, 0.026];
+/// towards the front. The switches of a row stand side by side in one
+/// housing.
+const ROWS: [f32; WORDS] = [-0.052, -0.024, 0.004, 0.032];
+const COLUMNS: [f32; WORD_BITS as usize] = [-0.03, -0.018, -0.006, 0.006];
 /// The lamp of each row on its right, its number on its left, and the RUN
 /// switch in front.
-const LAMP_COLUMN: f32 = 0.056;
-const NUMBER_COLUMN: f32 = -0.064;
-const RUN: Vec2 = Vec2::new(0.056, 0.058);
+const LAMP_COLUMN: f32 = 0.032;
+const NUMBER_COLUMN: f32 = -0.048;
+const RUN: Vec2 = Vec2::new(0.032, 0.058);
 /// Labels sit this far in front of what they name.
 const LABEL_GAP: f32 = 0.013;
 const DOT: f32 = 0.0005;
-const LINE: f32 = 0.0006;
 
 pub(super) const PLATE_COLOR: Color = Color::srgb_u8(0x3a, 0x40, 0x48);
 const PLATE_INK: Color = Color::srgb_u8(0xe8, 0xe4, 0xd8);
@@ -48,16 +48,6 @@ pub(super) fn plate(locale: &Locale) -> Image {
     let mut plate = Drawing::new(CASE.xz(), PLATE_COLOR, PLATE_INK);
     for (index, &y) in ROWS.iter().enumerate() {
         plate.text(&index.to_string(), Vec2::new(NUMBER_COLUMN, y), DOT);
-    }
-    // A line under each row ties its switches to its lamp.
-    let left = COLUMNS[0] - 0.009;
-    let right = LAMP_COLUMN;
-    for &y in &ROWS {
-        plate.stroke(
-            Vec2::new(left, y + 0.0105),
-            Vec2::new(right, y + 0.0105),
-            LINE,
-        );
     }
     plate.text(&word("panel-run"), RUN + Vec2::Y * LABEL_GAP, DOT);
     plate.image()
