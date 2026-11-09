@@ -28,7 +28,7 @@ static SIDEWALKS: [Sidewalk; 2] = [
         sheltered: Some([-1.45, -1.75]),
         room: -3.5..-0.95,
         curb: NEAR_CURB + 0.25,
-        walkers: 10,
+        walkers: 5,
         stalls: 1.0,
     },
     Sidewalk {
@@ -36,7 +36,7 @@ static SIDEWALKS: [Sidewalk; 2] = [
         sheltered: None,
         room: -15.3..-13.6,
         curb: FAR_CURB - 0.25,
-        walkers: 12,
+        walkers: 6,
         stalls: -1.0,
     },
 ];
