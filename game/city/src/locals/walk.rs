@@ -15,7 +15,7 @@ use self::chat::Passer;
 use self::outing::{Activity, Around};
 pub(super) use self::outing::{Customers, Seats};
 pub(super) use self::visit::Errands;
-pub use self::visit::{DropOff, DroppedOff};
+pub use self::visit::{Ask, Left, Summon, Visitor};
 use super::super::traffic::Vehicle;
 use super::super::weather::Weather;
 use super::super::{FAR_CURB, NEAR_CURB};
@@ -101,6 +101,17 @@ struct Sidewalk {
     /// The side of the street the stalls are on, along Z.
     stalls: f32,
 }
+
+/// A walker and what it moves, for [`Walker::walk`].
+type Walking<'a> = (
+    Entity,
+    &'a mut Walker,
+    &'a mut Bird,
+    &'a mut Gaze,
+    &'a mut Voice,
+    &'a mut Transform,
+    Option<&'a mut Visitor>,
+);
 
 /// Someone or something on a sidewalk, seen from above.
 #[derive(Debug, Clone, Copy)]
@@ -234,14 +245,9 @@ impl Walker {
         mut whims: ResMut<Whims>,
         mut errands: ResMut<Errands>,
         mut bodies: Local<Vec<Body>>,
-        mut walkers: Query<(
-            &mut Walker,
-            &mut Bird,
-            &mut Gaze,
-            &mut Voice,
-            &mut Transform,
-        )>,
+        mut walkers: Query<Walking>,
         vehicles: Query<(&Vehicle, &Transform), Without<Walker>>,
+        mut commands: Commands,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
@@ -250,7 +256,10 @@ impl Walker {
             .iter()
             .map(|(vehicle, transform)| (vehicle, transform.translation))
             .collect();
-        let passers: Vec<Passer> = walkers.iter().map(|(walker, ..)| walker.passer()).collect();
+        let passers: Vec<Passer> = walkers
+            .iter()
+            .map(|(_, walker, ..)| walker.passer())
+            .collect();
         let partners = Passer::pairs(&passers, dt, rng);
         let raining = weather.rain >= SHELTER_RAIN;
         let mut then = vec![None; partners.len()];
@@ -258,7 +267,7 @@ impl Walker {
             let Some(meeting) = meeting.filter(|m| m.together && m.with > a) else {
                 continue;
             };
-            let Some((walker, bird, ..)) = walkers.iter().nth(a) else {
+            let Some((_, walker, bird, ..)) = walkers.iter().nth(a) else {
                 continue;
             };
             let dry = !raining || bird.has_umbrella_open();
@@ -276,8 +285,12 @@ impl Walker {
             radius: STOOL,
         }));
         let first = bodies.len();
-        bodies.extend(walkers.iter().map(|(walker, bird, ..)| walker.body(bird)));
-        for (index, (mut walker, mut bird, mut gaze, mut voice, mut transform)) in
+        bodies.extend(
+            walkers
+                .iter()
+                .map(|(_, walker, bird, ..)| walker.body(bird)),
+        );
+        for (index, (entity, mut walker, mut bird, mut gaze, mut voice, mut transform, visitor)) in
             walkers.iter_mut().enumerate()
         {
             let rained_on = bird.rained_on(weather.rain);
@@ -288,9 +301,9 @@ impl Walker {
             if let Some(meeting) = partners[index] {
                 walker.chat_with(passers[meeting.with].at, meeting.left, then[index], rng);
             }
-            if matches!(walker.activity, Activity::Visit { .. }) {
-                if let Some(errand) = walker.visit(&mut bird, &mut gaze, &mut voice, dt, rng) {
-                    errands.let_go(errand);
+            if walker.activity.is_visit() {
+                if let Some(mut visitor) = visitor {
+                    walker.visit(&mut visitor, &mut bird, &mut gaze, &mut voice, dt, rng);
                 }
                 *transform = walker.place();
                 continue;
@@ -313,7 +326,9 @@ impl Walker {
             }
             let wet =
                 rained_on > SHELTER_RAIN && !bird.carries_umbrella() && walker.until_shelter <= 0.0;
-            errands.hand_out(&mut walker, &mut bird);
+            if visitor.is_none() {
+                errands.hand_out(entity, &mut walker, &mut commands);
+            }
             if !walker.activity.is_stroll() {
                 *transform = walker.place();
                 continue;

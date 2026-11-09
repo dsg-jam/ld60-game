@@ -26,8 +26,8 @@ use self::bird::{Bird, Birth, Carry, Dress, Posture, Steam};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
+pub use self::walk::{Ask, Left, Summon, Visitor};
 use self::walk::{Customers, Errands, Seats, Walker};
-pub use self::walk::{DropOff, DroppedOff};
 use super::buildings::Skyline;
 use super::{Pick, rng};
 

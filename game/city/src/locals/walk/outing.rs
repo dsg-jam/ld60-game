@@ -11,7 +11,6 @@ use super::super::{Places, SITTER_TALK, Spot, WALKER_TALK};
 use super::chat::{CHAT_TALK, NEIGHBOUR, TURN_EVERY, TURN_FOR};
 use super::cross::{Cars, Crossing};
 use super::meal::Dining;
-use super::visit::{DropOff, Visiting};
 use super::{ACCELERATION, Walker};
 
 /// People feel like sitting down after walking this many meters, and
@@ -23,11 +22,11 @@ const SEAT_AHEAD: Range<f32> = 1.0..6.0;
 /// Seats this far beyond the sidewalk count as on it.
 const SEAT_REACH: f32 = 1.0;
 /// People stop beside a seat this far from its middle and slide onto it.
-const BESIDE: f32 = 0.38;
+pub(super) const BESIDE: f32 = 0.38;
 /// They slow down this close to where they go.
 const SLOW_DOWN: f32 = 0.8;
 /// Seconds to sit down or get up, and to stay seated.
-const SIT_TIME: f32 = 1.8;
+pub(super) const SIT_TIME: f32 = 1.8;
 const SIT_FOR: Range<f32> = 25.0..120.0;
 /// Seated, people turn this far from the counter, to the side.
 const SEAT_TURN: f32 = 0.6;
@@ -83,8 +82,8 @@ pub(super) enum Activity {
     },
     /// Crossing the street at `x`.
     Cross { x: f32, step: Crossing },
-    /// Bringing something to the shop counter.
-    Visit { errand: DropOff, step: Visiting },
+    /// On an errand to the shop counter, see [`Visitor`](super::visit::Visitor).
+    Visit,
     /// Walking to a spot under an awning and waiting there for the rain
     /// to ease, for `left` seconds at most, looking around until `look`
     /// runs out. `eased` counts the seconds the rain has been light.
@@ -203,12 +202,16 @@ impl Activity {
             | Self::Chat { .. }
             | Self::Shelter { .. }
             | Self::Cross { .. }
-            | Self::Visit { .. } => false,
+            | Self::Visit => false,
         }
     }
 
     pub(super) fn is_stroll(self) -> bool {
         matches!(self, Self::Stroll)
+    }
+
+    pub(super) fn is_visit(self) -> bool {
+        matches!(self, Self::Visit)
     }
 }
 
@@ -374,7 +377,7 @@ impl Walker {
         } = *around;
         let stools = &places.stools;
         match self.activity {
-            Activity::Stroll | Activity::Visit { .. } => {}
+            Activity::Stroll | Activity::Visit => {}
             Activity::Cross { .. } => self.cross(bird, gaze, cars, dt, rng),
             Activity::Chat {
                 with,
@@ -623,7 +626,7 @@ pub(super) fn turned(from: f32, to: f32, step: f32) -> f32 {
     from + difference.clamp(-step, step)
 }
 
-fn ease(t: f32) -> f32 {
+pub(super) fn ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }

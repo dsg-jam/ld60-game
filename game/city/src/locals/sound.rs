@@ -108,6 +108,11 @@ impl Voice {
         }
     }
 
+    /// Says something now.
+    pub(super) fn speak_now(&mut self) {
+        self.until = 0.0;
+    }
+
     /// Chats with those close by, talking once every `every` seconds when
     /// not answering them.
     pub(super) fn chat(&mut self, every: Range<f32>) {
