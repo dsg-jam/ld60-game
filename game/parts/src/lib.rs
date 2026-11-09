@@ -1,8 +1,8 @@
 pub mod bulb;
 pub mod dot_matrix;
 pub mod downwash;
+pub mod drawing;
 pub mod dust;
-pub mod faceplate;
 pub mod gauge;
 pub mod keypad;
 pub mod knob;

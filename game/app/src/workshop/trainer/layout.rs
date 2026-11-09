@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use ld60_game_parts::faceplate::Faceplate;
+use ld60_game_parts::drawing::Drawing;
 use ld60_locale::{Locale, Message};
 
 use super::{Control, Lamp};
@@ -70,7 +70,7 @@ pub(super) fn lamps() -> impl Iterator<Item = (Lamp, Vec2)> {
 /// The printed top of the case, with the words in the player's language.
 pub(super) fn plate(locale: &Locale) -> Image {
     let word = |id: &'static str| locale.text(&Message::new(id).into());
-    let mut plate = Faceplate::new(CASE.xz(), PLATE_COLOR, PLATE_INK);
+    let mut plate = Drawing::new(CASE.xz(), PLATE_COLOR, PLATE_INK);
     let middle = |columns: &[f32]| (columns[0] + columns[columns.len() - 1]) / 2.0;
     plate.text(
         &word("panel-address"),
@@ -96,7 +96,7 @@ pub(super) fn plate(locale: &Locale) -> Image {
     }
     let left = BIT_COLUMNS[0] - 0.008;
     let right = BIT_COLUMNS[3] + 0.008;
-    plate.line(
+    plate.stroke(
         Vec2::new(left, SWITCH_ROW - 0.009),
         Vec2::new(right, SWITCH_ROW - 0.009),
         LINE,
