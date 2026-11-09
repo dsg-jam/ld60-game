@@ -20,7 +20,7 @@ use bevy::{mesh::skinning::SkinnedMeshInverseBindposes, prelude::*};
 use ld60_geometry::surface::SurfaceMaterial;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rand::{RngExt, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 
 use self::bird::{Bird, Birth, Carry, Dress, Posture, Steam};
 use self::gaze::Gaze;
@@ -55,8 +55,7 @@ impl Plugin for LocalsPlugin {
         .init_resource::<Places>()
         .init_resource::<Seats>()
         .init_resource::<Customers>()
-        .init_resource::<Errands>()
-        .add_observer(Errands::ask)
+        .add_observer(Errands::summon)
         .add_observer(Errands::call_off)
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
         .add_systems(
@@ -153,6 +152,26 @@ impl FromWorld for Figures {
 }
 
 impl Figures {
+    /// Spawns someone out on `walker`'s walk.
+    fn spawn_walker(
+        &self,
+        commands: &mut Commands,
+        plumages: &mut Assets<PlumageMaterial>,
+        rng: &mut impl Rng,
+        walker: Walker,
+    ) -> Entity {
+        let birth = Birth {
+            at: walker.place(),
+            posture: Posture::Out,
+            carry: Carry::Maybe,
+            dress: Dress::pick(rng),
+            sheltered: false,
+            coat: Coat::new(plumages, &self.bare, rng),
+        };
+        let bird = Bird::spawn(commands, self, rng, birth);
+        commands.entity(bird).insert(walker).id()
+    }
+
     /// Made at startup, once the materials can be.
     fn load(world: &mut World) {
         world.init_resource::<Self>();
@@ -167,16 +186,7 @@ impl Figures {
         let mut rng = rng(SEED);
         let mut paths = super::rng(SEED + 1);
         for walker in Walker::crowd(&mut paths) {
-            let birth = Birth {
-                at: walker.place(),
-                posture: Posture::Out,
-                carry: Carry::Maybe,
-                dress: Dress::pick(&mut rng),
-                sheltered: false,
-                coat: Coat::new(&mut plumages, &figures.bare, &mut rng),
-            };
-            let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
-            commands.entity(bird).insert(walker);
+            figures.spawn_walker(&mut commands, &mut plumages, &mut rng, walker);
         }
         let mut seats = Seats::new(&places);
         let mut stools: Vec<usize> = (0..places.stools.len()).collect();
@@ -188,16 +198,7 @@ impl Figures {
                 continue;
             };
             let walker = Walker::seated(walker, index, stool, &mut seats, &mut rng);
-            let birth = Birth {
-                at: walker.place(),
-                posture: Posture::Out,
-                carry: Carry::Maybe,
-                dress: Dress::pick(&mut rng),
-                sheltered: false,
-                coat: Coat::new(&mut plumages, &figures.bare, &mut rng),
-            };
-            let bird = Bird::spawn(&mut commands, &figures, &mut rng, birth);
-            commands.entity(bird).insert(walker);
+            figures.spawn_walker(&mut commands, &mut plumages, &mut rng, walker);
         }
         commands.insert_resource(seats);
         for &(at, half_width) in &places.counters {

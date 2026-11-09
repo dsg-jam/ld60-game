@@ -104,7 +104,6 @@ struct Sidewalk {
 
 /// A walker and what it moves, for [`Walker::walk`].
 type Walking<'a> = (
-    Entity,
     &'a mut Walker,
     &'a mut Bird,
     &'a mut Gaze,
@@ -243,11 +242,9 @@ impl Walker {
         mut seats: ResMut<Seats>,
         mut customers: ResMut<Customers>,
         mut whims: ResMut<Whims>,
-        mut errands: ResMut<Errands>,
         mut bodies: Local<Vec<Body>>,
         mut walkers: Query<Walking>,
         vehicles: Query<(&Vehicle, &Transform), Without<Walker>>,
-        mut commands: Commands,
     ) {
         let dt = time.delta_secs();
         let rng = &mut whims.0;
@@ -256,10 +253,7 @@ impl Walker {
             .iter()
             .map(|(vehicle, transform)| (vehicle, transform.translation))
             .collect();
-        let passers: Vec<Passer> = walkers
-            .iter()
-            .map(|(_, walker, ..)| walker.passer())
-            .collect();
+        let passers: Vec<Passer> = walkers.iter().map(|(walker, ..)| walker.passer()).collect();
         let partners = Passer::pairs(&passers, dt, rng);
         let raining = weather.rain >= SHELTER_RAIN;
         let mut then = vec![None; partners.len()];
@@ -267,7 +261,7 @@ impl Walker {
             let Some(meeting) = meeting.filter(|m| m.together && m.with > a) else {
                 continue;
             };
-            let Some((_, walker, bird, ..)) = walkers.iter().nth(a) else {
+            let Some((walker, bird, ..)) = walkers.iter().nth(a) else {
                 continue;
             };
             let dry = !raining || bird.has_umbrella_open();
@@ -285,12 +279,8 @@ impl Walker {
             radius: STOOL,
         }));
         let first = bodies.len();
-        bodies.extend(
-            walkers
-                .iter()
-                .map(|(_, walker, bird, ..)| walker.body(bird)),
-        );
-        for (index, (entity, mut walker, mut bird, mut gaze, mut voice, mut transform, visitor)) in
+        bodies.extend(walkers.iter().map(|(walker, bird, ..)| walker.body(bird)));
+        for (index, (mut walker, mut bird, mut gaze, mut voice, mut transform, visitor)) in
             walkers.iter_mut().enumerate()
         {
             let rained_on = bird.rained_on(weather.rain);
@@ -326,9 +316,6 @@ impl Walker {
             }
             let wet =
                 rained_on > SHELTER_RAIN && !bird.carries_umbrella() && walker.until_shelter <= 0.0;
-            if visitor.is_none() {
-                errands.hand_out(entity, &mut walker, &mut commands);
-            }
             if !walker.activity.is_stroll() {
                 *transform = walker.place();
                 continue;

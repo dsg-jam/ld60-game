@@ -1,27 +1,36 @@
-use std::f32::consts::TAU;
+use std::f32::consts::{FRAC_PI_2, TAU};
 use std::ops::Range;
-use std::ptr;
 
 use bevy::prelude::*;
 use ld60_game_core::layout::counter::CounterLayout;
 use rand::{Rng, RngExt};
 
-use super::super::WALKER_TALK;
 use super::super::bird::Bird;
 use super::super::gaze::Gaze;
+use super::super::plumage::PlumageMaterial;
 use super::super::shadows::Silhouette;
 use super::super::sound::Voice;
+use super::super::{Figures, WALKER_TALK, Whims};
 use super::chat::CHAT_TALK;
 use super::outing::{Activity, BESIDE, SIT_TIME, ease, turned};
-use super::{SIDEWALKS, Walker};
+use super::{ACCELERATION, SIDEWALKS, Walker};
 
-/// Someone takes an errand when it is this many meters ahead of where it
-/// goes.
-const TAKE_WITHIN: Range<f32> = 3.0..9.0;
+/// A visitor comes along the sidewalk from this far away. Once it has
+/// left and is this far away again, it is gone.
+const COME_FROM: f32 = 7.0;
 /// On the way, it keeps to its side of the sidewalk like everyone else,
 /// and turns in to the counter this far before it, along the street.
 const TURN_IN: f32 = 1.2;
-/// Having left, a visitor is out of sight this far from the counter.
+/// The last steps up to the counter go straight in from this far, at this
+/// share of its pace.
+const STEP_UP: f32 = 0.5;
+const STEP_UP_PACE: f32 = 0.7;
+/// Moving along the counter, it steps this far back from it first, at
+/// this pace in meters per second, and slows down this close to each
+/// step.
+const STEP_BACK: f32 = 0.3;
+const SHUFFLE_PACE: f32 = 0.5;
+const SLOW_DOWN: f32 = 0.25;
 const GONE: f32 = 12.0;
 /// Seconds to hold the hand out, and to draw it back.
 const REACH_TIME: f32 = 1.2;
@@ -36,7 +45,7 @@ const BOB: f32 = 0.025;
 const BOB_RATE: f32 = 2.5;
 /// How far a visitor leans in, in radians: holding something out over the
 /// counter, calling, and shifting about while it waits.
-const LEAN_OVER: f32 = 0.45;
+const LEAN_OVER: f32 = 0.2;
 const LEAN_CALL: f32 = 0.15;
 const FIDGET: Range<f32> = 0.0..0.08;
 /// Showing something, a visitor tips it this far towards the player.
@@ -137,25 +146,51 @@ pub enum Ask {
     Leave,
 }
 
-/// Summons nobody has taken yet.
-#[derive(Resource, Debug, Default)]
-pub(in super::super) struct Errands {
-    waiting: Vec<Summon>,
-}
+/// Brings visitors to the shop and sends them away again.
+#[derive(Debug)]
+pub(in super::super) struct Errands;
 
 impl Errands {
-    pub(in super::super) fn ask(summon: On<Summon>, mut errands: ResMut<Errands>) {
-        errands.waiting.push(*summon);
+    /// Someone comes along the sidewalk by the shop, on its way to the
+    /// counter.
+    pub(in super::super) fn summon(
+        summon: On<Summon>,
+        figures: Res<Figures>,
+        mut plumages: ResMut<Assets<PlumageMaterial>>,
+        mut whims: ResMut<Whims>,
+        mut commands: Commands,
+    ) {
+        let rng = &mut whims.0;
+        let heading = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+        let mut walker = Walker::on(&SIDEWALKS[0], rng);
+        walker.heading = heading;
+        let lanes = walker.lanes();
+        walker.lane = (lanes.start + lanes.end) / 2.0;
+        walker.z = walker.lane;
+        walker.x = summon.stand.x - heading * COME_FROM;
+        walker.yaw = heading * FRAC_PI_2;
+        walker.activity = Activity::Visit;
+        let entity = figures.spawn_walker(&mut commands, &mut plumages, rng, walker);
+        commands.entity(entity).insert(Visitor {
+            errand: summon.errand,
+            ask: Ask::Wait,
+            carrying: Some(summon.carrying),
+            stand: summon.stand,
+            at_counter: false,
+            head: Vec3::ZERO,
+            seat: None,
+            sitting: 0.0,
+            hand: Vec3::ZERO,
+            reach: 0.0,
+            clock: 0.0,
+            look: 0.0,
+            at_player: false,
+            gaze: Glance::Work,
+            lean: 0.0,
+        });
     }
 
-    pub(in super::super) fn call_off(
-        call_off: On<CallOff>,
-        mut errands: ResMut<Errands>,
-        mut visitors: Query<&mut Visitor>,
-    ) {
-        errands
-            .waiting
-            .retain(|summon| summon.errand != call_off.errand);
+    pub(in super::super) fn call_off(call_off: On<CallOff>, mut visitors: Query<&mut Visitor>) {
         for mut visitor in &mut visitors {
             if visitor.errand == call_off.errand {
                 visitor.carrying = None;
@@ -164,8 +199,8 @@ impl Errands {
         }
     }
 
-    /// Moves what visitors carry along with their hands, and lets them go
-    /// once out of sight.
+    /// Moves what visitors carry along with their hands, and takes them
+    /// away once out of sight.
     pub(in super::super) fn carry(
         mut visitors: Query<(Entity, &Walker, &mut Bird, &mut Visitor, &Silhouette)>,
         mut items: Query<&mut Transform, Without<Walker>>,
@@ -179,53 +214,18 @@ impl Errands {
             ) {
                 *item = held;
             }
-            let away = (walker.x - visitor.stand.x).abs();
-            if visitor.ask == Ask::Leave && !walker.activity.is_visit() {
-                // Out from under the roof before the umbrella opens again.
-                let near = Vec2::new(walker.x, walker.z).distance(visitor.stand) < CLOSE_WITHIN;
-                bird.stand_under(near);
+            if visitor.ask != Ask::Leave || walker.activity.is_visit() {
+                continue;
             }
-            if visitor.ask == Ask::Leave && !walker.activity.is_visit() && away > GONE {
-                bird.carry(false);
-                commands.entity(entity).remove::<Visitor>();
+            // Out from under the roof before the umbrella opens again.
+            let place = Vec2::new(walker.x, walker.z);
+            bird.stand_under(place.distance(visitor.stand) < CLOSE_WITHIN);
+            if (walker.x - visitor.stand.x).abs() > GONE {
+                commands.entity(entity).despawn();
                 commands.trigger(Left {
                     errand: visitor.errand,
                 });
             }
-        }
-    }
-
-    /// Hands a waiting summons to `walker` if it comes along the sidewalk
-    /// by the shop, out of sight still.
-    pub(super) fn hand_out(
-        &mut self,
-        entity: Entity,
-        walker: &mut Walker,
-        commands: &mut Commands,
-    ) {
-        let Some(summon) = self.waiting.first().copied() else {
-            return;
-        };
-        if walker.takes(&summon) {
-            self.waiting.remove(0);
-            walker.activity = Activity::Visit;
-            commands.entity(entity).insert(Visitor {
-                errand: summon.errand,
-                ask: Ask::Wait,
-                carrying: Some(summon.carrying),
-                stand: summon.stand,
-                at_counter: false,
-                head: Vec3::ZERO,
-                seat: None,
-                sitting: 0.0,
-                hand: Vec3::ZERO,
-                reach: 0.0,
-                clock: 0.0,
-                look: 0.0,
-                at_player: false,
-                gaze: Glance::Work,
-                lean: 0.0,
-            });
         }
     }
 }
@@ -253,12 +253,6 @@ impl Visitor {
 }
 
 impl Walker {
-    /// Whether it would take `summon` now.
-    fn takes(&self, summon: &Summon) -> bool {
-        let ahead = (summon.stand.x - self.x) * self.heading;
-        ptr::eq(self.sidewalk, &SIDEWALKS[0]) && TAKE_WITHIN.contains(&ahead)
-    }
-
     /// Walks up to the counter and does what the shop asks there.
     pub(super) fn visit(
         &mut self,
@@ -274,6 +268,11 @@ impl Walker {
             visitor.seat.is_none() && Vec2::new(self.x, self.z).distance(visitor.stand) < 0.05;
         let counter = CounterLayout::new();
         let player = counter.seated_view().translation;
+        // It leans in and shows things only standing at the counter.
+        if !visitor.at_counter {
+            bird.lean_in(0.0, dt);
+            bird.present(0.0, dt);
+        }
         if let Some((stool, height)) = visitor.seat {
             let staying = visitor.ask == (Ask::Sit { at: stool, height });
             self.sit_on(visitor, bird, stool, height, staying, dt);
@@ -286,7 +285,7 @@ impl Walker {
         }
         match visitor.ask {
             Ask::Leave => {
-                bird.lean_in(0.0, dt);
+                bird.lean_in(0.0, f32::INFINITY);
                 bird.present(0.0, f32::INFINITY);
                 bird.stop_reaching();
                 voice.talk_every(WALKER_TALK);
@@ -297,7 +296,7 @@ impl Walker {
             Ask::Sit { at, height } if visitor.reach <= 0.0 => {
                 bird.stand_under(true);
                 let beside = Self::beside(at);
-                if self.walk_to(bird, beside, bird.pace, dt) {
+                if self.shuffle_to(bird, beside, visitor.stand.y, dt) {
                     visitor.seat = Some((at, height));
                 }
                 gaze.glance_at(self.look_at(at, bird), 0.5);
@@ -312,14 +311,24 @@ impl Walker {
                 bird.stand_under(true);
             }
             let ahead = (visitor.stand.x - self.x) * self.heading;
-            if away < SHUT_BY && !bird.has_umbrella_shut() {
-                bird.speed = 0.0;
+            // It comes up to the counter straight from the street, so it
+            // stands facing it without turning on the spot.
+            let front = visitor.stand - Vec2::Y * STEP_UP;
+            let here = Vec2::new(self.x, self.z);
+            if here.y > front.y {
+                // Already at the counter, from a stool.
+                self.shuffle_to(bird, visitor.stand, visitor.stand.y, dt);
+            } else if away < SHUT_BY && !bird.has_umbrella_shut() {
+                bird.speed = (bird.speed - ACCELERATION * dt).max(0.0);
             } else if ahead > TURN_IN {
-                // Aiming at the turn-in spot, it would slow down there.
+                // Aiming past where it turns, so it does not slow down.
                 let along = Vec2::new(visitor.stand.x, self.lane);
                 self.walk_to(bird, along, bird.pace, dt);
+            } else if here.y < front.y {
+                let past = front + (front - here).normalize_or_zero();
+                self.walk_to(bird, past, bird.pace, dt);
             } else {
-                self.walk_to(bird, visitor.stand, bird.pace, dt);
+                self.walk_to(bird, visitor.stand, bird.pace * STEP_UP_PACE, dt);
             }
             return;
         }
@@ -385,6 +394,31 @@ impl Walker {
         if let Some(target) = target {
             gaze.eye_at(self.look_at(target, bird), 0.5);
         }
+    }
+
+    /// Steps over to `to` at the counter, facing it: back from the counter
+    /// at `line` first, along, and in again, so it keeps clear of the
+    /// counter and the stools. Returns whether it is there.
+    fn shuffle_to(&mut self, bird: &mut Bird, to: Vec2, line: f32, dt: f32) -> bool {
+        let here = Vec2::new(self.x, self.z);
+        let back = line - STEP_BACK;
+        let goal = if (here.x - to.x).abs() < 0.05 {
+            to
+        } else if here.y > back + 0.03 {
+            Vec2::new(here.x, back)
+        } else {
+            Vec2::new(to.x, back)
+        };
+        let way = goal - here;
+        let distance = way.length();
+        let target = SHUFFLE_PACE * (distance / SLOW_DOWN).min(1.0);
+        let change = ACCELERATION * dt;
+        bird.speed += (target - bird.speed).clamp(-change, change);
+        let step = way.normalize_or_zero() * (bird.speed * dt).min(distance);
+        self.x += step.x;
+        self.z += step.y;
+        self.yaw = turned(self.yaw, 0.0, TURN_RATE * dt);
+        goal == to && distance < 0.04
     }
 
     /// Moves the free hand as the shop asks, at the counter. An umbrella
