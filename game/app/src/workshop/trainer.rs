@@ -1,6 +1,8 @@
 mod datasheet;
+mod flyer;
 mod layout;
 mod movement;
+mod sheet;
 
 use bevy::prelude::*;
 use ld60_devices::Movement;
@@ -17,6 +19,7 @@ use ld60_locale::Locale;
 use ld60_tick::{Effect, Revision};
 
 pub(crate) use self::datasheet::Datasheet;
+pub(crate) use self::flyer::Flyer;
 use self::layout::{CASE, MOVEMENT, PLATE_COLOR};
 use self::movement::Hand;
 
@@ -53,6 +56,7 @@ impl Plugin for TrainerPlugin {
         )
         .add_observer(Trainer::on_add)
         .add_observer(Datasheet::on_add)
+        .add_observer(Flyer::on_add)
         .add_observer(Trainer::push);
     }
 }
@@ -338,6 +342,7 @@ mod tests {
                 "panel-deposit",
                 "panel-step",
                 "click-datasheet",
+                "click-flyer",
                 "tick-sheet-title",
                 "tick-sheet-revision",
                 "tick-sheet-word",

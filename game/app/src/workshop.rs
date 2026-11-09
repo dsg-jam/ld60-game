@@ -46,7 +46,7 @@ use self::shop::Shop;
 use self::stamp::RubberStamp;
 use self::ticket::Clipboard;
 use self::till::Till;
-use self::trainer::{Datasheet, Trainer};
+use self::trainer::{Datasheet, Flyer, Trainer};
 
 const COMPUTER_YAW: f32 = -0.4;
 const LAMP_YAW: f32 = -0.7;
@@ -63,6 +63,9 @@ const TRAINER_YAW: f32 = -0.25;
 /// In front of the panel.
 const DATASHEET_SPOT: Vec2 = Vec2::new(0.62, 0.3);
 const DATASHEET_YAW: f32 = -0.15;
+/// On the left of the mat, as if just handed over.
+const FLYER_SPOT: Vec2 = Vec2::new(-0.5, 0.35);
+const FLYER_YAW: f32 = 0.1;
 /// On the left wall, just behind the pillar of the shop front.
 const DIAL_SPOT: Vec3 = Vec3::new(-1.45, 2.0, -0.05);
 
@@ -176,6 +179,11 @@ fn spawn_stage(mut commands: Commands) {
         Name::new("tick datasheet"),
         Datasheet,
         counter.place_on_mat(DATASHEET_SPOT, DATASHEET_YAW),
+    ));
+    commands.spawn((
+        Name::new("flyer"),
+        Flyer { seed: 1 },
+        counter.place_on_mat(FLYER_SPOT, FLYER_YAW),
     ));
     commands.spawn((
         Name::new("camera"),

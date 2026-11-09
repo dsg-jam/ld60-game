@@ -40,6 +40,7 @@ click-radio-off = Switch off radio
 click-radio-on = Switch on radio
 click-trainer = Use front panel
 click-datasheet = Read datasheet
+click-flyer = Read flyer
 click-volume = Drag to set volume
 click-tune = Next station
 click-receipt = Inspect receipt

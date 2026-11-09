@@ -1,9 +1,6 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::prelude::*;
-use ld60_game_parts::paper::{INK, PAPER, PAPER_REFLECTANCE, PAPER_ROUGHNESS, Wrinkles};
+use ld60_game_parts::paper::{INK, PAPER};
 use ld60_game_parts::screen::UiCanvas;
-use ld60_game_player::focus::{Focus, FocusTarget, View};
 use ld60_locale::{Localized, Message};
 use ld60_tick::Op;
 
@@ -14,10 +11,6 @@ const TITLE_SIZE: f32 = 24.0;
 const TEXT_SIZE: f32 = 14.0;
 const WORD_WIDTH: f32 = 60.0;
 const NAME_WIDTH: f32 = 60.0;
-/// Camera height above the card while reading it.
-const READING_HEIGHT: f32 = 0.2;
-/// Keeps the card off the mat under it.
-const LIFT: f32 = 0.0004;
 
 /// The printed datasheet of the Tick chip, lying face up.
 #[derive(Component, Debug)]
@@ -106,30 +99,13 @@ impl Datasheet {
                 page.spawn(text("tick-sheet-order", TEXT_SIZE));
                 page.spawn(text("tick-sheet-erase", TEXT_SIZE));
             });
-        let wrinkles = Wrinkles::sticky(SIZE, "tick-datasheet");
-        commands
-            .entity(add.entity)
-            .insert(FocusTarget {
-                prompt: "click-datasheet",
-                focus: Focus::Paper,
-                view: View::Local(
-                    Transform::from_xyz(0.0, READING_HEIGHT, 0.001)
-                        .looking_at(Vec3::ZERO, -Vec3::Z),
-                ),
-            })
-            .with_child((
-                Mesh3d(meshes.add(wrinkles.mesh())),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color_texture: Some(canvas.image),
-                    perceptual_roughness: PAPER_ROUGHNESS,
-                    reflectance: PAPER_REFLECTANCE,
-                    double_sided: true,
-                    cull_mode: None,
-                    ..default()
-                })),
-                wrinkles,
-                Transform::from_xyz(0.0, LIFT, 0.0)
-                    .with_rotation(Quat::from_rotation_x(-FRAC_PI_2)),
-            ));
+        super::sheet::lay(
+            &mut commands,
+            add.entity,
+            (canvas.image, SIZE, "tick-datasheet"),
+            "click-datasheet",
+            &mut meshes,
+            &mut materials,
+        );
     }
 }
