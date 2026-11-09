@@ -17,7 +17,7 @@ use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
 use ld60_geometry::surface::Finish;
 use ld60_locale::Locale;
-use ld60_tick::{Effect, Revision};
+use ld60_tick::Effect;
 
 pub(crate) use self::datasheet::Datasheet;
 pub(crate) use self::flyer::Flyer;
@@ -69,7 +69,8 @@ impl Plugin for TrainerPlugin {
 #[derive(Component, Debug)]
 #[require(Transform, Visibility)]
 pub(crate) struct Trainer {
-    movement: Movement,
+    /// The movement standing on the panel, if one does.
+    movement: Option<Movement>,
     /// Seconds until the next tick.
     until_tick: f32,
     /// Seconds left of an erase.
@@ -81,7 +82,7 @@ pub(crate) struct Trainer {
 impl Default for Trainer {
     fn default() -> Self {
         Self {
-            movement: Movement::blank(Revision::A),
+            movement: None,
             until_tick: TICK,
             erasing: None,
             owed: 0.0,
@@ -111,6 +112,10 @@ enum Lamp {
     Erasing,
 }
 
+/// Where a movement stands on the panel. It shows while one does.
+#[derive(Component, Debug)]
+struct Mount;
+
 /// The top of the case, printed once the words are loaded.
 #[derive(Component, Debug)]
 struct Unprinted;
@@ -133,7 +138,7 @@ impl Trainer {
                 parent.spawn((Shape::cuboid(&case, PLATE_COLOR), Finish::Paint));
                 parent.spawn((Unprinted, Transform::default()));
                 parent
-                    .spawn((top(MOVEMENT), Visibility::default()))
+                    .spawn((Mount, top(MOVEMENT), Visibility::Hidden))
                     .with_children(movement::spawn);
                 for (control, at) in layout::controls() {
                     let mut entity = parent.spawn((control, top(at)));
@@ -192,15 +197,22 @@ impl Trainer {
         let Ok((mut trainer, children)) = trainers.get_mut(child_of.parent()) else {
             return;
         };
-        let pc = trainer.movement.cpu().pc();
+        let erasing = trainer.erasing.is_some();
+        let Some(movement) = trainer.movement.as_mut() else {
+            if !matches!(control, Control::Data(_) | Control::Run) {
+                commands.trigger(Play(Sound::Refuse));
+            }
+            return;
+        };
+        let pc = movement.cpu().pc();
         match control {
-            Control::Reset => trainer.movement.cpu_mut().reset(),
-            Control::Next => trainer.movement.cpu_mut().set_pc(pc + 1),
+            Control::Reset => movement.cpu_mut().reset(),
+            Control::Next => movement.cpu_mut().set_pc(pc + 1),
             Control::Step => {
-                trainer.movement.step();
+                movement.step();
             }
             Control::Erase => {
-                if trainer.erasing.is_none() {
+                if !erasing {
                     trainer.erasing = Some(ERASE_TIME);
                 }
             }
@@ -212,14 +224,13 @@ impl Trainer {
                         _ => None,
                     })
                     .sum();
-                let written = trainer.erasing.is_none()
-                    && trainer
-                        .movement
+                let written = !erasing
+                    && movement
                         .rom_mut()
                         .program_word(usize::from(pc), word)
                         .is_ok();
                 if written {
-                    trainer.movement.cpu_mut().set_pc(pc + 1);
+                    movement.cpu_mut().set_pc(pc + 1);
                 } else {
                     commands.trigger(Play(Sound::Refuse));
                 }
@@ -236,10 +247,14 @@ impl Trainer {
     ) {
         let dt = time.delta_secs();
         for (mut trainer, children) in &mut trainers {
+            let trainer = &mut *trainer;
+            let Some(movement) = trainer.movement.as_mut() else {
+                continue;
+            };
             trainer.until_tick -= dt;
             if trainer.until_tick <= 0.0 {
                 trainer.until_tick += TICK;
-                trainer.movement.tick();
+                movement.tick();
             }
             if let Some(left) = trainer.erasing {
                 if left > dt {
@@ -247,7 +262,7 @@ impl Trainer {
                 } else {
                     trainer.erasing = None;
                     // The chip in a movement is always an EPROM.
-                    let _ = trainer.movement.rom_mut().erase();
+                    let _ = movement.rom_mut().erase();
                 }
             }
             let running = switches
@@ -261,7 +276,7 @@ impl Trainer {
             trainer.owed += SPEED * dt;
             while trainer.owed >= 1.0 {
                 trainer.owed -= 1.0;
-                if trainer.movement.step() == Effect::Asleep {
+                if movement.step() == Effect::Asleep {
                     trainer.owed = 0.0;
                 }
             }
@@ -275,13 +290,27 @@ impl Trainer {
         trainers: Query<(&Trainer, &Children)>,
         children: Query<&Children>,
         mut lamps: Query<(&Lamp, &mut Led)>,
+        mut mounts: Query<&mut Visibility, With<Mount>>,
         mut hands: Query<(&mut Transform, &GlobalTransform), With<Hand>>,
         mut commands: Commands,
     ) {
         for (trainer, parts) in &trainers {
-            let cpu = trainer.movement.cpu();
-            let word = trainer.movement.rom().image().get(usize::from(cpu.pc()));
+            let Some(movement) = &trainer.movement else {
+                for &part in parts {
+                    if let Ok((_, mut led)) = lamps.get_mut(part)
+                        && led.on
+                    {
+                        led.on = false;
+                    }
+                }
+                continue;
+            };
+            let cpu = movement.cpu();
+            let word = movement.rom().image().get(usize::from(cpu.pc()));
             for &part in parts {
+                if let Ok(mut visibility) = mounts.get_mut(part) {
+                    visibility.set_if_neq(Visibility::Inherited);
+                }
                 if let Ok((lamp, mut led)) = lamps.get_mut(part) {
                     let on = match *lamp {
                         Lamp::Address(bit) => cpu.pc() >> bit & 1 != 0,
@@ -295,7 +324,7 @@ impl Trainer {
                 }
                 for descendant in children.iter_descendants(part) {
                     if let Ok((mut hand, placed)) = hands.get_mut(descendant) {
-                        let goal = Hand::at(trainer.movement.hand());
+                        let goal = Hand::at(movement.hand());
                         if hand.rotation != goal {
                             hand.rotation = goal;
                             commands.trigger(PlayAt(Sound::Ratchet, placed.translation()));
@@ -304,6 +333,13 @@ impl Trainer {
                 }
             }
         }
+    }
+
+    /// Puts `movement` on the panel, from power on.
+    pub(crate) fn mount(&mut self, mut movement: Movement) {
+        movement.power_on();
+        self.movement = Some(movement);
+        self.until_tick = TICK;
     }
 
     /// The controls of the focused panel take clicks.
@@ -346,6 +382,7 @@ mod tests {
                 "panel-step",
                 "click-datasheet",
                 "click-flyer",
+                "click-mount-movement",
                 "tick-sheet-title",
                 "tick-sheet-revision",
                 "tick-sheet-word",

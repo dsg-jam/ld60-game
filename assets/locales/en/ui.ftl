@@ -41,6 +41,7 @@ click-radio-on = Switch on radio
 click-trainer = Use front panel
 click-datasheet = Read datasheet
 click-flyer = Read flyer
+click-mount-movement = Put movement on front panel
 click-volume = Drag to set volume
 click-tune = Next station
 click-receipt = Inspect receipt
