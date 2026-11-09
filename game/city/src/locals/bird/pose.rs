@@ -173,6 +173,8 @@ pub(super) struct Pose {
     pub(super) umbrella: Option<Transform>,
     /// The food in its hand.
     pub(super) dish: Option<(Food, Transform)>,
+    /// Where what the left hand carries goes.
+    pub(super) held: Option<Vec3>,
     pub(super) silhouette: Silhouette,
 }
 
@@ -259,6 +261,7 @@ impl Bird {
         };
         let mut umbrella_at = None;
         let mut dish = None;
+        let mut held = None;
         let mut soles = [Vec3::ZERO; 2];
         for (index, side) in Side::BOTH.into_iter().enumerate() {
             let hip = hull.transform_point(side.mirror(HIP) - HULL);
@@ -317,6 +320,14 @@ impl Bird {
                 hand = rest.lerp(shoulder + side.mirror(OVER_COUNTER), ease(self.meal.reach));
                 hand = hand.lerp(hull.transform_point(side.mirror(UP_TO_BILL) - HULL), dip);
             }
+            if side == Side::Left {
+                if self.carrying {
+                    hand = shoulder + side.mirror(CHEST);
+                }
+                if let Some((at, amount)) = self.reach {
+                    hand = hand.lerp(at, ease(amount));
+                }
+            }
             let elbows = side.mirror(ELBOWS);
             let (elbow, wrist) = ARM.reach(shoulder, hand, elbows);
             set(
@@ -326,6 +337,9 @@ impl Bird {
             set(Bone::Forearm(side), frame(elbow, wrist - elbow, elbows));
             let palm = frame(wrist, wrist - elbow, elbows);
             set(Bone::Hand(side), palm);
+            if side == Side::Left && self.carrying {
+                held = Some(palm.transform_point(Vec3::Y * 0.04) - Vec3::Y * 0.02);
+            }
             if let Some(food) = food.filter(|_| self.meal.held) {
                 let at = palm.transform_point(Vec3::Y * 0.04) - Vec3::Y * 0.02;
                 dish = Some((food, Transform::from_translation(at)));
@@ -351,6 +365,7 @@ impl Bird {
             feet: soles,
             umbrella: umbrella_at,
             dish,
+            held,
             silhouette,
         }
     }

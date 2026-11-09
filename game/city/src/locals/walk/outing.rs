@@ -11,6 +11,7 @@ use super::super::{Places, SITTER_TALK, Spot, WALKER_TALK};
 use super::chat::{CHAT_TALK, NEIGHBOUR, TURN_EVERY, TURN_FOR};
 use super::cross::{Cars, Crossing};
 use super::meal::Dining;
+use super::visit::{DropOff, Visiting};
 use super::{ACCELERATION, Walker};
 
 /// People feel like sitting down after walking this many meters, and
@@ -82,6 +83,8 @@ pub(super) enum Activity {
     },
     /// Crossing the street at `x`.
     Cross { x: f32, step: Crossing },
+    /// Bringing something to the shop counter.
+    Visit { errand: DropOff, step: Visiting },
     /// Walking to a spot under an awning and waiting there for the rain
     /// to ease, for `left` seconds at most, looking around until `look`
     /// runs out. `eased` counts the seconds the rain has been light.
@@ -199,7 +202,8 @@ impl Activity {
             | Self::ToSeat { .. }
             | Self::Chat { .. }
             | Self::Shelter { .. }
-            | Self::Cross { .. } => false,
+            | Self::Cross { .. }
+            | Self::Visit { .. } => false,
         }
     }
 
@@ -370,7 +374,7 @@ impl Walker {
         } = *around;
         let stools = &places.stools;
         match self.activity {
-            Activity::Stroll => {}
+            Activity::Stroll | Activity::Visit { .. } => {}
             Activity::Cross { .. } => self.cross(bird, gaze, cars, dt, rng),
             Activity::Chat {
                 with,

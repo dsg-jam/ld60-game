@@ -20,6 +20,7 @@ mod traffic;
 mod weather;
 mod wet;
 
+pub use self::locals::{DropOff, DroppedOff};
 pub use self::traffic::Draft;
 
 use std::f32::consts::PI;

@@ -2,6 +2,7 @@ mod chat;
 mod cross;
 mod meal;
 mod outing;
+mod visit;
 
 use std::f32::consts::{FRAC_PI_2, TAU};
 use std::iter;
@@ -13,6 +14,8 @@ use rand::{Rng, RngExt};
 use self::chat::Passer;
 use self::outing::{Activity, Around};
 pub(super) use self::outing::{Customers, Seats};
+pub(super) use self::visit::Errands;
+pub use self::visit::{DropOff, DroppedOff};
 use super::super::traffic::Vehicle;
 use super::super::weather::Weather;
 use super::super::{FAR_CURB, NEAR_CURB};
@@ -229,6 +232,7 @@ impl Walker {
         mut seats: ResMut<Seats>,
         mut customers: ResMut<Customers>,
         mut whims: ResMut<Whims>,
+        mut errands: ResMut<Errands>,
         mut bodies: Local<Vec<Body>>,
         mut walkers: Query<(
             &mut Walker,
@@ -284,6 +288,13 @@ impl Walker {
             if let Some(meeting) = partners[index] {
                 walker.chat_with(passers[meeting.with].at, meeting.left, then[index], rng);
             }
+            if matches!(walker.activity, Activity::Visit { .. }) {
+                if let Some(errand) = walker.visit(&mut bird, &mut gaze, &mut voice, dt, rng) {
+                    errands.let_go(errand);
+                }
+                *transform = walker.place();
+                continue;
+            }
             if !walker.activity.is_stroll() {
                 let around = Around {
                     places: &places,
@@ -302,6 +313,11 @@ impl Walker {
             }
             let wet =
                 rained_on > SHELTER_RAIN && !bird.carries_umbrella() && walker.until_shelter <= 0.0;
+            errands.hand_out(&mut walker, &mut bird);
+            if !walker.activity.is_stroll() {
+                *transform = walker.place();
+                continue;
+            }
             let crossing = walker.until_cross <= 0.0 && walker.start_crossing(rng);
             if crossing || wet && walker.take_shelter(&places, &mut seats, rng) {
                 *transform = walker.place();

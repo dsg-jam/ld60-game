@@ -104,6 +104,12 @@ pub(super) struct Bird {
     tail: pose::Swing,
     scarf: pose::Swing,
     umbrella: Option<Umbrella>,
+    /// Whether the left hand holds something in front of the chest.
+    carrying: bool,
+    /// Where the left hand reaches to in its body's space, and how far.
+    reach: Option<(Vec3, f32)>,
+    /// Where what the left hand holds is in the world, after the last pose.
+    held: Option<Transform>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -319,6 +325,9 @@ impl Bird {
                 tail: pose::Swing::default(),
                 scarf: pose::Swing::default(),
                 umbrella,
+                carrying: false,
+                reach: None,
+                held: None,
             },
         ));
         root.id()
@@ -421,6 +430,27 @@ impl Bird {
     /// Stands under a roof, which keeps the rain off, or steps out again.
     pub(super) fn stand_under(&mut self, roof: bool) {
         self.sheltered = roof;
+    }
+
+    /// Holds something in the left hand in front of the chest, or not.
+    pub(super) fn carry(&mut self, carrying: bool) {
+        self.carrying = carrying;
+    }
+
+    /// Reaches the left hand `amount` of the way from where it would be to
+    /// `at` in the world, with the bird standing at `root`.
+    pub(super) fn reach_to(&mut self, root: &Transform, at: Vec3, amount: f32) {
+        let body = *root * Transform::from_scale(Vec3::splat(self.size));
+        self.reach = Some((body.compute_affine().inverse().transform_point3(at), amount));
+    }
+
+    pub(super) fn stop_reaching(&mut self) {
+        self.reach = None;
+    }
+
+    /// Where what the left hand holds is, after the last pose.
+    pub(super) fn held(&self) -> Option<Transform> {
+        self.held
     }
 
     pub(super) fn carries_umbrella(&self) -> bool {
@@ -550,6 +580,9 @@ impl Bird {
                 }
             }
             *silhouette = pose.silhouette.moved(&body);
+            bird.held = pose.held.map(|at| {
+                Transform::from_translation(body.transform_point(at)).with_rotation(root.rotation)
+            });
             let rig = &bird.rig;
             let mut set = |entity: Entity, transform: Transform| {
                 if let Ok(mut part) = parts.get_mut(entity) {

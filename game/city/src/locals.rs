@@ -26,7 +26,8 @@ use self::bird::{Bird, Birth, Carry, Dress, Posture, Steam};
 use self::gaze::Gaze;
 use self::keeper::Keeper;
 use self::plumage::{Bare, Coat, PlumageMaterial};
-use self::walk::{Customers, Seats, Walker};
+use self::walk::{Customers, Errands, Seats, Walker};
+pub use self::walk::{DropOff, DroppedOff};
 use super::buildings::Skyline;
 use super::{Pick, rng};
 
@@ -54,6 +55,8 @@ impl Plugin for LocalsPlugin {
         .init_resource::<Places>()
         .init_resource::<Seats>()
         .init_resource::<Customers>()
+        .init_resource::<Errands>()
+        .add_observer(Errands::ask)
         .insert_resource(Whims(SmallRng::seed_from_u64(SEED)))
         .add_systems(
             Startup,
@@ -63,7 +66,14 @@ impl Plugin for LocalsPlugin {
         )
         .add_systems(
             Update,
-            (Walker::walk, Keeper::work_on, Gaze::glance, Bird::pose).chain(),
+            (
+                Walker::walk,
+                Keeper::work_on,
+                Gaze::glance,
+                Bird::pose,
+                Errands::carry,
+            )
+                .chain(),
         )
         .add_systems(Update, (Bird::open_umbrellas, Bird::live, Steam::drift));
         #[cfg(feature = "debug_port")]
