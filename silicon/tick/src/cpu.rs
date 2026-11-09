@@ -9,7 +9,8 @@ use crate::{Op, Revision};
 pub struct Cpu {
     revision: Revision,
     pc: u8,
-    waiting: bool,
+    /// The address of the WAIT it sleeps at, if it sleeps.
+    asleep_at: Option<u8>,
 }
 
 /// What one step did outside the chip.
@@ -30,7 +31,7 @@ impl Cpu {
         Self {
             revision,
             pc: 0,
-            waiting: false,
+            asleep_at: None,
         }
     }
 
@@ -49,17 +50,23 @@ impl Cpu {
     }
 
     pub fn waiting(&self) -> bool {
-        self.waiting
+        self.asleep_at.is_some()
+    }
+
+    /// The word the chip is at: the WAIT it sleeps at, or else the next
+    /// one it runs.
+    pub fn at(&self) -> u8 {
+        self.asleep_at.unwrap_or(self.pc)
     }
 
     pub fn reset(&mut self) {
         self.pc = 0;
-        self.waiting = false;
+        self.asleep_at = None;
     }
 
     /// The once-a-second tick from the crystal wakes a waiting chip.
     pub fn tick(&mut self) {
-        self.waiting = false;
+        self.asleep_at = None;
     }
 
     /// A key press sends the program to [`Revision::KEY_VECTOR`] and wakes
@@ -67,17 +74,18 @@ impl Cpu {
     pub fn press(&mut self) {
         if self.revision.has_key() {
             self.pc = Revision::KEY_VECTOR;
-            self.waiting = false;
+            self.asleep_at = None;
         }
     }
 
     /// Runs the instruction at the program counter from `rom`, unless the
     /// chip is asleep.
     pub fn step(&mut self, rom: &Image) -> Effect {
-        if self.waiting {
+        if self.waiting() {
             return Effect::Asleep;
         }
-        let word = rom.get(usize::from(self.pc) % rom.len());
+        let at = self.pc;
+        let word = rom.get(usize::from(at) % rom.len());
         let next = self.pc + 1;
         self.set_pc(if next.is_multiple_of(Revision::PAGE) {
             0
@@ -88,7 +96,7 @@ impl Cpu {
             Op::Step => Effect::Step,
             Op::Home => Effect::Home,
             Op::Wait => {
-                self.waiting = true;
+                self.asleep_at = Some(at);
                 Effect::None
             }
             Op::Nop | Op::Reserved(_) => Effect::None,
@@ -133,6 +141,7 @@ mod tests {
         assert_eq!(cpu.step(&rom), Effect::Step);
         assert_eq!(cpu.step(&rom), Effect::None);
         assert_eq!(cpu.step(&rom), Effect::Asleep);
+        assert_eq!((cpu.pc(), cpu.at()), (2, 1));
         cpu.tick();
         assert_eq!(cpu.step(&rom), Effect::None);
         assert_eq!(cpu.step(&rom), Effect::None);
