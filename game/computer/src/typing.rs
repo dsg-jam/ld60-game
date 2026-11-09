@@ -62,6 +62,27 @@ const CHARACTERS: &[(KeyCode, char, char)] = &[
     (KeyCode::KeyZ, 'z', 'Z'),
 ];
 
+/// The keys that type nothing, with the logical key each one sends.
+const COMMANDS: &[(KeyCode, Key)] = &[
+    (KeyCode::Escape, Key::Escape),
+    (KeyCode::Backspace, Key::Backspace),
+    (KeyCode::Tab, Key::Tab),
+    (KeyCode::Enter, Key::Enter),
+    (KeyCode::CapsLock, Key::CapsLock),
+    (KeyCode::F1, Key::F1),
+    (KeyCode::F2, Key::F2),
+    (KeyCode::F3, Key::F3),
+    (KeyCode::F4, Key::F4),
+    (KeyCode::F5, Key::F5),
+    (KeyCode::F6, Key::F6),
+    (KeyCode::F7, Key::F7),
+    (KeyCode::F8, Key::F8),
+    (KeyCode::F9, Key::F9),
+    (KeyCode::F10, Key::F10),
+    (KeyCode::F11, Key::F11),
+    (KeyCode::F12, Key::F12),
+];
+
 const SHIFT: [KeyCode; 2] = [KeyCode::ShiftLeft, KeyCode::ShiftRight];
 
 /// Types with the mouse on the keyboard of the computer, as if the keys were
@@ -163,11 +184,9 @@ impl MouseTyping {
             .drain(..)
             .map(|(held, logical_key)| input(held, logical_key, None))
             .collect();
+        let command = COMMANDS.iter().find(|(key, _)| *key == code);
         let (logical_key, text) = match code {
-            KeyCode::Backspace => (Key::Backspace, None),
-            KeyCode::Tab => (Key::Tab, None),
-            KeyCode::Enter => (Key::Enter, None),
-            KeyCode::CapsLock => (Key::CapsLock, None),
+            _ if let Some((_, logical_key)) = command => (logical_key.clone(), None),
             KeyCode::Space => (Key::Space, Some(' ')),
             _ => match CHARACTERS.iter().find(|(key, ..)| *key == code) {
                 Some(&(_, plain, shifted)) => {
@@ -236,6 +255,14 @@ mod tests {
 
     fn character(c: &str) -> (Key, Option<String>) {
         (Key::Character(c.into()), Some(c.into()))
+    }
+
+    #[test]
+    fn function_keys_and_escape_go_through() {
+        let mut typing = MouseTyping::default();
+        assert_eq!(typed(&mut typing, KeyCode::F8), [(Key::F8, None)]);
+        assert_eq!(typed(&mut typing, KeyCode::F1), [(Key::F1, None)]);
+        assert_eq!(typed(&mut typing, KeyCode::Escape), [(Key::Escape, None)]);
     }
 
     #[test]
