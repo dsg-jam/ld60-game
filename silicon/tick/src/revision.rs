@@ -6,15 +6,18 @@ use crate::Op;
 pub enum Revision {
     /// Four words of ROM. Steps and waits.
     A,
-    /// Eight words of ROM, `HOME`, and a key that sends the program to
-    /// [`Revision::KEY_VECTOR`].
+    /// Eight words of ROM in two pages, `HOME`, and a key that sends the
+    /// program to [`Revision::KEY_VECTOR`], the start of the second page.
     B,
 }
 
 impl Revision {
     pub const ALL: [Self; 2] = [Self::A, Self::B];
     /// Where a key press sends the program on chips with a key.
-    pub const KEY_VECTOR: u8 = 7;
+    pub const KEY_VECTOR: u8 = 4;
+    /// Words in a page. After the last word of a page, the program goes
+    /// back to word 0.
+    pub const PAGE: u8 = 4;
 
     /// Decodes like this chip does. Unknown patterns come back as
     /// [`Op::Reserved`].

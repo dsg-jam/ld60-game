@@ -2,8 +2,9 @@ use ld60_machine::Image;
 
 use crate::{Op, Revision};
 
-/// The core of a Tick chip: a program counter that wraps at the end of
-/// ROM, and whether it sleeps until the next tick.
+/// The core of a Tick chip: a program counter that goes back to word 0
+/// after the last word of each page, and whether it sleeps until the next
+/// tick.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cpu {
     revision: Revision,
@@ -77,7 +78,8 @@ impl Cpu {
             return Effect::Asleep;
         }
         let word = rom.get(usize::from(self.pc) % rom.len());
-        self.set_pc(self.pc + 1);
+        let next = self.pc + 1;
+        self.set_pc(if next.is_multiple_of(Revision::PAGE) { 0 } else { next });
         match self.revision.decode(word as u8) {
             Op::Step => Effect::Step,
             Op::Home => Effect::Home,
@@ -143,7 +145,15 @@ mod tests {
 
         let mut b = Cpu::new(Revision::B);
         assert_eq!(b.step(&rom(Revision::B, &words)), Effect::Home);
-        b.step(&rom(Revision::B, &[Op::NOP, Op::WAIT]));
+        b.set_pc(3);
+        b.step(&rom(Revision::B, &[]));
+        assert_eq!(b.pc(), 0, "the first page wraps on itself");
+        b.set_pc(7);
+        b.step(&rom(Revision::B, &[]));
+        assert_eq!(b.pc(), 0, "the key page goes back to the first");
+        let sleepy = rom(Revision::B, &[Op::NOP, Op::WAIT]);
+        b.step(&sleepy);
+        b.step(&sleepy);
         assert!(b.waiting());
         b.press();
         assert_eq!((b.pc(), b.waiting()), (Revision::KEY_VECTOR, false));
