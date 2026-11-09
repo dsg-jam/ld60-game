@@ -2,6 +2,7 @@ mod datasheet;
 mod flyer;
 mod layout;
 mod movement;
+mod parcel;
 mod sheet;
 
 use bevy::prelude::*;
@@ -22,6 +23,7 @@ pub(crate) use self::datasheet::Datasheet;
 pub(crate) use self::flyer::Flyer;
 use self::layout::{CASE, MOVEMENT, PLATE_COLOR};
 use self::movement::Hand;
+pub(crate) use self::parcel::Parcel;
 
 /// Instructions a second while running. Fast enough that a program
 /// without a wait spins the hand.
@@ -58,6 +60,7 @@ impl Plugin for TrainerPlugin {
         .add_observer(Datasheet::on_add)
         .add_observer(Flyer::on_add)
         .add_observer(Trainer::push);
+        Parcel::register(app);
     }
 }
 
