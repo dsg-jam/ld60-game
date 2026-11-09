@@ -180,6 +180,7 @@ fn held(counter: &CounterLayout, kind: DeviceKind, turn: Quat) -> Ends {
         exit,
         device: Some((at, bounds)),
         file: None,
+        page: None,
     }
 }
 
@@ -194,6 +195,7 @@ fn on_mat(counter: &CounterLayout, kind: DeviceKind, yaw: f32) -> Ends {
         exit: Vec3::Y,
         device: Some((at, bounds)),
         file: None,
+        page: None,
     }
 }
 
@@ -205,6 +207,7 @@ fn resting(counter: &CounterLayout) -> Ends {
         exit,
         device: None,
         file: None,
+        page: None,
     }
 }
 

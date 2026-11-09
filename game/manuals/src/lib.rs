@@ -42,6 +42,7 @@ pub use self::moves::{MoveSheet, RailSlot};
 pub use self::pins::{Pins, Sheet};
 pub use self::pose::Pose;
 use self::stack::Stack;
+pub use self::turning::TurningPage;
 use self::turning::{LeafKit, PageShape};
 
 const CANVAS_SIZE: UVec2 = UVec2::new(640, 880);

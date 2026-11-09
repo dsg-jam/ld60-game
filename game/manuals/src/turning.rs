@@ -12,13 +12,30 @@ use ld60_game_parts::paper::{
     Bulge, Leaf, LeafShape, LeafSide, LeafSpec, Paper, PaperMaterial, Print, Stiffness, Wrinkles,
     blank_print, reprinted,
 };
+use ld60_geometry::block::Block;
 
 use super::Filed;
-use super::model::{HOLE_INSET, Parts};
+use super::model::{HOLE_INSET, Parts, SHEET_SIZE};
 use super::moves::SheetMoves;
 use super::pose::Pose;
 use super::stack::{Stack, Turning};
 use super::top_sheet::TopSheet;
+
+/// How thick a turning page counts for what it pushes aside.
+const PAGE_ROOM: f32 = 0.002;
+
+/// A page turning over in the manuals file, which lifts what lies on it.
+/// Its sheet lies in `bounds` in the space of its entity.
+#[derive(Component, Debug)]
+pub struct TurningPage {
+    bounds: Block,
+}
+
+impl TurningPage {
+    pub fn bounds(&self) -> Block {
+        self.bounds
+    }
+}
 
 /// How a page of the file is wrinkled. The open sheet, the sheet on top of
 /// the turned pages and a turning leaf all show it.
@@ -172,6 +189,10 @@ impl Stack {
                 },
                 &mut meshes,
             );
+            commands.entity(leaf).insert(TurningPage {
+                bounds: Block::new(Vec3::new(SHEET_SIZE.x, PAGE_ROOM, SHEET_SIZE.y))
+                    .translated(stack.middle(first)),
+            });
             stack.turning = Some(Turning {
                 items,
                 forward,

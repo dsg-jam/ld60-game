@@ -77,27 +77,31 @@ pub(super) struct Ends {
     pub(super) device: Option<(Affine3A, Block)>,
     /// The manuals file while it lies open.
     pub(super) file: Option<(Affine3A, Block)>,
+    /// The page turning over in the manuals file, if one is.
+    pub(super) page: Option<(Affine3A, Block)>,
 }
 
 impl Ends {
     /// The ends `t` of the way from these to `other`.
     fn towards(&self, other: &Self, t: f32) -> Self {
-        let device = match (self.device, other.device) {
-            (Some((from, _)), Some((to, bounds))) => {
-                let (_, a, p) = from.to_scale_rotation_translation();
-                let (_, b, q) = to.to_scale_rotation_translation();
-                Some((
-                    Affine3A::from_rotation_translation(a.slerp(b, t), p.lerp(q, t)),
-                    bounds,
-                ))
-            }
-            (_, device) => device,
-        };
+        let moving =
+            |from: Option<(Affine3A, Block)>, to: Option<(Affine3A, Block)>| match (from, to) {
+                (Some((from, _)), Some((to, bounds))) => {
+                    let (_, a, p) = from.to_scale_rotation_translation();
+                    let (_, b, q) = to.to_scale_rotation_translation();
+                    Some((
+                        Affine3A::from_rotation_translation(a.slerp(b, t), p.lerp(q, t)),
+                        bounds,
+                    ))
+                }
+                (_, to) => to,
+            };
         Self {
             end: self.end.lerp(other.end, t),
             exit: self.exit.lerp(other.exit, t).normalize_or(other.exit),
-            device,
+            device: moving(self.device, other.device),
             file: other.file,
+            page: moving(self.page, other.page),
         }
     }
 }
@@ -172,9 +176,9 @@ impl Cable {
     /// moved. Returns whether it moved.
     pub(super) fn tick(&mut self, ends: &Ends) -> bool {
         // Something the cable lies on or around moving wakes it too.
-        let same_solids = self
-            .last
-            .is_some_and(|last| last.device == ends.device && last.file == ends.file);
+        let same_solids = self.last.is_some_and(|last| {
+            last.device == ends.device && last.file == ends.file && last.page == ends.page
+        });
         if same_solids
             && self
                 .asleep
@@ -482,6 +486,7 @@ impl Cable {
         moving(ends.device, before.device)
             .into_iter()
             .chain(moving(ends.file, before.file))
+            .chain(moving(ends.page, before.page))
             .chain(
                 self.solids
                     .iter()
@@ -630,6 +635,7 @@ mod tests {
             exit: Vec3::X,
             device: None,
             file: None,
+            page: None,
         };
         let mut cable = cable(ends.end);
         settle(&mut cable, &ends);
@@ -648,6 +654,7 @@ mod tests {
             exit: Vec3::X,
             device: None,
             file: None,
+            page: None,
         };
         let mut slow = cable(Vec3::new(-0.2, 1.2, 0.1));
         let mut fast = cable(Vec3::new(-0.2, 1.2, 0.1));
@@ -683,6 +690,7 @@ mod tests {
                 exit,
                 device: Some((transform, bounds)),
                 file: None,
+                page: None,
             };
             let mut cable = cable(end);
             settle(&mut cable, &ends);
@@ -719,6 +727,7 @@ mod tests {
             exit: Vec3::X,
             device: None,
             file: None,
+            page: None,
         };
         for step in 0..12 {
             let yaw = Quat::from_rotation_y(step as f32 * 0.55);
@@ -729,6 +738,7 @@ mod tests {
                 exit: Vec3::Y,
                 device: Some((transform, bounds)),
                 file: None,
+                page: None,
             };
             let mut cable = cable(rest.end);
             settle(&mut cable, &rest);
@@ -754,6 +764,7 @@ mod tests {
                 exit,
                 device: Some((transform, bounds)),
                 file: None,
+                page: None,
             }
         };
         let mut cable = cable(at(0.0).end);
@@ -775,6 +786,7 @@ mod tests {
             exit: Vec3::X,
             device: None,
             file: None,
+            page: None,
         };
         let mut cable = cable(ends.end);
         settle(&mut cable, &ends);
@@ -784,6 +796,36 @@ mod tests {
         ends.file = Some((transform, file));
         settle(&mut cable, &ends);
         assert_eq!(inside(&cable, transform, &file), None);
+    }
+
+    #[test]
+    fn a_turning_page_lifts_the_cable_and_never_cuts_it() {
+        let file = Block::new(Vec3::new(0.2, 0.012, 0.1));
+        let mut ends = Ends {
+            end: Vec3::new(-0.4, 1.01, 0.1),
+            exit: Vec3::X,
+            device: None,
+            file: Some((Affine3A::from_translation(Vec3::new(-0.2, 1.0, 0.05)), file)),
+            page: None,
+        };
+        let mut cable = cable(ends.end);
+        settle(&mut cable, &ends);
+        // A page as wide as half the file turns over about its left edge.
+        let page = Block::new(Vec3::new(0.1, 0.002, 0.1)).translated(Vec3::X * 0.05);
+        let hinge = Vec3::new(-0.3, 1.006, 0.05);
+        let mut highest: f32 = 0.0;
+        for step in 0..=90 {
+            let angle = std::f32::consts::PI * (step as f32 / 60.0).min(1.0);
+            let at = Affine3A::from_translation(hinge) * Affine3A::from_rotation_z(angle);
+            ends.page = Some((at, page));
+            cable.tick(&ends);
+            assert_eq!(inside(&cable, at, &page), None, "step {step}");
+            highest = cable
+                .points
+                .iter()
+                .fold(highest, |high, point| high.max(point.y));
+        }
+        assert!(highest > 1.03, "the page lifted the cable to {highest}");
     }
 
     #[test]
@@ -813,6 +855,7 @@ mod tests {
                 exit,
                 device: Some((transform, bounds)),
                 file: None,
+                page: None,
             }
         };
         let mut cable = cable(Vec3::new(-0.4, 1.01, 0.1));

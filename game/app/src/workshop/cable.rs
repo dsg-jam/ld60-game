@@ -19,7 +19,7 @@ use bevy::{
 use ld60_game_computer::ComputerLayout;
 use ld60_game_core::layout::counter::CounterLayout;
 use ld60_game_core::layout::desk::COMPUTER_SPOT;
-use ld60_game_manuals::{Pose, ShopManuals};
+use ld60_game_manuals::{Pose, ShopManuals, TurningPage};
 use ld60_game_player::focus::{ClickTool, Focus, Focused};
 use ld60_geometry::block::Block;
 use ld60_geometry::shape::Shape;
@@ -336,6 +336,7 @@ impl Cable {
     /// the pointer is on, or back on the counter, and lets the cable move to
     /// it.
     #[expect(clippy::type_complexity, reason = "Bevy system")]
+    #[expect(clippy::too_many_arguments, reason = "Bevy system")]
     fn follow(
         headers: Query<(Entity, &ChildOf), With<Header>>,
         plugged: Query<&Casing, With<Connected>>,
@@ -344,6 +345,7 @@ impl Cable {
         mut places: ParamSet<(TransformHelper, Single<(&Plug, &mut Transform)>, Aim)>,
         cable: Single<(&mut Cable, &MeshMaterial3d<RopeMaterial>)>,
         files: Query<(&ShopManuals, &Pose)>,
+        pages: Query<(&TurningPage, &GlobalTransform)>,
         mut ropes: ResMut<Assets<RopeMaterial>>,
         time: Res<Time>,
     ) {
@@ -390,6 +392,10 @@ impl Cable {
                 .iter()
                 .find(|(_, pose)| pose.lying() > 0.5)
                 .map(|(file, _)| (file.open_at.compute_affine(), Block::new(ShopManuals::OPEN))),
+            page: pages
+                .iter()
+                .next()
+                .map(|(page, at)| (at.affine(), page.bounds())),
         };
         let moved = cable.advance(time.delta_secs(), &ends);
         if !moved && cable.ticked == cable.points {
